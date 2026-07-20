@@ -1,0 +1,26 @@
+{
+  "id": "/NBS2/",
+  "name": "NBS 2",
+  "short_name": "NBS 2",
+  "description": "Nunez Beauty Supply - OFICIAL V2.0",
+  "start_url": "./app_prueba_firebase.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a237e",
+  "theme_color": "#1a237e",
+  "icons": [
+    {
+      "src": "icono-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
