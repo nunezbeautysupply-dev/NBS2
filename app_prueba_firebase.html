@@ -3416,12 +3416,15 @@ function mostrarPopupFidelidad(cid, fidelidad){
 
 
 function adminAccion(accion){
+  // "borrar" tiene su PROPIA proteccion triple (huella + PIN + escribir BORRAR) dentro de
+  // borrarTodo(), asi que aqui NO se le pide PIN otra vez (seria doble). Las demas acciones
+  // si pasan por el PIN general cuando esta activo.
+  if(accion === 'borrar'){ borrarTodo(); return; }
   if(PIN_ACTIVO){
     var pin = prompt('🔒 PIN de administrador:');
     if(pin === null) return;
     if(pin !== PIN_ADMIN){ alert('PIN incorrecto. Acceso denegado.'); return; }
   }
-  if(accion === 'borrar') borrarTodo();
   if(accion === 'huerfanas') limpiarVentasHuerfanas();
 }
 
@@ -5015,7 +5018,7 @@ function verFacturaCompra(c, sid){
 }
 
 function eliminarCompra(cid, sid){
-  verificarPIN(function(){
+  protegerConHuella(function(){
     compras = LS('nc', []);
     var idx = compras.findIndex(function(x){ return String(x.id)===String(cid); });
     if(idx === -1) return;
@@ -5787,7 +5790,9 @@ function renderCl(q){
   }
 
   var el=document.getElementById('lcl');el.innerHTML='';
-  var list=q?clientes.filter(function(c){return coincideBusqueda((c.nombre+' '+c.apellido+' '+escaparHtml(c.negocio||'')+' '+(c.apodo||'')+' '+(c.tel||'')+' '+(c.dir||'')+' '+(c.ciudad||'')+' '+(c.estado||'')+' '+(c.zip||'')+' '+(c.contacto||'')+' '+(c.contactoApodo||'')+' '+(c.contactoTel||'')), q);}):clientes;
+  var list = q ? filtrarPorBusqueda(clientes, q, function(c){
+    return (c.nombre||'')+' '+(c.apellido||'')+' '+(c.negocio||'')+' '+(c.apodo||'')+' '+(c.tel||'')+' '+(c.dir||'')+' '+(c.ciudad||'')+' '+(c.estado||'')+' '+(c.zip||'')+' '+(c.contacto||'')+' '+(c.contactoApodo||'')+' '+(c.contactoTel||'');
+  }) : clientes;
   if(window._clFiltroTipo && window._clFiltroTipo !== 'todos'){
     list = list.filter(function(c){ var t2=(!c.tipoNegocio||c.tipoNegocio==='Barberia')?'Barberia':'Tienda'; return t2 === window._clFiltroTipo; });
   }
@@ -12117,8 +12122,33 @@ function verificarPIN(callback){
   }
 }
 
+// Protege una accion peligrosa (borrar cliente, borrar pago, etc.) pidiendo SOLO la huella
+// -un toque, rapido-. Si el usuario NO tiene huella configurada, cae al PIN como respaldo
+// para que la accion nunca quede sin proteccion. El callback solo corre si se verifica.
+function protegerConHuella(callback){
+  var idHuella = localStorage.getItem(CLAVE_HUELLA_ID);
+  if(idHuella && window.PublicKeyCredential && navigator.credentials && navigator.credentials.get){
+    navigator.credentials.get({
+      publicKey: {
+        challenge: retoAleatorio(),
+        allowCredentials: [{ type:'public-key', id: base64ABuffer(idHuella) }],
+        userVerification: 'required',
+        timeout: 60000
+      }
+    }).then(function(){
+      callback(); // huella verificada por el telefono
+    }).catch(function(e){
+      console.error('Huella no verificada:', e);
+      alert('No se reconoció la huella. Acción cancelada.');
+    });
+  } else {
+    // No hay huella configurada: usar el PIN como respaldo para no quedar sin proteccion.
+    verificarPIN(callback);
+  }
+}
+
 function cancelarFactura(v){
-  verificarPIN(function(){
+  protegerConHuella(function(){
     if(!confirm('¿Cancelar esta factura de $'+fmtNum(v.total)+'?\n\nEl stock de los productos será restaurado.\nLa factura quedará marcada como CANCELADA en el historial.')) return;
     loadProds();
     ventas = LS('nv', []);
@@ -12139,7 +12169,7 @@ function cancelarFactura(v){
 }
 
 function modificarFactura(v){
-  verificarPIN(function(){
+  protegerConHuella(function(){
     var el = document.getElementById('cl-factura-contenido');
     el.innerHTML = '';
 
@@ -12482,10 +12512,12 @@ function guardarEdicionCl(id){
 
 function eliminarCl(id){
   if(confirm('¿Eliminar este cliente?')){
-    clientes=LS('ncl',[]);
-    clientes=clientes.filter(function(x){return x.id!==id;});
-    SS('ncl',clientes);
-    ir('p-cl');
+    protegerConHuella(function(){
+      clientes=LS('ncl',[]);
+      clientes=clientes.filter(function(x){return x.id!==id;});
+      SS('ncl',clientes);
+      ir('p-cl');
+    });
   }
 }
 
@@ -13483,11 +13515,17 @@ function borrarPagoDesdeEditor(vid, pidx){
   if(!vf || !vf.pagosFactura || vf.pagosFactura[pidx] === undefined){ alert('No se encontró el pago.'); return; }
   var monto = vf.pagosFactura[pidx].monto || 0;
   if(!confirm('¿Borrar este pago de $'+fmtNum(monto)+'? El saldo del cliente volverá a subir por ese monto.')) return;
-  vf.pagosFactura.splice(pidx, 1);
-  SS('nv', ventas);
-  cerrarEditorPago();
-  abrirAbono(cxcClienteId);
-  alert('Pago borrado. El saldo se actualizó.');
+  // Borrar un pago toca el dinero del cliente: se pide la huella antes de hacerlo.
+  protegerConHuella(function(){
+    ventas = LS('nv', []);
+    var vf2 = ventas.find(function(x){ return x.id === vid; });
+    if(!vf2 || !vf2.pagosFactura || vf2.pagosFactura[pidx] === undefined){ alert('No se encontró el pago.'); return; }
+    vf2.pagosFactura.splice(pidx, 1);
+    SS('nv', ventas);
+    cerrarEditorPago();
+    abrirAbono(cxcClienteId);
+    alert('Pago borrado. El saldo se actualizó.');
+  });
 }
 
 var METODOS_PAGO_LABELS = { efectivo:'💵 Efectivo', cashapp:'📱 CashApp', zelle:'💸 Zelle', credito_cliente:'🎁 Crédito del cliente', tarjeta:'💳 Tarjeta (anterior)' };
@@ -13628,7 +13666,9 @@ function confirmarPagoMultiple(vid, saldo){
     SS('nv', ventas);
     var detalle = filas.map(function(m){ return METODOS_PAGO_LABELS[m.tipo]+': $'+fmtNum(m.monto); }).join('\n');
     alert('✅ Pago de $'+fmtNum(total)+' aplicado correctamente.\n\n'+detalle);
-    abrirAbono(cxcClienteId);
+    // Refrescar la pantalla DESPUES de cerrar el alert, con una pausa para que el telefono
+    // alcance a actualizar bien y el balance nuevo se vea al instante (sin salir y entrar).
+    setTimeout(function(){ abrirAbono(cxcClienteId); }, 50);
     return;
   }
 
@@ -13672,7 +13712,9 @@ function confirmarPagoMultiple(vid, saldo){
     resumen += (p.esLaActual ? '   • $'+fmtNum(m)+'  →  esta factura\n' : '   • $'+fmtNum(p.monto)+'  →  #'+p.nf+' ('+p.fecha+')\n');
   });
   alert(resumen);
-  abrirAbono(cxcClienteId);
+  // Refrescar la pantalla DESPUES de cerrar el alert, con una pausa, para que el balance
+  // nuevo se vea al instante (sin salir y entrar).
+  setTimeout(function(){ abrirAbono(cxcClienteId); }, 50);
 }
 
 
@@ -15026,28 +15068,64 @@ function limpiarVentasHuerfanas(){
 }
 
 function borrarTodo(){
-  if(confirm("Borrar TODOS los datos? Esto también borrará la copia en la nube.")){
-    // Si hay sesion iniciada, primero se borran los documentos en Firestore -la nube-,
-    // para que al recargar la app no se vuelvan a bajar datos viejos por accidente.
-    var terminarBorrado = function(){
-      localStorage.clear();
-      alert("Datos borrados");
-      location.reload();
-    };
-    if(typeof fbAuth !== 'undefined' && fbAuth.currentUser){
-      fbDb.collection('nbs_data').get().then(function(snapshot){
-        var borrados = [];
-        snapshot.forEach(function(doc){
-          borrados.push(fbDb.collection('nbs_data').doc(doc.id).delete());
-        });
-        return Promise.all(borrados);
-      }).then(terminarBorrado).catch(function(e){
-        console.error('No se pudo borrar todo en la nube:', e);
-        alert('No se pudo borrar la copia en la nube -revisa tu conexión-. El teléfono no se borró, para evitar que los datos vuelvan a bajarse de la nube después.');
+  // ===== TRIPLE CANDADO DE SEGURIDAD =====
+  // Borrar TODOS los datos es la accion mas peligrosa de la app. Si alguien agarra el
+  // telefono desbloqueado, NO debe poder borrar nada. Se piden 3 cosas en fila:
+  //   1) Huella digital (si esta activa)  2) PIN de administrador  3) Escribir BORRAR
+  // Solo si pasa las 3, se borra. Cualquier fallo o cancelacion detiene todo.
+  var pedirPalabraYBorrar = function(){
+    var palabra = prompt('\u26a0\ufe0f ULTIMO PASO\n\nEsto borrara TODOS tus datos y la copia en la nube. NO se puede deshacer.\n\nEscribe la palabra BORRAR (en mayusculas) para confirmar:');
+    if(palabra === null) return;
+    if(palabra.trim().toUpperCase() !== 'BORRAR'){ alert('La palabra no coincide. No se borro nada.'); return; }
+    if(!confirm('\u00bfSeguro que quieres borrar TODO? Esta es tu ultima oportunidad de cancelar.')) return;
+    ejecutarBorradoTotal();
+  };
+  var pedirPinYSeguir = function(){
+    var pin = prompt('\ud83d\udd12 Paso 2 de 3 \u2014 PIN de administrador:');
+    if(pin === null) return;
+    if(pin !== PIN_ADMIN){ alert('PIN incorrecto. No se borro nada.'); return; }
+    pedirPalabraYBorrar();
+  };
+  var idHuella = localStorage.getItem(CLAVE_HUELLA_ID);
+  if(idHuella && window.PublicKeyCredential && navigator.credentials && navigator.credentials.get){
+    navigator.credentials.get({
+      publicKey: {
+        challenge: retoAleatorio(),
+        allowCredentials: [{ type:'public-key', id: base64ABuffer(idHuella) }],
+        userVerification: 'required',
+        timeout: 60000
+      }
+    }).then(function(){
+      pedirPinYSeguir();
+    }).catch(function(e){
+      console.error('Huella no verificada para borrar:', e);
+      alert('No se reconocio la huella. No se borro nada.');
+    });
+  } else {
+    pedirPinYSeguir();
+  }
+}
+
+// Hace el borrado de verdad (nube + telefono). Solo se llama tras pasar los 3 candados.
+function ejecutarBorradoTotal(){
+  var terminarBorrado = function(){
+    localStorage.clear();
+    alert("Datos borrados");
+    location.reload();
+  };
+  if(typeof fbAuth !== 'undefined' && fbAuth.currentUser){
+    fbDb.collection('nbs_data').get().then(function(snapshot){
+      var borrados = [];
+      snapshot.forEach(function(doc){
+        borrados.push(fbDb.collection('nbs_data').doc(doc.id).delete());
       });
-    } else {
-      terminarBorrado();
-    }
+      return Promise.all(borrados);
+    }).then(terminarBorrado).catch(function(e){
+      console.error('No se pudo borrar todo en la nube:', e);
+      alert('No se pudo borrar la copia en la nube -revisa tu conexion-. El telefono no se borro.');
+    });
+  } else {
+    terminarBorrado();
   }
 }
 
@@ -17815,7 +17893,7 @@ function registrarCambioPrecio(nombre, precioAntes, precioDespues){
 // ===== HISTORIAL DE COMPRAS POR CLIENTE =====
 function cerrarFacturaEdit(){ var o=document.getElementById("fact-edit-overlay"); if(o) o.style.display="none"; }
 function eliminarFacturaCancelada(vid){
-  verificarPIN(function(){
+  protegerConHuella(function(){
     ventas = LS('nv', []);
     var idx = ventas.findIndex(function(x){ return String(x.id)===String(vid); });
     if(idx === -1) return;
@@ -17842,7 +17920,7 @@ function eliminarFacturaCancelada(vid){
 }
 
 function cancelarFacturaCompleta(vid){
-  verificarPIN(function(){
+  protegerConHuella(function(){
     ventas = LS('nv', []);
     var v = ventas.find(function(x){ return String(x.id)===String(vid); });
     if(!v) return;
