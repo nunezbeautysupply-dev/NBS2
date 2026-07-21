@@ -8626,13 +8626,14 @@ var _firmaCtx = null, _firmaDibujando = false, _firmaHayTrazo = false;
 function iniciarCanvasFirma(){
   var canvas = document.getElementById('firma-canvas');
   if(!canvas) return;
-  // Ajustar la resolución real del canvas al tamaño en pantalla, para que la firma no salga borrosa.
-  // Se usa 4x (antes 2x) para que la firma se vea NÍTIDA al verla grande o al imprimirla.
+  // Resolución real del canvas = tamaño en pantalla x densidad del teléfono (nítido en cualquier pantalla).
   var rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * 4;
-  canvas.height = rect.height * 4;
+  var dpr = window.devicePixelRatio || 1;
+  var escala = Math.max(3, dpr * 2); // buena nitidez sin deformar
+  canvas.width = Math.round(rect.width * escala);
+  canvas.height = Math.round(rect.height * escala);
   _firmaCtx = canvas.getContext('2d');
-  _firmaCtx.scale(4, 4);
+  _firmaCtx.scale(escala, escala);
   _firmaCtx.strokeStyle = '#111';
   _firmaCtx.lineWidth = 2.2;
   _firmaCtx.lineCap = 'round';
@@ -8641,6 +8642,8 @@ function iniciarCanvasFirma(){
   _firmaCtx.imageSmoothingQuality = 'high';
   _firmaHayTrazo = false;
 
+  // La posición del dedo se calcula EN EL TAMAÑO EN PANTALLA (rect), que es la misma
+  // escala en la que dibuja el contexto tras scale(). Así el trazo sigue al dedo exacto.
   function pos(e){
     var r = canvas.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
@@ -13869,10 +13872,15 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   // ahora son visibles pero discretos -sin negrita-.
   var fs = colorMode
     ? { dir:12, lbl:11, cliente:17, negocio:13, dirCl:11, prodLbl:11, item:14, itemQty:12, pago:14, total:21 }
-    : { dir:14, lbl:18, cliente:20, negocio:15, dirCl:18, prodLbl:16, item:16, itemQty:14, pago:21, total:32 };
+    : { dir:15, lbl:19, cliente:22, negocio:16, dirCl:18, prodLbl:17, item:18, itemQty:16, pago:22, total:34 };
   var maxCliente = colorMode ? 24 : 17; // solo se usa en el modo a color
   var maxNegocio = colorMode ? 24 : 15; // solo se usa en el modo a color
   var maxDir = colorMode ? 34 : 22; // solo se usa en el modo a color
+
+  // FUENTE del recibo. En la Epson TERMICA (blanco y negro) se usa una fuente SIN adornos
+  // y en NEGRITA: se imprime mucho mas marcada, limpia y legible que Georgia (que tiene
+  // "patitas" que la impresora termica no define bien). En color se mantiene Georgia (elegante).
+  var ff = colorMode ? 'Georgia, serif' : 'bold Arial, sans-serif';
 
   // Header con logo -se usa la proporcion REAL de cada imagen, ya que el logo a color y el
   // logo en blanco y negro no tienen exactamente las mismas proporciones; antes se forzaba la
@@ -13888,14 +13896,14 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
     // Respaldo si el logo no cargo a tiempo
     ctx.fillStyle = colorMode ? '#1a237e' : '#000';
     ctx.textAlign = 'center';
-    ctx.font = '23px Georgia, serif';
+    ctx.font = '23px '+ff+'';
     ctx.fillText('Nunez Beauty Supply', W/2, 32);
     y = 50;
   }
   // Direccion y telefono del NEGOCIO -visibles pero discretos, sin negrita, para no competir
   // con la informacion del cliente que viene despues-. Un poco mas grande y con mas espaciado
   // que antes, para que se lea mejor incluso con zoom/impreso.
-  ctx.font = (fs.dir+2)+'px Georgia, serif';
+  ctx.font = (fs.dir+2)+'px '+ff+'';
   ctx.fillStyle = colorMode ? '#888' : '#555';
   ctx.textAlign = 'center';
   ctx.fillText('964 Atwells Ave, Providence, RI 02909', W/2, y);
@@ -13905,11 +13913,11 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
 
   if(colorMode){
     // ===== Formato original, sin cambios (version a color para compartir) =====
-    ctx.font = ''+fs.lbl+'px Georgia, serif';
+    ctx.font = ''+fs.lbl+'px '+ff+'';
     ctx.textAlign = 'left'; ctx.fillStyle = '#aaa'; ctx.fillText('CLIENTE', pad, y);
     ctx.textAlign = 'right'; ctx.fillText('FACTURA', W-pad, y);
     y += 20;
-    ctx.font = ''+fs.cliente+'px Georgia, serif';
+    ctx.font = ''+fs.cliente+'px '+ff+'';
     ctx.fillStyle = '#1a237e';
     // Misma prioridad que en la vista digital: para Tiendas -no barberias-, el negocio va
     // primero y mas grande, el dueño/encargado mas chico debajo.
@@ -13919,19 +13927,19 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
     ctx.textAlign = 'left'; ctx.fillText(lineaGrande.substring(0,maxCliente), pad, y);
     ctx.textAlign = 'right'; ctx.fillText('#'+numFact, W-pad, y);
     y += 19;
-    ctx.font = ''+fs.negocio+'px Georgia, serif';
+    ctx.font = ''+fs.negocio+'px '+ff+'';
     ctx.fillStyle = '#555';
     if(lineaChica){ ctx.textAlign='left'; ctx.fillText(lineaChica.substring(0,maxNegocio), pad, y); }
     ctx.textAlign='right'; ctx.fillText(v.fecha, W-pad, y);
     y += 17;
     var dirClColor = cl ? ((cl.dir||'')+(cl.ciudad?', '+cl.ciudad:'')+(cl.estado?', '+cl.estado:'')+(cl.zip?' '+cl.zip:'')).trim() : '';
     if(dirClColor){
-      ctx.font = fs.dirCl+'px Georgia, serif';
+      ctx.font = fs.dirCl+'px '+ff+'';
       ctx.fillStyle = '#888';
       ctx.textAlign='left'; ctx.fillText(dirClColor.substring(0,maxDir), pad, y);
       ctx.textAlign='right'; ctx.fillText(v.hora, W-pad, y);
       y += 15;
-      ctx.font = ''+fs.negocio+'px Georgia, serif';
+      ctx.font = ''+fs.negocio+'px '+ff+'';
       ctx.fillStyle = '#555';
     } else {
       ctx.textAlign='right'; ctx.fillText(v.hora, W-pad, y);
@@ -13944,7 +13952,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
 
     // Fila 1: fecha (izquierda) | numero de factura (derecha) -sin la hora, que solo se
     // muestra en la factura interna/digital, no en la de impresion-
-    ctx.font = ''+fs.lbl+'px Georgia, serif';
+    ctx.font = ''+fs.lbl+'px '+ff+'';
     ctx.textAlign='left'; ctx.fillText(v.fecha, pad, y);
     ctx.textAlign='right'; ctx.fillText('Factura No. '+numFact, W-pad, y);
     y += 34;
@@ -13957,21 +13965,21 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
     var nombreCl = esNegocioPrioritarioBN ? cl.negocio : (v.cn || '');
     var nombreChico = esNegocioPrioritarioBN ? (v.cn || '') : '';
     var telCl = (cl && cl.tel) ? formatearTelefonoFactura(cl.tel) : '';
-    ctx.font = ''+fs.cliente+'px Georgia, serif';
+    ctx.font = ''+fs.cliente+'px '+ff+'';
     var anchoNombreCl = ctx.measureText(nombreCl).width;
-    ctx.font = ''+fs.negocio+'px Georgia, serif';
+    ctx.font = ''+fs.negocio+'px '+ff+'';
     var anchoTelCl = telCl ? ctx.measureText(telCl).width : 0;
     var cabenJuntos = telCl && (anchoNombreCl + anchoTelCl + 16) <= (W-2*pad);
 
-    ctx.font = ''+fs.cliente+'px Georgia, serif';
+    ctx.font = ''+fs.cliente+'px '+ff+'';
     ctx.textAlign='left'; ctx.fillText(nombreCl, pad, y);
     if(telCl && cabenJuntos){
-      ctx.font = ''+fs.negocio+'px Georgia, serif';
+      ctx.font = ''+fs.negocio+'px '+ff+'';
       ctx.textAlign='right'; ctx.fillText(telCl, W-pad, y);
     }
     y += 36;
     if(telCl && !cabenJuntos){
-      ctx.font = ''+fs.negocio+'px Georgia, serif';
+      ctx.font = ''+fs.negocio+'px '+ff+'';
       ctx.textAlign='left'; ctx.fillText(telCl, pad, y);
       y += 32;
     }
@@ -13982,7 +13990,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
     // lado izquierdo.
     var textoSegundaLinea = esNegocioPrioritarioBN ? nombreChico : (cl && cl.negocio ? cl.negocio : '');
     var dirCl2 = cl ? ((cl.dir||'')+(cl.ciudad?', '+cl.ciudad:'')+(cl.estado?', '+cl.estado:'')+(cl.zip?' '+cl.zip:'')).trim() : '';
-    ctx.font = fs.dirCl+'px Georgia, serif';
+    ctx.font = fs.dirCl+'px '+ff+'';
     var anchoSegundaLinea = textoSegundaLinea ? ctx.measureText(textoSegundaLinea).width : 0;
     var anchoDirCl = dirCl2 ? ctx.measureText(dirCl2).width : 0;
     var cabenSegundaLineaYDireccionJuntos = textoSegundaLinea && dirCl2 && (anchoSegundaLinea + anchoDirCl + 16) <= (W-2*pad);
@@ -14066,14 +14074,14 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   y += colorMode?26:29;
 
   if(colorMode){
-    ctx.font=''+fs.pago+'px Georgia, serif';
+    ctx.font=''+fs.pago+'px '+ff+'';
     ctx.fillStyle = '#555';
     ctx.textAlign='left'; ctx.fillText('Tipo de pago:', pad, y);
     ctx.fillStyle = (v.tipo==='credito' ? '#E65100' : '#2E7D32');
     ctx.textAlign='right'; ctx.fillText(v.tipo==='credito'?'A credito':'Contado', W-pad, y);
     y += 30;
 
-    ctx.font=''+fs.total+'px Georgia, serif';
+    ctx.font=''+fs.total+'px '+ff+'';
     ctx.fillStyle = '#1a237e';
     ctx.textAlign='left'; ctx.fillText('TOTAL', pad, y);
     ctx.fillStyle = '#1565C0';
@@ -14086,11 +14094,11 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
       var boxHeight = 22 + abonos.length*20 + 12;
       ctx.fillStyle = '#F1F8E9';
       ctx.fillRect(pad-6, boxTop, W-2*pad+12, boxHeight);
-      ctx.font='12px Georgia, serif';
+      ctx.font='12px '+ff+'';
       ctx.fillStyle = '#2E7D32';
       ctx.textAlign='left'; ctx.fillText('HISTORIAL DE ABONOS', pad, y);
       y += 22;
-      ctx.font='13px Georgia, serif';
+      ctx.font='13px '+ff+'';
       abonos.forEach(function(p){
         ctx.fillStyle = '#555';
         ctx.textAlign='left'; ctx.fillText(((p.fecha||'')+(p.nota?' - '+p.nota:'')).substring(0,24), pad, y);
@@ -14098,7 +14106,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
         ctx.textAlign='right'; ctx.fillText('$'+fmtNum(p.monto), W-pad, y);
         y += 20;
       });
-      ctx.font='14px Georgia, serif';
+      ctx.font='14px '+ff+'';
       ctx.fillStyle = '#2E7D32';
       ctx.textAlign='left'; ctx.fillText('Total abonado:', pad, y);
       ctx.textAlign='right'; ctx.fillText('$'+fmtNum(pagado), W-pad, y);
@@ -14111,7 +14119,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
       var bt = y - 18;
       ctx.fillStyle = '#FFEBEE';
       ctx.fillRect(pad-6, bt, W-2*pad+12, 26);
-      ctx.font='15px Georgia, serif';
+      ctx.font='15px '+ff+'';
       ctx.fillStyle = '#C62828';
       ctx.textAlign='left'; ctx.fillText('BALANCE PENDIENTE:', pad, y);
       ctx.textAlign='right'; ctx.fillText('$'+fmtNum(saldo), W-pad, y);
@@ -14119,7 +14127,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
     } else {
       ctx.fillStyle = '#E8F5E9';
       ctx.fillRect(pad-6, y-18, W-2*pad+12, 26);
-      ctx.font='15px Georgia, serif';
+      ctx.font='15px '+ff+'';
       ctx.fillStyle = '#2E7D32';
       ctx.textAlign='center'; ctx.fillText('\u2713 PAGADO COMPLETO', W/2, y);
       y += 32;
@@ -14127,21 +14135,21 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   } else {
     // ===== Formato nuevo y simple, SOLO para impresion termica =====
     // Linea 1: TOTAL ESTA FACTURA $00.00 -el mas importante de los 3, pero ya moderado-
-    ctx.font='16px Georgia, serif';
+    ctx.font='16px '+ff+'';
     ctx.fillStyle = '#000';
     ctx.textAlign='left'; ctx.fillText('TOTAL ESTA FACTURA', pad, y);
     ctx.textAlign='right'; ctx.fillText('$'+fmtNum(v.total), W-pad, y);
     y += 26;
 
     // Linea 2: PAGO $00.00 -informacion secundaria, mas chica y gris-
-    ctx.font='13px Georgia, serif';
+    ctx.font='13px '+ff+'';
     ctx.fillStyle = '#777';
     ctx.textAlign='left'; ctx.fillText('PAGO', pad, y);
     ctx.textAlign='right'; ctx.fillText('$'+fmtNum(pagado), W-pad, y);
     y += 22;
 
     // Linea 3: BALANCE PENDIENTE $00.00 -o $0.00 si esta saldada- -tambien secundaria-
-    ctx.font='13px Georgia, serif';
+    ctx.font='13px '+ff+'';
     ctx.fillStyle = '#777';
     ctx.textAlign='left'; ctx.fillText('BALANCE PENDIENTE', pad, y);
     ctx.textAlign='right'; ctx.fillText('$'+fmtNum(saldo), W-pad, y);
@@ -14149,7 +14157,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   }
 
   y += 16;
-  ctx.font=''+(colorMode?12:16)+'px Georgia, serif';
+  ctx.font=''+(colorMode?12:16)+'px '+ff+'';
   ctx.fillStyle = colorMode ? '#aaa' : '#000';
   ctx.textAlign='center';
   ctx.fillText('Gracias por su preferencia', W/2, y);
@@ -14206,7 +14214,7 @@ function generarFacturaCanvas(v, cl, pagado, saldo, numFact, colorMode){
     var d = imgData.data;
     for(var i = 0; i < d.length; i += 4){
       var lum = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
-      var v2 = lum < 165 ? 0 : 255;
+      var v2 = lum < 185 ? 0 : 255;
       d[i] = v2; d[i+1] = v2; d[i+2] = v2; d[i+3] = 255;
     }
     ctx.putImageData(imgData, 0, 0);
