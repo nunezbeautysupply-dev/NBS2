@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260721e-OFICIAL-V2.0">
+<meta name="app-version" content="20260721f-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16498,20 +16498,12 @@ function renderDocs(){
 // Abre el documento (desde la misma carpeta de la app en GitHub)
 function verDocumento(archivo){
   var url = rutaDocumento(archivo);
-  // Verificar si el documento existe ANTES de abrirlo. Si no está (por ejemplo,
-  // en esta app de prueba todavía no se han cargado los documentos), mostrar un
-  // aviso claro en vez de abrir una pestaña en blanco o rebotar a inicio.
-  fetch(url, { method: 'HEAD' })
-    .then(function(resp){
-      if(resp && resp.ok){
-        window.open(url, '_blank');
-      } else {
-        avisoDocumentoNoDisponible();
-      }
-    })
-    .catch(function(){
-      avisoDocumentoNoDisponible();
-    });
+  // Se abre DIRECTO, en el mismo toque del usuario. Antes se hacía un fetch HEAD para
+  // revisar si existía primero, pero eso abría el PDF un instante DESPUÉS del toque y el
+  // navegador del telefono lo bloqueaba como "ventana emergente". Abriendo directo, el
+  // telefono lo trata como accion pedida por el usuario y no lo bloquea. Si un documento
+  // no existiera, el navegador muestra su propio aviso (los documentos ya estan subidos).
+  window.open(url, '_blank');
 }
 
 // Aviso claro cuando un documento todavía no está en esta app.
@@ -16523,23 +16515,14 @@ function avisoDocumentoNoDisponible(){
 // Descarga el documento al teléfono (para guardarlo y verlo después sin internet)
 function descargarDocumento(archivo){
   var url = rutaDocumento(archivo);
-  // Igual que "Ver": verificar que el documento exista antes de intentar bajarlo.
-  fetch(url, { method: 'HEAD' })
-    .then(function(resp){
-      if(resp && resp.ok){
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = archivo;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } else {
-        avisoDocumentoNoDisponible();
-      }
-    })
-    .catch(function(){
-      avisoDocumentoNoDisponible();
-    });
+  // Descarga DIRECTA en el mismo toque (sin fetch HEAD previo que el telefono bloqueaba).
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = archivo;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // Construye la ruta del documento en la misma carpeta donde vive la app
