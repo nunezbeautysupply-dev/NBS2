@@ -583,6 +583,15 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       <span style="font-size:12px;font-weight:600;color:var(--nbs-ink)">🔒 Bloquear tras</span>
       <select id="sel-minutos-bloqueo" onchange="cambiarMinutosBloqueo(this.value)" style="border:0.5px solid #ddd;border-radius:7px;padding:5px 6px;font-size:12px;background:white"></select>
     </div>
+    <div style="background:#F5F3EF;border-radius:10px;padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+      <div style="flex:1"><span style="font-size:12px;font-weight:600;color:var(--nbs-ink)">⚡ Bloqueo inmediato</span><div style="font-size:10px;color:var(--nbs-muted)">Pide huella cada vez que sales y vuelves</div></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="bloqueo-inmediato-status" style="font-size:12px;color:var(--nbs-muted)">Desactivado</span>
+        <div id="bloqueo-inmediato-switch" onclick="toggleBloqueoInmediato()" style="width:44px;height:24px;border-radius:12px;background:#d8d8dc;cursor:pointer;position:relative;transition:background 0.2s">
+          <div id="bloqueo-inmediato-knob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:white;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>
+        </div>
+      </div>
+    </div>
     <button onclick="bloquearAhora()" style="width:100%;margin-top:8px;background:none;border:1px solid #546E7A;color:#546E7A;padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">🔒 Bloquear ahora</button>
     <button onclick="cerrarSesionNBS()" style="width:100%;margin-top:8px;background:none;border:1px solid #e0574a;color:#e0574a;padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">🚪 Cerrar sesión</button>
   </div>
@@ -1850,7 +1859,20 @@ function iniciarCopiasAutomaticas(){
   // automáticos se pausan y aparecen huecos de más de 15 minutos. Para arreglarlo:
   // cada vez que VUELVES a la app, se revisa si ya toca respaldar y se hace enseguida.
   document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'hidden'){
+      // Al SALIR de la app (mandarla a segundo plano): si hay huella registrada y el usuario
+      // activó el bloqueo inmediato, se marca para bloquear en cuanto vuelva -aunque sean segundos-.
+      if(bloqueoInmediatoActivado() && hayHuellaRegistrada() && typeof fbAuth !== 'undefined' && fbAuth.currentUser && !window._appBloqueada){
+        try{ localStorage.setItem(CLAVE_BLOQUEO_INMEDIATO_PENDIENTE, '1'); }catch(e){}
+      }
+    }
     if(document.visibilityState === 'visible'){
+      // Al VOLVER: si quedó marcado el bloqueo inmediato, se bloquea la app de una vez (pide huella).
+      if(localStorage.getItem(CLAVE_BLOQUEO_INMEDIATO_PENDIENTE) === '1' && hayHuellaRegistrada() && typeof fbAuth !== 'undefined' && fbAuth.currentUser && !window._appBloqueada){
+        try{ localStorage.removeItem(CLAVE_BLOQUEO_INMEDIATO_PENDIENTE); }catch(e){}
+        bloquearApp();
+        return; // no seguir con las copias mientras está bloqueada
+      }
       // Copia local del teléfono (siempre, refresca la hora aunque no haya cambios)
       hacerCopiaLocalSiCambio();
       // Copia en la nube si ya toca (cada 15 min) y hubo movimientos
@@ -15204,6 +15226,36 @@ function usarContrasenaEnVezDeHuella(){
 // El tiempo de bloqueo se puede cambiar desde el menu -asi se puede probar con 1 minuto sin
 // tener que tocar el codigo, y cambiarlo cualquier dia segun te convenga-. Por defecto 15 min.
 var CLAVE_MINUTOS_BLOQUEO = 'nbs_minutos_bloqueo';
+// Bloqueo inmediato: si está activado, la app se bloquea (pide huella) CADA VEZ que sales
+// y vuelves, aunque sea por segundos. Da la máxima seguridad.
+var CLAVE_BLOQUEO_INMEDIATO = 'nbs_bloqueo_inmediato';
+var CLAVE_BLOQUEO_INMEDIATO_PENDIENTE = 'nbs_bloqueo_inmediato_pendiente';
+function bloqueoInmediatoActivado(){
+  return localStorage.getItem(CLAVE_BLOQUEO_INMEDIATO) === '1';
+}
+function toggleBloqueoInmediato(){
+  if(!hayHuellaRegistrada()){
+    alert('Primero activa la huella digital. El bloqueo inmediato usa tu huella para desbloquear.');
+    renderToggleBloqueoInmediato();
+    return;
+  }
+  var nuevo = bloqueoInmediatoActivado() ? '0' : '1';
+  localStorage.setItem(CLAVE_BLOQUEO_INMEDIATO, nuevo);
+  renderToggleBloqueoInmediato();
+  if(nuevo === '1'){
+    alert('✅ Bloqueo inmediato activado. Cada vez que salgas y vuelvas a la app, te pedirá la huella.');
+  }
+}
+function renderToggleBloqueoInmediato(){
+  var txt = document.getElementById('bloqueo-inmediato-status');
+  var knob = document.getElementById('bloqueo-inmediato-knob');
+  var sw = document.getElementById('bloqueo-inmediato-switch');
+  if(!txt || !knob || !sw) return;
+  var on = bloqueoInmediatoActivado();
+  txt.textContent = on ? 'Activado' : 'Desactivado';
+  sw.style.background = on ? '#2E7D32' : '#d8d8dc';
+  knob.style.left = on ? '23px' : '3px';
+}
 var PRESETS_BLOQUEO = [1, 5, 10, 15, 20, 30, 45, 60, 90, 120];
 
 function limiteInactividadMs(){
@@ -15571,6 +15623,7 @@ function abrirMenuLateral(){
   menu.style.display = 'block';
   overlay.style.display = 'block'; overlay.scrollTop = 0;
   setTimeout(function(){ menu.style.transform = 'translateX(0)'; }, 10);
+  try{ renderToggleBloqueoInmediato(); }catch(e){}
 }
 
 function cerrarMenuLateral(){
