@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260721b-OFICIAL-V2.0">
+<meta name="app-version" content="20260721e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15573,11 +15573,11 @@ function mostrarLetreroActualizacion(){
     + '@keyframes subirBanner{from{opacity:1;transform:translateX(-50%) translateY(0)}to{opacity:0;transform:translateX(-50%) translateY(-16px)}}';
   document.head.appendChild(estilo);
   document.body.appendChild(d);
-  // Desaparece a los 4 segundos
+  // Desaparece a los 7 segundos (subido para dar tiempo de sobra a leerlo, pedido por Sensei)
   setTimeout(function(){
     d.style.animation = 'subirBanner 0.4s ease';
     setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); }, 400);
-  }, 4000);
+  }, 7000);
 }
 
 function iniciarAppDespuesDeLogin(){
