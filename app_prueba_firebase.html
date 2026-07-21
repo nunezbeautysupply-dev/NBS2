@@ -1445,6 +1445,23 @@ var LOGO_IMG = new Image();
 LOGO_IMG.src = LOGO_SRC;
 var LOGO_IMG_COLOR = new Image();
 LOGO_IMG_COLOR.src = LOGO_SRC_COLOR;
+// Precarga la imagen de la firma de una venta (si tiene) antes de dibujar la factura,
+// para que aparezca en la imagen final. Guarda la imagen lista en window._firmaImgFactura.
+function conFirmaLista(v, cb){
+  window._firmaImgFactura = null;
+  if(!v || !v.firma){ cb(); return; }
+  var img = new Image();
+  var hecho = false;
+  function terminar(){ if(!hecho){ hecho = true; window._firmaImgFactura = img; cb(); } }
+  img.onload = terminar;
+  img.onerror = function(){ if(!hecho){ hecho = true; window._firmaImgFactura = null; cb(); } };
+  img.src = v.firma;
+  // Por si la imagen ya estaba en cache y no dispara onload
+  if(img.complete && img.naturalWidth){ terminar(); }
+  // Seguridad: no esperar más de 2 segundos
+  setTimeout(function(){ if(!hecho){ hecho = true; window._firmaImgFactura = (img.complete && img.naturalWidth) ? img : null; cb(); } }, 2000);
+}
+
 function conLogoListo(cb){
   var listos = 0;
   var necesarios = 2;
@@ -11306,6 +11323,24 @@ function verFactura(v){
       +'<button id="btnpagofactura-'+v.id+'" style="padding:10px 14px;background:#1565C0;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">✓ Pagar</button>'
       +'</div>';
     el.appendChild(payCard);
+    // Botón de cobro rápido: pagar TODO el saldo en efectivo de un toque (sin escribir monto)
+    (function(vid, saldoFac){
+      var btnRapido = document.createElement('button');
+      btnRapido.textContent = '💵 Pagar todo en efectivo ($'+fmtNum(saldoFac)+')';
+      btnRapido.style.cssText = 'width:100%;padding:13px;background:#00838F;color:white;border:none;border-radius:8px;font-size:15px;font-weight:800;cursor:pointer;margin-top:10px';
+      btnRapido.onclick = function(){
+        if(!confirm('¿Registrar el pago COMPLETO de $'+fmtNum(saldoFac)+' en efectivo?')) return;
+        ventas = LS('nv', []);
+        var vr = ventas.find(function(x){ return x.id===vid; });
+        if(!vr) return;
+        if(!vr.pagosFactura) vr.pagosFactura = [];
+        vr.pagosFactura.push({ monto: saldoFac, fecha: fechaHoy(), metodos:[{tipo:'efectivo', monto:saldoFac}] });
+        SS('nv', ventas);
+        alert('✅ Pago de $'+fmtNum(saldoFac)+' en efectivo aplicado correctamente.');
+        verFactura(vr);
+      };
+      payCard.appendChild(btnRapido);
+    })(v.id, saldo);
     document.getElementById('btnpagofactura-'+v.id).onclick = function(){
       var inp = document.getElementById('pagofactura-'+v.id);
       var monto = parseFloat(inp.value) || 0;
@@ -13186,7 +13221,8 @@ function abrirAbono(cid){
 
         var pagoDiv = document.createElement('div');
         pagoDiv.style.cssText = 'margin-top:8px;border-top:1px solid #f0f0f0;padding-top:8px';
-        pagoDiv.innerHTML = '<div style="font-size:11px;color:#6A1B9A;font-weight:700;margin-bottom:4px;letter-spacing:0.5px">💰 APLICAR PAGO</div>'
+        pagoDiv.innerHTML = '<button type="button" onclick="pagarTodoEfectivo(\''+v.id+'\','+saldoFactura+')" style="width:100%;padding:13px;background:#00838F;color:white;border:none;border-radius:8px;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:10px">💵 Pagar todo en efectivo ($'+fmtNum(saldoFactura)+')</button>'
+          +'<div style="font-size:11px;color:#6A1B9A;font-weight:700;margin-bottom:4px;letter-spacing:0.5px">💰 APLICAR PAGO</div>'
           +'<div style="font-size:12px;color:#aaa;margin-bottom:8px">Saldo pendiente: $'+fmtNum(saldoFactura)+'</div>'
           +'<div id="pago-metodos-'+v.id+'"></div>'
           +'<button type="button" onclick="agregarMetodoPago(\''+v.id+'\')" style="background:none;border:1px dashed #ccc;border-radius:8px;padding:6px 10px;font-size:11px;color:#6A1B9A;cursor:pointer;margin:4px 0 8px;width:100%">+ Agregar otra forma de pago</button>'
@@ -13475,6 +13511,17 @@ function planDeReparto(cid, vidActual, saldoActual, montoPagado){
     sobrante -= aplicar;
   });
   return { plan: plan, sinAplicar: sobrante }; // sinAplicar = pago de mas, ya no debe nada
+}
+
+// COBRO RÁPIDO en Cuentas por Cobrar: paga TODO el saldo de la factura en efectivo,
+// de un solo toque, sin elegir forma de pago ni escribir cantidad. Pedido por Sensei
+// para no perder tiempo. Reutiliza confirmarPagoMultiple con el saldo completo en efectivo.
+function pagarTodoEfectivo(vid, saldo){
+  if(saldo <= 0){ alert('Esta factura ya está saldada.'); return; }
+  if(!confirm('¿Registrar el pago COMPLETO de $'+fmtNum(saldo)+' en efectivo?')) return;
+  if(!window._pagoMetodos) window._pagoMetodos = {};
+  window._pagoMetodos[vid] = [{tipo:'efectivo', monto: saldo}];
+  confirmarPagoMultiple(vid, saldo);
 }
 
 function confirmarPagoMultiple(vid, saldo){
@@ -14008,6 +14055,7 @@ function verFacturaProfesional(vid){
     +'<span style="font-size:14px;font-weight:800;color:'+(esSaldoPendiente(saldo)?'#C62828':'#2E7D32')+'">$'+fmtNum(saldo)+'</span>'
     +'</div>'
     +'</div>'
+    +(v.firma ? '<div style="text-align:center;margin-top:14px;border-top:0.5px solid #ddd;padding-top:12px"><div style="font-size:13px;font-weight:700;color:#333;margin-bottom:4px">Firma del cliente</div><img src="'+v.firma+'" style="max-width:220px;max-height:110px;border:1px solid #eee;border-radius:8px;background:white"></div>' : '')
     +'<div style="text-align:center;margin-top:16px;font-size:11px;color:#aaa;border-top:0.5px solid #f0f0f0;padding-top:12px">Gracias por su preferencia · Nunez Beauty Supply</div>'
     +'</div>';
   overlay.appendChild(factDiv);
@@ -14152,7 +14200,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   // FUENTE del recibo. En la Epson TERMICA (blanco y negro) se usa una fuente SIN adornos
   // y en NEGRITA: se imprime mucho mas marcada, limpia y legible que Georgia (que tiene
   // "patitas" que la impresora termica no define bien). En color se mantiene Georgia (elegante).
-  var ff = colorMode ? 'Georgia, serif' : 'bold Arial, sans-serif';
+  var ff = colorMode ? 'bold Georgia, serif' : 'bold Arial, sans-serif';
 
   // Header con logo -se usa la proporcion REAL de cada imagen, ya que el logo a color y el
   // logo en blanco y negro no tienen exactamente las mismas proporciones; antes se forzaba la
@@ -14437,6 +14485,32 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   ctx.fillText('Nunez Beauty Supply', W/2, y);
   y += 18;
 
+  // Firma del cliente (si la factura tiene una guardada). Se dibuja al final como
+  // constancia de entrega. La imagen ya viene precargada en _firmaImgFactura.
+  if(v.firma && window._firmaImgFactura && window._firmaImgFactura.complete && window._firmaImgFactura.naturalWidth){
+    y += 10;
+    ctx.strokeStyle = colorMode ? '#ccc' : '#000';
+    ctx.lineWidth = 1;
+    // Línea divisoria
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W-pad, y); ctx.stroke();
+    y += 16;
+    ctx.font = 'bold '+(colorMode?12:15)+'px '+(colorMode?'Georgia, serif':'Arial, sans-serif');
+    ctx.fillStyle = colorMode ? '#555' : '#000';
+    ctx.textAlign='center';
+    ctx.fillText('Firma del cliente', W/2, y);
+    y += 8;
+    // Dibujar la firma centrada, escalada al ancho disponible manteniendo proporción
+    var img = window._firmaImgFactura;
+    var maxW = W - pad*2;
+    var maxH = 90;
+    var escala = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
+    var fw = img.naturalWidth * escala;
+    var fh = img.naturalHeight * escala;
+    var fx = (W - fw) / 2;
+    try{ ctx.drawImage(img, fx, y, fw, fh); }catch(e){}
+    y += fh + 6;
+  }
+
   return y;
 }
 
@@ -14507,6 +14581,7 @@ function imprimirFacturaDiseno(vid){
   var numFact = v.numFactura || String(v.id).slice(-6);
 
   conLogoListo(function(){
+    conFirmaLista(v, function(){
     var canvas = generarFacturaCanvas(v, cl, pagado, saldo, numFact, false);
 
     canvas.toBlob(function(blob){
@@ -14522,6 +14597,7 @@ function imprimirFacturaDiseno(vid){
         window.open(url, '_blank');
       }
     }, 'image/png');
+    });
   });
 }
 
@@ -14536,6 +14612,7 @@ function compartirFactura(vid){
   var numFact = v.numFactura || String(v.id).slice(-6);
 
   conLogoListo(function(){
+    conFirmaLista(v, function(){
     // Imagen a color (igual al diseño de la vista Ver) para enviar al cliente por WhatsApp/email
     var canvas = generarFacturaCanvas(v, cl, pagado, saldo, numFact, true);
 
@@ -14565,6 +14642,7 @@ function compartirFactura(vid){
         }
       }
     }, 'image/png');
+    });
   });
 }
 
