@@ -14066,7 +14066,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke();
   y += colorMode?22:26;
 
-  ctx.font = ''+fs.prodLbl+'px Arial, sans-serif';
+  ctx.font = 'bold '+fs.prodLbl+'px Arial, sans-serif';
   ctx.fillStyle = colorMode ? '#aaa' : '#000';
   ctx.textAlign='left'; ctx.fillText('PRODUCTO', pad, y);
   ctx.textAlign='right'; ctx.fillText('TOTAL', W-pad, y);
@@ -14078,7 +14078,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   (v.items||[]).forEach(function(it){
     // Nombre del producto -con algo de peso, pero ya no tan fuerte como antes-, en una
     // fuente sans-serif limpia que se lee mejor a tamaños chicos que el serif del encabezado.
-    ctx.font = ''+fs.item+'px Arial, sans-serif';
+    ctx.font = 'bold '+fs.item+'px Arial, sans-serif';
     ctx.fillStyle = colorMode ? '#1a1a2e' : '#000';
     var precioTxt = '$'+fmtNum(it.cant*it.precio);
     if(colorMode){
@@ -14098,12 +14098,12 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
     }
     // "Cantidad x precio unitario" -tamaño de apoyo, pero en color normal como el resto del
     // detalle de la compra del cliente, no en gris-.
-    ctx.font='400 '+fs.itemQty+'px Arial, sans-serif';
+    ctx.font='bold '+fs.itemQty+'px Arial, sans-serif';
     ctx.fillStyle = colorMode ? '#777' : '#000';
     ctx.textAlign='left';
     ctx.fillText(it.cant+' x $'+fmtNum(it.precio), pad, y);
     if(!colorMode){
-      ctx.font=(fs.itemQty+2)+'px Arial, sans-serif';
+      ctx.font='bold '+(fs.itemQty+2)+'px Arial, sans-serif';
       ctx.fillStyle = '#000';
       ctx.textAlign='right'; ctx.fillText(precioTxt, W-pad, y);
     }
