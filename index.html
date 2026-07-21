@@ -14047,7 +14047,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   y += colorMode?22:26;
 
   ctx.font = ''+fs.prodLbl+'px Arial, sans-serif';
-  ctx.fillStyle = colorMode ? '#aaa' : '#555';
+  ctx.fillStyle = colorMode ? '#aaa' : '#000';
   ctx.textAlign='left'; ctx.fillText('PRODUCTO', pad, y);
   ctx.textAlign='right'; ctx.fillText('TOTAL', W-pad, y);
   y += 10;
@@ -14156,23 +14156,23 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
     }
   } else {
     // ===== Formato nuevo y simple, SOLO para impresion termica =====
-    // Linea 1: TOTAL ESTA FACTURA $00.00 -el mas importante de los 3, pero ya moderado-
-    ctx.font='16px '+ff+'';
+    // Linea 1: TOTAL ESTA FACTURA $00.00 -el mas importante de los 3-
+    ctx.font='22px '+ff+'';
     ctx.fillStyle = '#000';
     ctx.textAlign='left'; ctx.fillText('TOTAL ESTA FACTURA', pad, y);
     ctx.textAlign='right'; ctx.fillText('$'+fmtNum(v.total), W-pad, y);
-    y += 26;
+    y += 32;
 
-    // Linea 2: PAGO $00.00 -informacion secundaria, mas chica y gris-
-    ctx.font='13px '+ff+'';
-    ctx.fillStyle = '#777';
+    // Linea 2: PAGO $00.00 -en negro para que se lea bien en termica, no gris-
+    ctx.font='18px '+ff+'';
+    ctx.fillStyle = '#000';
     ctx.textAlign='left'; ctx.fillText('PAGO', pad, y);
     ctx.textAlign='right'; ctx.fillText('$'+fmtNum(pagado), W-pad, y);
-    y += 22;
+    y += 28;
 
-    // Linea 3: BALANCE PENDIENTE $00.00 -o $0.00 si esta saldada- -tambien secundaria-
-    ctx.font='13px '+ff+'';
-    ctx.fillStyle = '#777';
+    // Linea 3: BALANCE PENDIENTE $00.00 -o $0.00 si esta saldada- -en negro, bien visible-
+    ctx.font='18px '+ff+'';
+    ctx.fillStyle = '#000';
     ctx.textAlign='left'; ctx.fillText('BALANCE PENDIENTE', pad, y);
     ctx.textAlign='right'; ctx.fillText('$'+fmtNum(saldo), W-pad, y);
     y += 30;
