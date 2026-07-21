@@ -8792,7 +8792,7 @@ function pedirFirmaCliente(){
     '<div style="background:white;border-radius:14px;padding:16px;max-width:440px;width:100%">'
     +'<div style="font-size:16px;font-weight:800;color:#1a237e;margin-bottom:4px;text-align:center">✍️ Firma del cliente</div>'
     +'<p style="font-size:12px;color:#888;margin-bottom:10px;text-align:center">Firma con el dedo en el recuadro</p>'
-    +'<canvas id="firma-canvas" width="400" height="200" style="width:100%;height:200px;border:2px dashed #bbb;border-radius:10px;background:#FAFAFA;touch-action:none;display:block"></canvas>'
+    +'<canvas id="firma-canvas" width="400" height="130" style="width:100%;height:130px;border:2px dashed #bbb;border-radius:10px;background:#FAFAFA;touch-action:none;display:block"></canvas>'
     +'<div style="display:flex;gap:8px;margin-top:12px">'
     +'<button onclick="limpiarFirma()" style="flex:1;padding:11px;background:#FFF3E0;color:#E65100;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🔄 Borrar</button>'
     +'<button onclick="cancelarFirma()" style="flex:1;padding:11px;background:#F0F0F5;color:#333;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>'
@@ -8810,27 +8810,31 @@ var _firmaCtx = null, _firmaDibujando = false, _firmaHayTrazo = false;
 function dibujarGuiaFirma(){
   if(!_firmaCtx) return;
   var w = window._firmaAncho || 360;
-  var hh = window._firmaAlto || 200;
-  var yLinea = hh * 0.72; // la línea va en la parte baja del recuadro
-  var margen = 24;
+  var hh = window._firmaAlto || 130;
+  var yLinea = hh * 0.60; // la linea va un poco mas arriba del centro-bajo (menos espacio vacio)
+  var margen = 22;
   _firmaCtx.save();
-  _firmaCtx.strokeStyle = '#9aa0a6';
-  _firmaCtx.fillStyle = '#9aa0a6';
-  _firmaCtx.lineWidth = 1.5;
-  _firmaCtx.lineCap = 'butt';
-  _firmaCtx.lineJoin = 'miter';
-  // La línea horizontal
-  _firmaCtx.beginPath();
-  _firmaCtx.moveTo(margen + 22, yLinea);
-  _firmaCtx.lineTo(w - margen, yLinea);
-  _firmaCtx.stroke();
-  // La X a la izquierda, encima del inicio de la línea
+  // GRIS OSCURO: se ve claro pero no distrae ni tapa la firma
+  _firmaCtx.strokeStyle = '#5f6368';
+  _firmaCtx.fillStyle = '#5f6368';
+  _firmaCtx.lineCap = 'round';
+  _firmaCtx.lineJoin = 'round';
+  // La linea horizontal, bien marcada
   _firmaCtx.lineWidth = 2;
   _firmaCtx.beginPath();
-  _firmaCtx.moveTo(margen, yLinea - 8);
-  _firmaCtx.lineTo(margen + 12, yLinea + 4);
-  _firmaCtx.moveTo(margen + 12, yLinea - 8);
-  _firmaCtx.lineTo(margen, yLinea + 4);
+  _firmaCtx.moveTo(margen + 34, yLinea);
+  _firmaCtx.lineTo(w - margen, yLinea);
+  _firmaCtx.stroke();
+  // La X a la izquierda, GRANDE, encima del inicio de la linea (tamano 20px)
+  var xs = 20; // tamano de la X
+  var xcx = margen + 4; // esquina izquierda de la X
+  var xcy = yLinea - xs; // arriba de la linea
+  _firmaCtx.lineWidth = 3;
+  _firmaCtx.beginPath();
+  _firmaCtx.moveTo(xcx, xcy);
+  _firmaCtx.lineTo(xcx + xs, xcy + xs);
+  _firmaCtx.moveTo(xcx + xs, xcy);
+  _firmaCtx.lineTo(xcx, xcy + xs);
   _firmaCtx.stroke();
   _firmaCtx.restore();
   // Devolver el pincel al estado de firma (negro, grueso)
@@ -14262,6 +14266,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   // y en NEGRITA: se imprime mucho mas marcada, limpia y legible que Georgia (que tiene
   // "patitas" que la impresora termica no define bien). En color se mantiene Georgia (elegante).
   var ff = colorMode ? 'bold Georgia, serif' : 'bold Arial, sans-serif';
+  var ffFam = colorMode ? 'Georgia, serif' : 'Arial, sans-serif'; // familia sin 'bold' (para armar 'bold Npx familia')
 
   // Header con logo -se usa la proporcion REAL de cada imagen, ya que el logo a color y el
   // logo en blanco y negro no tienen exactamente las mismas proporciones; antes se forzaba la
@@ -14484,14 +14489,14 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   }
 
   if(colorMode){
-    ctx.font=''+fs.pago+'px '+ff+'';
+    ctx.font='bold '+fs.pago+'px '+ffFam+'';
     ctx.fillStyle = '#555';
     ctx.textAlign='left'; ctx.fillText('Tipo de pago:', pad, y);
     ctx.fillStyle = (v.tipo==='credito' ? '#E65100' : '#2E7D32');
     ctx.textAlign='right'; ctx.fillText(v.tipo==='credito'?'A credito':'Contado', W-pad, y);
     y += 30;
 
-    ctx.font=''+fs.total+'px '+ff+'';
+    ctx.font='bold '+fs.total+'px '+ffFam+'';
     ctx.fillStyle = '#1a237e';
     ctx.textAlign='left'; ctx.fillText('TOTAL', pad, y);
     ctx.fillStyle = '#1565C0';
@@ -14504,11 +14509,11 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
       var boxHeight = 22 + abonos.length*20 + 12;
       ctx.fillStyle = '#F1F8E9';
       ctx.fillRect(pad-6, boxTop, W-2*pad+12, boxHeight);
-      ctx.font='16px '+ff+'';
+      ctx.font='bold 16px '+ffFam+'';
       ctx.fillStyle = '#2E7D32';
       ctx.textAlign='left'; ctx.fillText('HISTORIAL DE ABONOS', pad, y);
       y += 22;
-      ctx.font='17px '+ff+'';
+      ctx.font='bold 17px '+ffFam+'';
       abonos.forEach(function(p){
         ctx.fillStyle = '#555';
         ctx.textAlign='left'; ctx.fillText(((p.fecha||'')+(p.nota?' - '+p.nota:'')).substring(0,24), pad, y);
@@ -14516,7 +14521,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
         ctx.textAlign='right'; ctx.fillText('$'+fmtNum(p.monto), W-pad, y);
         y += 20;
       });
-      ctx.font='18px '+ff+'';
+      ctx.font='bold 18px '+ffFam+'';
       ctx.fillStyle = '#2E7D32';
       ctx.textAlign='left'; ctx.fillText('Total abonado:', pad, y);
       ctx.textAlign='right'; ctx.fillText('$'+fmtNum(pagado), W-pad, y);
@@ -14529,7 +14534,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
       var bt = y - 18;
       ctx.fillStyle = '#FFEBEE';
       ctx.fillRect(pad-6, bt, W-2*pad+12, 26);
-      ctx.font='19px '+ff+'';
+      ctx.font='bold 19px '+ffFam+'';
       ctx.fillStyle = '#C62828';
       ctx.textAlign='left'; ctx.fillText('BALANCE PENDIENTE:', pad, y);
       ctx.textAlign='right'; ctx.fillText('$'+fmtNum(saldo), W-pad, y);
@@ -14537,7 +14542,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
     } else {
       ctx.fillStyle = '#E8F5E9';
       ctx.fillRect(pad-6, y-18, W-2*pad+12, 26);
-      ctx.font='19px '+ff+'';
+      ctx.font='bold 19px '+ffFam+'';
       ctx.fillStyle = '#2E7D32';
       ctx.textAlign='center'; ctx.fillText('\u2713 PAGADO COMPLETO', W/2, y);
       y += 32;
@@ -14545,21 +14550,21 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   } else {
     // ===== Formato nuevo y simple, SOLO para impresion termica =====
     // Linea 1: TOTAL ESTA FACTURA $00.00 -el mas importante de los 3-
-    ctx.font='22px '+ff+'';
+    ctx.font='bold 22px Arial, sans-serif';
     ctx.fillStyle = '#000';
     ctx.textAlign='left'; ctx.fillText('TOTAL ESTA FACTURA', pad, y);
     ctx.textAlign='right'; ctx.fillText('$'+fmtNum(v.total), W-pad, y);
     y += 32;
 
     // Linea 2: PAGO $00.00 -en negro para que se lea bien en termica, no gris-
-    ctx.font='18px '+ff+'';
+    ctx.font='bold 18px Arial, sans-serif';
     ctx.fillStyle = '#000';
     ctx.textAlign='left'; ctx.fillText('PAGO', pad, y);
     ctx.textAlign='right'; ctx.fillText('$'+fmtNum(pagado), W-pad, y);
     y += 28;
 
     // Linea 3: BALANCE PENDIENTE $00.00 -o $0.00 si esta saldada- -en negro, bien visible-
-    ctx.font='18px '+ff+'';
+    ctx.font='bold 18px Arial, sans-serif';
     ctx.fillStyle = '#000';
     ctx.textAlign='left'; ctx.fillText('BALANCE PENDIENTE', pad, y);
     ctx.textAlign='right'; ctx.fillText('$'+fmtNum(saldo), W-pad, y);
