@@ -8626,16 +8626,19 @@ var _firmaCtx = null, _firmaDibujando = false, _firmaHayTrazo = false;
 function iniciarCanvasFirma(){
   var canvas = document.getElementById('firma-canvas');
   if(!canvas) return;
-  // Ajustar la resolución real del canvas al tamaño en pantalla, para que la firma no salga borrosa
+  // Ajustar la resolución real del canvas al tamaño en pantalla, para que la firma no salga borrosa.
+  // Se usa 4x (antes 2x) para que la firma se vea NÍTIDA al verla grande o al imprimirla.
   var rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * 2;
-  canvas.height = rect.height * 2;
+  canvas.width = rect.width * 4;
+  canvas.height = rect.height * 4;
   _firmaCtx = canvas.getContext('2d');
-  _firmaCtx.scale(2, 2);
+  _firmaCtx.scale(4, 4);
   _firmaCtx.strokeStyle = '#111';
   _firmaCtx.lineWidth = 2.2;
   _firmaCtx.lineCap = 'round';
   _firmaCtx.lineJoin = 'round';
+  _firmaCtx.imageSmoothingEnabled = true;
+  _firmaCtx.imageSmoothingQuality = 'high';
   _firmaHayTrazo = false;
 
   function pos(e){
@@ -18764,13 +18767,24 @@ function verHistorialCliente(cid, modo){
 (function(){
   var btn = document.getElementById('btn-subir-flotante');
   var ultimoObjetivoScroll = window;
+  var temporizadorOcultar = null;
   function alManejarScroll(e){
     var objetivo = e.target;
     var esVentana = (objetivo === document || objetivo === document.documentElement || objetivo === document.body);
     var scrollActual = esVentana ? window.scrollY : objetivo.scrollTop;
     ultimoObjetivoScroll = esVentana ? window : objetivo;
-    if(scrollActual > 400){ btn.style.display = 'flex'; } else { btn.style.display = 'none'; }
-    acomodarBotonSubir();
+    // Aparece solo si hay MOVIMIENTO y ya se bajó un poco (más de 400px).
+    if(scrollActual > 400){
+      btn.style.display = 'flex';
+      acomodarBotonSubir();
+      // Cada vez que hay movimiento, se reinicia el temporizador.
+      // Si pasan 2 segundos SIN mover, el botón se oculta solo (para no estorbar).
+      if(temporizadorOcultar) clearTimeout(temporizadorOcultar);
+      temporizadorOcultar = setTimeout(function(){ btn.style.display = 'none'; }, 2000);
+    } else {
+      btn.style.display = 'none';
+      if(temporizadorOcultar) clearTimeout(temporizadorOcultar);
+    }
   }
   // El boton Subir se paraba ENCIMA de la barra de aviso de respaldo y le tapaba el texto
   // -tiene z-index mas alto, siempre ganaba el-. Ahora se hace a un lado solo: si la barra
