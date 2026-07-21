@@ -8658,7 +8658,7 @@ function iniciarCanvasFirma(){
   _firmaCtx = canvas.getContext('2d');
   _firmaCtx.scale(escala, escala);
   _firmaCtx.strokeStyle = '#111';
-  _firmaCtx.lineWidth = 2.2;
+  _firmaCtx.lineWidth = 3.5;
   _firmaCtx.lineCap = 'round';
   _firmaCtx.lineJoin = 'round';
   _firmaCtx.imageSmoothingEnabled = true;
@@ -8679,21 +8679,30 @@ function iniciarCanvasFirma(){
       e.preventDefault();
       _firmaDibujando = true;
       // Grosor un poco más fino si es lápiz (pen), para que se vea como pluma de verdad
-      _firmaCtx.lineWidth = (e.pointerType === 'pen') ? 1.8 : 2.2;
+      _firmaCtx.lineWidth = (e.pointerType === 'pen') ? 3.0 : 3.5;
       var p = pos(e);
       _firmaCtx.beginPath();
       _firmaCtx.moveTo(p.x, p.y);
+      _ultimoPunto = p;
       try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
     }
+    var _ultimoPunto = null;
     function mover(e){
       if(!_firmaDibujando) return;
       e.preventDefault();
       var p = pos(e);
-      _firmaCtx.lineTo(p.x, p.y);
-      _firmaCtx.stroke();
+      if(_ultimoPunto){
+        // Curva suave (punto medio) en vez de línea recta: elimina los "escaloncitos"
+        // en las curvas de la firma. El trazo sigue el dedo pero redondeado.
+        var medioX = (_ultimoPunto.x + p.x) / 2;
+        var medioY = (_ultimoPunto.y + p.y) / 2;
+        _firmaCtx.quadraticCurveTo(_ultimoPunto.x, _ultimoPunto.y, medioX, medioY);
+        _firmaCtx.stroke();
+      }
+      _ultimoPunto = p;
       _firmaHayTrazo = true;
     }
-    function terminar(e){ if(e) e.preventDefault(); _firmaDibujando = false; }
+    function terminar(e){ if(e) e.preventDefault(); _firmaDibujando = false; _ultimoPunto = null; }
 
     canvas.addEventListener('pointerdown', empezar);
     canvas.addEventListener('pointermove', mover);
@@ -8707,9 +8716,10 @@ function iniciarCanvasFirma(){
       var punto = e.touches ? e.touches[0] : e;
       return { x: punto.clientX - r.left, y: punto.clientY - r.top };
     }
-    function empezar2(e){ e.preventDefault(); _firmaDibujando = true; var p = pos2(e); _firmaCtx.beginPath(); _firmaCtx.moveTo(p.x, p.y); }
-    function mover2(e){ if(!_firmaDibujando) return; e.preventDefault(); var p = pos2(e); _firmaCtx.lineTo(p.x, p.y); _firmaCtx.stroke(); _firmaHayTrazo = true; }
-    function terminar2(e){ if(e) e.preventDefault(); _firmaDibujando = false; }
+    var _ultimoPunto2 = null;
+    function empezar2(e){ e.preventDefault(); _firmaDibujando = true; var p = pos2(e); _firmaCtx.beginPath(); _firmaCtx.moveTo(p.x, p.y); _ultimoPunto2 = p; }
+    function mover2(e){ if(!_firmaDibujando) return; e.preventDefault(); var p = pos2(e); if(_ultimoPunto2){ var mx=(_ultimoPunto2.x+p.x)/2, my=(_ultimoPunto2.y+p.y)/2; _firmaCtx.quadraticCurveTo(_ultimoPunto2.x, _ultimoPunto2.y, mx, my); _firmaCtx.stroke(); } _ultimoPunto2 = p; _firmaHayTrazo = true; }
+    function terminar2(e){ if(e) e.preventDefault(); _firmaDibujando = false; _ultimoPunto2 = null; }
     canvas.addEventListener('mousedown', empezar2);
     canvas.addEventListener('mousemove', mover2);
     canvas.addEventListener('mouseup', terminar2);
@@ -11120,7 +11130,7 @@ function verFactura(v){
     firmaCard.className = 'card';
     firmaCard.style.cssText = 'text-align:center;padding:12px';
     firmaCard.innerHTML = '<div style="font-size:12px;color:#888;font-weight:700;margin-bottom:8px">✍️ FIRMA DEL CLIENTE</div>'
-      +'<img src="'+v.firma+'" style="max-width:100%;max-height:160px;border:1px solid #eee;border-radius:8px;background:white">';
+      +'<img src="'+v.firma+'" style="max-width:100%;max-height:220px;border:1px solid #eee;border-radius:8px;background:white;image-rendering:auto">';
     el.appendChild(firmaCard);
   }
 
@@ -17352,7 +17362,7 @@ function abrirFirmaFactura(vid){
     var fotoActual = document.createElement('div');
     fotoActual.style.cssText = 'margin-top:12px;text-align:center';
     fotoActual.innerHTML = '<div style="font-size:11px;color:#777;margin-bottom:6px">Firma ya guardada -'+(v.firmaFecha||'')+'-:</div>'
-      +'<img src="'+v.firma+'" style="max-width:100%;border:1px solid #ddd;border-radius:8px;background:#FAFAFA">';
+      +'<img src="'+v.firma+'" style="max-width:100%;border:1px solid #ddd;border-radius:8px;background:#FAFAFA;image-rendering:auto">';
     overlay.appendChild(fotoActual);
     var btnBorrarFirma = document.createElement('button');
     btnBorrarFirma.textContent = '🗑️ Quitar esta firma y capturar una nueva';
