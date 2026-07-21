@@ -16388,19 +16388,48 @@ function renderDocs(){
 // Abre el documento (desde la misma carpeta de la app en GitHub)
 function verDocumento(archivo){
   var url = rutaDocumento(archivo);
-  window.open(url, '_blank');
+  // Verificar si el documento existe ANTES de abrirlo. Si no está (por ejemplo,
+  // en esta app de prueba todavía no se han cargado los documentos), mostrar un
+  // aviso claro en vez de abrir una pestaña en blanco o rebotar a inicio.
+  fetch(url, { method: 'HEAD' })
+    .then(function(resp){
+      if(resp && resp.ok){
+        window.open(url, '_blank');
+      } else {
+        avisoDocumentoNoDisponible();
+      }
+    })
+    .catch(function(){
+      avisoDocumentoNoDisponible();
+    });
+}
+
+// Aviso claro cuando un documento todavía no está en esta app.
+function avisoDocumentoNoDisponible(){
+  alert('📄 Documento no disponible\n\nEste documento todavía no está en esta app. Los documentos se generan con tu información real.\n\nAparecerán aquí cuando cargues tus datos en esta app.');
 }
 
 
 // Descarga el documento al teléfono (para guardarlo y verlo después sin internet)
 function descargarDocumento(archivo){
   var url = rutaDocumento(archivo);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = archivo;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  // Igual que "Ver": verificar que el documento exista antes de intentar bajarlo.
+  fetch(url, { method: 'HEAD' })
+    .then(function(resp){
+      if(resp && resp.ok){
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = archivo;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        avisoDocumentoNoDisponible();
+      }
+    })
+    .catch(function(){
+      avisoDocumentoNoDisponible();
+    });
 }
 
 // Construye la ruta del documento en la misma carpeta donde vive la app
