@@ -8705,8 +8705,16 @@ function guardarFirmaYVenta(){
   if(!_firmaHayTrazo){ alert('El recuadro está vacío. Pide al cliente que firme, o toca Cancelar.'); return; }
   var canvas = document.getElementById('firma-canvas');
   if(canvas){
-    // Guardar la firma como imagen comprimida (JPEG chico) para que no pese mucho
-    window._firmaVentaActual = canvas.toDataURL('image/jpeg', 0.6);
+    // Se pinta el fondo BLANCO detrás de la firma (así no sale negro)
+    // y se guarda en PNG para que la firma se vea nítida.
+    var canvasBlanco = document.createElement('canvas');
+    canvasBlanco.width = canvas.width;
+    canvasBlanco.height = canvas.height;
+    var ctxB = canvasBlanco.getContext('2d');
+    ctxB.fillStyle = '#FFFFFF';
+    ctxB.fillRect(0, 0, canvasBlanco.width, canvasBlanco.height);
+    ctxB.drawImage(canvas, 0, 0);
+    window._firmaVentaActual = canvasBlanco.toDataURL('image/png');
     window._firmaFechaActual = fechaHoy()+' '+new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
   }
   var o = document.getElementById('firma-canvas-overlay');
@@ -17364,7 +17372,14 @@ function abrirFirmaFactura(vid){
     ventas = LS('nv', []);
     var v2 = ventas.find(function(x){ return String(x.id)===String(vid); });
     if(v2){
-      v2.firma = canvas.toDataURL('image/png');
+      // Fondo blanco detrás de la firma para que no salga negra, y PNG nítido
+      var cB = document.createElement('canvas');
+      cB.width = canvas.width; cB.height = canvas.height;
+      var ctxB = cB.getContext('2d');
+      ctxB.fillStyle = '#FFFFFF';
+      ctxB.fillRect(0, 0, cB.width, cB.height);
+      ctxB.drawImage(canvas, 0, 0);
+      v2.firma = cB.toDataURL('image/png');
       v2.firmaFecha = fechaHoy()+' '+new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
       SS('nv', ventas);
     }
@@ -18701,14 +18716,14 @@ function verHistorialCliente(cid, modo){
 
 
 <div id="p-docs" class="pg">
-  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="irInicio()">🏠 Inicio</button></div>
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:22px;font-weight:800;color:#1a237e;margin-bottom:6px;text-align:center">📁 Mis Documentos</h2>
   <p style="font-size:12px;color:var(--nbs-muted);text-align:center;margin-bottom:16px">Todos tus documentos en un solo lugar. Necesitan internet para abrirse.</p>
   <div id="docs-lista"></div>
 </div>
 
 <div id="p-panorama" class="pg">
-  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="irInicio()">🏠 Inicio</button></div>
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:22px;font-weight:800;color:#1a237e;margin-bottom:6px;text-align:center">📊 Panorama Completo</h2>
   <p style="font-size:12px;color:var(--nbs-muted);text-align:center;margin-bottom:14px">Toda la salud de tu negocio en un solo lugar</p>
   <div id="panorama-periodo" style="display:flex;gap:6px;margin-bottom:16px"></div>
