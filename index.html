@@ -8482,6 +8482,124 @@ function forzarAgregar(){
   agregarProducto(pid, cant, prod);
 }
 
+// Muestra los productos que ESTE cliente compra más seguido, como botones grandes.
+// Tocar uno lo agrega a la venta al instante (con su precio personalizado si tiene).
+// Ahorra tener que buscar y escribir el producto en cada venta.
+function renderFavoritosCliente(){
+  var cont = document.getElementById('v-favoritos');
+  if(!cont) return;
+  var sel = document.getElementById('vcl');
+  var cid = sel ? sel.value : '';
+  if(!cid){ cont.style.display='none'; cont.innerHTML=''; return; }
+
+  // Contar qué productos compra más este cliente (sobre todo su historial)
+  var ventasCl = LS('nv', []).filter(function(v){ return String(v.cid)===String(cid); });
+  var conteo = {};
+  ventasCl.forEach(function(v){
+    (v.items||[]).forEach(function(it){
+      if(!it.pid) return;
+      if(!conteo[it.pid]) conteo[it.pid] = { cant:0, nombre:it.nombre };
+      conteo[it.pid].cant += it.cant;
+    });
+  });
+  var topPids = Object.keys(conteo).sort(function(a,b){ return conteo[b].cant - conteo[a].cant; }).slice(0,4);
+  if(!topPids.length){ cont.style.display='none'; cont.innerHTML=''; return; }
+
+  // Solo mostrar los que todavía existen en el catálogo (con su precio actual)
+  loadProds();
+  var botones = '';
+  topPids.forEach(function(pid){
+    var prod = productos.find(function(p){ return String(p.id)===String(pid); });
+    if(!prod) return;
+    var precio = obtenerPrecioParaCliente(cid, prod.id, prod.precio);
+    botones += '<button onclick="agregarFavorito(\''+prod.id+'\')" '
+      + 'style="flex:1;min-width:calc(50% - 4px);background:#FFF8E1;border:1.5px solid var(--nbs-gold);'
+      + 'border-radius:10px;padding:10px 8px;cursor:pointer;text-align:left">'
+      + '<div style="font-size:14px;font-weight:700;color:var(--nbs-ink);line-height:1.2">'+escaparHtml(prod.nombre)+'</div>'
+      + '<div style="font-size:13px;font-weight:800;color:#2E7D32;margin-top:3px">$'+fmtNum(precio)+' <span style="color:#E65100">+ Agregar</span></div>'
+      + '</button>';
+  });
+  if(!botones){ cont.style.display='none'; cont.innerHTML=''; return; }
+
+  cont.innerHTML = '<div style="font-size:12px;font-weight:700;color:#E65100;margin-bottom:6px">\u26A1 LO QUE M\u00c1S COMPRA (toca para agregar)</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:8px">'+botones+'</div>'
+    + '<button onclick="repetirUltimaVenta()" style="width:100%;margin-top:8px;background:#E8F5E9;border:1.5px solid #2E7D32;border-radius:10px;padding:11px;cursor:pointer;font-size:14px;font-weight:700;color:#2E7D32">\u21BB Repetir su \u00faltima compra</button>';
+  cont.style.display='block';
+}
+
+// Buscador rápido de cliente: escribes nombre o barbería y aparecen las coincidencias
+// al instante. Al tocar una, se selecciona ese cliente (más rápido que el menú de 128).
+function filtrarClienteVenta(q){
+  var lista = document.getElementById('vcl-lista');
+  if(!lista) return;
+  if(!q || !q.trim()){ lista.style.display='none'; lista.innerHTML=''; return; }
+  clientes = LS('ncl', []);
+  // Buscar por nombre Y por negocio (barbería)
+  var res = filtrarPorBusqueda(clientes, q, function(c){ return nombreCl(c) + ' ' + (c.negocio||''); }).slice(0,15);
+  if(!res.length){ lista.style.display='block'; lista.innerHTML='<div style="padding:12px;color:#999;font-size:13px">Sin coincidencias</div>'; return; }
+  lista.innerHTML = '';
+  res.forEach(function(c){
+    var d = document.createElement('div');
+    d.style.cssText = 'padding:11px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer';
+    d.innerHTML = '<div style="font-weight:600;font-size:14px;color:var(--nbs-ink)">'+escaparHtml(nombreCl(c))+'</div>'
+      + (c.negocio ? '<div style="font-size:12px;color:var(--nbs-muted)">🏪 '+escaparHtml(c.negocio)+'</div>' : '');
+    d.onclick = (function(cid){ return function(){ seleccionarClienteVenta(cid); }; })(c.id);
+    lista.appendChild(d);
+  });
+  lista.style.display='block';
+}
+
+// Al tocar un cliente en la búsqueda: lo selecciona en el menú y muestra sus favoritos.
+function seleccionarClienteVenta(cid){
+  var sel = document.getElementById('vcl');
+  if(sel) sel.value = cid;
+  var lista = document.getElementById('vcl-lista');
+  if(lista){ lista.style.display='none'; lista.innerHTML=''; }
+  var buscar = document.getElementById('vcl-buscar');
+  if(buscar) buscar.value = '';
+  renderMetodosPago('vini');
+  renderFavoritosCliente();
+}
+
+// Agrega un producto favorito a la venta de un solo toque.
+function agregarFavorito(pid){
+  loadProds();
+  var prod = productos.find(function(p){ return String(p.id)===String(pid); });
+  if(!prod){ alert('Ese producto ya no está en el catálogo.'); return; }
+  agregarProducto(prod.id, 1, prod);
+}
+
+// Repite la última venta de este cliente: pone en el carrito los mismos productos
+// y cantidades que compró la última vez. Ahorra armar toda la venta de nuevo.
+function repetirUltimaVenta(){
+  var sel = document.getElementById('vcl');
+  var cid = sel ? sel.value : '';
+  if(!cid){ alert('Primero elige el cliente.'); return; }
+  var ventasCl = LS('nv', []).filter(function(v){ return String(v.cid)===String(cid) && (v.items||[]).length; });
+  if(!ventasCl.length){ alert('Este cliente no tiene ventas anteriores todavía.'); return; }
+  // La última venta = la de id más grande (los id son fecha en milisegundos)
+  ventasCl.sort(function(a,b){ return (b.id||0) - (a.id||0); });
+  var ultima = ventasCl[0];
+  loadProds();
+  var agregados = 0, noExisten = 0;
+  (ultima.items||[]).forEach(function(it){
+    var prod = productos.find(function(p){ return String(p.id)===String(it.pid); });
+    if(prod){
+      agregarProducto(prod.id, it.cant, prod);
+      agregados++;
+    } else {
+      noExisten++;
+    }
+  });
+  if(agregados){
+    var msg = 'Se agregaron '+agregados+' producto(s) de su última compra.';
+    if(noExisten) msg += '\n('+noExisten+' ya no están en el catálogo y no se agregaron.)';
+    // aviso corto no bloqueante: se ve en el carrito de una vez
+  } else {
+    alert('Los productos de la última compra ya no están en el catálogo.');
+  }
+}
+
 function agregarProducto(pid, cant, prod){
   var encontrado = false;
   var cidActual = document.getElementById('vcl') ? document.getElementById('vcl').value : null;
@@ -8596,6 +8714,29 @@ function rmIV(i){ iV.splice(i,1); renderIV(); }
 
 // Este es el nuevo punto de entrada del botón "Registrar venta".
 // Primero valida que haya productos, luego pregunta por la firma.
+// COBRO RÁPIDO: para la venta más común (contado, efectivo). Pone contado + efectivo
+// y registra la venta de una vez, sin tener que elegir tipo ni forma de pago.
+// Los casos especiales (crédito, CashApp, Zelle) siguen con las opciones normales.
+function cobroRapidoContadoEfectivo(){
+  if(!iV.length){ alert('Agrega al menos un producto'); return; }
+  // Poner tipo = contado
+  var vtipo = document.getElementById('vtipo');
+  if(vtipo){ vtipo.value = 'contado'; if(typeof actualizarLabelPagoVenta==='function') actualizarLabelPagoVenta(); }
+  // Poner forma de pago = efectivo por el total
+  var total = iV.reduce(function(s,it){ return s + it.cant*it.precio; }, 0);
+  // aplicar descuento si hay
+  try{
+    var tipoD = document.getElementById('vdesc-tipo');
+    var valD = parseFloat((document.getElementById('vdesc-val')||{}).value) || 0;
+    if(tipoD && tipoD.value==='pct' && valD>0) total = total - total*(valD/100);
+    else if(tipoD && tipoD.value==='monto' && valD>0) total = Math.max(0, total - valD);
+  }catch(e){}
+  if(window._pagoMetodos) window._pagoMetodos['vini'] = [{tipo:'efectivo', monto:total}];
+  if(typeof renderMetodosPago==='function') renderMetodosPago('vini');
+  // Registrar la venta (pasa por la pregunta de firma, como siempre)
+  registrarVentaConFirma();
+}
+
 function registrarVentaConFirma(){
   if(!iV.length){ alert('Agrega al menos un producto'); return; }
   // Preguntar si el cliente firma
@@ -8649,14 +8790,21 @@ var _firmaCtx = null, _firmaDibujando = false, _firmaHayTrazo = false;
 function iniciarCanvasFirma(){
   var canvas = document.getElementById('firma-canvas');
   if(!canvas) return;
-  // Resolución real del canvas = tamaño en pantalla x densidad del teléfono (nítido en cualquier pantalla).
+  // SOLUCIÓN DEFINITIVA (basada en la librería profesional signature_pad):
+  // El secreto para que NO salga con escaloncitos es fijar DOS tamaños que coincidan:
+  //   1. El tamaño de dibujo (canvas.width/height) = tamaño en pantalla x densidad
+  //   2. El tamaño CSS EXACTO en píxeles (canvas.style.width/height) = tamaño en pantalla
+  // Antes el canvas tenía style width:100% (se estiraba y no coincidía → escaloncitos).
   var rect = canvas.getBoundingClientRect();
-  var dpr = window.devicePixelRatio || 1;
-  var escala = Math.max(3, dpr * 2); // buena nitidez sin deformar
-  canvas.width = Math.round(rect.width * escala);
-  canvas.height = Math.round(rect.height * escala);
+  var dpr = Math.max(window.devicePixelRatio || 1, 1);
+  // Fijar el tamaño CSS EXACTO en píxeles (no % que estira)
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  // Fijar el tamaño de dibujo a la densidad real de la pantalla
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
   _firmaCtx = canvas.getContext('2d');
-  _firmaCtx.scale(escala, escala);
+  _firmaCtx.scale(dpr, dpr); // así se dibuja en coordenadas de pantalla, nítido
   _firmaCtx.strokeStyle = '#111';
   _firmaCtx.lineWidth = 3.5;
   _firmaCtx.lineCap = 'round';
@@ -8665,8 +8813,8 @@ function iniciarCanvasFirma(){
   _firmaCtx.imageSmoothingQuality = 'high';
   _firmaHayTrazo = false;
 
-  // La posición del dedo se calcula EN EL TAMAÑO EN PANTALLA (rect), que es la misma
-  // escala en la que dibuja el contexto tras scale(). Así el trazo sigue al dedo exacto.
+  // La posición del dedo se calcula en el tamaño en pantalla (rect), que es la misma
+  // escala en la que dibuja el contexto tras scale(dpr). El trazo sigue al dedo exacto.
   function pos(e){
     var r = canvas.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
@@ -9425,6 +9573,7 @@ function selBarbero(cid, nombre){
   document.getElementById('ped-barberia-actual').textContent = pedBarberiaSel||'';
   pedItemsTemp = [];
   renderPedItems();
+  renderFavoritosPedido();
 }
 
 function volverABarberias(){
@@ -10484,6 +10633,75 @@ function addPedItem(){
   renderPedItems();
 }
 
+// Favoritos del barbero en PEDIDOS RÁPIDOS: muestra lo que ese barbero compra más,
+// en botones. Un toque lo agrega al pedido. Igual que en Vender pero para pedidos.
+function renderFavoritosPedido(){
+  var cont = document.getElementById('ped-favoritos');
+  if(!cont) return;
+  var cid = pedBarberoCid;
+  if(!cid){ cont.style.display='none'; cont.innerHTML=''; return; }
+  var ventasCl = LS('nv', []).filter(function(v){ return String(v.cid)===String(cid); });
+  var conteo = {};
+  ventasCl.forEach(function(v){
+    (v.items||[]).forEach(function(it){
+      if(!it.pid) return;
+      if(!conteo[it.pid]) conteo[it.pid] = { cant:0, nombre:it.nombre };
+      conteo[it.pid].cant += it.cant;
+    });
+  });
+  var topPids = Object.keys(conteo).sort(function(a,b){ return conteo[b].cant - conteo[a].cant; }).slice(0,4);
+  if(!topPids.length){ cont.style.display='none'; cont.innerHTML=''; return; }
+  loadProds();
+  var botones = '';
+  topPids.forEach(function(pid){
+    var prod = productos.find(function(p){ return String(p.id)===String(pid); });
+    if(!prod) return;
+    var precio = obtenerPrecioParaCliente(cid, prod.id, prod.precio);
+    botones += '<button onclick="agregarFavoritoPedido(\''+prod.id+'\')" '
+      + 'style="flex:1;min-width:calc(50% - 4px);background:#FFF8E1;border:1.5px solid var(--nbs-gold);'
+      + 'border-radius:10px;padding:10px 8px;cursor:pointer;text-align:left">'
+      + '<div style="font-size:14px;font-weight:700;color:var(--nbs-ink);line-height:1.2">'+escaparHtml(prod.nombre)+'</div>'
+      + '<div style="font-size:13px;font-weight:800;color:#2E7D32;margin-top:3px">$'+fmtNum(precio)+' <span style="color:#E65100">+ Agregar</span></div>'
+      + '</button>';
+  });
+  if(!botones){ cont.style.display='none'; cont.innerHTML=''; return; }
+  cont.innerHTML = '<div style="font-size:12px;font-weight:700;color:#E65100;margin-bottom:6px">\u26A1 LO QUE M\u00c1S COMPRA (toca para agregar)</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:8px">'+botones+'</div>'
+    + '<button onclick="repetirUltimoPedido()" style="width:100%;margin-top:8px;background:#E8F5E9;border:1.5px solid #2E7D32;border-radius:10px;padding:11px;cursor:pointer;font-size:14px;font-weight:700;color:#2E7D32">\u21BB Repetir su \u00faltima compra</button>';
+  cont.style.display='block';
+}
+
+// Agrega un favorito al pedido (reutiliza selPed que ya agrega al pedido con el precio del barbero).
+function agregarFavoritoPedido(pid){
+  if(typeof selPed === 'function'){ selPed(pid); }
+}
+
+// Repite la última compra del barbero en el pedido.
+function repetirUltimoPedido(){
+  var cid = pedBarberoCid;
+  if(!cid){ alert('Primero elige el barbero.'); return; }
+  var ventasCl = LS('nv', []).filter(function(v){ return String(v.cid)===String(cid) && (v.items||[]).length; });
+  if(!ventasCl.length){ alert('Este barbero no tiene compras anteriores todavía.'); return; }
+  ventasCl.sort(function(a,b){ return (b.id||0) - (a.id||0); });
+  var ultima = ventasCl[0];
+  loadProds();
+  var agregados = 0;
+  (ultima.items||[]).forEach(function(it){
+    var prod = productos.find(function(p){ return String(p.id)===String(it.pid); });
+    if(prod){
+      var encontrado = false;
+      var precioAUsar = obtenerPrecioParaCliente(cid, prod.id, prod.precio);
+      for(var j=0;j<pedItemsTemp.length;j++){
+        if(String(pedItemsTemp[j].pid)===String(prod.id)){ pedItemsTemp[j].cant += it.cant; encontrado=true; break; }
+      }
+      if(!encontrado) pedItemsTemp.push({ pid: prod.id, nombre: prod.nombre, cant: it.cant, precio: precioAUsar, costo: prod.costo });
+      agregados++;
+    }
+  });
+  if(agregados){ renderPedItems(); }
+  else { alert('Los productos de la última compra ya no están en el catálogo.'); }
+}
+
 function renderPedItems(){
   var el = document.getElementById('pedItems');
   el.innerHTML = '';
@@ -10567,6 +10785,7 @@ function irAVenderCliente(id){
       syncVcl();
       var sel = document.getElementById('vcl');
       if(sel) sel.value = id;
+      renderFavoritosCliente();
     }, 100);
   }
 }
@@ -10605,6 +10824,7 @@ function irAPedidoCliente(id){
     document.getElementById('ped-barbero-actual').textContent = nombreCl(cl);
     document.getElementById('ped-barberia-actual').textContent = cl.negocio||'';
     renderPedItems();
+    renderFavoritosPedido();
   }, 100);
 }
 
@@ -14146,11 +14366,11 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
       var boxHeight = 22 + abonos.length*20 + 12;
       ctx.fillStyle = '#F1F8E9';
       ctx.fillRect(pad-6, boxTop, W-2*pad+12, boxHeight);
-      ctx.font='12px '+ff+'';
+      ctx.font='16px '+ff+'';
       ctx.fillStyle = '#2E7D32';
       ctx.textAlign='left'; ctx.fillText('HISTORIAL DE ABONOS', pad, y);
       y += 22;
-      ctx.font='13px '+ff+'';
+      ctx.font='17px '+ff+'';
       abonos.forEach(function(p){
         ctx.fillStyle = '#555';
         ctx.textAlign='left'; ctx.fillText(((p.fecha||'')+(p.nota?' - '+p.nota:'')).substring(0,24), pad, y);
@@ -14158,7 +14378,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
         ctx.textAlign='right'; ctx.fillText('$'+fmtNum(p.monto), W-pad, y);
         y += 20;
       });
-      ctx.font='14px '+ff+'';
+      ctx.font='18px '+ff+'';
       ctx.fillStyle = '#2E7D32';
       ctx.textAlign='left'; ctx.fillText('Total abonado:', pad, y);
       ctx.textAlign='right'; ctx.fillText('$'+fmtNum(pagado), W-pad, y);
@@ -14171,7 +14391,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
       var bt = y - 18;
       ctx.fillStyle = '#FFEBEE';
       ctx.fillRect(pad-6, bt, W-2*pad+12, 26);
-      ctx.font='15px '+ff+'';
+      ctx.font='19px '+ff+'';
       ctx.fillStyle = '#C62828';
       ctx.textAlign='left'; ctx.fillText('BALANCE PENDIENTE:', pad, y);
       ctx.textAlign='right'; ctx.fillText('$'+fmtNum(saldo), W-pad, y);
@@ -14179,7 +14399,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
     } else {
       ctx.fillStyle = '#E8F5E9';
       ctx.fillRect(pad-6, y-18, W-2*pad+12, 26);
-      ctx.font='15px '+ff+'';
+      ctx.font='19px '+ff+'';
       ctx.fillStyle = '#2E7D32';
       ctx.textAlign='center'; ctx.fillText('\u2713 PAGADO COMPLETO', W/2, y);
       y += 32;
@@ -14209,7 +14429,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   }
 
   y += 16;
-  ctx.font=''+(colorMode?12:16)+'px '+ff+'';
+  ctx.font=''+(colorMode?12:18)+'px '+ff+'';
   ctx.fillStyle = colorMode ? '#aaa' : '#000';
   ctx.textAlign='center';
   ctx.fillText('Gracias por su preferencia', W/2, y);
@@ -18300,9 +18520,12 @@ function verHistorialCliente(cid, modo){
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">🧾 Vender</h2>
   <div class="card">
     <label class="lbl">Cliente</label>
-    <select class="inp" id="vcl" onchange="renderMetodosPago('vini')">
+    <input class="inp" id="vcl-buscar" type="text" placeholder="🔍 Escribe nombre o barbería..." oninput="filtrarClienteVenta(this.value)" autocomplete="off" style="margin-bottom:4px">
+    <div id="vcl-lista" style="background:white;border:1px solid #ddd;border-radius:8px;max-height:200px;overflow-y:auto;display:none;margin-bottom:8px"></div>
+    <select class="inp" id="vcl" onchange="renderMetodosPago('vini'); renderFavoritosCliente()">
       <option value="">-- Cliente general --</option>
     </select>
+    <div id="v-favoritos" style="display:none;margin-bottom:10px"></div>
     <label class="lbl">Buscar producto</label>
     <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="vb" type="text" placeholder="Escribe para buscar..." oninput="filterV(this.value)" onfocus="filterV(this.value||'')"></div>
     <div id="vlist" style="background:white;border:1px solid #ddd;border-radius:8px;max-height:200px;overflow-y:auto;display:none;margin-bottom:8px"></div>
@@ -18366,6 +18589,7 @@ function verHistorialCliente(cid, modo){
         <span id="pago-total-vini" style="font-size:16px;font-weight:800;color:#2E7D32">$0.00</span>
       </div>
     </div>
+    <button class="btn" style="background:#00838F;color:white;font-size:16px;font-weight:800;padding:15px" onclick="cobroRapidoContadoEfectivo()">⚡ Cobro rápido (contado en efectivo)</button>
     <button class="btn" style="background:#2E7D32;color:white" onclick="registrarVentaConFirma()">✓ Registrar venta</button>
     <button id="btn-cancelar-conversion-pedido" style="display:none;width:100%;padding:10px;background:#FFEBEE;color:#C62828;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px" onclick="cancelarConversionPedido()">✕ Cancelar y volver a Pedidos Pendientes -no se pierde nada-</button>
     <div class="snk" id="mk-v">Venta registrada</div>
@@ -18430,6 +18654,7 @@ function verHistorialCliente(cid, modo){
         </div>
         <button onclick="cancelarPedido()" style="background:#f5f5f5;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px;color:#546E7A;font-weight:600">✕ Cancelar</button>
       </div>
+      <div id="ped-favoritos" style="display:none;margin-bottom:10px"></div>
       <label class="lbl">Buscar producto</label>
       <div style="display:flex;gap:8px">
         <div class="busca-caja" style="border:2px solid var(--nbs-gold)">
