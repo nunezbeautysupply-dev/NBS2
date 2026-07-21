@@ -4988,6 +4988,32 @@ function verFacturaCompra(c, sid){
       +'<button id="btnpagocompra-'+c.id+'" style="padding:10px 14px;background:#5D4037;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">✓ Pagar</button>'
       +'</div>';
     el.appendChild(payCard);
+    // NUEVO: dos botones grandes para pagar TODO el saldo de un toque, eligiendo como.
+    var pagarTodoCard = document.createElement('div');
+    pagarTodoCard.className = 'card';
+    pagarTodoCard.innerHTML = '<div style="font-size:13px;font-weight:700;color:#5D4037;margin-bottom:4px">O PAGAR TODA LA FACTURA</div>'
+      + '<div style="font-size:12px;color:#aaa;margin-bottom:10px">Un toque paga los $'+fmtNum(saldo)+' completos</div>'
+      + '<div style="display:flex;gap:10px">'
+      + '<button id="pagtodo-efe-'+c.id+'" style="flex:1;padding:16px 10px;background:#2E7D32;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700">\ud83d\udcb5 EFECTIVO<br><span style="font-size:13px;font-weight:600">$'+fmtNum(saldo)+'</span></button>'
+      + '<button id="pagtodo-tar-'+c.id+'" style="flex:1;padding:16px 10px;background:#1565C0;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700">\ud83d\udcb3 TARJETA<br><span style="font-size:13px;font-weight:600">$'+fmtNum(saldo)+'</span></button>'
+      + '</div>';
+    el.appendChild(pagarTodoCard);
+    // Funcion que paga TODO el saldo con el metodo elegido (protegida con huella por ser dinero).
+    var pagarTodoCompra = function(metodo, metodoLabel){
+      if(!confirm('\u00bfPagar TODA la factura de $'+fmtNum(saldo)+' con '+metodoLabel+'?')) return;
+      protegerConHuella(function(){
+        compras = LS('nc', []);
+        var compraReal = compras.find(function(x){ return x.id===c.id; });
+        if(!compraReal) return;
+        if(!compraReal.pagosFactura) compraReal.pagosFactura = [];
+        compraReal.pagosFactura.push({ monto: saldo, fecha: fechaHoy(), metodo: metodo });
+        SS('nc', compras);
+        alert('\u2705 Factura pagada por completo ($'+fmtNum(saldo)+') con '+metodoLabel+'.');
+        verSup(sid);
+      });
+    };
+    document.getElementById('pagtodo-efe-'+c.id).onclick = function(){ pagarTodoCompra('efectivo', '\ud83d\udcb5 Efectivo'); };
+    document.getElementById('pagtodo-tar-'+c.id).onclick = function(){ pagarTodoCompra('tarjeta', '\ud83d\udcb3 Tarjeta'); };
     document.getElementById('btnpagocompra-'+c.id).onclick = function(){
       var inp = document.getElementById('pagocompra-'+c.id);
       var monto = parseFloat(inp.value) || 0;
