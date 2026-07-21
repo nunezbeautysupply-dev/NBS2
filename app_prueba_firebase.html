@@ -424,6 +424,35 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
   firebase.initializeApp(firebaseConfig);
   var fbAuth = firebase.auth();
   var fbDb = firebase.firestore();
+
+  // ===== MODO SIN INTERNET (offline) =====
+  // Guarda una copia de los datos en el teléfono. Así la app funciona sin internet:
+  // las ventas y cambios se hacen igual, se ponen en cola, y suben solos a la nube
+  // cuando vuelve la conexión. Es una función que Firebase ya trae incluida.
+  // El manejo de errores garantiza que, pase lo que pase, la app NUNCA deje de funcionar.
+  try {
+    fbDb.enablePersistence({ synchronizeTabs: true })
+      .then(function(){
+        window._offlineActivo = true;
+        console.log('✅ Modo sin internet ACTIVADO — la app funciona offline.');
+      })
+      .catch(function(err){
+        window._offlineActivo = false;
+        if(err && err.code === 'failed-precondition'){
+          // Varias pestañas abiertas: el offline solo puede estar en una a la vez.
+          console.log('Modo offline: hay varias pestañas abiertas. Se usa solo en una.');
+        } else if(err && err.code === 'unimplemented'){
+          // El navegador no soporta el offline. La app sigue funcionando normal (con internet).
+          console.log('Este navegador no soporta el modo offline. La app funciona normal con internet.');
+        } else {
+          console.log('Modo offline no se pudo activar:', err && err.message);
+        }
+      });
+  } catch(e){
+    // Si algo falla al activar, la app sigue funcionando igual que antes (con internet).
+    window._offlineActivo = false;
+    console.log('No se pudo activar el modo offline; la app funciona normal.', e && e.message);
+  }
 </script>
 </head>
 <body>
