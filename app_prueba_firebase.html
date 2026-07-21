@@ -14159,14 +14159,14 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
 
 function generarFacturaCanvas(v, cl, pagado, saldo, numFact, colorMode){
   var W = colorMode ? 480 : 384, pad = 16;
-  var SCALE = colorMode ? 2 : 1; // mayor resolucion para la version a color (se ve nitida al hacer zoom en el celular)
+  var SCALE = colorMode ? 2 : 4; // b/n en resolucion 4 = texto nitido/profesional en la Epson termica; color en 2 (se ve nitida al hacer zoom en el celular)
   var abonos = (v.tipo==='credito' && v.pagosFactura) ? v.pagosFactura.filter(function(p){ return typeof p.monto==='number' && p.monto>0; }) : [];
 
   var tmp = document.createElement('canvas');
   tmp.width = W*SCALE; tmp.height = 2200*SCALE;
   var ctxTmp = tmp.getContext('2d');
   ctxTmp.scale(SCALE, SCALE);
-  ctxTmp.imageSmoothingEnabled = colorMode; // suavizado activo solo para la version a color (evita el logo pixelado)
+  ctxTmp.imageSmoothingEnabled = true; // suavizado siempre activo: en b/n a resolucion 4 da letras finas y nitidas antes de pasar a blanco/negro puro
   ctxTmp.imageSmoothingQuality = 'high';
   ctxTmp.fillStyle = '#fff'; ctxTmp.fillRect(0,0,W,2200);
   var finalY = dibujarContenidoFactura(ctxTmp, W, pad, v, cl, pagado, saldo, numFact, abonos, colorMode);
@@ -14191,7 +14191,7 @@ function generarFacturaCanvas(v, cl, pagado, saldo, numFact, colorMode){
   var canvas = document.createElement('canvas');
   canvas.width = W*SCALE; canvas.height = finalH*SCALE;
   var ctx = canvas.getContext('2d');
-  ctx.imageSmoothingEnabled = colorMode;
+  ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.drawImage(tmp, 0, 0, W*SCALE, finalH*SCALE, 0, 0, W*SCALE, finalH*SCALE);
