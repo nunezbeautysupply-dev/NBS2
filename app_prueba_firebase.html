@@ -8804,6 +8804,42 @@ function pedirFirmaCliente(){
 
 var _firmaCtx = null, _firmaDibujando = false, _firmaHayTrazo = false;
 
+// Dibuja la GUÍA de firma: una línea horizontal con una X a la izquierda, estilo
+// documento profesional, para que el cliente firme ENCIMA de la línea. La guía queda
+// en el canvas por debajo de la firma, así al guardar la firma sale CON su línea.
+function dibujarGuiaFirma(){
+  if(!_firmaCtx) return;
+  var w = window._firmaAncho || 360;
+  var hh = window._firmaAlto || 200;
+  var yLinea = hh * 0.72; // la línea va en la parte baja del recuadro
+  var margen = 24;
+  _firmaCtx.save();
+  _firmaCtx.strokeStyle = '#9aa0a6';
+  _firmaCtx.fillStyle = '#9aa0a6';
+  _firmaCtx.lineWidth = 1.5;
+  _firmaCtx.lineCap = 'butt';
+  _firmaCtx.lineJoin = 'miter';
+  // La línea horizontal
+  _firmaCtx.beginPath();
+  _firmaCtx.moveTo(margen + 22, yLinea);
+  _firmaCtx.lineTo(w - margen, yLinea);
+  _firmaCtx.stroke();
+  // La X a la izquierda, encima del inicio de la línea
+  _firmaCtx.lineWidth = 2;
+  _firmaCtx.beginPath();
+  _firmaCtx.moveTo(margen, yLinea - 8);
+  _firmaCtx.lineTo(margen + 12, yLinea + 4);
+  _firmaCtx.moveTo(margen + 12, yLinea - 8);
+  _firmaCtx.lineTo(margen, yLinea + 4);
+  _firmaCtx.stroke();
+  _firmaCtx.restore();
+  // Devolver el pincel al estado de firma (negro, grueso)
+  _firmaCtx.strokeStyle = '#111';
+  _firmaCtx.lineWidth = 3.5;
+  _firmaCtx.lineCap = 'round';
+  _firmaCtx.lineJoin = 'round';
+}
+
 function iniciarCanvasFirma(){
   var canvas = document.getElementById('firma-canvas');
   if(!canvas) return;
@@ -8829,6 +8865,12 @@ function iniciarCanvasFirma(){
   _firmaCtx.imageSmoothingEnabled = true;
   _firmaCtx.imageSmoothingQuality = 'high';
   _firmaHayTrazo = false;
+
+  // Dibujar la GUÍA: una X y una línea horizontal, para que el cliente firme encima.
+  // Se guarda el tamaño en pantalla para redibujarla al limpiar.
+  window._firmaAncho = rect.width;
+  window._firmaAlto = rect.height;
+  dibujarGuiaFirma();
 
   // La posición del dedo se calcula en el tamaño en pantalla (rect), que es la misma
   // escala en la que dibuja el contexto tras scale(dpr). El trazo sigue al dedo exacto.
@@ -8896,7 +8938,7 @@ function iniciarCanvasFirma(){
 
 function limpiarFirma(){
   var canvas = document.getElementById('firma-canvas');
-  if(canvas && _firmaCtx){ _firmaCtx.clearRect(0, 0, canvas.width, canvas.height); _firmaHayTrazo = false; }
+  if(canvas && _firmaCtx){ _firmaCtx.clearRect(0, 0, canvas.width, canvas.height); _firmaHayTrazo = false; dibujarGuiaFirma(); }
 }
 
 function cancelarFirma(){
@@ -13530,7 +13572,7 @@ function confirmarPagoMultiple(vid, saldo){
   if(total <= 0){ alert('Ingresa un monto válido en al menos una forma de pago.'); return; }
 
   ventas = LS('nv',[]);
-  var venta = ventas.find(function(x){ return x.id===vid; });
+  var venta = ventas.find(function(x){ return String(x.id)===String(vid); });
   if(!venta) return;
 
   // Caso normal: el pago cabe en esta factura
@@ -13957,6 +13999,25 @@ function verFacturaProfesional(vid){
   btnDevolucion.onclick = function(){ abrirDevolucion(vid); };
   overlay.appendChild(btnDevolucion);
 
+  // Botón de cobro rápido: pagar TODO el saldo en efectivo de un toque (solo si es crédito con saldo)
+  if(!v.cancelada && v.tipo==='credito' && saldo > 0){
+    var btnPagoRapido = document.createElement('button');
+    btnPagoRapido.className = 'no-print';
+    btnPagoRapido.innerHTML = '💵 Pagar todo en efectivo ($'+fmtNum(saldo)+')';
+    btnPagoRapido.style.cssText = 'display:block;width:100%;max-width:400px;margin:0 auto 8px;padding:13px;background:#00838F;color:white;border:none;border-radius:8px;font-size:15px;font-weight:800;cursor:pointer';
+    btnPagoRapido.onclick = function(){
+      if(!confirm('¿Registrar el pago COMPLETO de $'+fmtNum(saldo)+' en efectivo?')) return;
+      var vv = LS('nv', []);
+      var vr = vv.find(function(x){ return String(x.id)===String(vid); });
+      if(!vr){ alert('No se encontró la factura.'); return; }
+      if(!vr.pagosFactura) vr.pagosFactura = [];
+      vr.pagosFactura.push({ monto: saldo, fecha: fechaHoy(), metodos:[{tipo:'efectivo', monto:saldo}] });
+      SS('nv', vv);
+      alert('✅ Pago de $'+fmtNum(saldo)+' en efectivo aplicado correctamente.');
+      verFacturaProfesional(vid);
+    };
+    overlay.appendChild(btnPagoRapido);
+  }
   if(!v.cancelada){
     var btnFirma = document.createElement('button');
     btnFirma.className = 'no-print';
@@ -14028,6 +14089,7 @@ function verFacturaProfesional(vid){
     +'<th style="padding:8px 6px;text-align:right;font-size:11px;color:#aaa;font-weight:700;text-transform:uppercase">Precio</th>'
     +'<th style="padding:8px 6px;text-align:right;font-size:11px;color:#aaa;font-weight:700;text-transform:uppercase">Total</th>'
     +'</tr></thead><tbody>'+itemsHTML+'</tbody></table>'
+    +(v.firma ? '<div style="margin:4px 0 14px;text-align:center"><div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;text-align:left">Constancia de entrega</div><img src="'+v.firma+'" style="max-width:100%;max-height:200px;background:white"><div style="font-size:12px;color:#888;margin-top:2px">Firma del cliente</div></div>' : '')
     +'<div style="border-top:2px solid #1a237e;padding-top:12px">'
     +'<div style="display:flex;justify-content:space-between;margin-bottom:4px">'
     +'<span style="font-size:13px;color:#555">Tipo de pago:</span>'
@@ -14055,7 +14117,6 @@ function verFacturaProfesional(vid){
     +'<span style="font-size:14px;font-weight:800;color:'+(esSaldoPendiente(saldo)?'#C62828':'#2E7D32')+'">$'+fmtNum(saldo)+'</span>'
     +'</div>'
     +'</div>'
-    +(v.firma ? '<div style="text-align:center;margin-top:14px;border-top:0.5px solid #ddd;padding-top:12px"><div style="font-size:13px;font-weight:700;color:#333;margin-bottom:4px">Firma del cliente</div><img src="'+v.firma+'" style="max-width:220px;max-height:110px;border:1px solid #eee;border-radius:8px;background:white"></div>' : '')
     +'<div style="text-align:center;margin-top:16px;font-size:11px;color:#aaa;border-top:0.5px solid #f0f0f0;padding-top:12px">Gracias por su preferencia · Nunez Beauty Supply</div>'
     +'</div>';
   overlay.appendChild(factDiv);
@@ -14393,6 +14454,35 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke();
   y += colorMode?26:29;
 
+  // FIRMA DEL CLIENTE — va aqui, DESPUES de los productos (y su raya) y ANTES de los
+  // totales. Solo si el cliente firmo. La imagen ya trae su X y linea guia. Debajo va
+  // otra raya que separa la firma de los totales. Pedido por Sensei con este orden exacto.
+  if(v.firma && window._firmaImgFactura && window._firmaImgFactura.complete && window._firmaImgFactura.naturalWidth){
+    ctx.font = 'bold '+(colorMode?11:14)+'px '+(colorMode?'Georgia, serif':'Arial, sans-serif');
+    ctx.fillStyle = colorMode ? '#666' : '#000';
+    ctx.textAlign='left';
+    ctx.fillText('CONSTANCIA DE ENTREGA', pad, y);
+    y += 8;
+    var _fimg = window._firmaImgFactura;
+    var _fmaxW = W - pad*2;
+    var _fmaxH = colorMode ? 200 : 230;
+    var _fesc = Math.min(_fmaxW / _fimg.naturalWidth, _fmaxH / _fimg.naturalHeight);
+    var _fw = _fimg.naturalWidth * _fesc;
+    var _fh = _fimg.naturalHeight * _fesc;
+    var _fx = (W - _fw) / 2;
+    try{ ctx.drawImage(_fimg, _fx, y, _fw, _fh); }catch(e){}
+    y += _fh + 2;
+    ctx.font = ''+(colorMode?11:13)+'px '+(colorMode?'Georgia, serif':'Arial, sans-serif');
+    ctx.fillStyle = colorMode ? '#888' : '#000';
+    ctx.textAlign='center';
+    ctx.fillText('Firma del cliente', W/2, y);
+    y += colorMode?14:18;
+    // Raya que separa la firma de los totales
+    ctx.strokeStyle = colorMode ? '#1a237e' : '#000'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke();
+    y += colorMode?26:29;
+  }
+
   if(colorMode){
     ctx.font=''+fs.pago+'px '+ff+'';
     ctx.fillStyle = '#555';
@@ -14484,32 +14574,6 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
   y += colorMode?16:20;
   ctx.fillText('Nunez Beauty Supply', W/2, y);
   y += 18;
-
-  // Firma del cliente (si la factura tiene una guardada). Se dibuja al final como
-  // constancia de entrega. La imagen ya viene precargada en _firmaImgFactura.
-  if(v.firma && window._firmaImgFactura && window._firmaImgFactura.complete && window._firmaImgFactura.naturalWidth){
-    y += 10;
-    ctx.strokeStyle = colorMode ? '#ccc' : '#000';
-    ctx.lineWidth = 1;
-    // Línea divisoria
-    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W-pad, y); ctx.stroke();
-    y += 16;
-    ctx.font = 'bold '+(colorMode?12:15)+'px '+(colorMode?'Georgia, serif':'Arial, sans-serif');
-    ctx.fillStyle = colorMode ? '#555' : '#000';
-    ctx.textAlign='center';
-    ctx.fillText('Firma del cliente', W/2, y);
-    y += 8;
-    // Dibujar la firma centrada, escalada al ancho disponible manteniendo proporción
-    var img = window._firmaImgFactura;
-    var maxW = W - pad*2;
-    var maxH = 90;
-    var escala = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
-    var fw = img.naturalWidth * escala;
-    var fh = img.naturalHeight * escala;
-    var fx = (W - fw) / 2;
-    try{ ctx.drawImage(img, fx, y, fw, fh); }catch(e){}
-    y += fh + 6;
-  }
 
   return y;
 }
@@ -16496,6 +16560,103 @@ function graficoTopClientes(ventasPeriodo){
 //  igual que el Panorama: abre el reporte visual para imprimir/guardar PDF,
 //  y si hay resumen en texto, lo comparte por el menú del teléfono.
 // ═══════════════════════════════════════════════════════════════════════════
+// Menu de opciones para un reporte de pantalla (CxC, Inventario, etc.): deja ELEGIR
+// entre Imprimir o Compartir, en vez de hacer las dos cosas a la vez (que abria
+// PrinterShare de una y ademas compartia solo un letrerito). Pedido por Sensei.
+function abrirMenuReporte(idContenedor, titulo){
+  var cont = document.getElementById(idContenedor);
+  if(!cont || !cont.innerHTML.trim()){ alert('No hay datos para imprimir en este reporte.'); return; }
+  var limpio = cont.innerHTML
+    .replace(/<button[^>]*>[\s\S]*?<\/button>/g, '')
+    .replace(/<input[^>]*>/g, '');
+
+  var overlay = document.getElementById('reporte-acciones-overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'reporte-acciones-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100000;display:flex;align-items:flex-end;justify-content:center';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'flex';
+  overlay.innerHTML = '';
+  overlay.onclick = function(e){ if(e.target === overlay) overlay.style.display = 'none'; };
+
+  var sheet = document.createElement('div');
+  sheet.style.cssText = 'background:white;width:100%;max-width:480px;margin:0 auto;border-radius:16px 16px 0 0;padding:18px 16px 26px';
+  var tit = document.createElement('div');
+  tit.style.cssText = 'text-align:center;font-size:13px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:14px';
+  tit.textContent = titulo;
+  sheet.appendChild(tit);
+
+  var opciones = [
+    ['🖨️ Imprimir / Guardar PDF', '#1565C0', function(){ overlay.style.display='none'; soloImprimirReporte(titulo, limpio); }],
+    ['📤 Compartir (WhatsApp, etc.)', '#2E7D32', function(){ overlay.style.display='none'; soloCompartirReporte(idContenedor, titulo); }]
+  ];
+  opciones.forEach(function(op){
+    var btn = document.createElement('button');
+    btn.textContent = op[0];
+    btn.style.cssText = 'width:100%;padding:15px;margin-bottom:10px;background:'+op[1]+';color:white;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer';
+    btn.onclick = op[2];
+    sheet.appendChild(btn);
+  });
+  var cancelar = document.createElement('button');
+  cancelar.textContent = 'Cancelar';
+  cancelar.style.cssText = 'width:100%;padding:13px;background:#F0F0F2;color:#555;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer';
+  cancelar.onclick = function(){ overlay.style.display='none'; };
+  sheet.appendChild(cancelar);
+  overlay.appendChild(sheet);
+}
+
+// SOLO imprime (abre la ventana de impresion / guardar PDF). No comparte.
+function soloImprimirReporte(titulo, contenidoHTML){
+  imprimirReporteVisual(titulo, contenidoHTML);
+}
+
+// SOLO comparte: arma un TEXTO legible con el contenido real del reporte (no un letrerito)
+// y lo manda por el menu del telefono (WhatsApp, email, etc.).
+function soloCompartirReporte(idContenedor, titulo){
+  var cont = document.getElementById(idContenedor);
+  if(!cont){ alert('No hay datos para compartir.'); return; }
+  // Convertir el HTML del reporte a texto plano legible
+  var tmp = document.createElement('div');
+  tmp.innerHTML = cont.innerHTML.replace(/<button[^>]*>[\s\S]*?<\/button>/g, '').replace(/<input[^>]*>/g, '');
+  var texto = (tmp.innerText || tmp.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+  var encabezado = titulo + ' — NBS\n' + new Date().toLocaleDateString('es-US') + '\n\n';
+  var mensaje = encabezado + texto;
+  if(navigator.share){
+    navigator.share({ title: titulo + ' — NBS', text: mensaje }).catch(function(){});
+  } else {
+    // Respaldo: copiar al portapapeles
+    try{ navigator.clipboard.writeText(mensaje); alert('Reporte copiado. Pégalo donde quieras compartirlo.'); }
+    catch(e){ alert('Tu navegador no permite compartir directamente.'); }
+  }
+}
+
+// Version visual del reporte SOLO para imprimir (sin compartir). Reusa el mismo diseno.
+function imprimirReporteVisual(titulo, contenidoHTML){
+  var hoy = new Date().toLocaleDateString('es-US');
+  var estilos = '<style>'
+    + '@page { size: letter; margin: 12mm; }'
+    + '* { box-sizing: border-box; }'
+    + 'body { font-family: -apple-system, Arial, sans-serif; color:#222; margin:0; padding:0; width:100%; }'
+    + '.rep-cab { text-align:center; border-bottom:2px solid #D4A017; padding-bottom:8px; margin-bottom:14px; }'
+    + '.rep-cab h1 { font-size:22px; color:#1a237e; margin:0 0 3px; }'
+    + '.rep-cab .sub { font-size:12px; color:#666; margin:0; }'
+    + '.rep-cuerpo > div { width:100% !important; max-width:100% !important; page-break-inside:avoid; }'
+    + '.rep-cuerpo table { width:100%; border-collapse:collapse; }'
+    + '.rep-cuerpo { font-size:13px; }'
+    + '</style>';
+  var html = estilos
+    + '<div class="rep-cab"><h1>'+titulo+' — NBS</h1>'
+    + '<p class="sub">Generado el '+hoy+' · Nunez Beauty Supply</p></div>'
+    + '<div class="rep-cuerpo">'+contenidoHTML+'</div>';
+  var vent = window.open('', '_blank');
+  if(!vent){ alert('Permite las ventanas emergentes para imprimir el reporte.'); return; }
+  vent.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+titulo+' NBS</title></head><body>'+html+'</body></html>');
+  vent.document.close();
+  setTimeout(function(){ try{ vent.focus(); vent.print(); }catch(e){} }, 400);
+}
+
 function imprimirReporte(titulo, contenidoHTML, resumenTexto){
   var hoy = new Date().toLocaleDateString('es-US');
 
@@ -19069,7 +19230,7 @@ function verHistorialCliente(cid, modo){
 
   <p style="font-size:13px;font-weight:700;color:#AD1457;margin-bottom:8px">Clientes inscritos en el programa</p>
   <div id="vip-lista"></div>
-  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="imprimirPantalla('vip-lista','Programa VIP')">🖨️ Imprimir / Compartir este reporte</button>
+  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="abrirMenuReporte('vip-lista','Programa VIP')">🖨️ Imprimir / Compartir este reporte</button>
 </div>
 
 <div id="p-cxc" class="pg">
@@ -19081,7 +19242,7 @@ function verHistorialCliente(cid, modo){
   </div>
   <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="cxc-buscar" type="text" placeholder="Buscar por nombre o negocio..." oninput="cxcBuscarActivo(this.value)" autocomplete="off"></div>
   <div id="cxc-lista"></div>
-  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="imprimirPantalla('cxc-lista','Cuentas por Cobrar')">🖨️ Imprimir / Compartir este reporte</button>
+  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="abrirMenuReporte('cxc-lista','Cuentas por Cobrar')">🖨️ Imprimir / Compartir este reporte</button>
   <div id="cxc-saldadas-lista" style="display:none"></div>
 
   <div style="margin-top:32px;padding-top:16px;border-top:1px solid #eee">
@@ -19132,7 +19293,7 @@ function verHistorialCliente(cid, modo){
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:24px;font-weight:800;color:#1a237e;margin-bottom:16px;text-align:center;padding-bottom:12px;border-bottom:2px solid #E8EAF6">📊 Resumen Financiero del Negocio</h2>
   <div id="dashboard-contenido"></div>
-  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="imprimirPantalla('dashboard-contenido','Dashboard Financiero')">🖨️ Imprimir / Compartir este reporte</button>
+  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="abrirMenuReporte('dashboard-contenido','Dashboard Financiero')">🖨️ Imprimir / Compartir este reporte</button>
 </div>
 
 <div id="p-rutas" class="pg">
@@ -19154,7 +19315,7 @@ function verHistorialCliente(cid, modo){
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:20px;font-weight:700;color:var(--nbs-ink);margin-bottom:14px">📤 Cuentas por Pagar</h2>
   <div id="cxp-contenido"></div>
-  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="imprimirPantalla('cxp-contenido','Cuentas por Pagar')">🖨️ Imprimir / Compartir este reporte</button>
+  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="abrirMenuReporte('cxp-contenido','Cuentas por Pagar')">🖨️ Imprimir / Compartir este reporte</button>
 </div>
 <button id="btn-subir-flotante" style="display:none;position:fixed;bottom:24px;left:16px;z-index:999997;background:var(--nbs-gold);color:white;border:none;border-radius:50px;padding:10px 16px;font-size:13px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,0.25);cursor:pointer;align-items:center;gap:6px;opacity:0.92">⬆️ Subir</button>
 <script>
