@@ -9144,6 +9144,11 @@ function saveV(){
         ir('p-ped');
       }
     }, 900); // pequena pausa para que se alcance a ver la confirmacion de la venta guardada
+  } else {
+    // La venta se hizo directo desde VENDER (se escogio el cliente ahi mismo, sin venir de un
+    // perfil ni de un pedido). Como ya se termino con ese cliente, regresar solo a la lista de
+    // clientes despues de 2 segundos, para seguir con el siguiente. Da tiempo a tocar imprimir.
+    setTimeout(function(){ ir('p-cl'); }, 2000);
   }
 }
 
