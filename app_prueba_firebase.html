@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722e-OFICIAL-V2.0">
+<meta name="app-version" content="20260722f-DIAGNOSTICO-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -582,6 +582,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <div style="font-size:10px;color:var(--nbs-muted-2);font-weight:700;letter-spacing:1px;padding:12px 8px 4px">FINANZAS</div>
     <button onclick="irMenu('p-panorama')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📊</span></span>Panorama Completo</button>
     <button onclick="irMenu('p-docs')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📁</span></span>Mis Documentos</button>
+    <button onclick="cerrarMenuLateral();setTimeout(verLogAtras,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🔧</span></span>Registro bot&oacute;n atr&aacute;s</button>
     <button onclick="irMenu('p-academia')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🎓</span></span>Academia</button>
     <button onclick="irMenu('p-dashboard')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📈</span></span>Resumen Financiero</button>
     <button onclick="irMenuProtegido('p-gastos')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💸</span></span>Gastos</button>
@@ -15195,6 +15196,49 @@ var _saliendoApp = false;
 //  la app todo el tiempo mientras trabaja, siempre habra un guardian valido.
 // ═══════════════════════════════════════════════════════════════
 
+// ═══ REGISTRO DE DIAGNOSTICO DEL BOTON ATRAS ═══
+// Graba en el telefono lo que va pasando. Como se guarda en localStorage,
+// SOBREVIVE aunque la app se cierre: al volver a abrir se puede leer que
+// paso justo antes. Es la unica forma de ver que ocurre en el telefono de
+// Sensei, porque en la computadora de pruebas todo funciona.
+function logAtras(txt){
+  try{
+    var L = JSON.parse(localStorage.getItem('nbs_log_atras') || '[]');
+    var t = new Date();
+    L.push(('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2)
+           +' | ' + txt);
+    if(L.length > 80) L = L.slice(-80);
+    localStorage.setItem('nbs_log_atras', JSON.stringify(L));
+  }catch(e){}
+}
+function verLogAtras(){
+  var L = [];
+  try{ L = JSON.parse(localStorage.getItem('nbs_log_atras') || '[]'); }catch(e){}
+  var txt = L.length ? L.join('\n') : '(vacio)';
+  var w = document.getElementById('logatras-caja');
+  if(!w) return;
+  document.getElementById('logatras-texto').textContent = txt;
+  document.getElementById('logatras-ov').style.display = 'block';
+  w.style.display = 'block';
+}
+function cerrarLogAtras(){
+  var ov = document.getElementById('logatras-ov'), c = document.getElementById('logatras-caja');
+  if(ov) ov.style.display='none';
+  if(c) c.style.display='none';
+}
+function borrarLogAtras(){
+  try{ localStorage.removeItem('nbs_log_atras'); }catch(e){}
+  document.getElementById('logatras-texto').textContent = '(borrado - ahora haz tu prueba)';
+}
+function copiarLogAtras(){
+  var t = document.getElementById('logatras-texto').textContent;
+  try{
+    if(navigator.clipboard) navigator.clipboard.writeText(t);
+    else { var a=document.createElement('textarea'); a.value=t; document.body.appendChild(a); a.select(); document.execCommand('copy'); document.body.removeChild(a); }
+    alert('Copiado. Pegalo en el chat.');
+  }catch(e){ alert('No se pudo copiar. Toma una foto de la pantalla.'); }
+}
+
 function hayGuardian(){
   return !!(history.state && history.state.nbs);
 }
@@ -15211,7 +15255,10 @@ function profundidadGuardian(){
 // hay tantos guardianes como pasos haya dado, y puede tocar atras varias
 // veces seguidas sin tener que tocar la pantalla entremedio.
 var _ultimoGuardian = 0;
-var MIN_GUARDIANES = 6;   // colchon: aguanta 6 toques de atras seguidos sin tocar la pantalla
+var MIN_GUARDIANES = 6;
+logAtras('=== ABRIO LA APP | largo historial='+history.length
+         +' | state='+(history.state?JSON.stringify(history.state):'null')
+         +' | modo='+(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ? 'ICONO' : 'navegador')+' ===');   // colchon: aguanta 6 toques de atras seguidos sin tocar la pantalla
 
 function ponerGuardianAtras(){
   var ahora = Date.now();
@@ -15221,16 +15268,21 @@ function ponerGuardianAtras(){
   // del toque real del usuario, asi que Chrome los respeta todos. Con 6 de
   // colchon, Sensei puede tocar atras 6 veces seguidas sin tocar la pantalla
   // entremedio y la app nunca se queda sin proteccion.
-  var d = profundidadGuardian(), vueltas = 0;
+  var antes = profundidadGuardian(), largoAntes = history.length;
+  var d = antes, vueltas = 0, errores = 0;
   while(d < MIN_GUARDIANES && vueltas < MIN_GUARDIANES){
     d++; vueltas++;
-    try{ history.pushState({nbs:1, d:d}, '', window.location.href); }catch(e){ break; }
+    try{ history.pushState({nbs:1, d:d}, '', window.location.href); }
+    catch(e){ errores++; break; }
   }
+  logAtras('TOQUE: guardianes '+antes+'->'+profundidadGuardian()
+           +' | puestos '+vueltas+(errores?' | ERRORES '+errores:'')
+           +' | largo historial '+largoAntes+'->'+history.length);
 }
 
 // EN CADA TOQUE REAL del usuario. Es lo unico que Chrome respeta.
 // Se usa captura (true) para que corra siempre, aunque el boton haga otra cosa.
-['pointerdown','mousedown','keydown'].forEach(function(ev){
+['pointerdown','touchstart','mousedown','click','keydown'].forEach(function(ev){
   document.addEventListener(ev, ponerGuardianAtras, true);
 });
 
@@ -15248,6 +15300,9 @@ function hayADondeVolver(){
 }
 
 window.addEventListener('popstate', function(){
+  logAtras('ATRAS: prof='+profundidadGuardian()+' | largo='+history.length
+           +' | pantalla='+pantallaActual()+' | pila='+(historialPantallas?historialPantallas.length:'?')
+           +(_saliendoApp?' | SALIENDO':''));
   if(_saliendoApp) return;
 
   // OJO: aqui NO se pone guardian. Un guardian creado dentro del propio evento
@@ -15257,6 +15312,7 @@ window.addEventListener('popstate', function(){
 
   // 1) Si el menu lateral esta abierto, el boton atras solo lo cierra
   if(menuLateralAbierto()){
+    logAtras('  -> cerro menu lateral');
     cerrarMenuLateral();
     return;
   }
@@ -15270,6 +15326,7 @@ window.addEventListener('popstate', function(){
   // 3) Si hay a donde volver, hacer lo mismo que el boton "<- Atras" de la app
   //    -volverAtras ya sabe cerrar formularios, perfiles y editores primero-
   if(hayADondeVolver()){
+    logAtras('  -> volverAtras()');
     volverAtras();
     return;
   }
@@ -15277,6 +15334,7 @@ window.addEventListener('popstate', function(){
   // 4) Estamos en el Inicio y no hay nada mas atras: preguntar antes de salir.
   //    Se usa un letrero PROPIO de la app -no el confirm() de Android- porque
   //    ese congela la app y estorba con la navegacion.
+  logAtras('  -> LETRERO SALIR');
   mostrarLetreroSalir();
 });
 
@@ -19966,6 +20024,19 @@ function verHistorialCliente(cid, modo){
   <div style="font-size:15px;color:#555;line-height:1.5;margin-bottom:20px">Tu informaci&oacute;n ya est&aacute; guardada.</div>
   <button onclick="cerrarLetreroSalir()" style="width:100%;padding:16px;border:none;border-radius:13px;background:#1a237e;color:#fff;font-size:18px;font-weight:800;cursor:pointer;margin-bottom:11px;font-family:inherit">No, quedarme aqu&iacute;</button>
   <button onclick="salirDeLaApp()" style="width:100%;padding:16px;border:2px solid #c62828;border-radius:13px;background:#fff;color:#c62828;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit">S&iacute;, salir</button>
+</div>
+
+<!-- Panel de diagnostico del boton atras (temporal, para encontrar la falla) -->
+<div id="logatras-ov" onclick="cerrarLogAtras()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.75);z-index:99996"></div>
+<div id="logatras-caja" style="display:none;position:fixed;left:4%;right:4%;top:6%;bottom:6%;z-index:99997;background:#fff;border-radius:16px;padding:16px;box-shadow:0 12px 44px rgba(0,0,0,.45);display:none;flex-direction:column">
+  <div style="font-size:19px;font-weight:800;color:#1a237e;margin-bottom:4px">&#128295; Registro del bot&oacute;n atr&aacute;s</div>
+  <div style="font-size:13px;color:#666;margin-bottom:10px">Haz tu prueba y despu&eacute;s c&oacute;piame esto.</div>
+  <pre id="logatras-texto" style="flex:1;overflow:auto;background:#f4f5fa;border:1px solid #dcdfee;border-radius:10px;padding:10px;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;margin:0 0 12px;color:#222"></pre>
+  <div style="display:flex;gap:8px">
+    <button onclick="borrarLogAtras()" style="flex:1;padding:13px 6px;border:1px solid #c62828;border-radius:11px;background:#fff;color:#c62828;font-size:14px;font-weight:800;font-family:inherit">Borrar</button>
+    <button onclick="copiarLogAtras()" style="flex:1.4;padding:13px 6px;border:none;border-radius:11px;background:#1a237e;color:#fff;font-size:14px;font-weight:800;font-family:inherit">Copiar</button>
+    <button onclick="cerrarLogAtras()" style="flex:1;padding:13px 6px;border:1px solid #999;border-radius:11px;background:#fff;color:#444;font-size:14px;font-weight:800;font-family:inherit">Cerrar</button>
+  </div>
 </div>
 </body>
 </html>
