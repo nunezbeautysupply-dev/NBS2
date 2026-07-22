@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722m-OFICIAL-V2.0">
+<meta name="app-version" content="20260722n-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -608,6 +608,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <div style="font-size:10px;color:var(--nbs-muted-2);font-weight:700;letter-spacing:1px;padding:12px 8px 4px">FINANZAS</div>
     <button onclick="irMenu('p-panorama')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📊</span></span>Panorama Completo</button>
     <button onclick="irMenu('p-docs')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📁</span></span>Mis Documentos</button>
+    <button onclick="cerrarMenuLateral();setTimeout(revisarIntegridad,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🩺</span></span>Revisi&oacute;n de integridad</button>
     <button onclick="cerrarMenuLateral();setTimeout(verLogAtras,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🔧</span></span>Registro bot&oacute;n atr&aacute;s</button>
     <button onclick="irMenu('p-academia')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🎓</span></span>Academia</button>
     <button onclick="irMenu('p-dashboard')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📈</span></span>Resumen Financiero</button>
@@ -2483,7 +2484,29 @@ function SS(k,v){
     localStorage.setItem(k,JSON.stringify(v));
     marcarHoraLocal(k);
     revisarSiTocaCopiaLocal(k, v); // cada 5 facturas guarda una copia DENTRO del telefono
-  }catch(e){}
+  }catch(e){
+    // ═══ ARREGLO CRITICO (22 jul 2026) ═══
+    // ANTES este catch estaba VACIO: si el telefono no podia guardar -memoria
+    // llena, modo privado, permisos- el dato se perdia EN SILENCIO y Sensei
+    // seguia trabajando creyendo que todo se habia guardado. Ahora se avisa
+    // fuerte y claro, para que pueda actuar antes de perder el dia de trabajo.
+    console.error('FALLO AL GUARDAR', k, e);
+    try{
+      var ahora = Date.now();
+      if(!window._ultimoAvisoGuardado || ahora - window._ultimoAvisoGuardado > 15000){
+        window._ultimoAvisoGuardado = ahora;
+        var msg = '\u26a0\ufe0f NO SE PUDO GUARDAR\n\n'
+          + 'El telefono no pudo guardar la informacion (' + k + ').\n\n'
+          + 'QUE HACER AHORA:\n'
+          + '1. Anota en papel lo que acabas de registrar\n'
+          + '2. Libera espacio en el telefono\n'
+          + '3. Cierra y vuelve a abrir la app\n\n'
+          + 'NO sigas trabajando hasta resolverlo: lo que hagas no se va a guardar.';
+        if(typeof avisoGrande === 'function') avisoGrande(msg);
+        else if(typeof _alertNativo === 'function') _alertNativo(msg);
+      }
+    }catch(e2){}
+  }
   // Ademas de guardar local -como siempre-, se manda una copia a la nube en segundo plano.
   // Si no hay internet o falla, la app sigue funcionando igual con lo que ya guardo local;
   // esto nunca bloquea ni retrasa el uso normal de la app.
@@ -5087,7 +5110,7 @@ function verFacturaCompra(c, sid){
         var compraReal = compras.find(function(x){ return x.id===c.id; });
         if(!compraReal) return;
         if(!compraReal.pagosFactura) compraReal.pagosFactura = [];
-        compraReal.pagosFactura.push({ monto: saldo, fecha: fechaHoy(), metodo: metodo });
+        compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: saldo, fecha: fechaHoy(), metodo: metodo });
         SS('nc', compras);
         alert('\u2705 Factura pagada por completo ($'+fmtNum(saldo)+') con '+metodoLabel+'.');
         verSup(sid);
@@ -5104,7 +5127,7 @@ function verFacturaCompra(c, sid){
       var compraReal = compras.find(function(x){ return x.id===c.id; });
       if(!compraReal) return;
       if(!compraReal.pagosFactura) compraReal.pagosFactura = [];
-      compraReal.pagosFactura.push({ monto: monto, fecha: fechaHoy() });
+      compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy() });
       SS('nc', compras);
       alert('Pago de $'+fmtNum(monto)+' aplicado correctamente');
       verSup(sid);
@@ -6243,6 +6266,173 @@ var productoEditandoId = null;
 // Esta funcion evita que ese residuo haga parecer que una factura pagada todavia debe algo.
 function esSaldoPendiente(saldo){
   return saldo > 0.005;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  IDENTIFICADOR UNICO DE CADA PAGO  (arreglo critico, 22 jul 2026)
+//
+//  POR QUE EXISTE ESTO: los pagos NO tenian un identificador propio, asi que
+//  para evitar duplicados el codigo los comparaba por monto+fecha. Resultado:
+//  si un cliente abonaba $20 hoy y mas tarde el MISMO DIA abonaba otros $20,
+//  la app BORRABA el segundo pago creyendo que era repetido — y encima decia
+//  "pago aplicado correctamente". Se perdia dinero real de la cuenta.
+//
+//  Ahora cada pago nace con su propio numero unico (pid). Asi se pueden
+//  distinguir dos pagos identicos hechos el mismo dia, y solo se considera
+//  repetido lo que de verdad tiene el MISMO pid.
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  REVISION DE INTEGRIDAD  (pedida por Sensei el 22 jul 2026)
+//  Revisa TODOS sus datos reales y avisa si algo no cuadra.
+//  NO toca nada: solo mira y reporta. Es un chequeo, no una reparacion.
+// ═══════════════════════════════════════════════════════════════
+function revisarIntegridad(){
+  var V = LS('nv', []), C = LS('ncl', []), CO = LS('nc', []), G = LS('ngastos', []);
+  var problemas = [], avisos = [], oks = [];
+
+  // ── 1. IDs repetidos en ventas ──
+  var idsV = {}, dupV = 0;
+  V.forEach(function(v){ var k=String(v.id); if(idsV[k]) dupV++; idsV[k]=1; });
+  if(dupV) problemas.push('Hay '+dupV+' factura(s) con el mismo numero. Eso puede hacer que un pago se aplique a la factura equivocada.');
+  else oks.push('Ninguna factura repetida ('+V.length+' revisadas)');
+
+  // ── 2. IDs repetidos en clientes ──
+  var idsC = {}, dupC = 0;
+  C.forEach(function(c){ var k=String(c.id); if(idsC[k]) dupC++; idsC[k]=1; });
+  if(dupC) problemas.push('Hay '+dupC+' cliente(s) con el mismo numero interno.');
+  else oks.push('Ningun cliente repetido ('+C.length+' revisados)');
+
+  // ── 3. Ventas de clientes que ya no existen ──
+  var huerfanas = V.filter(function(v){ return v.cid && !idsC[String(v.cid)]; });
+  if(huerfanas.length){
+    var montoH = huerfanas.reduce(function(s,v){ return s+(v.total||0); },0);
+    avisos.push(huerfanas.length+' venta(s) de clientes que ya borraste, por $'+fmtNum(montoH)+'. Aparecen en Cuentas por Cobrar pero el cliente no esta en la lista. Se limpian desde el menu: "Limpiar ventas huerfanas".');
+  } else oks.push('Todas las ventas tienen su cliente');
+
+  // ── 4. Pagos que suman MAS que la factura ──
+  var sobrepago = [];
+  V.forEach(function(v){
+    if(v.tipo!=='credito' || !v.pagosFactura) return;
+    var pag = v.pagosFactura.reduce(function(s,p){ return s+(typeof p.monto==='number'?p.monto:0); },0);
+    if(pag > (v.total||0) + 0.01) sobrepago.push({id:v.id, total:v.total, pag:pag});
+  });
+  if(sobrepago.length){
+    problemas.push(sobrepago.length+' factura(s) con MAS pagos que su total. Ejemplo: factura '+sobrepago[0].id+' es de $'+fmtNum(sobrepago[0].total)+' y tiene $'+fmtNum(sobrepago[0].pag)+' en pagos.');
+  } else oks.push('Ninguna factura tiene mas pagos que su total');
+
+  // ── 5. Montos negativos o raros ──
+  var raros = 0;
+  V.forEach(function(v){
+    if(typeof v.total !== 'number' || isNaN(v.total) || v.total < 0) raros++;
+    (v.pagosFactura||[]).forEach(function(p){
+      if(typeof p.monto !== 'number' || isNaN(p.monto)) raros++;
+      else if(p.monto < 0 && !p.esDevolucion) raros++;
+    });
+  });
+  if(raros) problemas.push(raros+' monto(s) invalidos (negativos o dañados) en ventas o pagos.');
+  else oks.push('Todos los montos son numeros validos');
+
+  // ── 6. Pagos sin fecha ──
+  var sinFecha = 0;
+  V.forEach(function(v){ (v.pagosFactura||[]).forEach(function(p){ if(!p.fecha) sinFecha++; }); });
+  if(sinFecha) avisos.push(sinFecha+' pago(s) sin fecha. No van a contar bien en el resumen por fechas.');
+  else oks.push('Todos los pagos tienen fecha');
+
+  // ── 7. Ventas sin fecha ──
+  var vSinFecha = V.filter(function(v){ return !v.fecha; }).length;
+  if(vSinFecha) avisos.push(vSinFecha+' venta(s) sin fecha.');
+  else oks.push('Todas las ventas tienen fecha');
+
+  // ── 8. Identificador unico de pago (el arreglo del 22 jul) ──
+  var pidsRep = 0, vistos = {}, totalPagos = 0, sinPid = 0;
+  V.forEach(function(v){
+    (v.pagosFactura||[]).forEach(function(p){
+      totalPagos++;
+      if(!p.pid){ sinPid++; return; }
+      if(vistos[p.pid]) pidsRep++;
+      vistos[p.pid] = 1;
+    });
+  });
+  if(pidsRep) problemas.push(pidsRep+' pago(s) guardados dos veces (mismo identificador).');
+  else oks.push(totalPagos+' pagos revisados, ninguno guardado dos veces');
+  if(sinPid) avisos.push(sinPid+' pago(s) viejos sin identificador. No es un error: son de antes del arreglo del 22 de julio y estan protegidos, nunca se borran.');
+
+  // ── 9. Cuadre general del dinero ──
+  var totalVendido = 0, totalCobrado = 0, totalPorCobrar = 0;
+  V.forEach(function(v){
+    if(v.cancelada) return;
+    totalVendido += (v.total||0);
+    if(v.tipo === 'contado'){ totalCobrado += (v.total||0); return; }
+    var pag = (v.pagosFactura||[]).reduce(function(s,p){ return s+(typeof p.monto==='number'&&!p.esDevolucion?p.monto:0); },0);
+    totalCobrado += pag;
+    totalPorCobrar += Math.max(0, (v.total||0) - pag);
+  });
+  var descuadre = Math.abs(totalVendido - (totalCobrado + totalPorCobrar));
+  if(descuadre > 0.05) problemas.push('El dinero no cuadra: vendido $'+fmtNum(totalVendido)+' pero cobrado + por cobrar da $'+fmtNum(totalCobrado+totalPorCobrar)+'. Diferencia de $'+fmtNum(descuadre)+'.');
+  else oks.push('El dinero CUADRA: vendido $'+fmtNum(totalVendido)+' = cobrado $'+fmtNum(totalCobrado)+' + por cobrar $'+fmtNum(totalPorCobrar));
+
+  // ── 10. ¿El telefono puede guardar? ──
+  var puedeGuardar = true;
+  try{ localStorage.setItem('nbs_chk_'+Date.now(), '1'); localStorage.removeItem('nbs_chk_'+Date.now()); }
+  catch(e){ puedeGuardar = false; }
+  if(!puedeGuardar) problemas.push('EL TELEFONO NO PUEDE GUARDAR. Libera espacio YA: lo que registres no se va a guardar.');
+  else oks.push('El telefono puede guardar sin problema');
+
+  // ── 11. Cuanto espacio ocupa ──
+  var bytes = 0;
+  try{ for(var k in localStorage){ if(localStorage.hasOwnProperty(k)) bytes += (localStorage[k]||'').length; } }catch(e){}
+  var mb = (bytes/1048576).toFixed(2);
+  if(bytes > 4.5*1048576) avisos.push('Tus datos ocupan '+mb+' MB. El limite anda por 5 MB. Conviene bajar un respaldo y borrar copias viejas.');
+  else oks.push('Espacio usado: '+mb+' MB (hay de sobra)');
+
+  // ── Armar el reporte ──
+  var h = '<h3 style="font-size:21px;font-weight:800;color:#1a237e;margin:0 0 4px">\ud83e\ude7a Revisi\u00f3n de integridad</h3>'
+    + '<p style="font-size:14px;color:#666;margin:6px 0 14px">Revis\u00e9 '+V.length+' ventas, '+C.length+' clientes, '+CO.length+' compras y '+G.length+' gastos. No toqu\u00e9 nada: solo revis\u00e9.</p>';
+
+  if(problemas.length){
+    h += '<div style="background:#FDECEA;border:2px solid #C62828;border-radius:12px;padding:14px;margin-bottom:12px">'
+      + '<div style="font-size:16px;font-weight:900;color:#C62828;margin-bottom:8px">\u26a0\ufe0f HAY QUE ARREGLAR ('+problemas.length+')</div>';
+    problemas.forEach(function(x){ h += '<div style="font-size:15px;line-height:1.5;color:#7f1d1d;margin-bottom:8px">\u2022 '+escaparHtml(x)+'</div>'; });
+    h += '</div>';
+  } else {
+    h += '<div style="background:#E8F5E9;border:2px solid #2E7D32;border-radius:12px;padding:16px;margin-bottom:12px;text-align:center">'
+      + '<div style="font-size:38px">\u2705</div>'
+      + '<div style="font-size:18px;font-weight:900;color:#2E7D32;margin-top:4px">TODO EN ORDEN</div>'
+      + '<div style="font-size:14px;color:#2E7D32;margin-top:4px">No encontr\u00e9 ning\u00fan problema con tus datos.</div></div>';
+  }
+
+  if(avisos.length){
+    h += '<div style="background:#FFF8E1;border:1px solid #F9A825;border-radius:12px;padding:14px;margin-bottom:12px">'
+      + '<div style="font-size:15px;font-weight:900;color:#8a6d00;margin-bottom:8px">\ud83d\udcdd PARA QUE LO SEPAS ('+avisos.length+')</div>';
+    avisos.forEach(function(x){ h += '<div style="font-size:14.5px;line-height:1.5;color:#6b5500;margin-bottom:8px">\u2022 '+escaparHtml(x)+'</div>'; });
+    h += '</div>';
+  }
+
+  h += '<div style="background:#F4F6FB;border:1px solid #d9dcec;border-radius:12px;padding:14px">'
+    + '<div style="font-size:14px;font-weight:900;color:#1a237e;margin-bottom:8px">\u2705 REVISADO Y CORRECTO ('+oks.length+')</div>';
+  oks.forEach(function(x){ h += '<div style="font-size:13.5px;line-height:1.5;color:#444;margin-bottom:5px">\u2022 '+escaparHtml(x)+'</div>'; });
+  h += '</div>';
+
+  mostrarReporteIntegridad(h);
+}
+
+function mostrarReporteIntegridad(html){
+  var ov = document.getElementById('integridad-ov');
+  var caja = document.getElementById('integridad-caja');
+  if(!ov || !caja){ avisoGrande('No se pudo abrir la revision.'); return; }
+  document.getElementById('integridad-cuerpo').innerHTML = html;
+  ov.style.display = 'block';
+  caja.style.display = 'flex';
+}
+function cerrarIntegridad(){
+  var ov = document.getElementById('integridad-ov');
+  var caja = document.getElementById('integridad-caja');
+  if(ov) ov.style.display = 'none';
+  if(caja) caja.style.display = 'none';
+}
+
+function nuevoPagoId(){
+  return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
 }
 
 function fmtNum(n){
@@ -11532,7 +11722,7 @@ function verFactura(v){
         var vr = ventas.find(function(x){ return x.id===vid; });
         if(!vr) return;
         if(!vr.pagosFactura) vr.pagosFactura = [];
-        vr.pagosFactura.push({ monto: saldoFac, fecha: fechaHoy(), metodos:[{tipo:'efectivo', monto:saldoFac}] });
+        vr.pagosFactura.push({ pid: nuevoPagoId(), monto: saldoFac, fecha: fechaHoy(), metodos:[{tipo:'efectivo', monto:saldoFac}] });
         SS('nv', ventas);
         alert('✅ Pago de $'+fmtNum(saldoFac)+' en efectivo aplicado correctamente.');
         verFactura(vr);
@@ -11548,7 +11738,7 @@ function verFactura(v){
       var ventaReal = ventas.find(function(x){ return x.id===v.id; });
       if(!ventaReal) return;
       if(!ventaReal.pagosFactura) ventaReal.pagosFactura = [];
-      ventaReal.pagosFactura.push({ monto: monto, fecha: fechaHoy() });
+      ventaReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy() });
       SS('nv', ventas);
       alert('Pago de $'+fmtNum(monto)+' aplicado correctamente');
       verFactura(ventaReal);
@@ -13348,19 +13538,29 @@ function abrirAbono(cid){
 
 
   if(facturasCredito.length){
-    // Clean duplicate pagosFactura entries (same monto+fecha appearing twice)
+    // ═══ ARREGLO CRITICO (22 jul 2026) ═══
+    // ANTES: aqui se borraba cualquier pago con el mismo monto+fecha que otro.
+    // Eso BORRABA DINERO REAL: si un cliente abonaba $20 hoy y mas tarde el
+    // mismo dia abonaba otros $20, el segundo desaparecia -y la app decia que
+    // el pago se habia aplicado correctamente-.
+    // AHORA: solo se quita lo que de verdad esta repetido, o sea lo que tiene
+    // el MISMO identificador de pago (pid). Dos pagos distintos del mismo monto
+    // y el mismo dia son dos pagos distintos, y los dos se respetan.
+    var huboLimpieza = false;
     facturasCredito.forEach(function(v){
       if(v.pagosFactura && v.pagosFactura.length > 1){
-        var seen = {};
+        var vistos = {};
+        var antes = v.pagosFactura.length;
         v.pagosFactura = v.pagosFactura.filter(function(p){
-          var key = p.monto + '_' + p.fecha + '_' + (p.nota||'');
-          if(seen[key]) return false;
-          seen[key] = true;
+          if(!p || !p.pid) return true;       // sin identificador: NUNCA se borra
+          if(vistos[p.pid]) return false;     // mismo pid = el mismo pago guardado dos veces
+          vistos[p.pid] = true;
           return true;
         });
+        if(v.pagosFactura.length !== antes) huboLimpieza = true;
       }
     });
-    SS('nv', ventas);
+    if(huboLimpieza) SS('nv', ventas);
 
     var div = document.createElement('div');
     div.style.cssText = 'font-size:12px;font-weight:700;color:#6A1B9A;margin-bottom:8px;text-transform:uppercase';
@@ -13778,7 +13978,7 @@ function confirmarPagoMultiple(vid, saldo){
   // Caso normal: el pago cabe en esta factura
   if(total <= saldo + 0.01){
     if(!venta.pagosFactura) venta.pagosFactura = [];
-    venta.pagosFactura.push({ monto: total, fecha: fechaHoy(), metodos: filas });
+    venta.pagosFactura.push({ pid: nuevoPagoId(), monto: total, fecha: fechaHoy(), metodos: filas });
     SS('nv', ventas);
     var detalle = filas.map(function(m){ return METODOS_PAGO_LABELS[m.tipo]+': $'+fmtNum(m.monto); }).join('\n');
     alert('✅ Pago de $'+fmtNum(total)+' aplicado correctamente.\n\n'+detalle);
@@ -14215,7 +14415,7 @@ function verFacturaProfesional(vid){
       var vr = vv.find(function(x){ return String(x.id)===String(vid); });
       if(!vr){ alert('No se encontró la factura.'); return; }
       if(!vr.pagosFactura) vr.pagosFactura = [];
-      vr.pagosFactura.push({ monto: saldo, fecha: fechaHoy(), metodos:[{tipo:'efectivo', monto:saldo}] });
+      vr.pagosFactura.push({ pid: nuevoPagoId(), monto: saldo, fecha: fechaHoy(), metodos:[{tipo:'efectivo', monto:saldo}] });
       SS('nv', vv);
       alert('✅ Pago de $'+fmtNum(saldo)+' en efectivo aplicado correctamente.');
       verFacturaProfesional(vid);
@@ -20434,6 +20634,13 @@ function verHistorialCliente(cid, modo){
 <div id="aviso-caja" style="display:none;position:fixed;left:5%;right:5%;top:50%;transform:translateY(-50%);max-height:80%;z-index:99991;background:#fff;border-radius:18px;padding:24px 20px 20px;box-shadow:0 12px 44px rgba(0,0,0,.45);overflow-y:auto">
   <div id="aviso-texto" style="font-size:18.5px;line-height:1.55;color:#1a1a1a;font-weight:600;text-align:center;margin-bottom:20px;word-break:break-word"></div>
   <button onclick="cerrarAviso()" style="width:100%;padding:17px;border:none;border-radius:13px;background:#1a237e;color:#fff;font-size:19px;font-weight:800;cursor:pointer;font-family:inherit">Entendido</button>
+</div>
+
+<!-- Ventana de la revision de integridad (chequeo de los datos) -->
+<div id="integridad-ov" onclick="cerrarIntegridad()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.75);z-index:99992"></div>
+<div id="integridad-caja" style="display:none;position:fixed;left:4%;right:4%;top:5%;bottom:5%;z-index:99993;background:#fff;border-radius:16px;padding:16px;box-shadow:0 12px 44px rgba(0,0,0,.45);flex-direction:column;overflow:hidden">
+  <div id="integridad-cuerpo" style="flex:1;overflow-y:auto;padding-right:2px"></div>
+  <button onclick="cerrarIntegridad()" style="width:100%;padding:16px;border:none;border-radius:12px;background:#1a237e;color:#fff;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit;margin-top:12px;flex:0 0 auto">Cerrar</button>
 </div>
 </body>
 </html>
