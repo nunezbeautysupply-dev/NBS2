@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722k-OFICIAL-V2.0">
+<meta name="app-version" content="20260722l-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -481,7 +481,8 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <input id="login-email" type="email" placeholder="Correo electrónico" class="inp" style="margin-bottom:10px" autocomplete="username">
     <input id="login-pass" type="password" placeholder="Contraseña" class="inp" style="margin-bottom:14px" autocomplete="current-password">
     <button onclick="intentarLogin()" class="btn" style="width:100%;background:var(--nbs-gold,#D4A017);color:white;padding:12px;font-weight:700;border:none;border-radius:10px;cursor:pointer;font-size:15px">Entrar</button>
-    <p id="login-error" style="color:#c0392b;font-size:13px;text-align:center;margin-top:12px;display:none"></p>
+    <button onclick="recuperarContrasena()" style="width:100%;background:none;border:none;color:#1a237e;font-size:15.5px;font-weight:700;margin-top:14px;cursor:pointer;text-decoration:underline;font-family:inherit;padding:8px">¿Olvidaste tu contraseña?</button>
+    <p id="login-error" style="color:#c0392b;font-size:14.5px;text-align:center;margin-top:12px;display:none;font-weight:600"></p>
     <p id="login-cargando" style="color:#888;font-size:13px;text-align:center;margin-top:12px;display:none">Entrando...</p>
   </div>
 </div>
@@ -491,10 +492,10 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
   <div style="width:100%;max-width:320px;text-align:center">
     <img src="icon-192.png" style="width:74px;height:74px;margin-bottom:14px" alt="NBS">
     <h1 style="font-size:19px;font-weight:700;margin-bottom:4px;color:var(--nbs-ink,#1a1a2e)">App bloqueada</h1>
-    <p style="font-size:13px;color:#888;margin-bottom:22px">Desbloquea con tu huella para continuar</p>
-    <button onclick="desbloquearConHuella()" class="btn" style="width:100%;background:var(--nbs-gold,#D4A017);color:white;padding:14px;font-weight:700;border:none;border-radius:10px;cursor:pointer;font-size:15px">👆 Desbloquear con huella</button>
+    <p id="bloqueo-msg" style="font-size:15px;color:#666;margin-bottom:22px;font-weight:600">Pon tu huella para entrar...</p>
+    <button id="btn-huella" onclick="desbloquearConHuella()" class="btn" style="width:100%;background:var(--nbs-gold,#D4A017);color:white;padding:14px;font-weight:700;border:none;border-radius:10px;cursor:pointer;font-size:15px">👆 Desbloquear con huella</button>
     <p id="bloqueo-error" style="color:#c0392b;font-size:13px;margin-top:12px;display:none"></p>
-    <button onclick="usarContrasenaEnVezDeHuella()" style="background:none;border:none;color:#888;font-size:13px;margin-top:16px;cursor:pointer;text-decoration:underline">Usar correo y contraseña</button>
+    <button id="btn-contrasena" onclick="usarContrasenaEnVezDeHuella()" style="background:none;border:none;color:#888;font-size:13px;margin-top:16px;cursor:pointer;text-decoration:underline">Usar correo y contraseña</button>
   </div>
 </div>
 
@@ -15999,6 +16000,36 @@ function bloquearApp(){
   document.getElementById('bloqueo-error').style.display = 'none';
   document.getElementById('pantalla-bloqueo').style.display = 'flex';
   document.getElementById('app-contenido').style.display = 'none';
+
+  // Pedido por Sensei (22 jul): que NO tenga que tocar un boton para usar la huella.
+  // La app pide la huella SOLA al abrir. Mientras tanto se esconden las otras
+  // opciones; si la huella falla, ahi si aparecen -ver el catch de desbloquearConHuella-.
+  var b1 = document.getElementById('btn-huella');
+  var b2 = document.getElementById('btn-contrasena');
+  var msg = document.getElementById('bloqueo-msg');
+  var hayHuella = !!localStorage.getItem(CLAVE_HUELLA_ID);
+  if(hayHuella){
+    if(b1) b1.style.display = 'none';
+    if(b2) b2.style.display = 'none';
+    if(msg) msg.textContent = 'Pon tu huella para entrar...';
+    // Pequena pausa para que la pantalla alcance a dibujarse antes de pedirla
+    setTimeout(function(){ desbloquearConHuella(); }, 350);
+  } else {
+    // Sin huella configurada: se muestran las opciones de siempre
+    if(b1) b1.style.display = '';
+    if(b2) b2.style.display = '';
+    if(msg) msg.textContent = 'Entra con tu contrase\u00f1a para continuar';
+  }
+}
+
+// Si la huella falla o Sensei la cancela, se muestran las otras opciones
+function mostrarOpcionesDeBloqueo(){
+  var b1 = document.getElementById('btn-huella');
+  var b2 = document.getElementById('btn-contrasena');
+  var msg = document.getElementById('bloqueo-msg');
+  if(b1) b1.style.display = '';
+  if(b2) b2.style.display = '';
+  if(msg) msg.textContent = 'Puedes intentar la huella otra vez o entrar con tu contrase\u00f1a';
 }
 
 function desbloquearConHuella(){
@@ -16030,8 +16061,9 @@ function desbloquearConHuella(){
     }
   }).catch(function(e){
     console.error('No se pudo verificar la huella:', e);
-    errorEl.textContent = 'No se reconoció la huella. Intenta de nuevo o usa tu contraseña.';
+    errorEl.textContent = 'No se reconoció la huella.';
     errorEl.style.display = 'block';
+    mostrarOpcionesDeBloqueo();   // aqui si aparecen el boton y la contraseña
   });
 }
 
@@ -16291,6 +16323,57 @@ function intentarLogin(){
     document.getElementById('login-cargando').style.display = 'none';
     errorEl.textContent = 'Correo o contraseña incorrectos.';
     errorEl.style.display = 'block';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RECUPERAR LA CONTRASEÑA POR CORREO  (pedido por Sensei, 22 jul)
+//  Firebase manda un correo con un enlace para poner una contraseña nueva.
+//  No hace falta nada mas: ni servidor propio ni configuracion extra.
+// ═══════════════════════════════════════════════════════════════
+function recuperarContrasena(){
+  var campo = document.getElementById('login-email');
+  var email = (campo && campo.value ? campo.value : '').trim();
+  var errorEl = document.getElementById('login-error');
+
+  if(!email){
+    avisoGrande('Escribe primero tu correo electr\u00f3nico arriba, y despu\u00e9s toca "\u00bfOlvidaste tu contrase\u00f1a?".');
+    if(campo) campo.focus();
+    return;
+  }
+  if(email.indexOf('@') < 0){
+    avisoGrande('Ese correo no se ve bien escrito. Rev\u00edsalo e intenta otra vez.');
+    if(campo) campo.focus();
+    return;
+  }
+  if(typeof fbAuth === 'undefined' || !fbAuth){
+    avisoGrande('No hay conexi\u00f3n con el servidor. Rev\u00edsa tu internet e intenta de nuevo.');
+    return;
+  }
+
+  if(errorEl){ errorEl.style.display = 'none'; }
+  avisoGrande('\ud83d\udce7 Enviando el correo a:\n\n' + email + '\n\nEspera un momento...');
+
+  fbAuth.sendPasswordResetEmail(email).then(function(){
+    avisoGrande('\u2705 LISTO\n\nSe envi\u00f3 un correo a:\n' + email +
+      '\n\nAbrelo y toca el enlace para poner una contrase\u00f1a nueva.\n\n' +
+      'Si no lo ves en unos minutos, revisa la carpeta de SPAM o correo no deseado.');
+  }).catch(function(e){
+    var codigo = (e && e.code) ? e.code : '';
+    var msg;
+    if(codigo === 'auth/user-not-found'){
+      msg = 'No hay ninguna cuenta con ese correo.\n\nRevisa que est\u00e9 bien escrito.';
+    } else if(codigo === 'auth/invalid-email'){
+      msg = 'Ese correo no es v\u00e1lido. Rev\u00edsalo e intenta otra vez.';
+    } else if(codigo === 'auth/too-many-requests'){
+      msg = 'Se hicieron muchos intentos seguidos.\n\nEspera unos minutos e intenta de nuevo.';
+    } else if(codigo === 'auth/network-request-failed'){
+      msg = 'No hay internet.\n\nCon\u00e9ctate e intenta otra vez.';
+    } else {
+      msg = 'No se pudo enviar el correo.\n\nRevisa tu conexi\u00f3n e intenta de nuevo.';
+    }
+    avisoGrande('\u26a0\ufe0f ' + msg);
+    console.error('Error al enviar el correo de recuperacion:', e);
   });
 }
 
