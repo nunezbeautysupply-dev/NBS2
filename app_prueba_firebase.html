@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722d-OFICIAL-V2.0">
+<meta name="app-version" content="20260722e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15198,15 +15198,39 @@ var _saliendoApp = false;
 function hayGuardian(){
   return !!(history.state && history.state.nbs);
 }
-function ponerGuardianAtras(){
-  if(hayGuardian()) return;
-  try{ history.pushState({nbs:1}, '', window.location.href); }catch(e){}
+function profundidadGuardian(){
+  return (history.state && history.state.nbs) ? (history.state.d || 1) : 0;
 }
 
-// EN CADA TOQUE REAL del usuario se asegura el guardian. Esto es lo que hace
-// que Chrome lo respete. Se usa captura (true) para que corra siempre, aunque
-// el boton tocado haga otra cosa.
-['pointerdown','touchstart','mousedown','click','keydown'].forEach(function(ev){
+// ── ERROR DEL 3er INTENTO, corregido aqui ──
+// Antes decia: "si ya hay un guardian, no pongas otro". El problema es que
+// despues de tocar atras, el guardian que quedaba lo habia creado el propio
+// codigo (sin toque del usuario), o sea uno que Chrome tira a la basura. Y
+// como "ya habia uno", los toques de Sensei nunca ponian uno bueno.
+// AHORA: CADA toque real del usuario pone un guardian NUEVO y valido. Asi
+// hay tantos guardianes como pasos haya dado, y puede tocar atras varias
+// veces seguidas sin tener que tocar la pantalla entremedio.
+var _ultimoGuardian = 0;
+var MIN_GUARDIANES = 6;   // colchon: aguanta 6 toques de atras seguidos sin tocar la pantalla
+
+function ponerGuardianAtras(){
+  var ahora = Date.now();
+  if(ahora - _ultimoGuardian < 250) return;   // un toque = una recarga, no tres
+  _ultimoGuardian = ahora;
+  // Se RELLENA hasta tener MIN_GUARDIANES. Todos se crean aqui dentro, dentro
+  // del toque real del usuario, asi que Chrome los respeta todos. Con 6 de
+  // colchon, Sensei puede tocar atras 6 veces seguidas sin tocar la pantalla
+  // entremedio y la app nunca se queda sin proteccion.
+  var d = profundidadGuardian(), vueltas = 0;
+  while(d < MIN_GUARDIANES && vueltas < MIN_GUARDIANES){
+    d++; vueltas++;
+    try{ history.pushState({nbs:1, d:d}, '', window.location.href); }catch(e){ break; }
+  }
+}
+
+// EN CADA TOQUE REAL del usuario. Es lo unico que Chrome respeta.
+// Se usa captura (true) para que corra siempre, aunque el boton haga otra cosa.
+['pointerdown','mousedown','keydown'].forEach(function(ev){
   document.addEventListener(ev, ponerGuardianAtras, true);
 });
 
@@ -15226,11 +15250,10 @@ function hayADondeVolver(){
 window.addEventListener('popstate', function(){
   if(_saliendoApp) return;
 
-  // Se vuelve a poner el guardian de inmediato -mejor esfuerzo-. Aunque Chrome
-  // pueda marcar ESTE como saltable, el proximo toque del usuario pone uno
-  // valido, y mientras el letrero de salir esta abierto el usuario TIENE que
-  // tocar un boton, lo que arma un guardian bueno.
-  ponerGuardianAtras();
+  // OJO: aqui NO se pone guardian. Un guardian creado dentro del propio evento
+  // de atras no lleva toque del usuario, y Chrome lo descarta -ese fue el error
+  // de los intentos anteriores-. Los guardianes buenos ya se pusieron con cada
+  // toque de Sensei mientras navegaba, y hay uno por cada paso que dio.
 
   // 1) Si el menu lateral esta abierto, el boton atras solo lo cierra
   if(menuLateralAbierto()){
@@ -15270,7 +15293,9 @@ function cerrarLetreroSalir(){
   var box = document.getElementById('salir-box');
   if(ov) ov.style.display = 'none';
   if(box) box.style.display = 'none';
-  ponerGuardianAtras();
+  // El toque del boton viene de un gesto real, asi que se rellenan los 6
+  // guardianes de colchon de una vez.
+  _ultimoGuardian = 0; ponerGuardianAtras();
 }
 function salirDeLaApp(){
   var box = document.getElementById('salir-box');
@@ -15278,13 +15303,18 @@ function salirDeLaApp(){
   if(box) box.style.display = 'none';
   if(ov) ov.style.display = 'none';
   _saliendoApp = true;
-  // Se retrocede DOS pasos: uno es el guardian que acabamos de poner y otro
-  // es la entrada de la app. Asi el telefono si la cierra de verdad.
+  // Para salir de verdad hay que retroceder TODOS los guardianes que se
+  // acumularon mas la entrada de la app. Antes se retrocedia solo 2 pasos y
+  // por eso la app se quedaba abierta al tocar "Si, salir".
+  var pasos = profundidadGuardian() + 1;
   try{ window.close(); }catch(e){}
-  setTimeout(function(){ try{ history.go(-2); }catch(e){} }, 30);
+  setTimeout(function(){ try{ history.go(-pasos); }catch(e){} }, 30);
   // Red de seguridad: si por lo que sea la app sigue viva, se vuelve a proteger
   // para que un toque accidental no la cierre sin preguntar.
-  setTimeout(function(){ _saliendoApp = false; ponerGuardianAtras(); }, 1500);
+  setTimeout(function(){
+    _saliendoApp = false;
+    _ultimoGuardian = 0; ponerGuardianAtras();
+  }, 1800);
 }
 
 function capitalizarFinal(el){
