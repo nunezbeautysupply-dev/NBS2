@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722i-OFICIAL-V2.0">
+<meta name="app-version" content="20260722j-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -318,7 +318,21 @@ button:active{transform:scale(0.96);filter:brightness(0.93);}
 .busca-caja{ border-width:2px !important; }
 /* Los botones de accion tambien se leen mejor */
 .btn{ font-weight:800 !important; }
-.mlb2{ font-weight:700 !important; }
+.mlb2{ font-weight:800 !important; font-size:18.5px !important; padding:15px 12px !important; }
+/* Franja destacada de REPORTES, pedida por Sensei el 22 jul */
+.mlb2-destacado{
+  background:linear-gradient(90deg,#D4A017,#f0c04a) !important;
+  color:#1a237e !important;
+  border:none !important;
+  border-left:6px solid #1a237e !important;
+  border-radius:10px !important;
+  margin:6px 0 !important;
+  font-size:19.5px !important;
+  font-weight:900 !important;
+  letter-spacing:.4px;
+  box-shadow:0 2px 8px rgba(212,160,23,.35) !important;
+}
+.mlb2-destacado .mlb2-icon{ background:rgba(26,35,126,.14) !important; }
 
 /* ═══ Los 6 botones de la pantalla de inicio ═══
    Grandes, con el color propio de cada uno, y con letra legible: se usan en la van,
@@ -566,6 +580,9 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <button onclick="irMenu('p-ped')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">⚡</span></span>Pedidos rápidos</button>
     <button onclick="window._vendiendoDesde=null;irMenu('p-v')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💵</span></span>Vender</button>
     <button onclick="irMenu('p-cl')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">👥</span></span>Clientes</button>
+
+    <!-- REPORTES destacado con franja, subido aqui arriba a pedido de Sensei (22 jul) -->
+    <button onclick="irMenuProtegido('p-rpt')" class="mlb2 mlb2-destacado"><span class="mlb2-icon"><span style="font-size:22px">📊</span></span>REPORTES</button>
     <button onclick="irMenu('p-cxc')" class="mlb2" style="background:#EAF3E2;border-radius:10px;margin-bottom:8px"><span class="mlb2-icon" style="font-size:16px">💳</span><span style="color:#2E7D32;font-weight:700">Cuentas por Cobrar / Facturas</span></button>
     <button onclick="irMenu('p-vip')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">⭐</span></span>Programa VIP</button>
     <button onclick="irMenu('p-cxp')" class="mlb2" style="background:#F5E6EA;border-radius:10px;margin-bottom:4px"><span class="mlb2-icon" style="font-size:16px">📤</span><span style="color:#7B1E3A;font-weight:700">Cuentas por Pagar</span><span style="margin-left:auto;font-size:10px;color:#7B1E3A;opacity:0.7">↑ tú debes</span></button>
@@ -587,7 +604,6 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <button onclick="irMenu('p-academia')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🎓</span></span>Academia</button>
     <button onclick="irMenu('p-dashboard')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📈</span></span>Resumen Financiero</button>
     <button onclick="irMenuProtegido('p-gastos')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💸</span></span>Gastos</button>
-    <button onclick="irMenuProtegido('p-rpt')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📈</span></span>Reportes</button>
     <button onclick="irMenu('p-rutas')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🗺️</span></span>Ruta de Visitas</button>
 
     <div style="font-size:10px;color:var(--nbs-muted-2);font-weight:700;letter-spacing:1px;padding:12px 8px 4px">IMPRESIÓN</div>
@@ -6352,8 +6368,7 @@ function pedirRestaurarLocal(hora){
   hacerCopiaLocal().then(function(){          // red de seguridad: guardar como esta AHORA
     return restaurarCopiaLocal(hora);
   }).then(function(partes){
-    alert('✅ Listo. Se restauraron '+partes+' parte(s).\n\nLa app se va a recargar.');
-    setTimeout(function(){ location.reload(); }, 600);
+    avisoGrande('✅ Listo. Se restauraron '+partes+' parte(s).\n\nLa app se va a recargar.', function(){ location.reload(); });
   }).catch(function(e){
     console.error(e);
     alert('No se pudo restaurar: ' + (e.message||'error') + '\n\nTus datos NO se tocaron.');
@@ -6600,8 +6615,7 @@ function pedirRestaurar(idCopia){
     hacerCopiaAutomatica(true).then(function(){
       return restaurarCopia(idCopia);
     }).then(function(partes){
-      alert('✅ Listo. Se restauraron '+partes+' parte(s).\n\nLa app se va a recargar.');
-      setTimeout(function(){ location.reload(); }, 600);
+      avisoGrande('✅ Listo. Se restauraron '+partes+' parte(s).\n\nLa app se va a recargar.', function(){ location.reload(); });
     }).catch(function(e){
       console.error(e);
       alert('No se pudo restaurar: ' + (e.message || 'error desconocido') + '\n\nTus datos NO se tocaron.');
@@ -15145,8 +15159,7 @@ function borrarTodo(){
 function ejecutarBorradoTotal(){
   var terminarBorrado = function(){
     localStorage.clear();
-    alert("Datos borrados");
-    location.reload();
+    avisoGrande("Datos borrados", function(){ location.reload(); });
   };
   if(typeof fbAuth !== 'undefined' && fbAuth.currentUser){
     fbDb.collection('nbs_data').get().then(function(snapshot){
@@ -15196,6 +15209,52 @@ var _saliendoApp = false;
 //  ahora el guardian se asegura EN CADA TOQUE de pantalla. Como Sensei toca
 //  la app todo el tiempo mientras trabaja, siempre habra un guardian valido.
 // ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+//  AVISOS GRANDES  (pedido por Sensei el 22 jul: "que sean mas legibles")
+//  Reemplaza el letrero chiquito del telefono por uno propio de la app,
+//  con letras grandes y un boton grande de Entendido. Si por lo que sea el
+//  letrero aun no existe en la pantalla, se usa el del telefono como respaldo.
+//  Los avisos se ponen en fila: si llegan dos seguidos, se ven uno tras otro.
+// ═══════════════════════════════════════════════════════════════
+var _alertNativo = window.alert;
+var _colaAvisos = [];
+var _avisoActivo = false;
+var _avisoCb = null;
+
+function avisoGrande(msg, alDarOK){
+  _colaAvisos.push({ m: String(msg), cb: alDarOK || null });
+  if(!_avisoActivo) mostrarSiguienteAviso();
+}
+function mostrarSiguienteAviso(){
+  if(!_colaAvisos.length){ _avisoActivo = false; return; }
+  var caja = document.getElementById('aviso-caja');
+  var txt  = document.getElementById('aviso-texto');
+  var ov   = document.getElementById('aviso-ov');
+  var a = _colaAvisos.shift();
+  if(!caja || !txt || !ov){          // respaldo: el letrero del telefono
+    try{ _alertNativo(a.m); }catch(e){}
+    if(a.cb){ try{ a.cb(); }catch(e){} }
+    setTimeout(mostrarSiguienteAviso, 50);
+    return;
+  }
+  _avisoActivo = true;
+  _avisoCb = a.cb;
+  txt.innerHTML = escaparHtml(a.m).replace(/\n/g, '<br>');
+  ov.style.display = 'block';
+  caja.style.display = 'block';
+}
+function cerrarAviso(){
+  var caja = document.getElementById('aviso-caja');
+  var ov   = document.getElementById('aviso-ov');
+  if(caja) caja.style.display = 'none';
+  if(ov)   ov.style.display = 'none';
+  var cb = _avisoCb; _avisoCb = null; _avisoActivo = false;
+  if(cb){ try{ cb(); }catch(e){} }
+  setTimeout(mostrarSiguienteAviso, 130);
+}
+// De aqui en adelante, TODOS los alert() de la app salen con letras grandes
+window.alert = function(m){ avisoGrande(m); };
 
 // ═══ REGISTRO DE DIAGNOSTICO DEL BOTON ATRAS ═══
 // Graba en el telefono lo que va pasando. Como se guarda en localStorage,
@@ -15569,8 +15628,7 @@ function importD(inp){
       if(d.devoluciones){SS('ndevoluciones',d.devoluciones);}
       if(d.productosEliminados){SS('np_eliminados',d.productosEliminados);}
       if(d.visitasBarberos){SS('nvisitas_barberos',d.visitasBarberos);}
-      alert('Datos importados correctamente');
-      ir('p-ped');
+      avisoGrande('Datos importados correctamente', function(){ ir('p-ped'); });
     }catch(err){alert('Error al importar');}
     inp.value='';
   };fr.readAsText(file);
@@ -20077,6 +20135,13 @@ function verHistorialCliente(cid, modo){
   <div style="font-size:40px;line-height:1">&#11013;&#65039;</div>
   <div style="font-size:20px;font-weight:800;margin-top:8px;line-height:1.3">Toca ATR&Aacute;S<br>una vez m&aacute;s para salir</div>
   <div style="font-size:13.5px;color:#c7cdf0;margin-top:9px;line-height:1.45">El tel&eacute;fono no deja que la app se cierre sola.</div>
+</div>
+
+<!-- Letrero de avisos GRANDE (reemplaza al chiquito del telefono) -->
+<div id="aviso-ov" onclick="cerrarAviso()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.72);z-index:99990"></div>
+<div id="aviso-caja" style="display:none;position:fixed;left:5%;right:5%;top:50%;transform:translateY(-50%);max-height:80%;z-index:99991;background:#fff;border-radius:18px;padding:24px 20px 20px;box-shadow:0 12px 44px rgba(0,0,0,.45);overflow-y:auto">
+  <div id="aviso-texto" style="font-size:18.5px;line-height:1.55;color:#1a1a1a;font-weight:600;text-align:center;margin-bottom:20px;word-break:break-word"></div>
+  <button onclick="cerrarAviso()" style="width:100%;padding:17px;border:none;border-radius:13px;background:#1a237e;color:#fff;font-size:19px;font-weight:800;cursor:pointer;font-family:inherit">Entendido</button>
 </div>
 </body>
 </html>
