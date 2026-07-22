@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722c-OFICIAL-V2.0">
+<meta name="app-version" content="20260722d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15176,12 +15176,39 @@ function ejecutarBorradoTotal(){
 
 var _saliendoApp = false;
 
-// El "guardian" es una entrada extra en el historial del telefono. Mientras
-// exista, el boton atras nos avisa a nosotros en vez de cerrar la app.
+// ═══════════════════════════════════════════════════════════════
+//  EL GUARDIAN DEL BOTON ATRAS  (3er intento, 22 jul — este si)
+//
+//  POR QUE FALLARON LOS INTENTOS ANTERIORES:
+//  Chrome tiene una proteccion llamada "history manipulation intervention".
+//  Existe porque hay paginas tramposas que secuestran el boton atras.
+//  Chrome MARCA COMO BASURA (skippable) cualquier entrada del historial que
+//  la pagina cree SIN que el usuario haya tocado algo — y la SALTA, sin
+//  siquiera avisarle al codigo. Yo ponia el guardian al cargar la app y
+//  desde adentro del propio evento de atras: ninguno de los dos cuenta como
+//  "toque del usuario". Por eso Chrome lo saltaba y la app se cerraba de una,
+//  sin llegar nunca a mostrar el letrero.
+//
+//  LA SOLUCION (segun la propia documentacion de Chromium):
+//  la entrada vale si hay un gesto real del usuario en el documento. Por eso
+//  ahora el guardian se asegura EN CADA TOQUE de pantalla. Como Sensei toca
+//  la app todo el tiempo mientras trabaja, siempre habra un guardian valido.
+// ═══════════════════════════════════════════════════════════════
+
+function hayGuardian(){
+  return !!(history.state && history.state.nbs);
+}
 function ponerGuardianAtras(){
+  if(hayGuardian()) return;
   try{ history.pushState({nbs:1}, '', window.location.href); }catch(e){}
 }
-ponerGuardianAtras();
+
+// EN CADA TOQUE REAL del usuario se asegura el guardian. Esto es lo que hace
+// que Chrome lo respete. Se usa captura (true) para que corra siempre, aunque
+// el boton tocado haga otra cosa.
+['pointerdown','touchstart','mousedown','click','keydown'].forEach(function(ev){
+  document.addEventListener(ev, ponerGuardianAtras, true);
+});
 
 function menuLateralAbierto(){
   var m = document.getElementById('menu-lateral');
@@ -15199,13 +15226,10 @@ function hayADondeVolver(){
 window.addEventListener('popstate', function(){
   if(_saliendoApp) return;
 
-  // ═══ REGLA DE ORO (arreglado 22 jul, 2do intento) ═══
-  // PROTEGER PRIMERO, DECIDIR DESPUES. En cuanto el telefono nos avisa que
-  // tocaron atras, ya nos movimos hacia atras en el historial y la app queda
-  // DESPROTEGIDA. Si en ese momento mostramos un letrero (que ademas congela
-  // la app), Android puede cerrarla mientras el letrero esta en pantalla —
-  // que fue exactamente lo que le pasaba a Sensei al tocar "Cancelar".
-  // Por eso lo PRIMERO que se hace, siempre, es volver a poner el guardian.
+  // Se vuelve a poner el guardian de inmediato -mejor esfuerzo-. Aunque Chrome
+  // pueda marcar ESTE como saltable, el proximo toque del usuario pone uno
+  // valido, y mientras el letrero de salir esta abierto el usuario TIENE que
+  // tocar un boton, lo que arma un guardian bueno.
   ponerGuardianAtras();
 
   // 1) Si el menu lateral esta abierto, el boton atras solo lo cierra
