@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722b-OFICIAL-V2.0">
+<meta name="app-version" content="20260722c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15199,33 +15199,69 @@ function hayADondeVolver(){
 window.addEventListener('popstate', function(){
   if(_saliendoApp) return;
 
+  // ═══ REGLA DE ORO (arreglado 22 jul, 2do intento) ═══
+  // PROTEGER PRIMERO, DECIDIR DESPUES. En cuanto el telefono nos avisa que
+  // tocaron atras, ya nos movimos hacia atras en el historial y la app queda
+  // DESPROTEGIDA. Si en ese momento mostramos un letrero (que ademas congela
+  // la app), Android puede cerrarla mientras el letrero esta en pantalla —
+  // que fue exactamente lo que le pasaba a Sensei al tocar "Cancelar".
+  // Por eso lo PRIMERO que se hace, siempre, es volver a poner el guardian.
+  ponerGuardianAtras();
+
   // 1) Si el menu lateral esta abierto, el boton atras solo lo cierra
   if(menuLateralAbierto()){
     cerrarMenuLateral();
-    ponerGuardianAtras();
     return;
   }
 
-  // 2) Si hay a donde volver, hacer lo mismo que el boton "<- Atras" de la app
+  // 2) Si el letrero de salir ya esta abierto, atras lo cierra -no sale-
+  if(document.getElementById('salir-box') && document.getElementById('salir-box').style.display === 'block'){
+    cerrarLetreroSalir();
+    return;
+  }
+
+  // 3) Si hay a donde volver, hacer lo mismo que el boton "<- Atras" de la app
   //    -volverAtras ya sabe cerrar formularios, perfiles y editores primero-
   if(hayADondeVolver()){
-    ponerGuardianAtras();
     volverAtras();
     return;
   }
 
-  // 3) Estamos en el Inicio y no hay nada mas atras: preguntar antes de salir
-  if(confirm('\u00bfQuieres salir de la app?')){
-    _saliendoApp = true;
-    try{ window.close(); }catch(e){}
-    try{ history.back(); }catch(e){}
-    // Si por alguna razon la app sigue abierta, se vuelve a proteger para que
-    // un toque accidental no la cierre sin preguntar.
-    setTimeout(function(){ _saliendoApp = false; ponerGuardianAtras(); }, 1200);
-  } else {
-    ponerGuardianAtras();
-  }
+  // 4) Estamos en el Inicio y no hay nada mas atras: preguntar antes de salir.
+  //    Se usa un letrero PROPIO de la app -no el confirm() de Android- porque
+  //    ese congela la app y estorba con la navegacion.
+  mostrarLetreroSalir();
 });
+
+// ── Letrero propio para salir de la app (botones grandes y legibles) ──
+function mostrarLetreroSalir(){
+  var ov = document.getElementById('salir-ov');
+  var box = document.getElementById('salir-box');
+  if(!ov || !box) return;
+  ov.style.display = 'block';
+  box.style.display = 'block';
+}
+function cerrarLetreroSalir(){
+  var ov = document.getElementById('salir-ov');
+  var box = document.getElementById('salir-box');
+  if(ov) ov.style.display = 'none';
+  if(box) box.style.display = 'none';
+  ponerGuardianAtras();
+}
+function salirDeLaApp(){
+  var box = document.getElementById('salir-box');
+  var ov = document.getElementById('salir-ov');
+  if(box) box.style.display = 'none';
+  if(ov) ov.style.display = 'none';
+  _saliendoApp = true;
+  // Se retrocede DOS pasos: uno es el guardian que acabamos de poner y otro
+  // es la entrada de la app. Asi el telefono si la cierra de verdad.
+  try{ window.close(); }catch(e){}
+  setTimeout(function(){ try{ history.go(-2); }catch(e){} }, 30);
+  // Red de seguridad: si por lo que sea la app sigue viva, se vuelve a proteger
+  // para que un toque accidental no la cierre sin preguntar.
+  setTimeout(function(){ _saliendoApp = false; ponerGuardianAtras(); }, 1500);
+}
 
 function capitalizarFinal(el){
   var pos = el.selectionStart;
@@ -19866,5 +19902,16 @@ function verHistorialCliente(cid, modo){
 })();
 </script>
 </div><!-- cierra #app-contenido -->
+
+<!-- Letrero propio para salir de la app (reemplaza al confirm() de Android,
+     que congelaba la app y hacia que se cerrara aunque tocaras Cancelar) -->
+<div id="salir-ov" onclick="cerrarLetreroSalir()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.72);z-index:99998"></div>
+<div id="salir-box" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;background:#ffffff;border-radius:18px;padding:24px 20px 20px;width:86%;max-width:340px;box-shadow:0 12px 44px rgba(0,0,0,.45);text-align:center">
+  <div style="font-size:44px;line-height:1">&#128682;</div>
+  <div style="font-size:21px;font-weight:800;color:#1a237e;margin:10px 0 6px;line-height:1.25">&iquest;Salir de la app?</div>
+  <div style="font-size:15px;color:#555;line-height:1.5;margin-bottom:20px">Tu informaci&oacute;n ya est&aacute; guardada.</div>
+  <button onclick="cerrarLetreroSalir()" style="width:100%;padding:16px;border:none;border-radius:13px;background:#1a237e;color:#fff;font-size:18px;font-weight:800;cursor:pointer;margin-bottom:11px;font-family:inherit">No, quedarme aqu&iacute;</button>
+  <button onclick="salirDeLaApp()" style="width:100%;padding:16px;border:2px solid #c62828;border-radius:13px;background:#fff;color:#c62828;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit">S&iacute;, salir</button>
+</div>
 </body>
 </html>
