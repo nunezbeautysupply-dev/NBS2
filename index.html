@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722l-OFICIAL-V2.0">
+<meta name="app-version" content="20260722m-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -530,6 +530,12 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <span>Ayuda — ¿Cómo hago tal cosa?</span>
   </button>
 
+  <button onclick="ir('p-resumen')" class="ini-btn" style="--c:#2E7D32;--cb:#E8F5E9">
+    <span class="ini-ico">💰</span>
+    <span class="ini-txt"><b>Cobrado y Vendido</b><i>Lo de hoy, al instante</i></span>
+    <span class="ini-fl">›</span>
+  </button>
+
   <button onclick="ir('p-ped')" class="ini-btn" style="--c:#D4A017;--cb:#FFF6DF">
     <span class="ini-ico">⚡</span>
     <span class="ini-txt"><b>Pedidos Rápidos</b><i>Toma pedidos en la barbería</i></span>
@@ -583,6 +589,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <button onclick="irMenu('p-cl')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">👥</span></span>Clientes</button>
 
     <!-- REPORTES destacado con franja, subido aqui arriba a pedido de Sensei (22 jul) -->
+    <button onclick="irMenu('p-resumen')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💰</span></span>Cobrado y Vendido</button>
     <button onclick="irMenuProtegido('p-rpt')" class="mlb2 mlb2-destacado"><span class="mlb2-icon"><span style="font-size:22px">📊</span></span>REPORTES</button>
     <button onclick="irMenu('p-cxc')" class="mlb2" style="background:#EAF3E2;border-radius:10px;margin-bottom:8px"><span class="mlb2-icon" style="font-size:16px">💳</span><span style="color:#2E7D32;font-weight:700">Cuentas por Cobrar / Facturas</span></button>
     <button onclick="irMenu('p-vip')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">⭐</span></span>Programa VIP</button>
@@ -980,6 +987,53 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
   </div>
 
   <div id="van-lista"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     COBRADO Y VENDIDO — acceso directo pedido por Sensei (22 jul).
+     Abre YA con la fecha de hoy y el resultado calculado, sin tocar nada mas.
+     ═══════════════════════════════════════════════ -->
+<div id="p-resumen" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:14px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+
+  <h2 style="font-size:23px;font-weight:800;color:#1a237e;margin-bottom:12px;text-align:center">💰 Cobrado y Vendido</h2>
+
+  <div style="display:flex;gap:6px;margin-bottom:12px">
+    <button class="rng-btn rng-on" data-r="hoy" style="flex:1">HOY</button>
+    <button class="rng-btn" data-r="ayer" style="flex:1">Ayer</button>
+    <button class="rng-btn" data-r="semana" style="flex:1">Semana</button>
+    <button class="rng-btn" data-r="mes" style="flex:1">Mes</button>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <div style="flex:1">
+      <label style="font-size:12.5px;color:#666;font-weight:800;display:block;margin-bottom:4px">DESDE</label>
+      <input id="res-desde" type="date" class="inp" style="width:100%;font-size:16px;margin:0">
+    </div>
+    <div style="flex:1">
+      <label style="font-size:12.5px;color:#666;font-weight:800;display:block;margin-bottom:4px">HASTA</label>
+      <input id="res-hasta" type="date" class="inp" style="width:100%;font-size:16px;margin:0">
+    </div>
+  </div>
+
+  <div style="background:linear-gradient(135deg,#2E7D32,#43A047);border-radius:16px;padding:20px 18px;margin-bottom:12px;box-shadow:0 4px 14px rgba(46,125,50,.3)">
+    <div style="font-size:13px;color:#c8f0cd;font-weight:800;letter-spacing:1px">💵 COBRADO</div>
+    <div id="res-cobrado" style="font-size:38px;font-weight:900;color:#fff;line-height:1.1;margin:4px 0">$0.00</div>
+    <div id="res-cobrado-n" style="font-size:14px;color:#d6f5da;font-weight:600">0 cobros</div>
+  </div>
+
+  <div style="background:linear-gradient(135deg,#1565C0,#1976D2);border-radius:16px;padding:20px 18px;margin-bottom:16px;box-shadow:0 4px 14px rgba(21,101,192,.3)">
+    <div style="font-size:13px;color:#c5dcf5;font-weight:800;letter-spacing:1px">🧾 VENDIDO</div>
+    <div id="res-vendido" style="font-size:38px;font-weight:900;color:#fff;line-height:1.1;margin:4px 0">$0.00</div>
+    <div id="res-vendido-n" style="font-size:14px;color:#d5e7f8;font-weight:600">0 ventas</div>
+  </div>
+
+  <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px 16px">
+    <div style="font-size:13px;color:#888;font-weight:800;letter-spacing:.6px;margin-bottom:10px">DESGLOSE</div>
+    <div id="res-desglose"></div>
+  </div>
+
+  <p id="res-rango" style="font-size:13px;color:#888;text-align:center;margin-top:14px"></p>
 </div>
 
 <div id="p-cl" class="pg">
@@ -2848,7 +2902,7 @@ function pintarSegunPantalla(id){
 
 var historialPantallas = [];
 function pantallaActual(){
-  var all = ['menu','p-inicio','p-cl','p-v','p-rpt','p-cxc','p-cl-perfil','p-cl-factura','p-cat','p-inventario','p-panorama','p-docs','p-relleno','p-van','p-copias','p-sup','p-comp','p-ped','p-gastos','p-vip','p-mas','p-facturas','p-dashboard','p-rutas','p-manual','p-cxp','p-academia'];
+  var all = ['menu','p-inicio','p-cl','p-v','p-rpt','p-cxc','p-cl-perfil','p-cl-factura','p-cat','p-inventario','p-panorama','p-docs','p-relleno','p-van','p-copias','p-sup','p-comp','p-ped','p-gastos','p-vip','p-mas','p-facturas','p-dashboard','p-rutas','p-manual','p-cxp','p-academia','p-resumen'];
   for(var i=0;i<all.length;i++){
     var el = document.getElementById(all[i]);
     if(el && el.style.display === 'block') return all[i];
@@ -2998,6 +3052,7 @@ function ir(id, sinHistorial){
   if(id==='p-dashboard') renderDashboard();
   if(id==='p-panorama') renderPanorama();
   if(id==='p-docs') renderDocs();
+  if(id==='p-resumen') abrirResumen();
   if(id==='p-academia') renderAcademia();
   // Si sale de la Academia, callar la voz para que no siga hablando en otra pantalla
   if(id!=='p-academia' && typeof acaPausar === 'function' && window._acaReproduciendo) acaPausar();
@@ -17105,6 +17160,147 @@ function renderAcademia(){
     acaActualizarParte();
   }
   acaActualizarBoton();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  COBRADO Y VENDIDO  (acceso directo, pedido por Sensei 22 jul)
+//  Abre con la fecha de HOY y el resultado ya calculado.
+//
+//  VENDIDO  = todo lo que facturaste en el rango (contado + credito),
+//             sin contar las facturas canceladas.
+//  COBRADO  = el dinero que de verdad entro en el rango:
+//             las ventas de contado de esos dias + los abonos que te
+//             pagaron esos dias (aunque la factura sea de antes).
+// ═══════════════════════════════════════════════════════════════
+
+// Convierte MM/DD/AAAA o AAAA-MM-DD a un objeto Date (a las 12 del dia, para
+// que no se corra por zonas horarias)
+function resFechaADate(f){
+  if(!f) return null;
+  f = String(f).trim();
+  var p;
+  if(f.indexOf('-') > 0){ p = f.split('-'); return new Date(+p[0], +p[1]-1, +p[2], 12,0,0); }
+  p = f.split('/');
+  if(p.length !== 3) return null;
+  return new Date(+p[2], +p[0]-1, +p[1], 12,0,0);
+}
+function resISOaDate(iso){
+  if(!iso) return null;
+  var p = iso.split('-');
+  return new Date(+p[0], +p[1]-1, +p[2], 12,0,0);
+}
+function resHoyISO(){
+  var d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function resSumarDias(iso, n){
+  var d = resISOaDate(iso);
+  d.setDate(d.getDate()+n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+// Se llama cada vez que entras a la pantalla: pone HOY y calcula de una
+function abrirResumen(){
+  var dEl = document.getElementById('res-desde');
+  var hEl = document.getElementById('res-hasta');
+  if(!dEl || !hEl) return;
+  if(!dEl.value || !hEl.value){
+    var hoy = resHoyISO();
+    dEl.value = hoy; hEl.value = hoy;
+  }
+  if(!dEl._listo){
+    dEl._listo = true;
+    dEl.onchange = function(){ marcarRango(null); calcularResumen(); };
+    hEl.onchange = function(){ marcarRango(null); calcularResumen(); };
+    Array.prototype.forEach.call(document.querySelectorAll('.rng-btn'), function(b){
+      b.onclick = function(){ ponerRango(b.getAttribute('data-r')); };
+    });
+  }
+  calcularResumen();
+}
+
+function marcarRango(cual){
+  Array.prototype.forEach.call(document.querySelectorAll('.rng-btn'), function(b){
+    if(cual && b.getAttribute('data-r') === cual) b.classList.add('rng-on');
+    else b.classList.remove('rng-on');
+  });
+}
+
+function ponerRango(cual){
+  var hoy = resHoyISO();
+  var desde = hoy, hasta = hoy;
+  if(cual === 'ayer'){ desde = resSumarDias(hoy,-1); hasta = desde; }
+  else if(cual === 'semana'){ desde = resSumarDias(hoy,-6); hasta = hoy; }
+  else if(cual === 'mes'){
+    var d = new Date();
+    desde = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';
+    hasta = hoy;
+  }
+  document.getElementById('res-desde').value = desde;
+  document.getElementById('res-hasta').value = hasta;
+  marcarRango(cual);
+  calcularResumen();
+}
+
+function calcularResumen(){
+  ventas = LS('nv', []);
+  var dIso = document.getElementById('res-desde').value;
+  var hIso = document.getElementById('res-hasta').value;
+  var d0 = resISOaDate(dIso), d1 = resISOaDate(hIso);
+  if(!d0 || !d1){ return; }
+  if(d0 > d1){ var t=d0; d0=d1; d1=t; }
+
+  function dentro(fecha){
+    var f = resFechaADate(fecha);
+    if(!f) return false;
+    return f >= d0 && f <= d1;
+  }
+
+  var vendido = 0, nVentas = 0, contado = 0, credito = 0;
+  var cobrado = 0, nCobros = 0, abonos = 0;
+
+  ventas.forEach(function(v){
+    if(v.cancelada) return;
+    // ── VENDIDO: facturas emitidas en el rango ──
+    if(dentro(v.fecha)){
+      var t = v.total || 0;
+      vendido += t; nVentas++;
+      if(v.tipo === 'contado'){ contado += t; cobrado += t; nCobros++; }
+      else { credito += t; }
+    }
+    // ── COBRADO: abonos pagados en el rango, sea cual sea la fecha de la factura ──
+    if(v.tipo === 'credito' && v.pagosFactura && v.pagosFactura.length){
+      v.pagosFactura.forEach(function(p){
+        if(typeof p.monto !== 'number' || p.monto <= 0) return;
+        if(p.esDevolucion) return;
+        if(dentro(p.fecha || v.fecha)){
+          cobrado += p.monto; abonos += p.monto; nCobros++;
+        }
+      });
+    }
+  });
+
+  document.getElementById('res-cobrado').textContent = '$'+fmtNum(cobrado);
+  document.getElementById('res-cobrado-n').textContent = nCobros + (nCobros===1?' cobro':' cobros');
+  document.getElementById('res-vendido').textContent = '$'+fmtNum(vendido);
+  document.getElementById('res-vendido-n').textContent = nVentas + (nVentas===1?' venta':' ventas');
+
+  function fila(nom, val, color){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed #eee">'
+      + '<span style="font-size:15.5px;color:#444;font-weight:600">'+nom+'</span>'
+      + '<span style="font-size:17px;font-weight:800;color:'+color+'">$'+fmtNum(val)+'</span></div>';
+  }
+  document.getElementById('res-desglose').innerHTML =
+      fila('Ventas de contado', contado, '#2E7D32')
+    + fila('Ventas a cr\u00e9dito', credito, '#E65100')
+    + fila('Abonos que te pagaron', abonos, '#1565C0')
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 2px">'
+    + '<span style="font-size:15.5px;color:#1a237e;font-weight:800">Falta por cobrar de estas ventas</span>'
+    + '<span style="font-size:17px;font-weight:900;color:#C62828">$'+fmtNum(Math.max(0, credito))+'</span></div>';
+
+  function bonito(iso){ var p = iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+  document.getElementById('res-rango').textContent =
+    (dIso === hIso) ? ('Del d\u00eda '+bonito(dIso)) : ('Del '+bonito(dIso)+' al '+bonito(hIso));
 }
 
 function renderDocs(){
