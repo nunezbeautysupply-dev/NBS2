@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722a-OFICIAL-V2.0">
+<meta name="app-version" content="20260722b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2885,7 +2885,9 @@ function volverAtras(){
     var prev = historialPantallas.pop();
     ir(prev, true);
   } else {
-    ir('p-ped', true);
+    // Antes mandaba a Pedidos Rapidos. Ahora termina en el Inicio, que es
+    // donde de verdad empieza la app -arreglado 22 jul 2026-.
+    ir('p-inicio', true);
   }
 }
 function ir(id, sinHistorial){
@@ -15160,37 +15162,68 @@ function ejecutarBorradoTotal(){
   }
 }
 
-// Android back button support
-history.pushState(null, '', window.location.href);
+// ══════════════════════════════════════════════════════════════
+//  BOTON ATRAS DEL CELULAR  (arreglado 22 jul 2026, pedido por Sensei)
+//
+//  ANTES: solo funcionaba en 4 pantallas de las 26. En las otras 22 no
+//  hacia nada y, peor, el telefono se quedaba sin historial y CERRABA
+//  la app de golpe -aunque estuvieras a mitad de una venta-.
+//
+//  AHORA: hace exactamente lo mismo que el boton "<- Atras" de la app,
+//  en TODAS las pantallas; nunca deja al telefono sin historial; y al
+//  llegar al Inicio pregunta si de verdad quieres salir.
+// ══════════════════════════════════════════════════════════════
+
+var _saliendoApp = false;
+
+// El "guardian" es una entrada extra en el historial del telefono. Mientras
+// exista, el boton atras nos avisa a nosotros en vez de cerrar la app.
+function ponerGuardianAtras(){
+  try{ history.pushState({nbs:1}, '', window.location.href); }catch(e){}
+}
+ponerGuardianAtras();
+
+function menuLateralAbierto(){
+  var m = document.getElementById('menu-lateral');
+  return !!(m && m.style.display && m.style.display !== 'none');
+}
+
+// Hay algo a donde volver? -una subvista, una pantalla anterior, o no estamos en Inicio-
+function hayADondeVolver(){
+  if(historialPantallas && historialPantallas.length) return true;
+  var actual = pantallaActual();
+  if(actual && actual !== 'p-inicio') return true;
+  return false;
+}
+
 window.addEventListener('popstate', function(){
-  var abono = document.getElementById('cxc-abono');
-  if(abono && abono.style.display === 'block'){
-    abono.style.display='none';
-    document.getElementById('cxc-lista').style.display='block';
-    history.pushState(null, '', window.location.href);
+  if(_saliendoApp) return;
+
+  // 1) Si el menu lateral esta abierto, el boton atras solo lo cierra
+  if(menuLateralAbierto()){
+    cerrarMenuLateral();
+    ponerGuardianAtras();
     return;
   }
-  var factura = document.getElementById('p-cl-factura');
-  if(factura && factura.style.display === 'block'){
-    factura.style.display='none';
-    document.getElementById('p-cl-perfil').style.display='block';
-    history.pushState(null, '', window.location.href);
+
+  // 2) Si hay a donde volver, hacer lo mismo que el boton "<- Atras" de la app
+  //    -volverAtras ya sabe cerrar formularios, perfiles y editores primero-
+  if(hayADondeVolver()){
+    ponerGuardianAtras();
+    volverAtras();
     return;
   }
-  var perfil = document.getElementById('p-cl-perfil');
-  if(perfil && perfil.style.display === 'block'){
-    ir('p-cl');
-    history.pushState(null, '', window.location.href);
-    return;
-  }
-  var pages=['p-cl','p-v','p-cxc','p-rpt'];
-  for(var i=0;i<pages.length;i++){
-    var el=document.getElementById(pages[i]);
-    if(el && el.style.display==='block'){
-      ir('p-ped');
-      history.pushState(null, '', window.location.href);
-      return;
-    }
+
+  // 3) Estamos en el Inicio y no hay nada mas atras: preguntar antes de salir
+  if(confirm('\u00bfQuieres salir de la app?')){
+    _saliendoApp = true;
+    try{ window.close(); }catch(e){}
+    try{ history.back(); }catch(e){}
+    // Si por alguna razon la app sigue abierta, se vuelve a proteger para que
+    // un toque accidental no la cierre sin preguntar.
+    setTimeout(function(){ _saliendoApp = false; ponerGuardianAtras(); }, 1200);
+  } else {
+    ponerGuardianAtras();
   }
 });
 
