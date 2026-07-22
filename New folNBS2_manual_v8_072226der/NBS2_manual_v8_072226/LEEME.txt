@@ -1,0 +1,38 @@
+MANUAL NUEVO DE NBS 2 (Version 8.0)
+
+*** PARA TU APP NBS 2 (carpeta NBS2) ***
+*** ESTE PAQUETE TIENE 4 ARCHIVOS ***
+
+QUE TRAE:
+El manual completo y actualizado de tu app, con TODO
+lo nuevo. Son 11 paginas e incluye:
+
+  - La pantalla de inicio y el letrero APP OFICIAL
+  - Pedidos Rapidos, Vender, Clientes
+  - La firma del cliente en la factura
+  - Busqueda inteligente (encuentra aunque escribas mal)
+  - Cuentas por Cobrar (balance al instante)
+  - Cuentas por Pagar (pagar todo con Efectivo o Tarjeta)
+  - SEGURIDAD: la huella en todo lo de dinero y el
+    TRIPLE CANDADO para borrar todo
+  - Como funciona SIN INTERNET
+  - El aviso de "app actualizada"
+  - Los demas modulos, copias de seguridad, impresora
+  - Preguntas frecuentes
+
+Ya quedo puesto en "Mis Documentos" de la app,
+reemplazando el manual viejo.
+
+SUBE ESTOS 4 ARCHIVOS a tu carpeta NBS2:
+  1. index.html                     (reemplaza)
+  2. app_prueba_firebase.html       (reemplaza)
+  3. sw.js                          (reemplaza)
+  4. NBS2_Manual_de_Usuario_v8.pdf  (nuevo)
+
+DESPUES: Commit + Push. Espera 2 min. Refresca 3 veces.
+-> Menu -> Mis Documentos -> Manual de Usuario -> Ver
+
+NOTA: puedes borrar el viejo NBS_Manual_de_Usuario.pdf
+de la carpeta si quieres, ya no se usa.
+
+** INCLUYE TODO LO DE HOY **

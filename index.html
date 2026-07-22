@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260721f-OFICIAL-V2.0">
+<meta name="app-version" content="20260722a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -582,6 +582,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <div style="font-size:10px;color:var(--nbs-muted-2);font-weight:700;letter-spacing:1px;padding:12px 8px 4px">FINANZAS</div>
     <button onclick="irMenu('p-panorama')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📊</span></span>Panorama Completo</button>
     <button onclick="irMenu('p-docs')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📁</span></span>Mis Documentos</button>
+    <button onclick="irMenu('p-academia')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🎓</span></span>Academia</button>
     <button onclick="irMenu('p-dashboard')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📈</span></span>Resumen Financiero</button>
     <button onclick="irMenuProtegido('p-gastos')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💸</span></span>Gastos</button>
     <button onclick="irMenuProtegido('p-rpt')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📈</span></span>Reportes</button>
@@ -2828,7 +2829,7 @@ function pintarSegunPantalla(id){
 
 var historialPantallas = [];
 function pantallaActual(){
-  var all = ['menu','p-inicio','p-cl','p-v','p-rpt','p-cxc','p-cl-perfil','p-cl-factura','p-cat','p-inventario','p-panorama','p-docs','p-relleno','p-van','p-copias','p-sup','p-comp','p-ped','p-gastos','p-vip','p-mas','p-facturas','p-dashboard','p-rutas','p-manual','p-cxp'];
+  var all = ['menu','p-inicio','p-cl','p-v','p-rpt','p-cxc','p-cl-perfil','p-cl-factura','p-cat','p-inventario','p-panorama','p-docs','p-relleno','p-van','p-copias','p-sup','p-comp','p-ped','p-gastos','p-vip','p-mas','p-facturas','p-dashboard','p-rutas','p-manual','p-cxp','p-academia'];
   for(var i=0;i<all.length;i++){
     var el = document.getElementById(all[i]);
     if(el && el.style.display === 'block') return all[i];
@@ -2976,6 +2977,9 @@ function ir(id, sinHistorial){
   if(id==='p-dashboard') renderDashboard();
   if(id==='p-panorama') renderPanorama();
   if(id==='p-docs') renderDocs();
+  if(id==='p-academia') renderAcademia();
+  // Si sale de la Academia, callar la voz para que no siga hablando en otra pantalla
+  if(id!=='p-academia' && typeof acaPausar === 'function' && window._acaReproduciendo) acaPausar();
   if(id==='p-inventario') renderInventario('');
   if(id==='p-inicio') renderInicio();
   if(id==='p-relleno') abrirRelleno();
@@ -16463,16 +16467,280 @@ function ventaEnRango(v, desde, hasta){
 //  Para agregar un documento nuevo: súbelo a GitHub junto a la app y añádelo aquí.
 // ═══════════════════════════════════════════════════════════════════════════
 var DOCUMENTOS_NBS = [
-  { archivo: 'Cartera_de_Clientes.pdf', titulo: 'Cartera de Clientes', desc: 'Directorio completo de tus 128 clientes con toda su info', color: '#00838F' },
-  { archivo: 'Fichas_Clientes_NBS.pdf', titulo: 'Cuentas por Cobrar (para llenar)', desc: 'Fichas para anotar pagos a mano, por deuda', color: '#C62828' },
-  { archivo: 'Clientes_CON_Deuda.pdf', titulo: 'Clientes con Deuda', desc: 'Los 60 clientes que te deben, con toda su info', color: '#D84315' },
-  { archivo: 'Clientes_SIN_Deuda.pdf', titulo: 'Clientes al Día', desc: 'Los 68 clientes sin deuda, con toda su info', color: '#2E7D32' },
   { archivo: 'Recuento_Cambios_NBS_20jul2026.pdf', titulo: 'Recuento 20 Julio', desc: 'Todo lo hecho hoy: respaldos, reportes, app instalable', color: '#1a237e' },
   { archivo: 'Programa_de_Ofertas_NBS.pdf', titulo: 'Programa de Ofertas', desc: 'Cómo vender más sin perder ganancia', color: '#2E7D32' },
   { archivo: 'Como_Ganar_Lealtad_Clientes_NBS.pdf', titulo: 'Cómo Ganar la Lealtad', desc: 'Metodologías para retener clientes', color: '#1a237e' },
-  { archivo: 'NBS_Manual_de_Usuario.pdf', titulo: 'Manual de Usuario', desc: 'Guía paso a paso de cómo usar la app', color: '#6A1B9A' },
+  { archivo: 'NBS_Guia_Finanzas_y_Contabilidad.pdf', titulo: 'Finanzas y Contabilidad', desc: 'Cómo llevar el dinero de tu negocio con claridad', color: '#2E7D32' },
+  { archivo: 'NBS_Guia_Precios_y_Margenes.pdf', titulo: 'Precios y Márgenes', desc: 'Cómo poner precios que te dejen ganancia', color: '#1565C0' },
+  { archivo: 'NBS2_Manual_de_Usuario_v8.pdf', titulo: 'Manual de Usuario', desc: 'Guía completa de la app — Versión 8.0, con seguridad y modo sin internet', color: '#1a237e' },
   { archivo: 'Registro_de_Cambios_NBS.pdf', titulo: 'Registro de Cambios', desc: 'Todas las mejoras de las últimas 2 semanas', color: '#E65100' }
 ];
+
+// ═══════════════════════════════════════════════════════════════
+//  NBS ACADEMIA - lecciones de negocio en AUDIO
+//  Pedida por Sensei (21 jul 2026): escuchar mientras trabaja la ruta.
+//  La voz del telefono lee las lecciones. Mantiene la pantalla encendida
+//  con Wake Lock para que el audio no se corte. Avanza sola de una
+//  leccion a la otra, como un podcast.
+// ═══════════════════════════════════════════════════════════════
+
+var ACA_LECCIONES = [
+
+{ titulo: "Ganancia no es lo mismo que ingreso", texto:
+"Bienvenido a tu primera lección. Vamos a empezar con el error más común en los negocios, y entenderlo te va a cambiar la forma de ver tu dinero. Muchos dueños ven entrar mil dólares en el día y piensan: gané mil dólares. Pero eso no es verdad. Ese dinero que entra se llama ingreso, y de ahí todavía tienes que pagar muchas cosas. Piénsalo así: si vendiste mil dólares, pero el producto que vendiste te costó seiscientos, y gastaste cincuenta en gasolina de la ruta, entonces tu ganancia real no es mil. Es mil, menos seiscientos, menos cincuenta. O sea, trescientos cincuenta dólares. Esa es tu ganancia de verdad. El resto nunca fue tuyo: era para reponer el producto y cubrir tus gastos. Por eso, graba esta regla de oro: el dinero que entra no es tuyo hasta que le descuentas lo que costó ganarlo. El número que de verdad importa se llama ganancia neta. Es lo que te queda después de pagar el producto y todos tus gastos. Ese es el número que debes vivir mirando. No te emociones con lo que vendes; emociónate con lo que te queda. En las próximas lecciones vamos a ver cómo hacer que tu ganancia neta sea cada vez más grande. Nos vemos en la siguiente." },
+
+{ titulo: "Precios y márgenes: cómo cobrar bien", texto:
+"En esta lección vas a aprender a poner precios que te dejen ganancia de verdad. Primero, dos palabras que se confunden todo el tiempo: margen y markup. El margen es qué parte de tu precio de venta es ganancia. El markup es cuánto le sumas encima a tu costo. Un ejemplo: te costó seis dólares y lo vendes en diez. Ganas cuatro. Ese cuatro, dividido entre el precio de diez, es cuarenta por ciento de margen. El mismo cuatro, dividido entre el costo de seis, es casi sesenta y siete por ciento de markup. Es el mismo dinero, pero se ve distinto. Para tu negocio, guíate por el margen. Ahora, la fórmula para sacar tu precio es simple: precio igual a costo, dividido entre uno menos el margen que quieres. Si te costó seis y quieres cuarenta por ciento, divides seis entre cero punto seis, y te da diez dólares. Y aquí va lo importante: no todos los productos dan el mismo margen. Las máquinas y clippers son caras y muy competidas, así que dan poco margen, entre veinte y treinta y cinco por ciento. Pero los líquidos, como shampoo, colonia y gel, son consumibles, se acaban y se vuelven a comprar, y ahí puedes ganar entre cuarenta y sesenta por ciento. La estrategia es esta: la máquina es el gancho para atraer al cliente, y ganas de verdad en lo que se lleva con ella. Recuerda: el precio correcto no es el más barato, es el que te deja ganancia y el cliente paga con gusto." },
+
+{ titulo: "Cómo ganar la lealtad de tus barberías", texto:
+"Tu ventaja más grande es algo que ningún competidor por internet puede copiar: tú ves a tus barberías en persona, cara a cara, todos los días. Usa eso. La primera clave es conocerlos de verdad. Aprende el nombre del dueño y de los barberos. Recuerda qué producto usa cada barbería y cuál prefiere. La gente quiere sentirse tratada como persona, no como un número. La segunda clave es ser rápido y confiable. Si dices que llegas el martes, llega el martes. Nunca les falles con un producto que necesitan. Si hay un problema, resuélvelo rápido. La mayoría de los clientes se van cuando su proveedor les falla. La tercera clave es crear conexión humana. Salúdalos por su nombre, pregúntales cómo va el negocio. De vez en cuando, dale una muestra gratis o un pequeño detalle a tus mejores clientes. La gente le compra a quien le cae bien y en quien confía. Y la cuarta clave: premia la lealtad. Usa tu programa VIP para dar mejores precios a los más fieles. Haz que se sientan parte de algo exclusivo. Recuerda siempre: cuidar al cliente que ya tienes es el mejor negocio que existe, porque conseguir uno nuevo cuesta cinco veces más. La competencia por internet puede tener precios, pero no puede darle a tus barberías lo que tú sí: trato personal, confianza y una relación de verdad." },
+
+{ titulo: "Ofertas que venden sin perder ganancia", texto:
+"Una oferta bien hecha no es una pérdida. Es una inversión que se paga sola si trae suficiente volumen. Cuando bajas el precio, ganas un poco menos por cada unidad, pero si vendes muchas más unidades, terminas ganando más en total. La primera estrategia, y la mejor, es el descuento por volumen. Premia al que compra más con un mejor precio por unidad. Por ejemplo: de una a cinco unidades, a diez dólares cada una. De seis a once, a nueve cincuenta. De doce o más, a nueve. El cliente siente que gana comprando más, y tú mueves más producto y más rápido. La segunda estrategia es la oferta semanal. Cada semana, elige un solo producto de buen margen y ponlo en oferta, con límite: solo esta semana. Eso crea urgencia y le da a las barberías una razón para comprarte ahora. Pero cuidado: ofrece descuentos fuertes solo en productos de buen margen. En las máquinas, que dan poco margen, ofrece descuentos suaves o ninguno. La tercera estrategia es la venta cruzada, y sube tu ganancia sin descontar nada. Consiste en ofrecer productos que combinan con lo que ya compran. Al que compra máquinas, ofrécele aceite, cuchillas y limpieza. Al que compra shampoo, ofrécele acondicionador. La máquina es el gancho; la ganancia está en lo que la acompaña." },
+
+{ titulo: "Vender más en cada visita de la ruta", texto:
+"Cada visita a una barbería es una oportunidad, y la mayoría de los vendedores la desaprovecha porque solo toma el pedido y se va. Tú vas a hacer algo diferente. Antes de entrar, revisa en tu app qué compra normalmente ese cliente y qué compró la última vez. Así llegas preparado. Cuando estés ahí, no esperes a que te pidan: sugiere. Si siempre compra shampoo, pregúntale si le hace falta acondicionador. Si compra máquinas, ofrécele las cuchillas y el aceite que va a necesitar. La gente muchas veces compra más solo porque se lo recordaste. Segundo: menciona siempre la oferta de la semana. Es una razón para que compre hoy y no la próxima vez. Tercero: fíjate en lo que se le está acabando. Si ves que un producto está bajo en su estante, díselo con confianza: te queda poco de esto, ¿te dejo unos cuantos? Cuarto: al cliente que compra poco, tiéntalo con el descuento por volumen. Muéstrale cuánto ahorra si lleva más. Recuerda: no eres solo el que entrega; eres el que ayuda a la barbería a nunca quedarse sin lo que necesita. Esa actitud te hace vender más y te hace indispensable." },
+
+{ titulo: "Negociar bien con tus suplidores", texto:
+"El dinero también se gana cuando compras, no solo cuando vendes. Si compras mejor, ganas más en cada venta. Primera regla: compra en volumen cuando puedas. Los suplidores casi siempre te dan mejor precio si les compras más cantidad. Un costo más bajo significa más margen para ti en cada producto que vendes. Segunda regla: paga a tiempo y construye confianza. El suplidor que confía en ti te da mejores precios, te avisa primero de los productos nuevos, y a veces te da crédito. Tu buena fama con ellos vale dinero. Tercera regla: compara. No te cases con un solo suplidor sin saber si otro te da mejor precio por lo mismo. Tener dos o tres opciones te da poder para negociar. Cuarta regla: pregunta siempre por descuentos y términos. ¿Hay mejor precio si pago de contado? ¿Si compro esta cantidad? Muchas veces el descuento está ahí, pero solo lo dan si preguntas. Y quinta: lleva la cuenta de lo que le debes a cada suplidor, tus cuentas por pagar, para nunca perder el control. Recuerda: cada dólar que ahorras comprando es un dólar directo a tu ganancia." },
+
+{ titulo: "No quedarte sin lo que más vendes", texto:
+"El inventario es dinero. Cada producto en tu van es dinero tuyo esperando a venderse, y manejarlo bien es clave para ganar. La primera regla de oro es esta: nunca te quedes sin tus productos más vendidos. Si un cliente te pide lo que siempre lleva y no lo tienes, no solo pierdes esa venta: le abres la puerta al competidor. Ten siempre stock de lo que más se mueve. Segundo: conoce tus números. Tu app te dice cuáles son tus productos más vendidos. Esos son tus estrellas; cuídalos y tenlos siempre. Tercero: cuidado con el inventario muerto. Ese producto que compraste y no se vende, que lleva meses ahí, es dinero atrapado que no está trabajando. Es mejor bajarle el precio y salir de él para recuperar tu dinero y comprar lo que sí se vende. Cuarto: rellena tu van con orden, por marca, para que sea rápido y no se te olvide nada. Y quinto: revisa tu inventario seguido, para pedir a tiempo y nunca llegar corto a la ruta. Recuerda: un buen negocio no es el que tiene más producto, es el que tiene el producto correcto, el que se vende, siempre disponible." },
+
+{ titulo: "Manejar el crédito y cobrar a tiempo", texto:
+"Dar crédito, fiar, ayuda a vender más, pero es un arma de doble filo. Esta lección te enseña a manejarlo sin que te ahogue. Primero entiende esto: cada dólar que te deben es un dólar que ya trabajaste, pero que todavía no tienes en la mano. Si se acumula demasiado, puedes vender muchísimo y aun así quedarte sin efectivo para comprar más producto. A eso se le llama un problema de flujo de caja. Para no caer ahí, sigue estas reglas. Regla uno: no dejes que un cliente pase de dos o tres semanas sin abonar. Habla con él antes de que la deuda crezca. Regla dos: ponle un límite a cuánto le fías a cada cliente. No todos merecen el mismo crédito. Regla tres: al que siempre paga tarde, véndele más de contado y menos a crédito. Regla cuatro: revisa tus cuentas por cobrar cada semana en la app, para no perder de vista quién te debe. Cobrar a tiempo es tan importante como vender. Una venta a crédito no está completa hasta que te pagan. El vendedor amable que nunca cobra termina quebrando; el que cobra con respeto pero con firmeza, prospera." },
+
+{ titulo: "Servicio que hace que te prefieran a ti", texto:
+"En un mundo donde el cliente puede comprar por internet, ¿por qué te compraría a ti? La respuesta es el servicio, y es tu arma secreta. Primero, la puntualidad. Llegar cuando dijiste que ibas a llegar genera una confianza que el internet no puede dar. El cliente sabe que puede contar contigo. Segundo, resolver rápido. Cuando algo sale mal, un producto defectuoso, un pedido incompleto, la velocidad con que lo arreglas es lo que decide si el cliente se queda o se va. Un problema bien resuelto crea más lealtad que si nunca hubiera pasado. Tercero, el trato humano. Preguntar cómo va el negocio, acordarte de sus cosas, felicitarlo en una fecha especial. Eso construye una relación, no solo una venta. Cuarto, escucha. Pregúntale qué productos le gustaría que trajeras, y cuando puedas, tráelos. El cliente que se siente escuchado no se va con la competencia. Y quinto, cumple siempre tu palabra. Tu palabra es tu marca. La competencia por internet puede tener precios más bajos, pero no puede mirarte a los ojos, ni resolverte un problema hoy mismo, ni conocerte por tu nombre. Ese trato personal es lo que te hace ganar, visita tras visita." },
+
+{ titulo: "Mentalidad de dueño de negocio", texto:
+"Esta lección no es de técnicas, es de mentalidad, y quizás es la más importante de todas. Un dueño de negocio piensa diferente. Primero: separa el dinero del negocio del dinero personal. Si los mezclas, nunca vas a saber si el negocio gana o pierde, y te vas a gastar sin querer el dinero que era para comprar producto. Ten una cuenta o un sobre solo para el negocio, y págate un sueldo fijo, en vez de sacar dinero cuando sea. Segundo: reinvierte para crecer. Parte de lo que ganas debe volver al negocio, en más producto, en mejores herramientas, en crecer tu ruta. El que se lo gasta todo, se queda igual. Tercero: piensa a largo plazo. No sacrifiques una relación de años por ganar un poco más hoy. Cuarto: decide con números, no con emociones. Tus números te dicen la verdad; tus corazonadas a veces te engañan. Revisa tus ganancias cada semana y cada mes. Y quinto: cuida tu nombre. En este negocio, tu reputación con las barberías y con los suplidores es tu activo más valioso. El que conoce sus números y cuida su palabra, manda en su negocio. El que va a ciegas y gasta sin control, tarde o temprano tropieza." },
+
+{ titulo: "Cómo crecer tu negocio paso a paso", texto:
+"Para cerrar, vamos a juntar todo en un plan de crecimiento. Crecer no es solo vender más hoy; es construir algo cada vez más grande y sólido. Paso uno: primero retén, después crece. Antes de buscar clientes nuevos, asegúrate de cuidar bien a los que ya tienes, porque retener cuesta cinco veces menos que conseguir. Un cliente feliz, además, te recomienda gratis con otras barberías, y esa es la mejor publicidad que existe. Paso dos: vende más a los que ya te compran. Con venta cruzada y buen servicio, cada cliente puede darte más sin que gastes en conseguir uno nuevo. Paso tres: agrega productos con inteligencia. Pregunta a tus clientes qué les gustaría que trajeras, y trae lo que de verdad se va a vender. Paso cuatro: expande tu ruta poco a poco. Cada barbería nueva bien atendida es un ingreso más, pero crece a un ritmo que puedas cumplir, porque fallar por crecer muy rápido te cuesta caro. Paso cinco: mide y ajusta. Cada mes, compara si tus ganancias subieron. Si sí, sigue por ahí. Si no, ajusta precios, gastos o cobros. Recuerda: los negocios grandes empezaron pequeños, pero con dueños que cuidaban sus números, cuidaban a su gente, y mejoraban un poco cada mes. Ese eres tú. Sigue adelante, Sensei." }
+];
+
+var acaSynth = window.speechSynthesis;
+var acaIdxLeccion = -1;
+var acaChunks = [];
+var acaIdxChunk = 0;
+var acaCancelManual = false;
+var acaVelocidad = 1;
+var acaVoz = null;
+var acaWakeLock = null;
+window._acaReproduciendo = false;
+
+// Escoger una voz en espanol de las que tenga el telefono
+function acaElegirVoz(){
+  if(!acaSynth) return null;
+  var voces = acaSynth.getVoices() || [];
+  var pref = ['es-us','es-mx','es-419','es-es','es'];
+  for(var p=0; p<pref.length; p++){
+    for(var i=0;i<voces.length;i++){
+      if((voces[i].lang||'').toLowerCase().indexOf(pref[p])===0) return voces[i];
+    }
+  }
+  return null;
+}
+if(acaSynth){
+  acaVoz = acaElegirVoz();
+  if(typeof acaSynth.onvoiceschanged !== 'undefined'){
+    acaSynth.onvoiceschanged = function(){ acaVoz = acaElegirVoz(); };
+  }
+}
+
+// Partir la leccion en pedazos cortos (por oracion). Chrome corta la voz a los
+// ~15 segundos si el texto es largo, por eso se lee de a pedacitos encadenados.
+function acaPartir(txt){
+  var crudo = txt.match(/[^.!?]+[.!?]*/g) || [txt];
+  var res = [];
+  crudo.forEach(function(s){
+    s = s.trim();
+    if(!s) return;
+    if(s.length <= 200){ res.push(s); return; }
+    var partes = s.split(/,\s*/);
+    var buffer = '';
+    partes.forEach(function(p){
+      if((buffer + ' ' + p).length > 200){
+        if(buffer) res.push(buffer.trim());
+        buffer = p;
+      } else {
+        buffer = buffer ? (buffer + ', ' + p) : p;
+      }
+    });
+    if(buffer) res.push(buffer.trim());
+  });
+  return res;
+}
+
+// Mantener la pantalla encendida mientras lee -asi el audio no se detiene-
+function acaPedirWakeLock(){
+  try{
+    if('wakeLock' in navigator && navigator.wakeLock.request){
+      navigator.wakeLock.request('screen').then(function(wl){
+        acaWakeLock = wl;
+        acaNotaPantalla(true);
+      }).catch(function(){ acaNotaPantalla(false); });
+    }
+  }catch(e){ acaNotaPantalla(false); }
+}
+function acaSoltarWakeLock(){
+  try{ if(acaWakeLock){ acaWakeLock.release(); acaWakeLock = null; } }catch(e){}
+  acaNotaPantalla(false);
+}
+function acaNotaPantalla(activa){
+  var el = document.getElementById('aca-pantalla');
+  if(!el) return;
+  if(activa){ el.innerHTML = '<span style="color:#6cd08f;font-weight:700">\u2600\ufe0f Pantalla encendida - no se apagara</span>'; }
+  else { el.textContent = 'La pantalla se mantiene encendida al reproducir'; }
+}
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible' && window._acaReproduciendo) acaPedirWakeLock();
+});
+
+// Leer un pedazo y encadenar el siguiente
+function acaHablarChunk(){
+  if(!acaSynth) return;
+  if(acaIdxChunk >= acaChunks.length){ acaLeccionTerminada(); return; }
+  var u = new SpeechSynthesisUtterance(acaChunks[acaIdxChunk]);
+  u.lang = 'es-US';
+  if(acaVoz) u.voice = acaVoz;
+  u.rate = acaVelocidad;
+  u.onend = function(){
+    if(acaCancelManual){ acaCancelManual = false; return; }
+    acaIdxChunk++;
+    acaActualizarParte();
+    if(acaIdxChunk < acaChunks.length){ acaHablarChunk(); } else { acaLeccionTerminada(); }
+  };
+  u.onerror = function(){
+    if(!acaCancelManual && window._acaReproduciendo){
+      acaIdxChunk++;
+      if(acaIdxChunk < acaChunks.length){ acaHablarChunk(); } else { acaLeccionTerminada(); }
+    }
+    acaCancelManual = false;
+  };
+  acaSynth.speak(u);
+}
+
+function acaReproducir(){
+  if(!acaSynth){ alert('Este telefono no soporta lectura por voz. Prueba con Chrome.'); return; }
+  if(acaIdxLeccion < 0){ acaCargarLeccion(0, false); }
+  if(!acaChunks.length){ acaChunks = acaPartir(ACA_LECCIONES[acaIdxLeccion].texto); }
+  window._acaReproduciendo = true;
+  acaActualizarBoton();
+  acaPedirWakeLock();
+  acaCancelManual = true;
+  try{ acaSynth.cancel(); }catch(e){}
+  setTimeout(function(){ acaCancelManual = false; acaHablarChunk(); }, 120);
+}
+
+function acaPausar(){
+  window._acaReproduciendo = false;
+  acaCancelManual = true;
+  try{ if(acaSynth) acaSynth.cancel(); }catch(e){}
+  acaSoltarWakeLock();
+  acaActualizarBoton();
+}
+
+function acaTogglePlay(){
+  if(window._acaReproduciendo){ acaPausar(); } else { acaReproducir(); }
+}
+
+// Al terminar una leccion, pasar sola a la siguiente -como un podcast-
+function acaLeccionTerminada(){
+  if(acaIdxLeccion < ACA_LECCIONES.length - 1){
+    var seguia = window._acaReproduciendo;
+    acaCargarLeccion(acaIdxLeccion + 1, false);
+    if(seguia){ setTimeout(acaReproducir, 400); }
+  } else {
+    window._acaReproduciendo = false;
+    acaSoltarWakeLock();
+    acaActualizarBoton();
+    var el = document.getElementById('aca-parte');
+    if(el) el.textContent = 'Fin de las lecciones. \u00a1Bien hecho!';
+  }
+}
+
+function acaCargarLeccion(i, autoplay){
+  if(i < 0 || i >= ACA_LECCIONES.length) return;
+  acaCancelManual = true;
+  try{ if(acaSynth) acaSynth.cancel(); }catch(e){}
+  acaIdxLeccion = i;
+  acaChunks = acaPartir(ACA_LECCIONES[i].texto);
+  acaIdxChunk = 0;
+  try{ localStorage.setItem('nbs_academia_leccion', String(i)); }catch(e){}
+  var t = document.getElementById('aca-titulo');
+  if(t) t.textContent = ACA_LECCIONES[i].titulo;
+  acaActualizarParte();
+  acaRenderLista();
+  if(autoplay){ setTimeout(acaReproducir, 150); }
+}
+
+function acaSiguiente(){ if(acaIdxLeccion < ACA_LECCIONES.length-1) acaCargarLeccion(acaIdxLeccion+1, window._acaReproduciendo); }
+function acaAnterior(){ if(acaIdxLeccion > 0) acaCargarLeccion(acaIdxLeccion-1, window._acaReproduciendo); }
+
+function acaActualizarBoton(){
+  var b = document.getElementById('aca-play');
+  if(b) b.textContent = window._acaReproduciendo ? '\u23F8' : '\u25B6';
+  acaRenderLista();
+}
+function acaActualizarParte(){
+  var el = document.getElementById('aca-parte');
+  if(!el) return;
+  if(acaIdxLeccion < 0){ el.innerHTML = '&nbsp;'; return; }
+  var total = acaChunks.length || 1;
+  el.textContent = 'Lecci\u00f3n ' + (acaIdxLeccion+1) + ' de ' + ACA_LECCIONES.length + '  \u00b7  parte ' + Math.min(acaIdxChunk+1, total) + '/' + total;
+}
+
+function acaRenderLista(){
+  var cont = document.getElementById('aca-lista');
+  if(!cont) return;
+  cont.innerHTML = ACA_LECCIONES.map(function(l, i){
+    var activa = (i === acaIdxLeccion);
+    return '<div class="aca-lec" data-i="'+i+'" style="display:flex;align-items:center;gap:11px;background:'+(activa?'#1e2658':'#171e46')+';border:1px solid '+(activa?'#E3B23C':'#262e63')+';border-radius:13px;padding:13px 12px;margin-bottom:8px;cursor:pointer">' +
+      '<div style="width:32px;height:32px;border-radius:8px;flex-shrink:0;background:'+(activa?'#E3B23C':'#2a336f')+';color:'+(activa?'#161d44':'#E3B23C')+';font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center">'+(i+1)+'</div>' +
+      '<div style="font-size:15px;font-weight:600;color:#f3f4fb;line-height:1.25;flex:1">'+escaparHtml(l.titulo)+'</div>' +
+      '<div style="color:'+(activa?'#E3B23C':'#7b83b5')+';font-size:18px;flex-shrink:0">'+((activa && window._acaReproduciendo)?'\u25B6':'\u266A')+'</div>' +
+    '</div>';
+  }).join('');
+  Array.prototype.forEach.call(cont.querySelectorAll('.aca-lec'), function(el){
+    el.onclick = function(){ acaCargarLeccion(parseInt(el.getAttribute('data-i'),10), true); };
+  });
+}
+
+// Se llama cada vez que entras a la pantalla de Academia
+function renderAcademia(){
+  var bp = document.getElementById('aca-play');
+  if(bp && !bp._acaListo){
+    bp._acaListo = true;
+    bp.onclick = acaTogglePlay;
+    var bs = document.getElementById('aca-sig'); if(bs) bs.onclick = acaSiguiente;
+    var ba = document.getElementById('aca-ant'); if(ba) ba.onclick = acaAnterior;
+    Array.prototype.forEach.call(document.querySelectorAll('.aca-velo'), function(el){
+      el.onclick = function(){
+        Array.prototype.forEach.call(document.querySelectorAll('.aca-velo'), function(x){
+          x.style.background = '#20285a'; x.style.color = '#c7cdf0'; x.style.borderColor = '#313a7d';
+        });
+        el.style.background = '#E3B23C'; el.style.color = '#161d44'; el.style.borderColor = '#E3B23C';
+        acaVelocidad = parseFloat(el.getAttribute('data-v'));
+        if(window._acaReproduciendo){
+          acaCancelManual = true;
+          try{ acaSynth.cancel(); }catch(e){}
+          setTimeout(function(){ acaCancelManual=false; acaHablarChunk(); }, 150);
+        }
+      };
+    });
+  }
+  if(acaIdxLeccion < 0){
+    var guardada = 0;
+    try{ var g = localStorage.getItem('nbs_academia_leccion'); if(g!==null) guardada = parseInt(g,10)||0; }catch(e){}
+    acaCargarLeccion(guardada, false);
+  } else {
+    acaRenderLista();
+    acaActualizarParte();
+  }
+  acaActualizarBoton();
+}
 
 function renderDocs(){
   var cont = document.getElementById('docs-lista');
@@ -19442,6 +19710,43 @@ function verHistorialCliente(cid, modo){
   <h2 style="font-size:22px;font-weight:800;color:#1a237e;margin-bottom:6px;text-align:center">📁 Mis Documentos</h2>
   <p style="font-size:12px;color:var(--nbs-muted);text-align:center;margin-bottom:16px">Todos tus documentos en un solo lugar. Necesitan internet para abrirse.</p>
   <div id="docs-lista"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     NBS ACADEMIA - lecciones de negocio en AUDIO.
+     Pedida por Sensei el 21 jul 2026: escuchar mientras
+     trabaja la ruta, sin detenerse a leer. La voz del
+     telefono lee las lecciones; mantiene la pantalla
+     encendida para que no se corte el audio.
+     ═══════════════════════════════════════════════ -->
+<div id="p-academia" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:22px;font-weight:800;color:#1a237e;margin-bottom:6px;text-align:center">🎓 NBS Academia</h2>
+  <p style="font-size:12px;color:var(--nbs-muted);text-align:center;margin-bottom:14px">Aprende de negocio escuchando, mientras trabajas</p>
+
+  <div style="background:linear-gradient(160deg,#232c5e 0%,#1a2350 100%);border-radius:16px;padding:16px 14px 18px;margin-bottom:16px;box-shadow:0 6px 18px rgba(0,0,0,0.25)">
+    <div style="font-size:11px;color:#E3B23C;font-weight:800;letter-spacing:1px">ESCUCHANDO AHORA</div>
+    <div id="aca-titulo" style="font-size:20px;font-weight:800;color:#ffffff;margin:6px 0 2px;line-height:1.2">Toca una lección</div>
+    <div id="aca-parte" style="font-size:12.5px;color:#9aa2cc">&nbsp;</div>
+
+    <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin:16px 0 4px">
+      <button id="aca-ant" style="width:56px;height:56px;border-radius:50%;background:#2c356f;border:none;color:#fff;font-size:22px;cursor:pointer">⏮</button>
+      <button id="aca-play" style="width:82px;height:82px;border-radius:50%;background:linear-gradient(145deg,#f0c04a,#d99b1f);border:none;color:#161d44;font-size:34px;cursor:pointer;box-shadow:0 5px 15px rgba(227,178,60,0.45)">▶</button>
+      <button id="aca-sig" style="width:56px;height:56px;border-radius:50%;background:#2c356f;border:none;color:#fff;font-size:22px;cursor:pointer">⏭</button>
+    </div>
+
+    <div id="aca-pantalla" style="text-align:center;font-size:12px;color:#8a92bd;margin-top:8px">La pantalla se mantiene encendida al reproducir</div>
+
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+      <button class="aca-velo" data-v="0.85" style="background:#20285a;border:1px solid #313a7d;color:#c7cdf0;padding:6px 13px;border-radius:18px;font-size:12.5px;font-weight:700;cursor:pointer">Lento</button>
+      <button class="aca-velo aca-velo-on" data-v="1" style="background:#E3B23C;border:1px solid #E3B23C;color:#161d44;padding:6px 13px;border-radius:18px;font-size:12.5px;font-weight:700;cursor:pointer">Normal</button>
+      <button class="aca-velo" data-v="1.15" style="background:#20285a;border:1px solid #313a7d;color:#c7cdf0;padding:6px 13px;border-radius:18px;font-size:12.5px;font-weight:700;cursor:pointer">Rápido</button>
+    </div>
+  </div>
+
+  <div style="font-size:12px;font-weight:800;color:var(--nbs-muted);letter-spacing:1px;margin-bottom:8px">TODAS LAS LECCIONES</div>
+  <div id="aca-lista"></div>
+  <p style="font-size:11.5px;color:var(--nbs-muted);text-align:center;margin-top:16px;line-height:1.5">Consejo: ten el teléfono en su soporte y cargando.<br>No aprietes el botón de apagar mientras escuchas.</p>
 </div>
 
 <div id="p-panorama" class="pg">
