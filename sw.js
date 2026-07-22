@@ -14,7 +14,7 @@
 
 // VERSIÓN del caché. Al subir una app nueva, sube este número (v2, v3...).
 // El evento 'activate' borra los cachés viejos, así no quedan restos.
-var CACHE_NOMBRE = 'nbs2-cache-v16';
+var CACHE_NOMBRE = 'nbs2-cache-v17';
 
 // Archivos base que la app necesita para abrir sin internet.
 // La página principal se guarda sola al visitarla (dynamic caching).
