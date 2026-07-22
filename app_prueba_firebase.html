@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722f-DIAGNOSTICO-V2.0">
+<meta name="app-version" content="20260722h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15219,7 +15219,7 @@ function verLogAtras(){
   if(!w) return;
   document.getElementById('logatras-texto').textContent = txt;
   document.getElementById('logatras-ov').style.display = 'block';
-  w.style.display = 'block';
+  w.style.display = 'flex';   // ARREGLADO: era block y los botones se salian de pantalla
 }
 function cerrarLogAtras(){
   var ov = document.getElementById('logatras-ov'), c = document.getElementById('logatras-caja');
@@ -15317,8 +15317,20 @@ window.addEventListener('popstate', function(){
     return;
   }
 
-  // 2) Si el letrero de salir ya esta abierto, atras lo cierra -no sale-
+  // 1.5) Si la ventana del registro esta abierta, atras la cierra
+  var vlog = document.getElementById('logatras-caja');
+  if(vlog && vlog.style.display && vlog.style.display !== 'none'){
+    logAtras('  -> cerro ventana registro');
+    cerrarLogAtras();
+    return;
+  }
+
+  // 2) Si el letrero esta abierto y AUN asi llega un aviso de atras, es que
+  //    quedaban guardianes: se cierra el letrero y se repone la proteccion.
+  //    -Lo normal es que no llegue: al mostrar el letrero la app queda en el
+  //     borde, asi que el atras cierra la app directamente.-
   if(document.getElementById('salir-box') && document.getElementById('salir-box').style.display === 'block'){
+    logAtras('  -> atras con letrero abierto: se cierra el letrero');
     cerrarLetreroSalir();
     return;
   }
@@ -15345,6 +15357,21 @@ function mostrarLetreroSalir(){
   if(!ov || !box) return;
   ov.style.display = 'block';
   box.style.display = 'block';
+
+  // ═══ LA CLAVE (22 jul) ═══
+  // Android NO deja que una app web se cierre a si misma. Lo unico que la
+  // cierra es que el USUARIO toque atras estando en el BORDE del historial.
+  // Asi que al mostrar el letrero se deshacen todos los guardianes: la app
+  // queda en el borde. Entonces:
+  //   - si toca ATRAS  -> se cierra de una, sin mas pasos
+  //   - si toca "No, quedarme aqui" -> ese toque vuelve a poner los guardianes
+  var pasos = profundidadGuardian();
+  logAtras('LETRERO: deshaciendo '+pasos+' guardianes (queda en el borde)');
+  if(pasos > 0){
+    _saliendoApp = true;
+    try{ history.go(-pasos); }catch(e){}
+    setTimeout(function(){ _saliendoApp = false; }, 400);
+  }
 }
 function cerrarLetreroSalir(){
   var ov = document.getElementById('salir-ov');
@@ -15356,24 +15383,28 @@ function cerrarLetreroSalir(){
   _ultimoGuardian = 0; ponerGuardianAtras();
 }
 function salirDeLaApp(){
+  // La app ya esta en el borde del historial -se deshicieron los guardianes al
+  // mostrar el letrero-. Aqui solo se le indica con letras grandes que toque
+  // atras, porque es lo unico que de verdad cierra una app web en Android.
   var box = document.getElementById('salir-box');
-  var ov = document.getElementById('salir-ov');
+  var ov  = document.getElementById('salir-ov');
   if(box) box.style.display = 'none';
-  if(ov) ov.style.display = 'none';
-  _saliendoApp = true;
-  // Para salir de verdad hay que retroceder TODOS los guardianes que se
-  // acumularon mas la entrada de la app. Antes se retrocedia solo 2 pasos y
-  // por eso la app se quedaba abierta al tocar "Si, salir".
-  var pasos = profundidadGuardian() + 1;
-  try{ window.close(); }catch(e){}
-  setTimeout(function(){ try{ history.go(-pasos); }catch(e){} }, 30);
-  // Red de seguridad: si por lo que sea la app sigue viva, se vuelve a proteger
-  // para que un toque accidental no la cierre sin preguntar.
+  if(ov)  ov.style.display  = 'none';
+  logAtras('SALIR: mostrando aviso de tocar atras');
+  var av = document.getElementById('salir-aviso');
+  if(av) av.style.display = 'block';
+  // Si en 12 segundos no toco atras, se quita el aviso y se vuelve a proteger
+  // para que la app no quede desprotegida sin querer.
   setTimeout(function(){
-    _saliendoApp = false;
-    _ultimoGuardian = 0; ponerGuardianAtras();
-  }, 1800);
+    var a = document.getElementById('salir-aviso');
+    if(a && a.style.display === 'block'){
+      a.style.display = 'none';
+      _ultimoGuardian = 0; ponerGuardianAtras();
+      logAtras('SALIR: se acabo el tiempo, guardianes repuestos');
+    }
+  }, 12000);
 }
+
 
 function capitalizarFinal(el){
   var pos = el.selectionStart;
@@ -20021,14 +20052,16 @@ function verHistorialCliente(cid, modo){
 <div id="salir-box" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;background:#ffffff;border-radius:18px;padding:24px 20px 20px;width:86%;max-width:340px;box-shadow:0 12px 44px rgba(0,0,0,.45);text-align:center">
   <div style="font-size:44px;line-height:1">&#128682;</div>
   <div style="font-size:21px;font-weight:800;color:#1a237e;margin:10px 0 6px;line-height:1.25">&iquest;Salir de la app?</div>
-  <div style="font-size:15px;color:#555;line-height:1.5;margin-bottom:20px">Tu informaci&oacute;n ya est&aacute; guardada.</div>
-  <button onclick="cerrarLetreroSalir()" style="width:100%;padding:16px;border:none;border-radius:13px;background:#1a237e;color:#fff;font-size:18px;font-weight:800;cursor:pointer;margin-bottom:11px;font-family:inherit">No, quedarme aqu&iacute;</button>
-  <button onclick="salirDeLaApp()" style="width:100%;padding:16px;border:2px solid #c62828;border-radius:13px;background:#fff;color:#c62828;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit">S&iacute;, salir</button>
+  <div style="font-size:15px;color:#555;line-height:1.5;margin-bottom:14px">Tu informaci&oacute;n ya est&aacute; guardada.</div>
+  <div style="background:#eef0fb;border:1px solid #c9cef0;border-radius:12px;padding:12px 10px;margin-bottom:16px">
+    <div style="font-size:15.5px;color:#1a237e;font-weight:800;line-height:1.4">Para salir, toca <span style="font-size:19px">&#11013;&#65039;</span> ATR&Aacute;S otra vez</div>
+  </div>
+  <button onclick="cerrarLetreroSalir()" style="width:100%;padding:17px;border:none;border-radius:13px;background:#1a237e;color:#fff;font-size:19px;font-weight:800;cursor:pointer;font-family:inherit">No, quedarme aqu&iacute;</button>
 </div>
 
 <!-- Panel de diagnostico del boton atras (temporal, para encontrar la falla) -->
 <div id="logatras-ov" onclick="cerrarLogAtras()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.75);z-index:99996"></div>
-<div id="logatras-caja" style="display:none;position:fixed;left:4%;right:4%;top:6%;bottom:6%;z-index:99997;background:#fff;border-radius:16px;padding:16px;box-shadow:0 12px 44px rgba(0,0,0,.45);display:none;flex-direction:column">
+<div id="logatras-caja" style="display:none;position:fixed;left:4%;right:4%;top:6%;bottom:6%;z-index:99997;background:#fff;border-radius:16px;padding:14px;box-shadow:0 12px 44px rgba(0,0,0,.45);flex-direction:column;overflow:hidden">
   <div style="font-size:19px;font-weight:800;color:#1a237e;margin-bottom:4px">&#128295; Registro del bot&oacute;n atr&aacute;s</div>
   <div style="font-size:13px;color:#666;margin-bottom:10px">Haz tu prueba y despu&eacute;s c&oacute;piame esto.</div>
   <pre id="logatras-texto" style="flex:1;overflow:auto;background:#f4f5fa;border:1px solid #dcdfee;border-radius:10px;padding:10px;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;margin:0 0 12px;color:#222"></pre>
@@ -20037,6 +20070,12 @@ function verHistorialCliente(cid, modo){
     <button onclick="copiarLogAtras()" style="flex:1.4;padding:13px 6px;border:none;border-radius:11px;background:#1a237e;color:#fff;font-size:14px;font-weight:800;font-family:inherit">Copiar</button>
     <button onclick="cerrarLogAtras()" style="flex:1;padding:13px 6px;border:1px solid #999;border-radius:11px;background:#fff;color:#444;font-size:14px;font-weight:800;font-family:inherit">Cerrar</button>
   </div>
+</div>
+
+<div id="salir-aviso" style="display:none;position:fixed;left:8%;right:8%;top:36%;z-index:99999;background:#1a237e;color:#fff;border-radius:16px;padding:22px 18px;text-align:center;box-shadow:0 12px 44px rgba(0,0,0,.5)">
+  <div style="font-size:40px;line-height:1">&#11013;&#65039;</div>
+  <div style="font-size:20px;font-weight:800;margin-top:8px;line-height:1.3">Toca ATR&Aacute;S<br>una vez m&aacute;s para salir</div>
+  <div style="font-size:13.5px;color:#c7cdf0;margin-top:9px;line-height:1.45">El tel&eacute;fono no deja que la app se cierre sola.</div>
 </div>
 </body>
 </html>
