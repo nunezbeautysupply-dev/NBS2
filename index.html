@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722j-OFICIAL-V2.0">
+<meta name="app-version" content="20260722k-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -13523,6 +13523,17 @@ function actualizarTotalEditPago(){
   if(el) el.textContent = '$'+fmtNum(total);
 }
 
+// Editar un pago DESDE EL HISTORIAL del cliente (pedido por Sensei, 22 jul).
+// Antes solo se podia desde Cuentas por Cobrar, y si el pago habia saldado la
+// factura el cliente ya no aparecia ahi. Ahora tambien se llega desde el
+// historial: cierra el historial, entra a la pantalla de pagos de ese cliente
+// -que si lista las facturas saldadas- y abre el editor de ese pago exacto.
+function editarPagoDesdeHistorial(cid, vid, pidx){
+  try{ cerrarHistorial(); }catch(e){}
+  irACobrarCliente(cid);
+  setTimeout(function(){ abrirEditorPago(vid, pidx); }, 450);
+}
+
 function cerrarEditorPago(){
   var o = document.getElementById('editor-pago-overlay');
   if(o) o.style.display = 'none';
@@ -19436,10 +19447,12 @@ function verHistorialCliente(cid, modo){
       var pagosHtml = '';
       if(modo==='completo' && v.tipo==='credito' && v.pagosFactura && v.pagosFactura.length){
         pagosHtml = '<div style="margin-top:6px;padding-top:6px;border-top:0.5px dashed #ddd">'
-          +v.pagosFactura.filter(function(p){return p.monto>0;}).map(function(p){
+          +v.pagosFactura.map(function(p, pidx){
+            if(!(p.monto > 0)) return '';
             var detalle = (p.metodos && p.metodos.length) ? p.metodos.map(function(m){ return METODOS_PAGO_LABELS[m.tipo]+' $'+fmtNum(m.monto); }).join(' + ') : '';
-            if(p.esDevolucion) return '<div style="font-size:11px;color:#E65100;padding:2px 0">↩️ '+p.fecha+' — Devolución $'+fmtNum(p.monto)+(p.nota?' ('+p.nota.replace('↩️ Devolución: ','')+')':'')+'</div>';
-            return '<div style="font-size:11px;color:#2E7D32;padding:2px 0">✓ '+p.fecha+' — Pagó $'+fmtNum(p.monto)+(detalle?' ('+detalle+')':'')+'</div>';
+            var lapizPago = '<button onclick="editarPagoDesdeHistorial(\''+cid+'\','+v.id+','+pidx+')" title="Editar este pago" style="background:#E8EAF6;border:none;border-radius:7px;padding:4px 9px;font-size:14px;cursor:pointer;margin-left:auto;flex:0 0 auto">✏️</button>';
+            if(p.esDevolucion) return '<div style="font-size:12.5px;color:#E65100;padding:4px 0;display:flex;align-items:center;gap:4px">↩️ '+p.fecha+' — Devolución $'+fmtNum(p.monto)+(p.nota?' ('+p.nota.replace('↩️ Devolución: ','')+')':'')+lapizPago+'</div>';
+            return '<div style="font-size:12.5px;color:#2E7D32;padding:4px 0;display:flex;align-items:center;gap:4px">✓ '+p.fecha+' — Pagó $'+fmtNum(p.monto)+(detalle?' ('+detalle+')':'')+lapizPago+'</div>';
           }).join('')
           +'</div>';
       }
