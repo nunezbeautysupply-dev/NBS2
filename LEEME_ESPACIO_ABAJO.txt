@@ -1,0 +1,27 @@
+═══════════════════════════════════════════════════════════════
+  NBS 2 — MÁS ESPACIO ABAJO EN TODAS LAS PANTALLAS
+  23 de julio de 2026
+═══════════════════════════════════════════════════════════════
+
+QUÉ CAMBIÓ
+Se subió el espacio de abajo en TODAS las pantallas de la app
+(de 16px a 80px), para que la barra azul de "sin bajar respaldo"
+y el teclado del teléfono no tapen botones o campos que estén
+al final de una pantalla — ahora puedes deslizar un poco más
+para verlos completos.
+
+Probado con captura real: la búsqueda de Rutas (donde lo notaste)
+ya deja ver completo el resultado y su botón "+ Agregar" sin que
+la barra de respaldo lo tape.
+
+SOBRE EL COSTO DEL PRODUCTO (lo hablamos y se queda IGUAL)
+El campo de Costo NO se tocó — se queda como estaba, sin el
+efecto "calculadora" en vivo mientras escribes, porque esa es
+justo la razón por la que permite escribir costos con más de
+2 decimales (ej. $3.9585) cuando un suplidor factura por caja.
+Si tuviera el mismo efecto que Precio, se perdería esa función.
+
+CÓMO ACTUALIZAR
+Sube los 4 archivos (index.html, app_prueba_firebase.html,
+manifest.json, sw.js) — Commit + Push. Espera 2 minutos y
+confirma que salga "La app se actualizó".
