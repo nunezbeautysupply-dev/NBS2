@@ -20,7 +20,7 @@
 //  o con senal mala. La version nueva entra en la siguiente apertura.
 // ═══════════════════════════════════════════════════════════════
 
-var CACHE_NOMBRE = 'nbs2-cache-v33';
+var CACHE_NOMBRE = 'nbs2-cache-v34';
 
 // Cuanto se espera a la red cuando NO hay copia guardada (milisegundos)
 var LIMITE_RED = 4000;

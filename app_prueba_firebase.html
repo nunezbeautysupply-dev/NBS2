@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722y-OFICIAL-V2.0">
+<meta name="app-version" content="20260723a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3012,8 +3012,17 @@ function ir(id, sinHistorial){
     if(actual && actual !== id) historialPantallas.push(actual);
   }
   window.scrollTo(0, 0);
-  var all = ['menu','p-inicio','p-cl','p-v','p-rpt','p-cxc','p-cl-perfil','p-cl-factura','p-cat','p-inventario','p-panorama','p-docs','p-relleno','p-van','p-copias','p-sup','p-comp','p-ped','p-gastos','p-vip','p-mas','p-facturas','p-dashboard','p-rutas','p-manual','p-cxp'];
-  for(var i=0;i<all.length;i++) document.getElementById(all[i]).style.display='none';
+  var all = ['menu','p-inicio','p-cl','p-v','p-rpt','p-cxc','p-cl-perfil','p-cl-factura','p-cat','p-inventario','p-panorama','p-docs','p-relleno','p-van','p-copias','p-sup','p-comp','p-ped','p-gastos','p-vip','p-mas','p-facturas','p-dashboard','p-rutas','p-manual','p-cxp','p-academia','p-resumen'];
+  // BLINDAJE (23 jul): antes, si un id de la lista no existia, el bucle se
+  // rompia y las pantallas siguientes NO se escondian. Ahora se salta el que
+  // falte y sigue. Ademas se esconde CUALQUIER pantalla .pg aunque no este
+  // en la lista, para que nunca se quede una pegada.
+  for(var i=0;i<all.length;i++){
+    var elP = document.getElementById(all[i]);
+    if(elP) elP.style.display='none';
+  }
+  var todasPg = document.querySelectorAll('.pg');
+  for(var j=0;j<todasPg.length;j++){ todasPg[j].style.display='none'; }
   document.getElementById(id).style.display='block';
   pintarSegunPantalla(id);
   if(id==='p-cl'){
