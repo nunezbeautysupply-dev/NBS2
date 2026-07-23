@@ -1,9 +1,9 @@
 {
-  "id": "/NBS2/",
+  "id": "/NBS2v2/",
   "name": "NBS 2",
   "short_name": "NBS 2",
   "description": "Nunez Beauty Supply - OFICIAL V2.0",
-  "start_url": "./index.html",
+  "start_url": "./index.html?v2",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
