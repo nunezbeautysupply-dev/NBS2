@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260723d-OFICIAL-V2.0">
+<meta name="app-version" content="20260723e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4249,7 +4249,11 @@ function guardarEdicionGasto(id){
 }
 
 function eliminarGasto(id){
-  if(!confirm('¿Eliminar este gasto?')) return;
+  var gastos0 = LS('ngastos', []);
+  var g0 = gastos0.filter(function(g){ return g.id === id; })[0];
+  var det0 = g0 ? ('\n\n' + (g0.descripcion || g0.concepto || 'Gasto') + '\nMonto: $' + fmtNum(g0.monto || 0) + '\nFecha: ' + (g0.fecha || '')) : '';
+  if(!confirm('\u00bfEliminar este gasto?' + det0 + '\n\nEsto NO se puede deshacer.')) return;
+  if(!conHuella('eliminarGasto', function(){ eliminarGasto(id); })) return;
   var gastos = LS('ngastos', []);
   gastos = gastos.filter(function(g){ return g.id !== id; });
   SS('ngastos', gastos);
@@ -5544,6 +5548,17 @@ function guardarEdicionCompra(){
   var idx = compras.findIndex(function(x){ return String(x.id)===String(window._compraEditId); });
   if(idx < 0) return;
   if(!window._compraEditItems || !window._compraEditItems.length){ alert('La compra debe tener al menos un producto.'); return; }
+
+  // Editar una compra cambia lo que le debes al suplidor y el inventario -23 jul 2026-
+  var totalNuevoC = window._compraEditItems.reduce(function(s,it){ return s + (it.cant||0)*(it.costo||0); }, 0);
+  if(!confirm('Vas a modificar esta compra.\n\nTotal de la mercancia: $' + fmtNum(totalNuevoC)
+              + '\n-antes era $' + fmtNum(compras[idx].total || 0) + '-'
+              + '\n\nEsto cambia el inventario y lo que le debes al suplidor.\n\n\u00bfGuardar?')) return;
+  if(!conHuella('editarCompra', function(){ guardarEdicionCompra(); })) return;
+  compras = LS('nc', []);
+  loadProds();
+  idx = compras.findIndex(function(x){ return String(x.id)===String(window._compraEditId); });
+  if(idx < 0) return;
 
   // Ajustar inventario: primero quitar lo que esta compra habia agregado ANTES de editar,
   // luego agregar lo que tiene AHORA -asi los cambios de cantidad se reflejan bien en el stock-.
@@ -12469,6 +12484,24 @@ function verificarPIN(callback){
 // Protege una accion peligrosa (borrar cliente, borrar pago, etc.) pidiendo SOLO la huella
 // -un toque, rapido-. Si el usuario NO tiene huella configurada, cae al PIN como respaldo
 // para que la accion nunca quede sin proteccion. El callback solo corre si se verifica.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CANDADO DE HUELLA PARA ACCIONES DE DINERO  -23 jul 2026-
+// Pide la huella UNA vez y despues vuelve a llamar a la misma funcion, ya con
+// permiso. Asi se puede proteger una accion sin reescribirla entera.
+// Se usa asi, justo antes de tocar los datos:
+//     if(!conHuella('nombreUnico', function(){ laMismaFuncion(args); })) return;
+// ═══════════════════════════════════════════════════════════════════════════════
+function conHuella(clave, volverALlamar){
+  if(window['_huellaOK_' + clave]) return true;   // ya la puso, seguir de largo
+  protegerConHuella(function(){
+    window['_huellaOK_' + clave] = true;
+    try { volverALlamar(); }
+    finally { window['_huellaOK_' + clave] = false; }
+  });
+  return false;  // esta pasada se detiene aqui; la de verdad ocurre en el callback
+}
+
 function protegerConHuella(callback){
   var idHuella = localStorage.getItem(CLAVE_HUELLA_ID);
   if(idHuella && window.PublicKeyCredential && navigator.credentials && navigator.credentials.get){
@@ -12587,10 +12620,58 @@ function modificarFactura(v){
 
 window.guardarModificacionFactura = function(vid){
   if(!window._itemsEdit || !window._itemsEdit.length){ alert('Debe quedar al menos un producto'); return; }
-  // -confirmacion redundante quitada, el boton de Guardar ya es la confirmacion-
   loadProds();
   ventas = LS('nv', []);
   var ventaReal = ventas.find(function(x){ return x.id===vid; });
+  if(!ventaReal) return;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ARREGLADO EL 23 DE JULIO DE 2026 — este boton tenia TRES fallas de dinero:
+  //  (1) Si la factura era de CONTADO y le subias el total, se quedaba marcada
+  //      como contado. Como el contado se cuenta cobrado por su total, la app
+  //      daba por COBRADO dinero que nunca entro. Ejemplo real probado: factura
+  //      de $50 pagada, le agregas $100 -> la app decia que cobraste $150.
+  //  (2) Se comia el descuento: volvia a sumar los productos y guardaba ESE
+  //      total, sin volver a aplicar el descuento de la factura.
+  //  (3) No pedia ni confirmacion ni huella, aunque cambia dinero.
+  // ═══════════════════════════════════════════════════════════════════════════
+  var totalAntesM = ventaReal.total || 0;
+  var tipoAntesM  = ventaReal.tipo;
+  var subtotalM   = window._itemsEdit.reduce(function(s,it){ return s+it.cant*it.precio; }, 0);
+  subtotalM = Math.round(subtotalM * 100) / 100;
+
+  // -- El descuento se vuelve a aplicar --
+  var descM = ventaReal.descuento;
+  var montoDescM = 0;
+  if(descM && ((descM.valor || 0) > 0.005 || (descM.monto || 0) > 0.005)){
+    if(descM.tipo === 'pct') montoDescM = subtotalM * ((descM.valor || 0)/100);
+    else montoDescM = Math.min((descM.valor || descM.monto || 0), subtotalM);
+    montoDescM = Math.max(0, Math.min(montoDescM, subtotalM));
+  }
+  var totalNuevoM = Math.round((subtotalM - montoDescM) * 100) / 100;
+
+  // -- Se le enseña al usuario exactamente que va a pasar --
+  var avisoM = 'Vas a modificar la factura #' + (ventaReal.numFactura || ventaReal.id) + '\n\n'
+             + 'Productos:  $' + fmtNum(subtotalM) + '\n';
+  if(montoDescM > 0.005) avisoM += 'Descuento: -$' + fmtNum(montoDescM) + '\n';
+  avisoM += 'TOTAL:      $' + fmtNum(totalNuevoM) + '\n'
+          + '  -antes era $' + fmtNum(totalAntesM) + '-\n\n';
+  if(tipoAntesM === 'contado' && totalNuevoM > totalAntesM + 0.001){
+    avisoM += '\u26a0\ufe0f OJO: esta factura era de CONTADO -ya te la pagaron completa-.\n'
+            + 'Como el total sube, lo nuevo NO esta pagado. La factura pasa a CREDITO,\n'
+            + 'se deja registrado el pago de $' + fmtNum(totalAntesM) + ' que ya te hicieron,\n'
+            + 'y quedan $' + fmtNum(totalNuevoM - totalAntesM) + ' por cobrar.\n\n';
+  }
+  avisoM += '\u00bfGuardar los cambios?';
+  if(!confirm(avisoM)) return;
+
+  // -- Candado de huella, igual que las demas acciones de dinero --
+  if(!conHuella('modificarFactura', function(){ window.guardarModificacionFactura(vid); })) return;
+
+  // Se vuelven a leer los datos DENTRO del callback de la huella, por si algo cambio
+  loadProds();
+  ventas = LS('nv', []);
+  ventaReal = ventas.find(function(x){ return x.id===vid; });
   if(!ventaReal) return;
 
   // Restaurar stock original y aplicar nuevo
@@ -12603,18 +12684,36 @@ window.guardarModificacionFactura = function(vid){
     if(p) p.stock -= it.cant;
   });
 
-  var nuevoTotal = window._itemsEdit.reduce(function(s,it){ return s+it.cant*it.precio; }, 0);
   var nuevaGanancia = window._itemsEdit.reduce(function(s,it){ return s+it.cant*(it.precio-(it.costo||0)); }, 0);
 
   ventaReal.items = window._itemsEdit.slice();
-  ventaReal.total = nuevoTotal;
-  ventaReal.ganancia = nuevaGanancia;
+  ventaReal.subtotal = subtotalM;
+  ventaReal.total = totalNuevoM;                       // ya trae el descuento aplicado
+  ventaReal.ganancia = Math.max(0, nuevaGanancia - montoDescM);
   ventaReal.modificada = true;
   ventaReal.fechaModificacion = fechaHoy();
 
+  // -- Si era de CONTADO y el total subio: pasa a credito y se deja constancia
+  //    del dinero que SI se cobro. Sin esto la app inventaba dinero cobrado.
+  var extraM = '';
+  if(tipoAntesM === 'contado' && totalNuevoM > totalAntesM + 0.001){
+    ventaReal.tipo = 'credito';
+    if(!ventaReal.pagosFactura) ventaReal.pagosFactura = [];
+    ventaReal.pagosFactura.push({
+      pid: nuevoPagoId(),
+      monto: totalAntesM,
+      fecha: ventaReal.fecha,
+      hora: (typeof horaAhoraTxt === 'function' ? horaAhoraTxt() : ''),
+      nota: 'Pago original antes de modificar la factura'
+    });
+    extraM = '\n\n\u26a0\ufe0f La factura paso a CREDITO. Se registro el pago de $'
+           + fmtNum(totalAntesM) + ' que ya te habian hecho, y quedan $'
+           + fmtNum(totalNuevoM - totalAntesM) + ' por cobrar.';
+  }
+
   SS('nv', ventas);
   SS('np', productos);
-  alert('Factura modificada correctamente.');
+  alert('Factura modificada correctamente.' + extraM);
   verFactura(ventaReal);
 };
 
@@ -13855,6 +13954,19 @@ function guardarEditorPago(vid, pidx){
 
   ventas = LS('nv', []);
   var vf = ventas.find(function(x){ return x.id === vid; });
+  if(!vf || !vf.pagosFactura || vf.pagosFactura[pidx] === undefined){ alert('No se encontró el pago.'); return; }
+
+  // Cambiar el monto de un pago es tocar dinero: se avisa y se pide la huella -23 jul 2026-
+  var antesP = vf.pagosFactura[pidx].monto || 0;
+  if(Math.abs(antesP - montoTotal) > 0.005){
+    if(!confirm('Vas a cambiar este pago:\n\nAntes:  $' + fmtNum(antesP) + '\nAhora:  $' + fmtNum(montoTotal)
+                + '\n\nEl saldo del cliente cambia $' + fmtNum(Math.abs(montoTotal - antesP))
+                + (montoTotal > antesP ? ' a favor del cliente.' : ' en contra del cliente.')
+                + '\n\n\u00bfGuardar?')) return;
+  }
+  if(!conHuella('editarPago', function(){ guardarEditorPago(vid, pidx); })) return;
+  ventas = LS('nv', []);
+  vf = ventas.find(function(x){ return x.id === vid; });
   if(!vf || !vf.pagosFactura || vf.pagosFactura[pidx] === undefined){ alert('No se encontró el pago.'); return; }
 
   vf.pagosFactura[pidx].monto = montoTotal;
@@ -15352,6 +15464,9 @@ function agregarProductoAFactura(idx){
 }
 
 function guardarEdicionFactura(vid){
+  // Editar los productos de una factura cambia lo que el cliente debe -23 jul 2026-
+  if(!conHuella('editarFactura', function(){ guardarEdicionFactura(vid); })) return;
+
   ventas = LS('nv', []);
   loadProds();
   var idx = ventas.findIndex(function(x){ return String(x.id)===String(vid); });
@@ -19861,6 +19976,9 @@ function procesarDevolucion(vid){
 
   if(!itemsDevueltos.length){ alert('Indica al menos una cantidad a devolver.'); return; }
 
+  // Una devolucion mueve dinero e inventario: candado de huella -23 jul 2026-
+  if(!conHuella('devolucion', function(){ procesarDevolucion(vid); })) return;
+
   var itemsNuevos = esCambio ? (window._cambioItems||[]) : [];
   var totalNuevo = itemsNuevos.reduce(function(s,it){ return s+(it.cant*it.precio); },0);
 
@@ -20161,6 +20279,8 @@ function deshacerDevolucion(devId){
     ? '\nProducto que se había entregado a cambio: '+d.itemsNuevos.map(function(it){ return it.nombre+' x'+it.cant; }).join(', ')
     : '';
   if(!confirm('¿Deshacer esta devolución del '+d.fecha+'?\n\nProducto(s) devuelto(s) en su momento: '+resumenItems+resumenCambio+'\nMonto: $'+fmtNum(d.monto)+'\n\nEsto va a: restaurar el inventario a como estaba antes de la devolución, y quitar el crédito o pago que se haya generado por ella.\n\n¿Continuar?')) return;
+
+  if(!conHuella('deshacerDevolucion', function(){ deshacerDevolucion(devId); })) return;
 
   loadProds();
   // Revertir el inventario: lo que se habia restaurado -por ser devuelto- se vuelve a descontar;
