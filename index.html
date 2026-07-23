@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260723e-OFICIAL-V2.0">
+<meta name="app-version" content="20260723b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4249,11 +4249,7 @@ function guardarEdicionGasto(id){
 }
 
 function eliminarGasto(id){
-  var gastos0 = LS('ngastos', []);
-  var g0 = gastos0.filter(function(g){ return g.id === id; })[0];
-  var det0 = g0 ? ('\n\n' + (g0.descripcion || g0.concepto || 'Gasto') + '\nMonto: $' + fmtNum(g0.monto || 0) + '\nFecha: ' + (g0.fecha || '')) : '';
-  if(!confirm('\u00bfEliminar este gasto?' + det0 + '\n\nEsto NO se puede deshacer.')) return;
-  if(!conHuella('eliminarGasto', function(){ eliminarGasto(id); })) return;
+  if(!confirm('¿Eliminar este gasto?')) return;
   var gastos = LS('ngastos', []);
   gastos = gastos.filter(function(g){ return g.id !== id; });
   SS('ngastos', gastos);
@@ -5549,17 +5545,6 @@ function guardarEdicionCompra(){
   if(idx < 0) return;
   if(!window._compraEditItems || !window._compraEditItems.length){ alert('La compra debe tener al menos un producto.'); return; }
 
-  // Editar una compra cambia lo que le debes al suplidor y el inventario -23 jul 2026-
-  var totalNuevoC = window._compraEditItems.reduce(function(s,it){ return s + (it.cant||0)*(it.costo||0); }, 0);
-  if(!confirm('Vas a modificar esta compra.\n\nTotal de la mercancia: $' + fmtNum(totalNuevoC)
-              + '\n-antes era $' + fmtNum(compras[idx].total || 0) + '-'
-              + '\n\nEsto cambia el inventario y lo que le debes al suplidor.\n\n\u00bfGuardar?')) return;
-  if(!conHuella('editarCompra', function(){ guardarEdicionCompra(); })) return;
-  compras = LS('nc', []);
-  loadProds();
-  idx = compras.findIndex(function(x){ return String(x.id)===String(window._compraEditId); });
-  if(idx < 0) return;
-
   // Ajustar inventario: primero quitar lo que esta compra habia agregado ANTES de editar,
   // luego agregar lo que tiene AHORA -asi los cambios de cantidad se reflejan bien en el stock-.
   compras[idx].items.forEach(function(it){
@@ -6569,20 +6554,6 @@ function puntajeBusqueda(textoProducto, consulta){
 
   for(var i=0; i<palabrasConsulta.length; i++){
     var pal = palabrasConsulta[i];
-
-    // REGLA NUEVA -23 jul 2026-: una palabra de 1 o 2 letras solo cuenta si EMPIEZA
-    // una palabra de verdad. Antes se buscaba metida en cualquier parte, y por eso al
-    // buscar "RD BARBERSHOP" salian barberos de otras barberias: Yo-RD-y, Go-RD-on,
-    // Be-RD-ecia, Edwa-RD... todos llevan "rd" adentro del nombre.
-    if(pal.length <= 2){
-      var empiezaPalabra = false;
-      for(var jc=0; jc<palabrasProducto.length; jc++){
-        if(palabrasProducto[jc].indexOf(pal) === 0){ empiezaPalabra = true; break; }
-      }
-      if(empiezaPalabra){ puntaje += 10; continue; }
-      return -1;
-    }
-
     if(normProd.indexOf(pal) >= 0){ puntaje += 10; continue; } // la palabra esta, en cualquier orden
 
     // Si no esta tal cual, buscar la palabra MAS parecida del producto y premiar segun
@@ -6606,16 +6577,6 @@ function filtrarPorBusqueda(lista, consulta, sacarTexto){
     var p = puntajeBusqueda(sacarTexto(lista[i]), consulta);
     if(p >= 0) conPuntaje.push({ item: lista[i], puntaje: p, orden: i });
   }
-
-  // REGLA NUEVA -23 jul 2026-: si hay resultados que calzan con la frase EXACTA que
-  // escribiste -puntaje 100-, se muestran SOLO esos. Los "parecidos" salen unicamente
-  // cuando NADA calza exacto, para que se siga perdonando "jonson" -> Johnson.
-  var exactos = [];
-  for(var ie=0; ie<conPuntaje.length; ie++){
-    if(conPuntaje[ie].puntaje >= 100) exactos.push(conPuntaje[ie]);
-  }
-  if(exactos.length) conPuntaje = exactos;
-
   conPuntaje.sort(function(a,b){
     if(b.puntaje !== a.puntaje) return b.puntaje - a.puntaje;
     return a.orden - b.orden; // si empatan, respetar el orden original -alfabetico-
@@ -9161,6 +9122,14 @@ function cobroRapidoContadoEfectivo(){
 }
 
 function registrarVentaConFirma(){
+  // Si el cliente pertenece a una barberia de la ruta de hoy, arranca el reloj
+  // para recordarte marcarla como visitada (23 jul).
+  try{
+    var _cSel = (typeof clientes!=='undefined') ? clientes.filter(function(x){
+      return String(x.id) === String(window._vendiendoCid || (document.getElementById('vcl')||{}).value);
+    })[0] : null;
+    if(_cSel && _cSel.negocio) marcarLlegadaBarberia(_cSel.negocio);
+  }catch(e){}
   if(!iV.length){ alert('Agrega al menos un producto'); return; }
   // Preguntar si el cliente firma
   var overlay = document.getElementById('firma-pregunta-overlay');
@@ -9460,6 +9429,8 @@ function saveV(){
   var clienteData = cl ? {negocio:cl.negocio||'',tel:cl.tel||'',email:cl.email||'',dir:cl.dir||'',ciudad:cl.ciudad||'',estado:cl.estado||'',zip:cl.zip||''} : null;
   var descInfo = descMonto > 0 ? {tipo:descTipo, valor:descVal, monto:descMonto} : null;
   ventas.push({id:Date.now(),numFactura:siguienteNumeroFactura(),cid:cid,cn:cn,tipo:tipo,items:iV.slice(),subtotal:subtot,descuento:descInfo,total:tot,ganancia:gan,fecha:fechaVenta,hora:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}),pagosFactura:pagosIniciales,firma:(window._firmaVentaActual||null),firmaFecha:(window._firmaFechaActual||null),clienteData:clienteData});
+  // Si esta barberia esta en la ruta de hoy, empieza el reloj del recordatorio (23 jul)
+  if(cl && cl.negocio) marcarLlegadaBarberia(cl.negocio);
   iV=[];
   renderIV();
   document.getElementById('vcl').value='';
@@ -9473,7 +9444,6 @@ function saveV(){
   if(document.getElementById('vdesc-linea')) document.getElementById('vdesc-linea').style.display='none';
   SS('nv',ventas);
   SS('np',productos);
-  try{ if(cl && cl.negocio) marcarLlegada(cl.negocio, true); }catch(e){}
   window._firmaVentaActual = null; // limpiar la firma para la próxima venta
   window._firmaFechaActual = null;
   flash('mk-v');
@@ -10042,6 +10012,8 @@ function selBarberoPorNombre(){
 function selBarbero(cid, nombre){
   pedBarberoCid = cid;
   pedBarberoNombre = nombre;
+  // Llegaste a esa barberia: arranca el reloj para recordarte marcarla (23 jul)
+  try{ marcarLlegadaBarberia(pedBarberiaSel); }catch(e){}
   document.getElementById('ped-barbero-wrap').style.display = 'none';
   document.getElementById('ped-form-wrap').style.display = 'block';
   document.getElementById('ped-barbero-actual').textContent = nombre;
@@ -10768,11 +10740,6 @@ function registrarVisitaBarbero(cid, compro){
   if(compro) visitas[k].compro.push(hoy);
   else visitas[k].noCompro.push(hoy);
   SS('nvisitas_barberos', visitas);
-  // Si le hizo un pedido a un barbero, es porque LLEGO a esa barberia -arranca el reloj-
-  try{
-    var clLleg = (LS('ncl',[]) || []).filter(function(c){ return String(c.id) === k; })[0];
-    if(clLleg && clLleg.negocio) marcarLlegada(clLleg.negocio, true);
-  }catch(e){}
 }
 
 function guardarTodosLosPedidosMultiples(){
@@ -11456,6 +11423,7 @@ function savePedido(){
     pedidos[pedidoEditandoIdx].items = pedItemsTemp.slice();
   } else {
     pedidos.push({ id: Date.now(), cid: cid, nombre: nombre, barberia: barberia, items: pedItemsTemp.slice() });
+    if(barberia) marcarLlegadaBarberia(barberia);   // reloj del recordatorio (23 jul)
   }
   SS('npedidos', pedidos);
 
@@ -11786,7 +11754,7 @@ function verFactura(v){
         var vr = ventas.find(function(x){ return x.id===vid; });
         if(!vr) return;
         if(!vr.pagosFactura) vr.pagosFactura = [];
-        vr.pagosFactura.push({ pid: nuevoPagoId(), monto: saldoFac, fecha: fechaHoy(), hora: horaAhoraTxt(), metodos:[{tipo:'efectivo', monto:saldoFac}] });
+        vr.pagosFactura.push({ pid: nuevoPagoId(), monto: saldoFac, fecha: fechaHoy(), metodos:[{tipo:'efectivo', monto:saldoFac}] });
         SS('nv', ventas);
         alert('✅ Pago de $'+fmtNum(saldoFac)+' en efectivo aplicado correctamente.');
         verFactura(vr);
@@ -11802,7 +11770,7 @@ function verFactura(v){
       var ventaReal = ventas.find(function(x){ return x.id===v.id; });
       if(!ventaReal) return;
       if(!ventaReal.pagosFactura) ventaReal.pagosFactura = [];
-      ventaReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy(), hora: horaAhoraTxt() });
+      ventaReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy() });
       SS('nv', ventas);
       alert('Pago de $'+fmtNum(monto)+' aplicado correctamente');
       verFactura(ventaReal);
@@ -12484,24 +12452,6 @@ function verificarPIN(callback){
 // Protege una accion peligrosa (borrar cliente, borrar pago, etc.) pidiendo SOLO la huella
 // -un toque, rapido-. Si el usuario NO tiene huella configurada, cae al PIN como respaldo
 // para que la accion nunca quede sin proteccion. El callback solo corre si se verifica.
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// CANDADO DE HUELLA PARA ACCIONES DE DINERO  -23 jul 2026-
-// Pide la huella UNA vez y despues vuelve a llamar a la misma funcion, ya con
-// permiso. Asi se puede proteger una accion sin reescribirla entera.
-// Se usa asi, justo antes de tocar los datos:
-//     if(!conHuella('nombreUnico', function(){ laMismaFuncion(args); })) return;
-// ═══════════════════════════════════════════════════════════════════════════════
-function conHuella(clave, volverALlamar){
-  if(window['_huellaOK_' + clave]) return true;   // ya la puso, seguir de largo
-  protegerConHuella(function(){
-    window['_huellaOK_' + clave] = true;
-    try { volverALlamar(); }
-    finally { window['_huellaOK_' + clave] = false; }
-  });
-  return false;  // esta pasada se detiene aqui; la de verdad ocurre en el callback
-}
-
 function protegerConHuella(callback){
   var idHuella = localStorage.getItem(CLAVE_HUELLA_ID);
   if(idHuella && window.PublicKeyCredential && navigator.credentials && navigator.credentials.get){
@@ -12620,58 +12570,10 @@ function modificarFactura(v){
 
 window.guardarModificacionFactura = function(vid){
   if(!window._itemsEdit || !window._itemsEdit.length){ alert('Debe quedar al menos un producto'); return; }
+  // -confirmacion redundante quitada, el boton de Guardar ya es la confirmacion-
   loadProds();
   ventas = LS('nv', []);
   var ventaReal = ventas.find(function(x){ return x.id===vid; });
-  if(!ventaReal) return;
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // ARREGLADO EL 23 DE JULIO DE 2026 — este boton tenia TRES fallas de dinero:
-  //  (1) Si la factura era de CONTADO y le subias el total, se quedaba marcada
-  //      como contado. Como el contado se cuenta cobrado por su total, la app
-  //      daba por COBRADO dinero que nunca entro. Ejemplo real probado: factura
-  //      de $50 pagada, le agregas $100 -> la app decia que cobraste $150.
-  //  (2) Se comia el descuento: volvia a sumar los productos y guardaba ESE
-  //      total, sin volver a aplicar el descuento de la factura.
-  //  (3) No pedia ni confirmacion ni huella, aunque cambia dinero.
-  // ═══════════════════════════════════════════════════════════════════════════
-  var totalAntesM = ventaReal.total || 0;
-  var tipoAntesM  = ventaReal.tipo;
-  var subtotalM   = window._itemsEdit.reduce(function(s,it){ return s+it.cant*it.precio; }, 0);
-  subtotalM = Math.round(subtotalM * 100) / 100;
-
-  // -- El descuento se vuelve a aplicar --
-  var descM = ventaReal.descuento;
-  var montoDescM = 0;
-  if(descM && ((descM.valor || 0) > 0.005 || (descM.monto || 0) > 0.005)){
-    if(descM.tipo === 'pct') montoDescM = subtotalM * ((descM.valor || 0)/100);
-    else montoDescM = Math.min((descM.valor || descM.monto || 0), subtotalM);
-    montoDescM = Math.max(0, Math.min(montoDescM, subtotalM));
-  }
-  var totalNuevoM = Math.round((subtotalM - montoDescM) * 100) / 100;
-
-  // -- Se le enseña al usuario exactamente que va a pasar --
-  var avisoM = 'Vas a modificar la factura #' + (ventaReal.numFactura || ventaReal.id) + '\n\n'
-             + 'Productos:  $' + fmtNum(subtotalM) + '\n';
-  if(montoDescM > 0.005) avisoM += 'Descuento: -$' + fmtNum(montoDescM) + '\n';
-  avisoM += 'TOTAL:      $' + fmtNum(totalNuevoM) + '\n'
-          + '  -antes era $' + fmtNum(totalAntesM) + '-\n\n';
-  if(tipoAntesM === 'contado' && totalNuevoM > totalAntesM + 0.001){
-    avisoM += '\u26a0\ufe0f OJO: esta factura era de CONTADO -ya te la pagaron completa-.\n'
-            + 'Como el total sube, lo nuevo NO esta pagado. La factura pasa a CREDITO,\n'
-            + 'se deja registrado el pago de $' + fmtNum(totalAntesM) + ' que ya te hicieron,\n'
-            + 'y quedan $' + fmtNum(totalNuevoM - totalAntesM) + ' por cobrar.\n\n';
-  }
-  avisoM += '\u00bfGuardar los cambios?';
-  if(!confirm(avisoM)) return;
-
-  // -- Candado de huella, igual que las demas acciones de dinero --
-  if(!conHuella('modificarFactura', function(){ window.guardarModificacionFactura(vid); })) return;
-
-  // Se vuelven a leer los datos DENTRO del callback de la huella, por si algo cambio
-  loadProds();
-  ventas = LS('nv', []);
-  ventaReal = ventas.find(function(x){ return x.id===vid; });
   if(!ventaReal) return;
 
   // Restaurar stock original y aplicar nuevo
@@ -12684,36 +12586,18 @@ window.guardarModificacionFactura = function(vid){
     if(p) p.stock -= it.cant;
   });
 
+  var nuevoTotal = window._itemsEdit.reduce(function(s,it){ return s+it.cant*it.precio; }, 0);
   var nuevaGanancia = window._itemsEdit.reduce(function(s,it){ return s+it.cant*(it.precio-(it.costo||0)); }, 0);
 
   ventaReal.items = window._itemsEdit.slice();
-  ventaReal.subtotal = subtotalM;
-  ventaReal.total = totalNuevoM;                       // ya trae el descuento aplicado
-  ventaReal.ganancia = Math.max(0, nuevaGanancia - montoDescM);
+  ventaReal.total = nuevoTotal;
+  ventaReal.ganancia = nuevaGanancia;
   ventaReal.modificada = true;
   ventaReal.fechaModificacion = fechaHoy();
 
-  // -- Si era de CONTADO y el total subio: pasa a credito y se deja constancia
-  //    del dinero que SI se cobro. Sin esto la app inventaba dinero cobrado.
-  var extraM = '';
-  if(tipoAntesM === 'contado' && totalNuevoM > totalAntesM + 0.001){
-    ventaReal.tipo = 'credito';
-    if(!ventaReal.pagosFactura) ventaReal.pagosFactura = [];
-    ventaReal.pagosFactura.push({
-      pid: nuevoPagoId(),
-      monto: totalAntesM,
-      fecha: ventaReal.fecha,
-      hora: (typeof horaAhoraTxt === 'function' ? horaAhoraTxt() : ''),
-      nota: 'Pago original antes de modificar la factura'
-    });
-    extraM = '\n\n\u26a0\ufe0f La factura paso a CREDITO. Se registro el pago de $'
-           + fmtNum(totalAntesM) + ' que ya te habian hecho, y quedan $'
-           + fmtNum(totalNuevoM - totalAntesM) + ' por cobrar.';
-  }
-
   SS('nv', ventas);
   SS('np', productos);
-  alert('Factura modificada correctamente.' + extraM);
+  alert('Factura modificada correctamente.');
   verFactura(ventaReal);
 };
 
@@ -13956,19 +13840,6 @@ function guardarEditorPago(vid, pidx){
   var vf = ventas.find(function(x){ return x.id === vid; });
   if(!vf || !vf.pagosFactura || vf.pagosFactura[pidx] === undefined){ alert('No se encontró el pago.'); return; }
 
-  // Cambiar el monto de un pago es tocar dinero: se avisa y se pide la huella -23 jul 2026-
-  var antesP = vf.pagosFactura[pidx].monto || 0;
-  if(Math.abs(antesP - montoTotal) > 0.005){
-    if(!confirm('Vas a cambiar este pago:\n\nAntes:  $' + fmtNum(antesP) + '\nAhora:  $' + fmtNum(montoTotal)
-                + '\n\nEl saldo del cliente cambia $' + fmtNum(Math.abs(montoTotal - antesP))
-                + (montoTotal > antesP ? ' a favor del cliente.' : ' en contra del cliente.')
-                + '\n\n\u00bfGuardar?')) return;
-  }
-  if(!conHuella('editarPago', function(){ guardarEditorPago(vid, pidx); })) return;
-  ventas = LS('nv', []);
-  vf = ventas.find(function(x){ return x.id === vid; });
-  if(!vf || !vf.pagosFactura || vf.pagosFactura[pidx] === undefined){ alert('No se encontró el pago.'); return; }
-
   vf.pagosFactura[pidx].monto = montoTotal;
   vf.pagosFactura[pidx].fecha = fechaISOaUSA(fechaISO);
   if(filas.length === 1){
@@ -14139,7 +14010,7 @@ function confirmarPagoMultiple(vid, saldo){
   // Caso normal: el pago cabe en esta factura
   if(total <= saldo + 0.01){
     if(!venta.pagosFactura) venta.pagosFactura = [];
-    venta.pagosFactura.push({ pid: nuevoPagoId(), monto: total, fecha: fechaHoy(), hora: horaAhoraTxt(), metodos: filas });
+    venta.pagosFactura.push({ pid: nuevoPagoId(), monto: total, fecha: fechaHoy(), metodos: filas });
     SS('nv', ventas);
     var detalle = filas.map(function(m){ return METODOS_PAGO_LABELS[m.tipo]+': $'+fmtNum(m.monto); }).join('\n');
     alert('✅ Pago de $'+fmtNum(total)+' aplicado correctamente.\n\n'+detalle);
@@ -14174,7 +14045,7 @@ function confirmarPagoMultiple(vid, saldo){
     // Si sobro dinero -el cliente ya no debe nada-, ese sobrante se queda en la factura
     // donde estas cobrando, para no perderlo del balance
     if(p.esLaActual && r.sinAplicar > 0.01) monto += r.sinAplicar;
-    var pago = { pid: nuevoPagoId(), monto: monto, fecha: fechaPago, hora: horaAhoraTxt() };
+    var pago = { monto: monto, fecha: fechaPago };
     if(p.esLaActual) pago.metodos = filas;
     else pago.nota = 'Sobrante del pago de $'+fmtNum(total)+' aplicado a la factura más vieja';
     v.pagosFactura.push(pago);
@@ -14576,7 +14447,7 @@ function verFacturaProfesional(vid){
       var vr = vv.find(function(x){ return String(x.id)===String(vid); });
       if(!vr){ alert('No se encontró la factura.'); return; }
       if(!vr.pagosFactura) vr.pagosFactura = [];
-      vr.pagosFactura.push({ pid: nuevoPagoId(), monto: saldo, fecha: fechaHoy(), hora: horaAhoraTxt(), metodos:[{tipo:'efectivo', monto:saldo}] });
+      vr.pagosFactura.push({ pid: nuevoPagoId(), monto: saldo, fecha: fechaHoy(), metodos:[{tipo:'efectivo', monto:saldo}] });
       SS('nv', vv);
       alert('✅ Pago de $'+fmtNum(saldo)+' en efectivo aplicado correctamente.');
       verFacturaProfesional(vid);
@@ -15464,9 +15335,6 @@ function agregarProductoAFactura(idx){
 }
 
 function guardarEdicionFactura(vid){
-  // Editar los productos de una factura cambia lo que el cliente debe -23 jul 2026-
-  if(!conHuella('editarFactura', function(){ guardarEdicionFactura(vid); })) return;
-
   ventas = LS('nv', []);
   loadProds();
   var idx = ventas.findIndex(function(x){ return String(x.id)===String(vid); });
@@ -15500,39 +15368,6 @@ function guardarEdicionFactura(vid){
     if(fparts.length === 3) ventas[idx].fecha = fparts[1]+'/'+fparts[2]+'/'+fparts[0]; // guardar como MM/DD/YYYY
   }
   var totalDespues = ventas[idx].items.reduce(function(s,it){ return s+(it.cant*it.precio); },0);
-  ventas[idx].subtotal = totalDespues;
-
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // EL DESCUENTO YA NO SE PIERDE  -arreglado el 23 jul 2026-
-  // Antes, al editar una factura se volvia a sumar el precio de los productos y se
-  // guardaba ESE total, sin mirar el descuento. O sea: si la factura tenia un descuento,
-  // desaparecia en silencio y el cliente quedaba debiendo de mas. Ahora se vuelve a
-  // aplicar, se avisa con el desglose, y se puede quitar a proposito.
-  // ═══════════════════════════════════════════════════════════════════════════════
-  var descFac = ventas[idx].descuento;
-  if(descFac && (descFac.valor > 0.005 || descFac.monto > 0.005)){
-    var montoDesc = 0;
-    if(descFac.tipo === 'pct') montoDesc = totalDespues * ((descFac.valor || 0)/100);
-    else montoDesc = Math.min((descFac.valor || descFac.monto || 0), totalDespues);
-    montoDesc = Math.max(0, Math.min(montoDesc, totalDespues));
-
-    var msgDesc = 'Esta factura ten\u00eda un DESCUENTO de $'+fmtNum(montoDesc)+'.\n\n'
-                + 'Productos:  $'+fmtNum(totalDespues)+'\n'
-                + 'Descuento: -$'+fmtNum(montoDesc)+'\n'
-                + 'TOTAL:      $'+fmtNum(totalDespues - montoDesc)+'\n\n'
-                + '\u00bfMantener el descuento?\n\n'
-                + 'Aceptar = s\u00ed, mantenerlo\n'
-                + 'Cancelar = quitarlo -el total queda en $'+fmtNum(totalDespues)+'-';
-
-    if(confirm(msgDesc)){
-      descFac.monto = montoDesc;
-      ventas[idx].descuento = descFac;
-      totalDespues = totalDespues - montoDesc;
-    } else {
-      ventas[idx].descuento = null;   // lo quito a proposito
-    }
-  }
-
   ventas[idx].total = totalDespues;
 
   var mensajeExtra = '';
@@ -15562,34 +15397,22 @@ function guardarEdicionFactura(vid){
 
 
 function limpiarVentasHuerfanas(){
-  // Esto BORRA VENTAS -o sea, toca dinero-. Por eso primero dice exactamente que va a
-  // borrar y cuanto suma, y despues pide la huella. Antes borraba sin preguntar nada.
   clientes = LS('ncl', []);
   ventas = LS('nv', []);
   var idsClientes = clientes.map(function(c){ return String(c.id); });
-  var esHuerfana = function(v){ return v.cid && !idsClientes.includes(String(v.cid)); };
-  var huerfanas = ventas.filter(esHuerfana);
-  if(huerfanas.length === 0){
-    avisoGrande('No se encontraron ventas de clientes eliminados.');
+  var antes = ventas.length;
+  // Mantener ventas de cliente general (cid null/0) y de clientes existentes
+  ventas = ventas.filter(function(v){
+    if(!v.cid) return true; // cliente general, mantener
+    return idsClientes.includes(String(v.cid));
+  });
+  var eliminadas = antes - ventas.length;
+  if(eliminadas === 0){
+    alert('No se encontraron ventas de clientes eliminados.');
     return;
   }
-  var monto = huerfanas.reduce(function(s,v){ return s + (v.total || 0); }, 0);
-  var lista = huerfanas.slice(0,8).map(function(v){
-    return '\u2022 '+(v.cn || 'sin nombre')+' \u2014 $'+fmtNum(v.total || 0);
-  }).join('\n');
-  if(huerfanas.length > 8) lista += '\n\u2026 y '+(huerfanas.length-8)+' m\u00e1s';
-  var msg = '\u26a0\ufe0f SE VAN A BORRAR '+huerfanas.length+' VENTA(S)\n\n'
-          + 'Por un total de $'+fmtNum(monto)+'\n\n'+lista+'\n\n'
-          + 'Esto NO se puede deshacer. \u00bfSeguro?';
-  if(!confirm(msg)) return;
-  protegerConHuella(function(){
-    var lista2 = LS('nv', []);
-    var quedan = lista2.filter(function(v){ return !esHuerfana(v); });
-    var borradas = lista2.length - quedan.length;
-    SS('nv', quedan);
-    ventas = quedan;
-    avisoGrande('\u2705 Se borraron '+borradas+' venta(s) por $'+fmtNum(monto)+'.');
-  });
+  SS('nv', ventas);
+  alert(eliminadas + ' venta(s) de clientes eliminados han sido borradas.');
 }
 
 function borrarTodo(){
@@ -15975,16 +15798,19 @@ function exportD(){
   var devoluciones = LS('ndevoluciones', []);
   var productosEliminados = LS('np_eliminados', []);
   var visitasBarberos = LS('nvisitas_barberos', {});
-  // ── Las RUTAS -que barberia toca cada dia- y las VISITAS -cual se visito y a que hora-
-  //    no estaban en el respaldo, por eso se perdieron al pasar de una app a otra. Ya no.
+  // ── RUTAS (agregado 23 jul 2026) ──
+  // Antes las rutas NO iban en el respaldo, por eso al pasar el backup de la app
+  // vieja a la nueva quedaron VACIAS. Ahora se guarda el orden de cada dia y
+  // TODAS las visitas marcadas, con su hora.
   var rutasPorDia = LS('rutas_por_dia', {});
   var visitasRuta = {};
   try{
-    for(var iVR = 0; iVR < localStorage.length; iVR++){
-      var kVR = localStorage.key(iVR);
-      if(kVR && kVR.indexOf('visitas_') === 0) visitasRuta[kVR] = LS(kVR, []);
+    for(var kR in localStorage){
+      if(localStorage.hasOwnProperty(kR) && kR.indexOf('visitas_') === 0){
+        visitasRuta[kR] = LS(kR, []);
+      }
     }
-  }catch(e){}
+  }catch(eR){}
   var d = {v:2, productos:productos, ventas:ventas, compras:compras, creditos:creditos, clientes:clientes, suplidores:suplidores, gastos:gastos,
     tarjetas:tarjetas, otrasDeudas:otrasDeudas, pedidos:pedidos, devoluciones:devoluciones, productosEliminados:productosEliminados,
     visitasBarberos:visitasBarberos, rutasPorDia:rutasPorDia, visitasRuta:visitasRuta};
@@ -16114,8 +15940,13 @@ function importD(inp){
       if(d.devoluciones){SS('ndevoluciones',d.devoluciones);}
       if(d.productosEliminados){SS('np_eliminados',d.productosEliminados);}
       if(d.visitasBarberos){SS('nvisitas_barberos',d.visitasBarberos);}
-      if(d.rutasPorDia){SS('rutas_por_dia', d.rutasPorDia);}
-      if(d.visitasRuta){ Object.keys(d.visitasRuta).forEach(function(kVR){ SS(kVR, d.visitasRuta[kVR]); }); }
+      // ── RUTAS (23 jul) ──
+      if(d.rutasPorDia){ SS('rutas_por_dia', d.rutasPorDia); }
+      if(d.visitasRuta){
+        for(var kV in d.visitasRuta){
+          if(d.visitasRuta.hasOwnProperty(kV)) SS(kV, d.visitasRuta[kV]);
+        }
+      }
       avisoGrande('Datos importados correctamente', function(){ ir('p-ped'); });
     }catch(err){alert('Error al importar');}
     inp.value='';
@@ -17627,12 +17458,7 @@ function resFechaADate(f){
   if(f.indexOf('-') > 0){ p = f.split('-'); return new Date(+p[0], +p[1]-1, +p[2], 12,0,0); }
   p = f.split('/');
   if(p.length !== 3) return null;
-  var mes = +p[0], dia = +p[1];
-  // La app guarda MM/DD/AAAA. Pero quedaron unos pocos pagos viejos escritos al reves
-  // -24/6/2026, o sea DIA/MES-. Si el primer numero pasa de 12 no puede ser un mes,
-  // asi que se voltean y la fecha cae en el mes correcto.
-  if(mes > 12 && dia <= 12){ var tmpF = mes; mes = dia; dia = tmpF; }
-  return new Date(+p[2], mes-1, dia, 12,0,0);
+  return new Date(+p[2], +p[0]-1, +p[1], 12,0,0);
 }
 function resISOaDate(iso){
   if(!iso) return null;
@@ -17721,31 +17547,6 @@ function pintarMiniResumen(){
 }
 
 // Detalle por cliente: quien pago, cuanto cogio y como quedo el balance
-// Saca el momento exacto guardado dentro del codigo de un pago -el pid trae la hora-
-function tsDePid(pid){
-  if(!pid) return 0;
-  var s = String(pid);
-  if(s.charAt(0) !== 'p' || s.length <= 7) return 0;
-  var t = parseInt(s.slice(1, s.length-6), 36);
-  if(!t || t < 1500000000000 || t > Date.now() + 86400000) return 0;
-  return t;
-}
-function tsAHora(t){
-  return new Date(t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
-}
-function horaDeVenta(v){
-  if(v && v.hora) return v.hora;
-  var t = +(v && v.id);
-  if(t > 1500000000000 && t < Date.now() + 86400000) return tsAHora(t);
-  return '';
-}
-function horaDePago(p, v){
-  if(p && p.hora) return p.hora;
-  var t = tsDePid(p && p.pid);
-  if(t) return tsAHora(t);
-  return '';
-}
-
 function pintarDetalleClientes(d0, d1, dentro){
   var el = document.getElementById('res-detalle');
   if(!el) return;
@@ -17755,19 +17556,10 @@ function pintarDetalleClientes(d0, d1, dentro){
   ventas.forEach(function(v){
     if(v.cancelada) return;
     var cid = String(v.cid || 'general');
-    if(!porCli[cid]) porCli[cid] = { pago:0, cogio:0, bce:0, min:-1, hora:'' };
-
-    // Guarda la hora MAS TEMPRANA del cliente dentro del rango, para poder ordenar
-    // la lista igual que la ruta -parada por parada, en el orden en que paso-
-    function anotarHora(hTxt){
-      if(!hTxt) return;
-      var m = horaAMinutos(hTxt);
-      if(m < 0) return;
-      if(porCli[cid].min < 0 || m < porCli[cid].min){ porCli[cid].min = m; porCli[cid].hora = hTxt; }
-    }
+    if(!porCli[cid]) porCli[cid] = { pago:0, cogio:0, bce:0 };
 
     // COGIO: lo que se llevo en mercancia en el rango
-    if(dentro(v.fecha)){ porCli[cid].cogio += (v.total || 0); anotarHora(horaDeVenta(v)); }
+    if(dentro(v.fecha)) porCli[cid].cogio += (v.total || 0);
 
     // PAGO: contado del rango + abonos pagados en el rango
     if(v.tipo === 'contado'){
@@ -17775,7 +17567,7 @@ function pintarDetalleClientes(d0, d1, dentro){
     } else {
       (v.pagosFactura || []).forEach(function(p){
         if(typeof p.monto !== 'number' || p.monto <= 0 || p.esDevolucion) return;
-        if(dentro(p.fecha || v.fecha)){ porCli[cid].pago += p.monto; anotarHora(horaDePago(p, v)); }
+        if(dentro(p.fecha || v.fecha)) porCli[cid].pago += p.monto;
       });
     }
   });
@@ -17799,34 +17591,18 @@ function pintarDetalleClientes(d0, d1, dentro){
       nombre: c ? ((c.nombre||'')+' '+(c.apellido||'')).trim() : 'Cliente general',
       apodo: c ? (c.apodo || '') : '',
       negocio: c ? (c.negocio || '') : '',
-      pago: x.pago, cogio: x.cogio, bce: x.bce, min: x.min, hora: x.hora
+      pago: x.pago, cogio: x.cogio, bce: x.bce
     });
   });
-  // Orden: por HORA -como fue la ruta-. Los que no tienen hora se van al final.
-  filas.sort(function(a,b){
-    if(a.min < 0 && b.min < 0) return b.pago - a.pago;
-    if(a.min < 0) return 1;
-    if(b.min < 0) return -1;
-    return a.min - b.min;
-  });
+  filas.sort(function(a,b){ return b.pago - a.pago; });
 
   if(!filas.length){
     el.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:14px">Sin movimientos en estas fechas</div>';
     return;
   }
 
-  var yaPuseSeparador = false;
   el.innerHTML = filas.map(function(f){
-    var sep = '';
-    if(f.min < 0 && !yaPuseSeparador){
-      yaPuseSeparador = true;
-      sep = '<div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px"><div style="flex:1;height:1px;background:#e0e0e0"></div>'
-          + '<div style="font-size:10.5px;font-weight:800;color:#a0a4b0;letter-spacing:0.5px">SIN HORA</div>'
-          + '<div style="flex:1;height:1px;background:#e0e0e0"></div></div>';
-    }
-    return sep
-      + '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:11px;padding:10px 12px;margin-bottom:7px">'
-      + (f.hora ? '<div style="font-size:11.5px;font-weight:800;color:#E65100;margin-bottom:2px">🕐 '+escaparHtml(f.hora)+'</div>' : '')
+    return '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:11px;padding:10px 12px;margin-bottom:7px">'
       + '<div style="font-size:15.5px;font-weight:800;color:#1a237e;line-height:1.2">'+escaparHtml(f.nombre.toUpperCase())
       +   (f.apodo ? ' <span style="color:#A63D2F;font-weight:700">('+escaparHtml(f.apodo)+')</span>' : '')
       + '</div>'
@@ -19152,9 +18928,8 @@ function renderRutaDia(diaKey){
     el.appendChild(empty);
   } else {
     rutaHoy.forEach(function(neg, idx){
-      var visitada = idxVisita(visitas, neg) >= 0;
-      var horaVis = visitada ? visHora(visitas[idxVisita(visitas, neg)]) : '';
-      var llegadaAqui = (function(){ var a = LS(CLAVE_LLEGADA, null); return (a && a.neg === neg && a.dia === diaKey); })();
+      var visitada = posVisita(visitas, neg) >= 0;
+      var horaVis = visitada ? horaDeVisita(visitas, neg) : '';
       var esHuerfana = !barberias[neg]; // ya no hay ningun cliente con este nombre de negocio
       var row = document.createElement('div');
       row.style.cssText = 'background:'+(esHuerfana?'#FFF3E0':'white')+';border-radius:12px;padding:12px 14px;margin-bottom:6px;border:0.5px solid '+(esHuerfana?'#FFCC80':visitada?'#A5D6A7':'#e5e7eb')+';display:flex;align-items:center;gap:10px';
@@ -19170,23 +18945,19 @@ function renderRutaDia(diaKey){
 
       var nameDiv = document.createElement('div');
       nameDiv.style.cssText = 'flex:1;font-size:14px;font-weight:700;color:'+(esHuerfana?'#E65100':visitada?'#2E7D32':'#1a237e');
-      nameDiv.innerHTML = '🏪 '+escaparHtml(neg)+(esHuerfana?'<div style="font-size:10px;font-weight:600;color:#E65100;margin-top:2px">⚠️ Ya no hay ningún cliente con este negocio -¿se renombró o se eliminó?</div>':'');
+      nameDiv.innerHTML = '🏪 '+neg+(esHuerfana?'<div style="font-size:10px;font-weight:600;color:#E65100;margin-top:2px">⚠️ Ya no hay ningún cliente con este negocio -¿se renombró o se eliminó?</div>':'');
       if(visitada){
-        var lineaHora = document.createElement('div');
-        lineaHora.style.cssText = 'font-size:12px;font-weight:700;color:#2E7D32;margin-top:3px;display:flex;align-items:center;gap:6px';
-        lineaHora.innerHTML = '<span>🕐 '+escaparHtml(horaVis || 'sin hora')+'</span>';
-        var lapiz = document.createElement('button');
-        lapiz.textContent = '✏️';
-        lapiz.title = 'Cambiar la hora';
-        lapiz.style.cssText = 'background:#E8F5E9;border:none;border-radius:6px;padding:1px 5px;cursor:pointer;font-size:11px;line-height:1.4';
-        lapiz.onclick = (function(dk,n){ return function(ev){ ev.stopPropagation(); editarHoraVisita(dk,n); }; })(diaKey, neg);
-        lineaHora.appendChild(lapiz);
-        nameDiv.appendChild(lineaHora);
-      } else if(llegadaAqui){
-        var lineaLleg = document.createElement('div');
-        lineaLleg.style.cssText = 'font-size:11.5px;font-weight:700;color:#E65100;margin-top:3px';
-        lineaLleg.textContent = '🚩 Llegaste — te aviso en un rato';
-        nameDiv.appendChild(lineaLleg);
+        // La hora de la visita, con lapiz para corregirla (23 jul)
+        var hDiv = document.createElement('div');
+        hDiv.style.cssText = 'font-size:12px;font-weight:700;color:#1565C0;margin-top:3px;display:flex;align-items:center;gap:5px';
+        hDiv.innerHTML = '\ud83d\udd50 ' + (horaVis || '<span style="color:#999;font-weight:600">sin hora</span>');
+        var lap = document.createElement('button');
+        lap.textContent = '\u270f\ufe0f';
+        lap.title = 'Cambiar la hora';
+        lap.style.cssText = 'background:#E8EAF6;border:none;border-radius:6px;padding:2px 6px;font-size:11px;cursor:pointer';
+        lap.onclick = (function(dk,n){ return function(ev){ ev.stopPropagation(); editarHoraVisita(dk,n); }; })(diaKey, neg);
+        hDiv.appendChild(lap);
+        nameDiv.appendChild(hDiv);
       }
 
       var btnVis = document.createElement('button');
@@ -19208,14 +18979,6 @@ function renderRutaDia(diaKey){
       row.appendChild(btnUp);
       row.appendChild(numDiv);
       row.appendChild(nameDiv);
-      if(!visitada && !llegadaAqui){
-        var btnLleg = document.createElement('button');
-        btnLleg.textContent = '🚩';
-        btnLleg.title = 'Llegué a esta barbería';
-        btnLleg.style.cssText = 'background:#FFF3E0;color:#E65100;border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:15px;flex-shrink:0';
-        btnLleg.onclick = (function(n){ return function(){ marcarLlegada(n, false); }; })(neg);
-        row.appendChild(btnLleg);
-      }
       row.appendChild(btnNav);
       row.appendChild(btnVis);
       row.appendChild(btnQuit);
@@ -19330,150 +19093,192 @@ function quitarDeDia(diaKey, neg){
   renderRutaDia(diaKey);
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  HORA DE LAS VISITAS  (pedido por Sensei el 23 jul 2026)
+//  Antes solo se guardaba el NOMBRE de la barberia visitada. Ahora se guarda
+//  tambien la HORA, para poder ver la ruta en el orden real del dia.
+//  Formato viejo: ["MODERN CUTS", "RD BARBERSHOP"]        (solo nombres)
+//  Formato nuevo: [{n:"MODERN CUTS", h:"01:18 PM"}, ...]  (nombre + hora)
+//  Se aceptan LOS DOS, para no perder lo que ya estaba marcado.
+// ═══════════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// HORA DE LAS VISITAS DE LA RUTA  (23 jul 2026, pedido por Sensei)
-// Antes cada visita se guardaba SOLO como el nombre del negocio -un texto suelto-.
-// Ahora se guarda {n:negocio, h:'1:18 PM', t:momento exacto}. Las visitas viejas
-// -que son texto- se siguen leyendo igual, solo que sin hora.
-// ═══════════════════════════════════════════════════════════════════════════════
-function horaAhoraTxt(){
-  return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
-}
-function visNombre(v){ return (typeof v === 'string') ? v : ((v && v.n) ? v.n : ''); }
-function visHora(v){ return (typeof v === 'string') ? '' : ((v && v.h) ? v.h : ''); }
-function idxVisita(visitas, neg){
-  for(var i=0;i<visitas.length;i++){ if(visNombre(visitas[i]) === neg) return i; }
+function nombreDeVisita(v){ return (v && typeof v === 'object') ? v.n : v; }
+
+// Devuelve la posicion de una barberia en la lista de visitas, o -1
+function posVisita(visitas, neg){
+  for(var i=0;i<visitas.length;i++){ if(nombreDeVisita(visitas[i]) === neg) return i; }
   return -1;
 }
-function claveVisitas(diaKey){ return 'visitas_'+diaKey+'_'+fechaMasRecienteParaDia(diaKey); }
 
-// Entiende la hora escrita a mano de varias formas: "1:18 PM", "1:18pm", "13:18", "118 pm", "5 pm"
-function parseHoraTexto(txt){
-  if(!txt) return null;
-  var s = String(txt).trim().toUpperCase().replace(/\./g,'');
-  var pm = /P\s*M?\s*$/.test(s);
-  var am = /A\s*M?\s*$/.test(s);
-  s = s.replace(/[AP]\s*M?\s*$/,'').replace(/\s+/g,'');
-  var hh, mm;
-  if(s.indexOf(':') >= 0){
-    var p = s.split(':');
-    hh = parseInt(p[0],10); mm = parseInt(p[1],10);
-  } else {
-    var d = s.replace(/\D/g,'');
-    if(!d) return null;
-    if(d.length <= 2){ hh = parseInt(d,10); mm = 0; }
-    else { hh = parseInt(d.slice(0, d.length-2),10); mm = parseInt(d.slice(-2),10); }
-  }
-  if(isNaN(hh) || isNaN(mm)) return null;
-  if(mm < 0 || mm > 59) return null;
-  if(pm && hh < 12) hh += 12;
-  if(am && hh === 12) hh = 0;
-  if(hh < 0 || hh > 23) return null;
-  var suf = hh >= 12 ? 'PM' : 'AM';
+// La hora guardada de esa visita (o '' si es de las viejas, sin hora)
+function horaDeVisita(visitas, neg){
+  var i = posVisita(visitas, neg);
+  if(i < 0) return '';
+  var v = visitas[i];
+  return (v && typeof v === 'object' && v.h) ? v.h : '';
+}
+
+// Hora de AHORA en formato 12 horas: "01:18 PM"
+function horaAhora12(){
+  var d = new Date(), hh = d.getHours(), mm = d.getMinutes();
+  var ampm = hh >= 12 ? 'PM' : 'AM';
   var h12 = hh % 12; if(h12 === 0) h12 = 12;
-  return h12+':'+String(mm).padStart(2,'0')+' '+suf;
-}
-// Convierte "1:18 PM" a minutos desde medianoche, para poder ORDENAR la ruta
-function horaAMinutos(hTxt){
-  if(!hTxt) return -1;
-  var s = String(hTxt).trim().toUpperCase();
-  var pm = s.indexOf('PM') >= 0, am = s.indexOf('AM') >= 0;
-  var p = s.replace(/[^0-9:]/g,'').split(':');
-  var hh = parseInt(p[0],10), mm = parseInt(p[1]||'0',10);
-  if(isNaN(hh)) return -1;
-  if(isNaN(mm)) mm = 0;
-  if(pm && hh < 12) hh += 12;
-  if(am && hh === 12) hh = 0;
-  return hh*60 + mm;
+  return (h12 < 10 ? '0' : '') + h12 + ':' + (mm < 10 ? '0' : '') + mm + ' ' + ampm;
 }
 
+// Cambiar a mano la hora de una visita (a veces se le olvida marcarla al momento)
 function editarHoraVisita(diaKey, neg){
-  var key = claveVisitas(diaKey);
+  var key = 'visitas_'+diaKey+'_'+fechaMasRecienteParaDia(diaKey);
   var visitas = LS(key, []);
-  var i = idxVisita(visitas, neg);
-  if(i < 0) return;
-  var actual = visHora(visitas[i]);
-  var r = prompt('\u00bfA qu\u00e9 hora visitaste '+neg+'?\n\nEscr\u00edbela as\u00ed:   1:18 PM', actual || '');
-  if(r === null) return;
-  var hh = parseHoraTexto(r);
-  if(!hh){ avisoGrande('No entend\u00ed esa hora.\n\nEscr\u00edbela as\u00ed:   1:18 PM'); return; }
-  if(typeof visitas[i] === 'string') visitas[i] = { n: neg, h: hh, t: 0 };
-  else visitas[i].h = hh;
+  var i = posVisita(visitas, neg);
+  if(i < 0){ avisoGrande('Primero marca la barber\u00eda como visitada.'); return; }
+  var actual = horaDeVisita(visitas, neg) || horaAhora12();
+  var nueva = prompt('\u00bfA qu\u00e9 hora visitaste ' + neg + '?\n\nEscr\u00edbela as\u00ed:  01:18 PM', actual);
+  if(nueva === null) return;
+  nueva = String(nueva).trim().toUpperCase();
+  if(!/^\d{1,2}:\d{2}\s?(AM|PM)$/.test(nueva)){
+    avisoGrande('Esa hora no se entiende.\n\nEscr\u00edbela as\u00ed:\n\n   01:18 PM\n   09:30 AM');
+    return;
+  }
+  var p = nueva.replace(/\s+/g,' ').split(/[: ]/);
+  nueva = (p[0].length<2?'0':'')+p[0]+':'+p[1]+' '+p[2];
+  visitas[i] = { n: neg, h: nueva };
   SS(key, visitas);
   renderRutaDia(diaKey);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// RECORDATORIO DE LLEGADA  (23 jul 2026)
-// Cuando Sensei llega a una barberia arranca un reloj. A los 20 minutos la app le
-// pregunta si ya termino, para que no se le olvide marcarla. Se puede posponer 10 min.
-// La llegada se detecta de DOS formas: sola -al hacerle una venta o un pedido a un
-// barbero de esa barberia- y a mano -con el boton "Llegue"-.
-// ═══════════════════════════════════════════════════════════════════════════════
-var MIN_AVISO_LLEGADA = 20;
-var MIN_POSPONER_LLEGADA = 10;
-var CLAVE_LLEGADA = 'nbs_llegada';
+// ═══════════════════════════════════════════════════════════════
+//  RECORDATORIO DE MARCAR LA VISITA  (pedido por Sensei, 23 jul 2026)
+//
+//  "a veces por cuestion de tiempo se me olvida marcarlas, a menos que haya
+//   una ventana que me salga diciendome que la marque despues de x tiempo
+//   y que yo pueda posponerla si aun no e terminado de esa barberia"
+//
+//  COMO FUNCIONA: cuando Sensei registra la primera venta o el primer pedido
+//  en una barberia que esta en la ruta de HOY, empieza un reloj de 20 minutos.
+//  Al cumplirse, sale una ventana preguntando si ya termino ahi.
+//  Puede marcarla visitada, o posponer 10 minutos si sigue trabajando.
+// ═══════════════════════════════════════════════════════════════
 
-function marcarLlegada(neg, esAutomatica){
-  neg = String(neg || '').trim();
+var MIN_PARA_RECORDAR   = 20;   // minutos desde que llega hasta el aviso
+var MIN_PARA_POSPONER   = 10;   // minutos que se pospone al tocar "Todavia no"
+var CLAVE_LLEGADAS      = 'nbs_llegadas_barberia';
+
+// Se llama sola cuando registra algo en una barberia
+function marcarLlegadaBarberia(negocio){
+  if(!negocio) return;
+  try{
+    var hoyKey = DIAS_KEYS[new Date().getDay()];
+    var rutas  = LS('rutas_por_dia', {});
+    var rutaHoy = rutas[hoyKey] || [];
+    if(rutaHoy.indexOf(negocio) < 0) return;         // no esta en la ruta de hoy
+
+    var key = 'visitas_'+hoyKey+'_'+fechaMasRecienteParaDia(hoyKey);
+    var visitas = LS(key, []);
+    if(posVisita(visitas, negocio) >= 0) return;     // ya la marcaste, no molestar
+
+    var lleg = LS(CLAVE_LLEGADAS, {});
+    if(lleg[negocio]) return;                        // ya se habia registrado la llegada
+    lleg[negocio] = Date.now();
+    SS(CLAVE_LLEGADAS, lleg);
+  }catch(e){}
+}
+
+// Cuando marca la barberia, se borra su reloj
+function cancelarRecordatorioBarberia(negocio){
+  try{
+    var lleg = LS(CLAVE_LLEGADAS, {});
+    if(lleg[negocio]){ delete lleg[negocio]; SS(CLAVE_LLEGADAS, lleg); }
+  }catch(e){}
+  var caja = document.getElementById('recvis-caja');
+  if(caja && caja.getAttribute('data-neg') === negocio) cerrarRecordatorioVisita();
+}
+
+// Revisa cada minuto si toca recordar alguna
+function revisarRecordatoriosVisita(){
+  try{
+    if(window._appBloqueada) return;
+    var caja = document.getElementById('recvis-caja');
+    if(caja && caja.style.display === 'block') return;   // ya hay uno en pantalla
+
+    var lleg = LS(CLAVE_LLEGADAS, {});
+    var hoyKey = DIAS_KEYS[new Date().getDay()];
+    var key = 'visitas_'+hoyKey+'_'+fechaMasRecienteParaDia(hoyKey);
+    var visitas = LS(key, []);
+    var ahora = Date.now();
+
+    for(var neg in lleg){
+      if(!lleg.hasOwnProperty(neg)) continue;
+      if(posVisita(visitas, neg) >= 0){                 // ya la marcaste mientras tanto
+        delete lleg[neg]; SS(CLAVE_LLEGADAS, lleg); continue;
+      }
+      var minutos = Math.floor((ahora - lleg[neg]) / 60000);
+      if(minutos >= MIN_PARA_RECORDAR){
+        mostrarRecordatorioVisita(neg, minutos);
+        return;
+      }
+    }
+  }catch(e){}
+}
+
+function mostrarRecordatorioVisita(negocio, minutos){
+  var ov   = document.getElementById('recvis-ov');
+  var caja = document.getElementById('recvis-caja');
+  if(!ov || !caja) return;
+  document.getElementById('recvis-neg').textContent = negocio;
+  document.getElementById('recvis-min').textContent = 'Llegaste hace ' + minutos + ' minutos';
+  caja.setAttribute('data-neg', negocio);
+  ov.style.display = 'block';
+  caja.style.display = 'block';
+}
+
+function cerrarRecordatorioVisita(){
+  var ov   = document.getElementById('recvis-ov');
+  var caja = document.getElementById('recvis-caja');
+  if(ov) ov.style.display = 'none';
+  if(caja) caja.style.display = 'none';
+}
+
+// "Si, marcar visitada"
+function recvisMarcar(){
+  var caja = document.getElementById('recvis-caja');
+  var neg = caja ? caja.getAttribute('data-neg') : '';
+  cerrarRecordatorioVisita();
   if(!neg) return;
-  var dia = getDiaHoy();
-  if(esAutomatica){
-    var rutas = LS('rutas_por_dia', {});
-    if(((rutas[dia] || []).indexOf(neg)) < 0) return;         // no esta en la ruta de hoy
-    if(idxVisita(LS(claveVisitas(dia), []), neg) >= 0) return; // ya esta marcada
-    var yaHay = LS(CLAVE_LLEGADA, null);
-    if(yaHay && yaHay.neg === neg) return;                     // ya se esta contando
-  }
-  SS(CLAVE_LLEGADA, { neg: neg, dia: dia, t: Date.now(), avisarEn: Date.now() + MIN_AVISO_LLEGADA*60000 });
-  if(!esAutomatica) renderRutaDia(dia);
+  var hoyKey = DIAS_KEYS[new Date().getDay()];
+  toggleVisita(hoyKey, neg);     // esto ya guarda la hora y cancela el reloj
 }
-function limpiarLlegada(neg){
-  var a = LS(CLAVE_LLEGADA, null);
-  if(a && (!neg || a.neg === neg)){ try{ localStorage.removeItem(CLAVE_LLEGADA); }catch(e){} }
+
+// "Todavia no, recuerdame en 10 minutos"
+function recvisPosponer(){
+  var caja = document.getElementById('recvis-caja');
+  var neg = caja ? caja.getAttribute('data-neg') : '';
+  cerrarRecordatorioVisita();
+  if(!neg) return;
+  try{
+    var lleg = LS(CLAVE_LLEGADAS, {});
+    // Se corre el reloj: como si hubiera llegado hace (20 - 10) minutos
+    lleg[neg] = Date.now() - ((MIN_PARA_RECORDAR - MIN_PARA_POSPONER) * 60000);
+    SS(CLAVE_LLEGADAS, lleg);
+  }catch(e){}
 }
-function revisarLlegada(){
-  var a = LS(CLAVE_LLEGADA, null);
-  if(!a || !a.neg) return;
-  if(Date.now() < (a.avisarEn || 0)) return;
-  if(idxVisita(LS(claveVisitas(a.dia), []), a.neg) >= 0){ limpiarLlegada(); return; }
-  var ov = document.getElementById('lleg-ov');
-  if(!ov || ov.style.display === 'flex') return;
-  var t = document.getElementById('lleg-txt');
-  if(t) t.innerHTML = 'Llegaste a<br><b style="color:#1a237e;font-size:16.5px">'+escaparHtml(a.neg)+'</b><br>hace '+Math.round((Date.now()-a.t)/60000)+' minutos';
-  ov.style.display = 'flex';
-}
-function llegadaSiTermine(){
-  var a = LS(CLAVE_LLEGADA, null);
-  var ov = document.getElementById('lleg-ov'); if(ov) ov.style.display = 'none';
-  if(!a || !a.neg) return;
-  var key = claveVisitas(a.dia);
-  var visitas = LS(key, []);
-  if(idxVisita(visitas, a.neg) < 0){
-    visitas.push({ n: a.neg, h: new Date(a.t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}), t: a.t });
-    SS(key, visitas);
-  }
-  limpiarLlegada();
-  if(pantallaActual() === 'p-rutas') renderRutaDia(a.dia);
-}
-function llegadaPosponer(){
-  var a = LS(CLAVE_LLEGADA, null);
-  var ov = document.getElementById('lleg-ov'); if(ov) ov.style.display = 'none';
-  if(!a) return;
-  a.avisarEn = Date.now() + MIN_POSPONER_LLEGADA*60000;
-  SS(CLAVE_LLEGADA, a);
-}
-setInterval(revisarLlegada, 60000);
+
+// El reloj corre mientras la app esta abierta
+setInterval(revisarRecordatoriosVisita, 60000);
+setTimeout(revisarRecordatoriosVisita, 8000);
 
 function toggleVisita(diaKey, neg){
-  var key = claveVisitas(diaKey);
+  var key = 'visitas_'+diaKey+'_'+fechaMasRecienteParaDia(diaKey);
   var visitas = LS(key,[]);
-  var idx = idxVisita(visitas, neg);
-  if(idx >= 0) visitas.splice(idx,1);
-  else visitas.push({ n: neg, h: horaAhoraTxt(), t: Date.now() });
+  var idx = posVisita(visitas, neg);
+  if(idx >= 0){
+    visitas.splice(idx,1);
+  } else {
+    // Se guarda con la HORA de este momento (23 jul)
+    visitas.push({ n: neg, h: horaAhora12() });
+    cancelarRecordatorioBarberia(neg);   // ya la marcaste, no hace falta recordarte
+  }
   SS(key, visitas);
-  limpiarLlegada(neg);
   renderRutaDia(diaKey);
 }
 
@@ -19976,9 +19781,6 @@ function procesarDevolucion(vid){
 
   if(!itemsDevueltos.length){ alert('Indica al menos una cantidad a devolver.'); return; }
 
-  // Una devolucion mueve dinero e inventario: candado de huella -23 jul 2026-
-  if(!conHuella('devolucion', function(){ procesarDevolucion(vid); })) return;
-
   var itemsNuevos = esCambio ? (window._cambioItems||[]) : [];
   var totalNuevo = itemsNuevos.reduce(function(s,it){ return s+(it.cant*it.precio); },0);
 
@@ -20279,8 +20081,6 @@ function deshacerDevolucion(devId){
     ? '\nProducto que se había entregado a cambio: '+d.itemsNuevos.map(function(it){ return it.nombre+' x'+it.cant; }).join(', ')
     : '';
   if(!confirm('¿Deshacer esta devolución del '+d.fecha+'?\n\nProducto(s) devuelto(s) en su momento: '+resumenItems+resumenCambio+'\nMonto: $'+fmtNum(d.monto)+'\n\nEsto va a: restaurar el inventario a como estaba antes de la devolución, y quitar el crédito o pago que se haya generado por ella.\n\n¿Continuar?')) return;
-
-  if(!conHuella('deshacerDevolucion', function(){ deshacerDevolucion(devId); })) return;
 
   loadProds();
   // Revertir el inventario: lo que se habia restaurado -por ser devuelto- se vuelve a descontar;
@@ -21217,13 +21017,17 @@ function verHistorialCliente(cid, modo){
   <button onclick="cerrarIntegridad()" style="width:100%;padding:16px;border:none;border-radius:12px;background:#1a237e;color:#fff;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit;margin-top:12px;flex:0 0 auto">Cerrar</button>
 </div>
 
-<div id="lleg-ov" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:99996;align-items:center;justify-content:center;padding:18px">
-  <div id="lleg-box" style="background:#fff;border-radius:16px;max-width:340px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,0.4)">
-    <div style="font-size:17.5px;font-weight:900;color:#1a237e;text-align:center;margin-bottom:8px">&#9200; &#191;Ya terminaste?</div>
-    <div id="lleg-txt" style="font-size:14.5px;color:#333;text-align:center;margin-bottom:15px;line-height:1.4"></div>
-    <button onclick="llegadaSiTermine()" style="width:100%;padding:13px;background:#2E7D32;color:#fff;border:none;border-radius:11px;font-size:16px;font-weight:800;cursor:pointer;margin-bottom:9px">&#10003; S&#237;, marcar visitada</button>
-    <button onclick="llegadaPosponer()" style="width:100%;padding:12px;background:#fff;color:#555;border:1.5px solid #ccc;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer">&#9200; Todav&#237;a no &#8212; en 10 min</button>
-  </div>
+
+<!-- Fondo del recordatorio de visita (se restauro el 23 jul: se habia perdido
+     al limpiar el sistema viejo, y sin el la ventana no llegaba a mostrarse) -->
+<div id="recvis-ov" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.6);z-index:99994"></div>
+<div id="recvis-caja" style="display:none;position:fixed;left:7%;right:7%;top:50%;transform:translateY(-50%);z-index:99995;background:#fff;border-radius:18px;padding:24px 20px 20px;box-shadow:0 12px 44px rgba(0,0,0,.45);text-align:center">
+  <div style="font-size:42px;line-height:1">&#128336;</div>
+  <div style="font-size:19px;font-weight:800;color:#1a237e;margin:10px 0 4px;line-height:1.3">&iquest;Ya terminaste en</div>
+  <div id="recvis-neg" style="font-size:19px;font-weight:900;color:#2E7D32;line-height:1.25;margin-bottom:6px"></div>
+  <div id="recvis-min" style="font-size:14px;color:#777;margin-bottom:20px"></div>
+  <button onclick="recvisMarcar()" style="width:100%;padding:16px;border:none;border-radius:13px;background:#2E7D32;color:#fff;font-size:18px;font-weight:800;cursor:pointer;margin-bottom:10px;font-family:inherit">&#10003;&nbsp; S&iacute;, marcar visitada</button>
+  <button onclick="recvisPosponer()" style="width:100%;padding:15px;border:2px solid #d5d8e8;border-radius:13px;background:#fff;color:#444;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;line-height:1.35">&#9200;&nbsp; Todav&iacute;a no<br><span style="font-size:13.5px;font-weight:600;color:#888">Recu&eacute;rdame en 10 minutos</span></button>
 </div>
 </body>
 </html>

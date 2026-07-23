@@ -1,0 +1,74 @@
+NBS 2 - RUTAS: BACKUP, HORAS Y RECORDATORIO
+23 de julio de 2026
+
+SOLO 3 ARCHIVOS:
+  index.html · app_prueba_firebase.html · sw.js
+
+═══════════════════════════════════════
+1) LAS RUTAS YA SE GUARDAN EN EL BACKUP
+═══════════════════════════════════════
+POR ESO SE PERDIERON antes: las rutas nunca iban en el
+respaldo. Al pasar el backup de la app vieja a la nueva
+quedaban vacias.
+
+AHORA el respaldo guarda:
+   - El orden de tus barberias de cada dia
+   - Todas las visitas marcadas, con su hora
+
+Probado: se guardan las 7 barberias del miercoles, se
+borra todo, se restaura, y vuelven las 7 en el mismo
+orden y con sus horas.
+
+═══════════════════════════════════════
+2) CADA VISITA GUARDA SU HORA
+═══════════════════════════════════════
+   |------------------------------------|
+   | ⬆  1  🏪 MODERN CUTS BARBERSHOP    |
+   |        🕐 1:18 PM  ✏️              |
+   |    🗺  [ ✓ Visitada ]  ✕           |
+   |------------------------------------|
+
+Al marcar "Visitada" guarda la hora sola.
+Y el lapiz ✏️ te deja corregirla si se te olvido marcar.
+
+Las visitas viejas (sin hora) se siguen viendo igual,
+no se pierde nada.
+
+═══════════════════════════════════════
+3) EL RECORDATORIO
+═══════════════════════════════════════
+A los 20 MINUTOS de llegar a una barberia, si todavia
+no la marcaste, sale esto:
+
+   +----------------------------------+
+   |              🕐                  |
+   |   Ya terminaste en               |
+   |   MODERN CUTS BARBERSHOP?        |
+   |   Llegaste hace 20 minutos       |
+   |                                  |
+   |  [ ✓ Si, marcar visitada ]       |
+   |  [ ⏰ Todavia no                 |
+   |     Recuerdame en 10 minutos ]   |
+   +----------------------------------+
+
+La app sabe que llegaste cuando registras la primera
+venta o pedido a un barbero de esa barberia.
+
+Si tocas "Todavia no", te lo recuerda en 10 minutos.
+Si la marcas, ya no te molesta mas.
+
+═══════════════════════════════════════
+ADEMAS SE LIMPIO UN PROBLEMA
+═══════════════════════════════════════
+Habian quedado DOS sistemas de recordatorio duplicados
+peleandose entre si. Se dejo solo el que funciona.
+
+PROBADO:
+  - Marcar visitada guarda la hora
+  - Editar la hora funciona
+  - El aviso sale a los 20 min
+  - Posponer lo corre 10 minutos exactos
+  - Al marcarla, deja de molestar
+  - El backup guarda y restaura todo
+  - Las 27 pantallas, ninguna se queda pegada
+  - Auditoria: 22 pantallas, cero errores
