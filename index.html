@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260723c-OFICIAL-V2.0">
+<meta name="app-version" content="20260723d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -6554,6 +6554,20 @@ function puntajeBusqueda(textoProducto, consulta){
 
   for(var i=0; i<palabrasConsulta.length; i++){
     var pal = palabrasConsulta[i];
+
+    // REGLA NUEVA -23 jul 2026-: una palabra de 1 o 2 letras solo cuenta si EMPIEZA
+    // una palabra de verdad. Antes se buscaba metida en cualquier parte, y por eso al
+    // buscar "RD BARBERSHOP" salian barberos de otras barberias: Yo-RD-y, Go-RD-on,
+    // Be-RD-ecia, Edwa-RD... todos llevan "rd" adentro del nombre.
+    if(pal.length <= 2){
+      var empiezaPalabra = false;
+      for(var jc=0; jc<palabrasProducto.length; jc++){
+        if(palabrasProducto[jc].indexOf(pal) === 0){ empiezaPalabra = true; break; }
+      }
+      if(empiezaPalabra){ puntaje += 10; continue; }
+      return -1;
+    }
+
     if(normProd.indexOf(pal) >= 0){ puntaje += 10; continue; } // la palabra esta, en cualquier orden
 
     // Si no esta tal cual, buscar la palabra MAS parecida del producto y premiar segun
@@ -6577,6 +6591,16 @@ function filtrarPorBusqueda(lista, consulta, sacarTexto){
     var p = puntajeBusqueda(sacarTexto(lista[i]), consulta);
     if(p >= 0) conPuntaje.push({ item: lista[i], puntaje: p, orden: i });
   }
+
+  // REGLA NUEVA -23 jul 2026-: si hay resultados que calzan con la frase EXACTA que
+  // escribiste -puntaje 100-, se muestran SOLO esos. Los "parecidos" salen unicamente
+  // cuando NADA calza exacto, para que se siga perdonando "jonson" -> Johnson.
+  var exactos = [];
+  for(var ie=0; ie<conPuntaje.length; ie++){
+    if(conPuntaje[ie].puntaje >= 100) exactos.push(conPuntaje[ie]);
+  }
+  if(exactos.length) conPuntaje = exactos;
+
   conPuntaje.sort(function(a,b){
     if(b.puntaje !== a.puntaje) return b.puntaje - a.puntaje;
     return a.orden - b.orden; // si empatan, respetar el orden original -alfabetico-
@@ -15361,6 +15385,39 @@ function guardarEdicionFactura(vid){
     if(fparts.length === 3) ventas[idx].fecha = fparts[1]+'/'+fparts[2]+'/'+fparts[0]; // guardar como MM/DD/YYYY
   }
   var totalDespues = ventas[idx].items.reduce(function(s,it){ return s+(it.cant*it.precio); },0);
+  ventas[idx].subtotal = totalDespues;
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // EL DESCUENTO YA NO SE PIERDE  -arreglado el 23 jul 2026-
+  // Antes, al editar una factura se volvia a sumar el precio de los productos y se
+  // guardaba ESE total, sin mirar el descuento. O sea: si la factura tenia un descuento,
+  // desaparecia en silencio y el cliente quedaba debiendo de mas. Ahora se vuelve a
+  // aplicar, se avisa con el desglose, y se puede quitar a proposito.
+  // ═══════════════════════════════════════════════════════════════════════════════
+  var descFac = ventas[idx].descuento;
+  if(descFac && (descFac.valor > 0.005 || descFac.monto > 0.005)){
+    var montoDesc = 0;
+    if(descFac.tipo === 'pct') montoDesc = totalDespues * ((descFac.valor || 0)/100);
+    else montoDesc = Math.min((descFac.valor || descFac.monto || 0), totalDespues);
+    montoDesc = Math.max(0, Math.min(montoDesc, totalDespues));
+
+    var msgDesc = 'Esta factura ten\u00eda un DESCUENTO de $'+fmtNum(montoDesc)+'.\n\n'
+                + 'Productos:  $'+fmtNum(totalDespues)+'\n'
+                + 'Descuento: -$'+fmtNum(montoDesc)+'\n'
+                + 'TOTAL:      $'+fmtNum(totalDespues - montoDesc)+'\n\n'
+                + '\u00bfMantener el descuento?\n\n'
+                + 'Aceptar = s\u00ed, mantenerlo\n'
+                + 'Cancelar = quitarlo -el total queda en $'+fmtNum(totalDespues)+'-';
+
+    if(confirm(msgDesc)){
+      descFac.monto = montoDesc;
+      ventas[idx].descuento = descFac;
+      totalDespues = totalDespues - montoDesc;
+    } else {
+      ventas[idx].descuento = null;   // lo quito a proposito
+    }
+  }
+
   ventas[idx].total = totalDespues;
 
   var mensajeExtra = '';
