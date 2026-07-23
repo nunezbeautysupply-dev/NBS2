@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722u-OFICIAL-V2.0">
+<meta name="app-version" content="20260722x-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -651,7 +651,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       </div>
     </div>
     <button onclick="cambiarPinAdmin()" style="width:100%;margin-top:8px;background:none;border:1px solid var(--nbs-muted);color:var(--nbs-ink);padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">🔑 Cambiar mi PIN secreto</button>
-    <button id="btn-huella" onclick="activarHuella()" style="width:100%;margin-top:14px;background:none;border:1px solid var(--nbs-gold, #D4A017);color:var(--nbs-gold-dark, #8a6a10);padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">👆 Activar huella digital</button>
+    <button id="btn-huella-config" onclick="activarHuella()" style="width:100%;margin-top:14px;background:none;border:1px solid var(--nbs-gold, #D4A017);color:var(--nbs-gold-dark, #8a6a10);padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">👆 Activar huella digital</button>
     <div style="background:#F5F3EF;border-radius:10px;padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
       <span style="font-size:12px;font-weight:600;color:var(--nbs-ink)">🔒 Bloquear tras</span>
       <select id="sel-minutos-bloqueo" onchange="cambiarMinutosBloqueo(this.value)" style="border:0.5px solid #ddd;border-radius:7px;padding:5px 6px;font-size:12px;background:white"></select>
@@ -16245,7 +16245,13 @@ function desactivarHuella(){
 }
 
 function actualizarBotonHuella(){
-  var btn = document.getElementById('btn-huella');
+  // OJO (arreglado 22 jul): antes buscaba 'btn-huella', pero ESE id estaba
+  // repetido: existia igual en la pantalla de bloqueo. Como getElementById
+  // devuelve el PRIMERO, esta funcion le cambiaba el texto y el onclick al
+  // boton EQUIVOCADO — el de desbloquear pasaba a decir "Quitar huella
+  // digital" y, si Sensei lo tocaba, le BORRABA la huella en vez de
+  // reintentarla. Ahora apunta solo al del menu de seguridad.
+  var btn = document.getElementById('btn-huella-config');
   if(!btn) return;
   if(hayHuellaRegistrada()){
     btn.textContent = '👆 Quitar huella digital';
@@ -16292,9 +16298,27 @@ function mostrarOpcionesDeBloqueo(){
   var b1 = document.getElementById('btn-huella');
   var b2 = document.getElementById('btn-contrasena');
   var msg = document.getElementById('bloqueo-msg');
-  if(b1) b1.style.display = '';
+  if(b1){
+    b1.style.display = '';
+    // Que diga exactamente lo que hace, y que lo haga (pedido de Sensei)
+    b1.innerHTML = '\ud83d\udc46 Intentar de nuevo con la huella';
+    b1.setAttribute('onclick', 'reintentarHuella()');
+    b1.onclick = reintentarHuella;
+    b1.style.background = 'var(--nbs-gold,#D4A017)';
+    b1.style.color = '#fff';
+    b1.style.borderColor = '';
+  }
   if(b2) b2.style.display = '';
-  if(msg) msg.textContent = 'Puedes intentar la huella otra vez o entrar con tu contrase\u00f1a';
+  if(msg) msg.textContent = 'Toca el bot\u00f3n para poner tu huella de nuevo';
+}
+
+// Vuelve a pedir la huella desde la pantalla de bloqueo
+function reintentarHuella(){
+  var err = document.getElementById('bloqueo-error');
+  if(err) err.style.display = 'none';
+  var msg = document.getElementById('bloqueo-msg');
+  if(msg) msg.textContent = 'Pon tu huella...';
+  desbloquearConHuella();
 }
 
 function desbloquearConHuella(){
@@ -17523,6 +17547,7 @@ function pintarDetalleClientes(d0, d1, dentro){
     var c = clientes.filter(function(y){ return String(y.id) === cid; })[0];
     filas.push({
       nombre: c ? ((c.nombre||'')+' '+(c.apellido||'')).trim() : 'Cliente general',
+      apodo: c ? (c.apodo || '') : '',
       negocio: c ? (c.negocio || '') : '',
       pago: x.pago, cogio: x.cogio, bce: x.bce
     });
@@ -17536,7 +17561,9 @@ function pintarDetalleClientes(d0, d1, dentro){
 
   el.innerHTML = filas.map(function(f){
     return '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:11px;padding:10px 12px;margin-bottom:7px">'
-      + '<div style="font-size:15.5px;font-weight:800;color:#1a237e;line-height:1.2">'+escaparHtml(f.nombre.toUpperCase())+'</div>'
+      + '<div style="font-size:15.5px;font-weight:800;color:#1a237e;line-height:1.2">'+escaparHtml(f.nombre.toUpperCase())
+      +   (f.apodo ? ' <span style="color:#A63D2F;font-weight:700">('+escaparHtml(f.apodo)+')</span>' : '')
+      + '</div>'
       + (f.negocio ? '<div style="font-size:11.5px;color:#8a8f9e;margin-bottom:5px">'+escaparHtml(f.negocio)+'</div>' : '<div style="margin-bottom:5px"></div>')
       + '<div style="display:flex;gap:6px">'
       +   '<div style="flex:1;background:#E8F5E9;border-radius:7px;padding:5px 7px;text-align:center">'
