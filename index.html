@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722o-OFICIAL-V2.0">
+<meta name="app-version" content="20260722t-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -389,6 +389,13 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
 #p-inicio .ini-resumen{ color:#B9B9C9; }
 #p-inicio .ini-linea{ background:#3E3E52; }
 /* -estilo viejo de los botones de inicio, reemplazado el 18 jul 2026- */
+  /* ── Cobrado y Vendido: que nunca se corten ni desborden (22 jul) ──
+     Las cantidades y la miniatura se achican solas segun el ancho del telefono. */
+  #res-cobrado, #res-vendido{ font-size:19px }
+  @media (max-width:400px){ #res-cobrado, #res-vendido{ font-size:17px } }
+  @media (max-width:345px){ #res-cobrado, #res-vendido{ font-size:15px } }
+  @media (max-width:365px){ #mini-res-txt{ font-size:10.5px } }
+  #mini-resumen{ box-sizing:border-box }
 </style>
 
 <style media="print">
@@ -509,6 +516,17 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
   <div style="width:38px"></div>
 </div>
 
+<!-- MINIATURA de Cobrado y Vendido — debajo de la barra de arriba, se ve en TODAS
+     las pantallas (pedido por Sensei, 22 jul). Se toca y abre la pantalla completa.
+     Va dentro de un contenedor con padding para que nunca se salga de la pantalla. -->
+<div style="padding:0 12px 8px;box-sizing:border-box;width:100%">
+  <button onclick="ir('p-resumen')" id="mini-resumen" style="display:flex;align-items:center;gap:6px;width:100%;box-sizing:border-box;background:linear-gradient(90deg,#2E7D32,#388E3C);border:none;border-radius:9px;padding:7px 10px;margin:0;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(46,125,50,.22)">
+    <span style="font-size:13px;flex:0 0 auto">💰</span>
+    <span id="mini-res-txt" style="flex:1;text-align:left;font-size:12px;color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15;min-width:0">Cobr&eacute; $0.00 &nbsp;&middot;&nbsp; Vend&iacute; $0.00</span>
+    <span style="font-size:13px;color:#c8f0cd;flex:0 0 auto">›</span>
+  </button>
+</div>
+
 <!-- Overlay del menú lateral -->
 <div id="menu-lateral-overlay" onclick="cerrarMenuLateral()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:9998"></div>
 
@@ -522,7 +540,6 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <img src="icon-512.png" alt="NBS" style="width:92px;height:92px;object-fit:contain">
     <div class="ini-nombre" style="font-size:21px;font-weight:900;margin-top:10px;letter-spacing:-0.3px">Nunez Beauty Supply</div>
     <div style="display:inline-block;margin-top:8px;background:#2E7D32;color:white;font-size:13px;font-weight:800;letter-spacing:0.5px;padding:5px 16px;border-radius:20px;box-shadow:0 2px 6px rgba(46,125,50,0.3)">NBS 2 · APP OFICIAL</div>
-    <div id="inicio-resumen" class="ini-resumen" style="font-size:12.5px;margin-top:5px;font-weight:600">&nbsp;</div>
   </div>
 
   <button onclick="abrirAyuda()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:#F3E5F5;color:#6A1B9A;border:1px solid #E1BEE7;border-radius:10px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:10px">
@@ -532,13 +549,6 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
 
   <!-- MINIATURA de Cobrado y Vendido (22 jul): ocupa poco, muestra lo de hoy
        de un vistazo, y al tocarla se abre la pantalla completa. -->
-  <!-- MINIATURA de Cobrado y Vendido: un solo renglon delgado, para que no estorbe.
-       Se toca y se abre la pantalla completa. Achicada a pedido de Sensei (22 jul). -->
-  <button onclick="ir('p-resumen')" id="mini-resumen" style="width:100%;display:flex;align-items:center;gap:6px;background:linear-gradient(90deg,#2E7D32,#388E3C);border:none;border-radius:9px;padding:7px 10px;margin-bottom:10px;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(46,125,50,.22)">
-    <span style="font-size:13px;flex:0 0 auto">💰</span>
-    <span id="mini-res-txt" style="flex:1;text-align:left;font-size:12px;color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15">Cobr&eacute; $0.00 &nbsp;&middot;&nbsp; Vend&iacute; $0.00</span>
-    <span style="font-size:13px;color:#c8f0cd;flex:0 0 auto">›</span>
-  </button>
 
   <button onclick="ir('p-ped')" class="ini-btn" style="--c:#D4A017;--cb:#FFF6DF">
     <span class="ini-ico">⚡</span>
@@ -1001,7 +1011,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
 <div id="p-resumen" class="pg">
   <div style="display:flex;gap:8px;margin-bottom:14px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
 
-  <h2 style="font-size:23px;font-weight:800;color:#1a237e;margin-bottom:12px;text-align:center">💰 Cobrado y Vendido</h2>
+  <h2 style="font-size:19px;font-weight:800;color:#1a237e;margin-bottom:10px;text-align:center">Cobrado y Vendido</h2>
 
   <div style="display:flex;gap:6px;margin-bottom:12px">
     <button class="rng-btn rng-on" data-r="hoy" style="flex:1">HOY</button>
@@ -1011,26 +1021,29 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
   </div>
 
   <div style="display:flex;gap:8px;margin-bottom:16px">
-    <div style="flex:1">
+    <div style="flex:1;min-width:0">
       <label style="font-size:12.5px;color:#666;font-weight:800;display:block;margin-bottom:4px">DESDE</label>
-      <input id="res-desde" type="date" class="inp" style="width:100%;font-size:16px;margin:0">
+      <input id="res-desde" type="date" class="inp" style="width:100%;font-size:15px;margin:0;box-sizing:border-box;max-width:100%">
     </div>
-    <div style="flex:1">
+    <div style="flex:1;min-width:0">
       <label style="font-size:12.5px;color:#666;font-weight:800;display:block;margin-bottom:4px">HASTA</label>
-      <input id="res-hasta" type="date" class="inp" style="width:100%;font-size:16px;margin:0">
+      <input id="res-hasta" type="date" class="inp" style="width:100%;font-size:15px;margin:0;box-sizing:border-box;max-width:100%">
     </div>
   </div>
 
-  <div style="background:linear-gradient(135deg,#2E7D32,#43A047);border-radius:16px;padding:20px 18px;margin-bottom:12px;box-shadow:0 4px 14px rgba(46,125,50,.3)">
-    <div style="font-size:13px;color:#c8f0cd;font-weight:800;letter-spacing:1px">💵 COBRADO</div>
-    <div id="res-cobrado" style="font-size:38px;font-weight:900;color:#fff;line-height:1.1;margin:4px 0">$0.00</div>
-    <div id="res-cobrado-n" style="font-size:14px;color:#d6f5da;font-weight:600">0 cobros</div>
-  </div>
-
-  <div style="background:linear-gradient(135deg,#1565C0,#1976D2);border-radius:16px;padding:20px 18px;margin-bottom:16px;box-shadow:0 4px 14px rgba(21,101,192,.3)">
-    <div style="font-size:13px;color:#c5dcf5;font-weight:800;letter-spacing:1px">🧾 VENDIDO</div>
-    <div id="res-vendido" style="font-size:38px;font-weight:900;color:#fff;line-height:1.1;margin:4px 0">$0.00</div>
-    <div id="res-vendido-n" style="font-size:14px;color:#d5e7f8;font-weight:600">0 ventas</div>
+  <!-- Fondos de color como antes (a Sensei le gustan), pero COMPACTAS: lo que sobraba
+       era el tamano, no el color. Padding chico y numeros de 19px. -->
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <div style="flex:1;background:linear-gradient(135deg,#2E7D32,#43A047);border-radius:11px;padding:9px 11px;box-shadow:0 2px 7px rgba(46,125,50,.25);min-width:0">
+      <div style="font-size:10.5px;color:#c8f0cd;font-weight:800;letter-spacing:.5px">💵 COBRADO</div>
+      <div id="res-cobrado" style="font-weight:900;color:#fff;line-height:1.2;margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">$0.00</div>
+      <div id="res-cobrado-n" style="font-size:11px;color:#d6f5da;font-weight:600">0 cobros</div>
+    </div>
+    <div style="flex:1;background:linear-gradient(135deg,#1565C0,#1976D2);border-radius:11px;padding:9px 11px;box-shadow:0 2px 7px rgba(21,101,192,.25);min-width:0">
+      <div style="font-size:10.5px;color:#c5dcf5;font-weight:800;letter-spacing:.5px">🧾 VENDIDO</div>
+      <div id="res-vendido" style="font-weight:900;color:#fff;line-height:1.2;margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">$0.00</div>
+      <div id="res-vendido-n" style="font-size:11px;color:#d5e7f8;font-weight:600">0 ventas</div>
+    </div>
   </div>
 
   <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px 16px">
@@ -3084,7 +3097,8 @@ function ir(id, sinHistorial){
   // Si sale de la Academia, callar la voz para que no siga hablando en otra pantalla
   if(id!=='p-academia' && typeof acaPausar === 'function' && window._acaReproduciendo) acaPausar();
   if(id==='p-inventario') renderInventario('');
-  if(id==='p-inicio'){ renderInicio(); pintarMiniResumen(); }
+  if(id==='p-inicio'){ renderInicio(); }
+  pintarMiniResumen();   // la miniatura sale en todas las pantallas, se refresca siempre
   if(id==='p-relleno') abrirRelleno();
   if(id==='p-van') abrirVan();
   if(id==='p-copias') abrirCopias();
@@ -10354,21 +10368,10 @@ function renderAvisoPedidoEnProceso(){
 // Muestra un resumen de un vistazo -para saber como va el negocio sin entrar a nada- y
 // avisa si llevas rato sin bajar un respaldo.
 function renderInicio(){
+  // La linea de "X ventas - Y clientes - $Z por cobrar" se quito el 22 jul:
+  // era informacion repetida, la miniatura de arriba ya muestra lo del dia.
   var el = document.getElementById('inicio-resumen');
-  if(el){
-    var vts = LS('nv', []);
-    var activas = vts.filter(function(v){ return !v.cancelada; });
-    var porCobrar = 0;
-    activas.forEach(function(v){
-      var pag = (v.pagosFactura || []).reduce(function(s,p){
-        return s + (typeof p.monto === 'number' ? p.monto : 0);
-      }, 0);
-      var saldo = (v.total || 0) - pag;
-      if(saldo > 0.01) porCobrar += saldo;
-    });
-    var cls = LS('ncl', []).length;
-    el.textContent = activas.length + ' ventas · ' + cls + ' clientes · $' + fmtNum(porCobrar) + ' por cobrar';
-  }
+  if(el) el.style.display = 'none';
 
   // El boton de respaldo dice hace cuanto fue el ultimo, y se pone rojo si llevas mucho
   var sub = document.getElementById('inicio-respaldo-sub');
