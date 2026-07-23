@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260722n-OFICIAL-V2.0">
+<meta name="app-version" content="20260722o-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -530,10 +530,14 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <span>Ayuda — ¿Cómo hago tal cosa?</span>
   </button>
 
-  <button onclick="ir('p-resumen')" class="ini-btn" style="--c:#2E7D32;--cb:#E8F5E9">
-    <span class="ini-ico">💰</span>
-    <span class="ini-txt"><b>Cobrado y Vendido</b><i>Lo de hoy, al instante</i></span>
-    <span class="ini-fl">›</span>
+  <!-- MINIATURA de Cobrado y Vendido (22 jul): ocupa poco, muestra lo de hoy
+       de un vistazo, y al tocarla se abre la pantalla completa. -->
+  <!-- MINIATURA de Cobrado y Vendido: un solo renglon delgado, para que no estorbe.
+       Se toca y se abre la pantalla completa. Achicada a pedido de Sensei (22 jul). -->
+  <button onclick="ir('p-resumen')" id="mini-resumen" style="width:100%;display:flex;align-items:center;gap:6px;background:linear-gradient(90deg,#2E7D32,#388E3C);border:none;border-radius:9px;padding:7px 10px;margin-bottom:10px;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(46,125,50,.22)">
+    <span style="font-size:13px;flex:0 0 auto">💰</span>
+    <span id="mini-res-txt" style="flex:1;text-align:left;font-size:12px;color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15">Cobr&eacute; $0.00 &nbsp;&middot;&nbsp; Vend&iacute; $0.00</span>
+    <span style="font-size:13px;color:#c8f0cd;flex:0 0 auto">›</span>
   </button>
 
   <button onclick="ir('p-ped')" class="ini-btn" style="--c:#D4A017;--cb:#FFF6DF">
@@ -3080,7 +3084,7 @@ function ir(id, sinHistorial){
   // Si sale de la Academia, callar la voz para que no siga hablando en otra pantalla
   if(id!=='p-academia' && typeof acaPausar === 'function' && window._acaReproduciendo) acaPausar();
   if(id==='p-inventario') renderInventario('');
-  if(id==='p-inicio') renderInicio();
+  if(id==='p-inicio'){ renderInicio(); pintarMiniResumen(); }
   if(id==='p-relleno') abrirRelleno();
   if(id==='p-van') abrirVan();
   if(id==='p-copias') abrirCopias();
@@ -17440,6 +17444,34 @@ function ponerRango(cual){
   document.getElementById('res-hasta').value = hasta;
   marcarRango(cual);
   calcularResumen();
+}
+
+// La miniatura de la pantalla de inicio: calcula lo de HOY y lo muestra chiquito.
+// Al tocarla se abre la pantalla completa de Cobrado y Vendido.
+function pintarMiniResumen(){
+  var el = document.getElementById('mini-res-txt');
+  if(!el) return;
+  try{
+    var V = LS('nv', []);
+    var hoy = resHoyISO();
+    var d0 = resISOaDate(hoy), d1 = resISOaDate(hoy);
+    var cobrado = 0, vendido = 0;
+    function dentro(f){ var x = resFechaADate(f); return x && x >= d0 && x <= d1; }
+    V.forEach(function(v){
+      if(v.cancelada) return;
+      if(dentro(v.fecha)){
+        vendido += (v.total || 0);
+        if(v.tipo === 'contado') cobrado += (v.total || 0);
+      }
+      if(v.tipo === 'credito' && v.pagosFactura){
+        v.pagosFactura.forEach(function(p){
+          if(typeof p.monto !== 'number' || p.monto <= 0 || p.esDevolucion) return;
+          if(dentro(p.fecha || v.fecha)) cobrado += p.monto;
+        });
+      }
+    });
+    el.innerHTML = 'Cobr&eacute; <b>$'+fmtNum(cobrado)+'</b> &nbsp;&middot;&nbsp; Vend&iacute; <b>$'+fmtNum(vendido)+'</b>';
+  }catch(e){ el.textContent = 'Toca para ver lo de hoy'; }
 }
 
 function calcularResumen(){
