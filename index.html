@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260723d-OFICIAL-V2.0">
+<meta name="app-version" content="20260723e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10313,6 +10313,12 @@ function calcularBalancesClientes(){
   var total = {}, detalle = {};
   ventasTodas.forEach(function(v){
     if(v.cancelada) return;
+    // IMPORTANTE: solo las ventas A CRÉDITO pueden generar balance pendiente.
+    // Las de CONTADO se dan por cobradas al momento — igual que hace verCl() en el
+    // perfil del cliente. Antes esta función miraba TODAS las ventas por igual, y
+    // una venta de contado sin su pago completo en pagosFactura se contaba como
+    // deuda, aunque el cliente ya había pagado en el momento de la venta.
+    if(v.tipo !== 'credito') return;
     var pagado = (v.pagosFactura || []).reduce(function(s,p){
       return s + (typeof p.monto === 'number' ? p.monto : 0);
     }, 0);

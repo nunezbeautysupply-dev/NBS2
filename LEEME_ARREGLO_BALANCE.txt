@@ -1,0 +1,44 @@
+═══════════════════════════════════════════════════════════════
+  NBS 2 — ARREGLO: BALANCE FALSO EN PEDIDOS RÁPIDOS
+  23 de julio de 2026 — URGENTE
+═══════════════════════════════════════════════════════════════
+
+EL PROBLEMA QUE REPORTASTE
+En Pedidos Rápidos, algunos clientes (ej. Tropical Barbershop)
+aparecían con balance pendiente, pero su perfil mostraba $0.00
+correctamente.
+
+LA CAUSA REAL
+Había DOS funciones distintas calculando el balance de cada
+cliente, y no eran iguales:
+
+- El PERFIL del cliente (correcto): solo cuenta ventas A
+  CRÉDITO — crédito total menos lo pagado.
+- PEDIDOS RÁPIDOS (con el error): contaba TODAS las ventas,
+  incluyendo las de CONTADO. Si una venta de contado no tenía
+  su pago completo reflejado en el campo interno que se usa
+  para la cuenta, se contaba como deuda — aunque ya se hubiera
+  cobrado en el momento de la venta.
+
+EL ARREGLO
+Se corrigió la función de Pedidos Rápidos para que use
+EXACTAMENTE la misma regla que el perfil: solo las ventas A
+CRÉDITO pueden generar balance pendiente. Las de contado nunca
+cuentan como deuda.
+
+PROBADO (4 pruebas específicas, con Playwright):
+✅ Una venta de contado ya pagada → ya NO aparece como deuda
+✅ El perfil del cliente coincide con lo que muestra Pedidos
+   Rápidos
+✅ Una deuda real a crédito ($150 de $200) SÍ se sigue
+   mostrando correctamente — no se rompió nada
+✅ Un cliente con AMBOS tipos de venta (contado pagado +
+   crédito real) muestra solo la deuda real, no la de contado
+
+QUÉ HACER CON TROPICAL BARBERSHOP Y CUALQUIER OTRO CLIENTE
+QUE HAYA MOSTRADO ESTO
+Una vez subas esta corrección, entra de nuevo a Pedidos Rápidos
+y confirma que ya no salen con balance falso. No necesitas tocar
+nada de sus datos — el problema era solo de cómo se MOSTRABA el
+número, no de cómo estaba guardado. Sus ventas y pagos reales
+nunca se alteraron.
