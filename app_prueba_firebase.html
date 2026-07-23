@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260723a-OFICIAL-V2.0">
+<meta name="app-version" content="20260723b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -9434,6 +9434,7 @@ function saveV(){
   if(document.getElementById('vdesc-linea')) document.getElementById('vdesc-linea').style.display='none';
   SS('nv',ventas);
   SS('np',productos);
+  try{ if(cl && cl.negocio) marcarLlegada(cl.negocio, true); }catch(e){}
   window._firmaVentaActual = null; // limpiar la firma para la próxima venta
   window._firmaFechaActual = null;
   flash('mk-v');
@@ -10728,6 +10729,11 @@ function registrarVisitaBarbero(cid, compro){
   if(compro) visitas[k].compro.push(hoy);
   else visitas[k].noCompro.push(hoy);
   SS('nvisitas_barberos', visitas);
+  // Si le hizo un pedido a un barbero, es porque LLEGO a esa barberia -arranca el reloj-
+  try{
+    var clLleg = (LS('ncl',[]) || []).filter(function(c){ return String(c.id) === k; })[0];
+    if(clLleg && clLleg.negocio) marcarLlegada(clLleg.negocio, true);
+  }catch(e){}
 }
 
 function guardarTodosLosPedidosMultiples(){
@@ -11741,7 +11747,7 @@ function verFactura(v){
         var vr = ventas.find(function(x){ return x.id===vid; });
         if(!vr) return;
         if(!vr.pagosFactura) vr.pagosFactura = [];
-        vr.pagosFactura.push({ pid: nuevoPagoId(), monto: saldoFac, fecha: fechaHoy(), metodos:[{tipo:'efectivo', monto:saldoFac}] });
+        vr.pagosFactura.push({ pid: nuevoPagoId(), monto: saldoFac, fecha: fechaHoy(), hora: horaAhoraTxt(), metodos:[{tipo:'efectivo', monto:saldoFac}] });
         SS('nv', ventas);
         alert('✅ Pago de $'+fmtNum(saldoFac)+' en efectivo aplicado correctamente.');
         verFactura(vr);
@@ -11757,7 +11763,7 @@ function verFactura(v){
       var ventaReal = ventas.find(function(x){ return x.id===v.id; });
       if(!ventaReal) return;
       if(!ventaReal.pagosFactura) ventaReal.pagosFactura = [];
-      ventaReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy() });
+      ventaReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy(), hora: horaAhoraTxt() });
       SS('nv', ventas);
       alert('Pago de $'+fmtNum(monto)+' aplicado correctamente');
       verFactura(ventaReal);
@@ -13997,7 +14003,7 @@ function confirmarPagoMultiple(vid, saldo){
   // Caso normal: el pago cabe en esta factura
   if(total <= saldo + 0.01){
     if(!venta.pagosFactura) venta.pagosFactura = [];
-    venta.pagosFactura.push({ pid: nuevoPagoId(), monto: total, fecha: fechaHoy(), metodos: filas });
+    venta.pagosFactura.push({ pid: nuevoPagoId(), monto: total, fecha: fechaHoy(), hora: horaAhoraTxt(), metodos: filas });
     SS('nv', ventas);
     var detalle = filas.map(function(m){ return METODOS_PAGO_LABELS[m.tipo]+': $'+fmtNum(m.monto); }).join('\n');
     alert('✅ Pago de $'+fmtNum(total)+' aplicado correctamente.\n\n'+detalle);
@@ -14032,7 +14038,7 @@ function confirmarPagoMultiple(vid, saldo){
     // Si sobro dinero -el cliente ya no debe nada-, ese sobrante se queda en la factura
     // donde estas cobrando, para no perderlo del balance
     if(p.esLaActual && r.sinAplicar > 0.01) monto += r.sinAplicar;
-    var pago = { monto: monto, fecha: fechaPago };
+    var pago = { pid: nuevoPagoId(), monto: monto, fecha: fechaPago, hora: horaAhoraTxt() };
     if(p.esLaActual) pago.metodos = filas;
     else pago.nota = 'Sobrante del pago de $'+fmtNum(total)+' aplicado a la factura más vieja';
     v.pagosFactura.push(pago);
@@ -14434,7 +14440,7 @@ function verFacturaProfesional(vid){
       var vr = vv.find(function(x){ return String(x.id)===String(vid); });
       if(!vr){ alert('No se encontró la factura.'); return; }
       if(!vr.pagosFactura) vr.pagosFactura = [];
-      vr.pagosFactura.push({ pid: nuevoPagoId(), monto: saldo, fecha: fechaHoy(), metodos:[{tipo:'efectivo', monto:saldo}] });
+      vr.pagosFactura.push({ pid: nuevoPagoId(), monto: saldo, fecha: fechaHoy(), hora: horaAhoraTxt(), metodos:[{tipo:'efectivo', monto:saldo}] });
       SS('nv', vv);
       alert('✅ Pago de $'+fmtNum(saldo)+' en efectivo aplicado correctamente.');
       verFacturaProfesional(vid);
@@ -15384,22 +15390,34 @@ function guardarEdicionFactura(vid){
 
 
 function limpiarVentasHuerfanas(){
+  // Esto BORRA VENTAS -o sea, toca dinero-. Por eso primero dice exactamente que va a
+  // borrar y cuanto suma, y despues pide la huella. Antes borraba sin preguntar nada.
   clientes = LS('ncl', []);
   ventas = LS('nv', []);
   var idsClientes = clientes.map(function(c){ return String(c.id); });
-  var antes = ventas.length;
-  // Mantener ventas de cliente general (cid null/0) y de clientes existentes
-  ventas = ventas.filter(function(v){
-    if(!v.cid) return true; // cliente general, mantener
-    return idsClientes.includes(String(v.cid));
-  });
-  var eliminadas = antes - ventas.length;
-  if(eliminadas === 0){
-    alert('No se encontraron ventas de clientes eliminados.');
+  var esHuerfana = function(v){ return v.cid && !idsClientes.includes(String(v.cid)); };
+  var huerfanas = ventas.filter(esHuerfana);
+  if(huerfanas.length === 0){
+    avisoGrande('No se encontraron ventas de clientes eliminados.');
     return;
   }
-  SS('nv', ventas);
-  alert(eliminadas + ' venta(s) de clientes eliminados han sido borradas.');
+  var monto = huerfanas.reduce(function(s,v){ return s + (v.total || 0); }, 0);
+  var lista = huerfanas.slice(0,8).map(function(v){
+    return '\u2022 '+(v.cn || 'sin nombre')+' \u2014 $'+fmtNum(v.total || 0);
+  }).join('\n');
+  if(huerfanas.length > 8) lista += '\n\u2026 y '+(huerfanas.length-8)+' m\u00e1s';
+  var msg = '\u26a0\ufe0f SE VAN A BORRAR '+huerfanas.length+' VENTA(S)\n\n'
+          + 'Por un total de $'+fmtNum(monto)+'\n\n'+lista+'\n\n'
+          + 'Esto NO se puede deshacer. \u00bfSeguro?';
+  if(!confirm(msg)) return;
+  protegerConHuella(function(){
+    var lista2 = LS('nv', []);
+    var quedan = lista2.filter(function(v){ return !esHuerfana(v); });
+    var borradas = lista2.length - quedan.length;
+    SS('nv', quedan);
+    ventas = quedan;
+    avisoGrande('\u2705 Se borraron '+borradas+' venta(s) por $'+fmtNum(monto)+'.');
+  });
 }
 
 function borrarTodo(){
@@ -15785,9 +15803,19 @@ function exportD(){
   var devoluciones = LS('ndevoluciones', []);
   var productosEliminados = LS('np_eliminados', []);
   var visitasBarberos = LS('nvisitas_barberos', {});
+  // ── Las RUTAS -que barberia toca cada dia- y las VISITAS -cual se visito y a que hora-
+  //    no estaban en el respaldo, por eso se perdieron al pasar de una app a otra. Ya no.
+  var rutasPorDia = LS('rutas_por_dia', {});
+  var visitasRuta = {};
+  try{
+    for(var iVR = 0; iVR < localStorage.length; iVR++){
+      var kVR = localStorage.key(iVR);
+      if(kVR && kVR.indexOf('visitas_') === 0) visitasRuta[kVR] = LS(kVR, []);
+    }
+  }catch(e){}
   var d = {v:2, productos:productos, ventas:ventas, compras:compras, creditos:creditos, clientes:clientes, suplidores:suplidores, gastos:gastos,
     tarjetas:tarjetas, otrasDeudas:otrasDeudas, pedidos:pedidos, devoluciones:devoluciones, productosEliminados:productosEliminados,
-    visitasBarberos:visitasBarberos};
+    visitasBarberos:visitasBarberos, rutasPorDia:rutasPorDia, visitasRuta:visitasRuta};
   var json = JSON.stringify(d);
 
   // Registrar fecha del backup
@@ -15914,6 +15942,8 @@ function importD(inp){
       if(d.devoluciones){SS('ndevoluciones',d.devoluciones);}
       if(d.productosEliminados){SS('np_eliminados',d.productosEliminados);}
       if(d.visitasBarberos){SS('nvisitas_barberos',d.visitasBarberos);}
+      if(d.rutasPorDia){SS('rutas_por_dia', d.rutasPorDia);}
+      if(d.visitasRuta){ Object.keys(d.visitasRuta).forEach(function(kVR){ SS(kVR, d.visitasRuta[kVR]); }); }
       avisoGrande('Datos importados correctamente', function(){ ir('p-ped'); });
     }catch(err){alert('Error al importar');}
     inp.value='';
@@ -17425,7 +17455,12 @@ function resFechaADate(f){
   if(f.indexOf('-') > 0){ p = f.split('-'); return new Date(+p[0], +p[1]-1, +p[2], 12,0,0); }
   p = f.split('/');
   if(p.length !== 3) return null;
-  return new Date(+p[2], +p[0]-1, +p[1], 12,0,0);
+  var mes = +p[0], dia = +p[1];
+  // La app guarda MM/DD/AAAA. Pero quedaron unos pocos pagos viejos escritos al reves
+  // -24/6/2026, o sea DIA/MES-. Si el primer numero pasa de 12 no puede ser un mes,
+  // asi que se voltean y la fecha cae en el mes correcto.
+  if(mes > 12 && dia <= 12){ var tmpF = mes; mes = dia; dia = tmpF; }
+  return new Date(+p[2], mes-1, dia, 12,0,0);
 }
 function resISOaDate(iso){
   if(!iso) return null;
@@ -17514,6 +17549,31 @@ function pintarMiniResumen(){
 }
 
 // Detalle por cliente: quien pago, cuanto cogio y como quedo el balance
+// Saca el momento exacto guardado dentro del codigo de un pago -el pid trae la hora-
+function tsDePid(pid){
+  if(!pid) return 0;
+  var s = String(pid);
+  if(s.charAt(0) !== 'p' || s.length <= 7) return 0;
+  var t = parseInt(s.slice(1, s.length-6), 36);
+  if(!t || t < 1500000000000 || t > Date.now() + 86400000) return 0;
+  return t;
+}
+function tsAHora(t){
+  return new Date(t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+}
+function horaDeVenta(v){
+  if(v && v.hora) return v.hora;
+  var t = +(v && v.id);
+  if(t > 1500000000000 && t < Date.now() + 86400000) return tsAHora(t);
+  return '';
+}
+function horaDePago(p, v){
+  if(p && p.hora) return p.hora;
+  var t = tsDePid(p && p.pid);
+  if(t) return tsAHora(t);
+  return '';
+}
+
 function pintarDetalleClientes(d0, d1, dentro){
   var el = document.getElementById('res-detalle');
   if(!el) return;
@@ -17523,10 +17583,19 @@ function pintarDetalleClientes(d0, d1, dentro){
   ventas.forEach(function(v){
     if(v.cancelada) return;
     var cid = String(v.cid || 'general');
-    if(!porCli[cid]) porCli[cid] = { pago:0, cogio:0, bce:0 };
+    if(!porCli[cid]) porCli[cid] = { pago:0, cogio:0, bce:0, min:-1, hora:'' };
+
+    // Guarda la hora MAS TEMPRANA del cliente dentro del rango, para poder ordenar
+    // la lista igual que la ruta -parada por parada, en el orden en que paso-
+    function anotarHora(hTxt){
+      if(!hTxt) return;
+      var m = horaAMinutos(hTxt);
+      if(m < 0) return;
+      if(porCli[cid].min < 0 || m < porCli[cid].min){ porCli[cid].min = m; porCli[cid].hora = hTxt; }
+    }
 
     // COGIO: lo que se llevo en mercancia en el rango
-    if(dentro(v.fecha)) porCli[cid].cogio += (v.total || 0);
+    if(dentro(v.fecha)){ porCli[cid].cogio += (v.total || 0); anotarHora(horaDeVenta(v)); }
 
     // PAGO: contado del rango + abonos pagados en el rango
     if(v.tipo === 'contado'){
@@ -17534,7 +17603,7 @@ function pintarDetalleClientes(d0, d1, dentro){
     } else {
       (v.pagosFactura || []).forEach(function(p){
         if(typeof p.monto !== 'number' || p.monto <= 0 || p.esDevolucion) return;
-        if(dentro(p.fecha || v.fecha)) porCli[cid].pago += p.monto;
+        if(dentro(p.fecha || v.fecha)){ porCli[cid].pago += p.monto; anotarHora(horaDePago(p, v)); }
       });
     }
   });
@@ -17558,18 +17627,34 @@ function pintarDetalleClientes(d0, d1, dentro){
       nombre: c ? ((c.nombre||'')+' '+(c.apellido||'')).trim() : 'Cliente general',
       apodo: c ? (c.apodo || '') : '',
       negocio: c ? (c.negocio || '') : '',
-      pago: x.pago, cogio: x.cogio, bce: x.bce
+      pago: x.pago, cogio: x.cogio, bce: x.bce, min: x.min, hora: x.hora
     });
   });
-  filas.sort(function(a,b){ return b.pago - a.pago; });
+  // Orden: por HORA -como fue la ruta-. Los que no tienen hora se van al final.
+  filas.sort(function(a,b){
+    if(a.min < 0 && b.min < 0) return b.pago - a.pago;
+    if(a.min < 0) return 1;
+    if(b.min < 0) return -1;
+    return a.min - b.min;
+  });
 
   if(!filas.length){
     el.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:14px">Sin movimientos en estas fechas</div>';
     return;
   }
 
+  var yaPuseSeparador = false;
   el.innerHTML = filas.map(function(f){
-    return '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:11px;padding:10px 12px;margin-bottom:7px">'
+    var sep = '';
+    if(f.min < 0 && !yaPuseSeparador){
+      yaPuseSeparador = true;
+      sep = '<div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px"><div style="flex:1;height:1px;background:#e0e0e0"></div>'
+          + '<div style="font-size:10.5px;font-weight:800;color:#a0a4b0;letter-spacing:0.5px">SIN HORA</div>'
+          + '<div style="flex:1;height:1px;background:#e0e0e0"></div></div>';
+    }
+    return sep
+      + '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:11px;padding:10px 12px;margin-bottom:7px">'
+      + (f.hora ? '<div style="font-size:11.5px;font-weight:800;color:#E65100;margin-bottom:2px">🕐 '+escaparHtml(f.hora)+'</div>' : '')
       + '<div style="font-size:15.5px;font-weight:800;color:#1a237e;line-height:1.2">'+escaparHtml(f.nombre.toUpperCase())
       +   (f.apodo ? ' <span style="color:#A63D2F;font-weight:700">('+escaparHtml(f.apodo)+')</span>' : '')
       + '</div>'
@@ -18895,7 +18980,9 @@ function renderRutaDia(diaKey){
     el.appendChild(empty);
   } else {
     rutaHoy.forEach(function(neg, idx){
-      var visitada = visitas.indexOf(neg) >= 0;
+      var visitada = idxVisita(visitas, neg) >= 0;
+      var horaVis = visitada ? visHora(visitas[idxVisita(visitas, neg)]) : '';
+      var llegadaAqui = (function(){ var a = LS(CLAVE_LLEGADA, null); return (a && a.neg === neg && a.dia === diaKey); })();
       var esHuerfana = !barberias[neg]; // ya no hay ningun cliente con este nombre de negocio
       var row = document.createElement('div');
       row.style.cssText = 'background:'+(esHuerfana?'#FFF3E0':'white')+';border-radius:12px;padding:12px 14px;margin-bottom:6px;border:0.5px solid '+(esHuerfana?'#FFCC80':visitada?'#A5D6A7':'#e5e7eb')+';display:flex;align-items:center;gap:10px';
@@ -18911,7 +18998,24 @@ function renderRutaDia(diaKey){
 
       var nameDiv = document.createElement('div');
       nameDiv.style.cssText = 'flex:1;font-size:14px;font-weight:700;color:'+(esHuerfana?'#E65100':visitada?'#2E7D32':'#1a237e');
-      nameDiv.innerHTML = '🏪 '+neg+(esHuerfana?'<div style="font-size:10px;font-weight:600;color:#E65100;margin-top:2px">⚠️ Ya no hay ningún cliente con este negocio -¿se renombró o se eliminó?</div>':'');
+      nameDiv.innerHTML = '🏪 '+escaparHtml(neg)+(esHuerfana?'<div style="font-size:10px;font-weight:600;color:#E65100;margin-top:2px">⚠️ Ya no hay ningún cliente con este negocio -¿se renombró o se eliminó?</div>':'');
+      if(visitada){
+        var lineaHora = document.createElement('div');
+        lineaHora.style.cssText = 'font-size:12px;font-weight:700;color:#2E7D32;margin-top:3px;display:flex;align-items:center;gap:6px';
+        lineaHora.innerHTML = '<span>🕐 '+escaparHtml(horaVis || 'sin hora')+'</span>';
+        var lapiz = document.createElement('button');
+        lapiz.textContent = '✏️';
+        lapiz.title = 'Cambiar la hora';
+        lapiz.style.cssText = 'background:#E8F5E9;border:none;border-radius:6px;padding:1px 5px;cursor:pointer;font-size:11px;line-height:1.4';
+        lapiz.onclick = (function(dk,n){ return function(ev){ ev.stopPropagation(); editarHoraVisita(dk,n); }; })(diaKey, neg);
+        lineaHora.appendChild(lapiz);
+        nameDiv.appendChild(lineaHora);
+      } else if(llegadaAqui){
+        var lineaLleg = document.createElement('div');
+        lineaLleg.style.cssText = 'font-size:11.5px;font-weight:700;color:#E65100;margin-top:3px';
+        lineaLleg.textContent = '🚩 Llegaste — te aviso en un rato';
+        nameDiv.appendChild(lineaLleg);
+      }
 
       var btnVis = document.createElement('button');
       btnVis.textContent = visitada ? '✓ Visitada' : 'Marcar';
@@ -18932,6 +19036,14 @@ function renderRutaDia(diaKey){
       row.appendChild(btnUp);
       row.appendChild(numDiv);
       row.appendChild(nameDiv);
+      if(!visitada && !llegadaAqui){
+        var btnLleg = document.createElement('button');
+        btnLleg.textContent = '🚩';
+        btnLleg.title = 'Llegué a esta barbería';
+        btnLleg.style.cssText = 'background:#FFF3E0;color:#E65100;border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:15px;flex-shrink:0';
+        btnLleg.onclick = (function(n){ return function(){ marcarLlegada(n, false); }; })(neg);
+        row.appendChild(btnLleg);
+      }
       row.appendChild(btnNav);
       row.appendChild(btnVis);
       row.appendChild(btnQuit);
@@ -19046,13 +19158,150 @@ function quitarDeDia(diaKey, neg){
   renderRutaDia(diaKey);
 }
 
-function toggleVisita(diaKey, neg){
-  var key = 'visitas_'+diaKey+'_'+fechaMasRecienteParaDia(diaKey);
-  var visitas = LS(key,[]);
-  var idx = visitas.indexOf(neg);
-  if(idx >= 0) visitas.splice(idx,1);
-  else visitas.push(neg);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HORA DE LAS VISITAS DE LA RUTA  (23 jul 2026, pedido por Sensei)
+// Antes cada visita se guardaba SOLO como el nombre del negocio -un texto suelto-.
+// Ahora se guarda {n:negocio, h:'1:18 PM', t:momento exacto}. Las visitas viejas
+// -que son texto- se siguen leyendo igual, solo que sin hora.
+// ═══════════════════════════════════════════════════════════════════════════════
+function horaAhoraTxt(){
+  return new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+}
+function visNombre(v){ return (typeof v === 'string') ? v : ((v && v.n) ? v.n : ''); }
+function visHora(v){ return (typeof v === 'string') ? '' : ((v && v.h) ? v.h : ''); }
+function idxVisita(visitas, neg){
+  for(var i=0;i<visitas.length;i++){ if(visNombre(visitas[i]) === neg) return i; }
+  return -1;
+}
+function claveVisitas(diaKey){ return 'visitas_'+diaKey+'_'+fechaMasRecienteParaDia(diaKey); }
+
+// Entiende la hora escrita a mano de varias formas: "1:18 PM", "1:18pm", "13:18", "118 pm", "5 pm"
+function parseHoraTexto(txt){
+  if(!txt) return null;
+  var s = String(txt).trim().toUpperCase().replace(/\./g,'');
+  var pm = /P\s*M?\s*$/.test(s);
+  var am = /A\s*M?\s*$/.test(s);
+  s = s.replace(/[AP]\s*M?\s*$/,'').replace(/\s+/g,'');
+  var hh, mm;
+  if(s.indexOf(':') >= 0){
+    var p = s.split(':');
+    hh = parseInt(p[0],10); mm = parseInt(p[1],10);
+  } else {
+    var d = s.replace(/\D/g,'');
+    if(!d) return null;
+    if(d.length <= 2){ hh = parseInt(d,10); mm = 0; }
+    else { hh = parseInt(d.slice(0, d.length-2),10); mm = parseInt(d.slice(-2),10); }
+  }
+  if(isNaN(hh) || isNaN(mm)) return null;
+  if(mm < 0 || mm > 59) return null;
+  if(pm && hh < 12) hh += 12;
+  if(am && hh === 12) hh = 0;
+  if(hh < 0 || hh > 23) return null;
+  var suf = hh >= 12 ? 'PM' : 'AM';
+  var h12 = hh % 12; if(h12 === 0) h12 = 12;
+  return h12+':'+String(mm).padStart(2,'0')+' '+suf;
+}
+// Convierte "1:18 PM" a minutos desde medianoche, para poder ORDENAR la ruta
+function horaAMinutos(hTxt){
+  if(!hTxt) return -1;
+  var s = String(hTxt).trim().toUpperCase();
+  var pm = s.indexOf('PM') >= 0, am = s.indexOf('AM') >= 0;
+  var p = s.replace(/[^0-9:]/g,'').split(':');
+  var hh = parseInt(p[0],10), mm = parseInt(p[1]||'0',10);
+  if(isNaN(hh)) return -1;
+  if(isNaN(mm)) mm = 0;
+  if(pm && hh < 12) hh += 12;
+  if(am && hh === 12) hh = 0;
+  return hh*60 + mm;
+}
+
+function editarHoraVisita(diaKey, neg){
+  var key = claveVisitas(diaKey);
+  var visitas = LS(key, []);
+  var i = idxVisita(visitas, neg);
+  if(i < 0) return;
+  var actual = visHora(visitas[i]);
+  var r = prompt('\u00bfA qu\u00e9 hora visitaste '+neg+'?\n\nEscr\u00edbela as\u00ed:   1:18 PM', actual || '');
+  if(r === null) return;
+  var hh = parseHoraTexto(r);
+  if(!hh){ avisoGrande('No entend\u00ed esa hora.\n\nEscr\u00edbela as\u00ed:   1:18 PM'); return; }
+  if(typeof visitas[i] === 'string') visitas[i] = { n: neg, h: hh, t: 0 };
+  else visitas[i].h = hh;
   SS(key, visitas);
+  renderRutaDia(diaKey);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RECORDATORIO DE LLEGADA  (23 jul 2026)
+// Cuando Sensei llega a una barberia arranca un reloj. A los 20 minutos la app le
+// pregunta si ya termino, para que no se le olvide marcarla. Se puede posponer 10 min.
+// La llegada se detecta de DOS formas: sola -al hacerle una venta o un pedido a un
+// barbero de esa barberia- y a mano -con el boton "Llegue"-.
+// ═══════════════════════════════════════════════════════════════════════════════
+var MIN_AVISO_LLEGADA = 20;
+var MIN_POSPONER_LLEGADA = 10;
+var CLAVE_LLEGADA = 'nbs_llegada';
+
+function marcarLlegada(neg, esAutomatica){
+  neg = String(neg || '').trim();
+  if(!neg) return;
+  var dia = getDiaHoy();
+  if(esAutomatica){
+    var rutas = LS('rutas_por_dia', {});
+    if(((rutas[dia] || []).indexOf(neg)) < 0) return;         // no esta en la ruta de hoy
+    if(idxVisita(LS(claveVisitas(dia), []), neg) >= 0) return; // ya esta marcada
+    var yaHay = LS(CLAVE_LLEGADA, null);
+    if(yaHay && yaHay.neg === neg) return;                     // ya se esta contando
+  }
+  SS(CLAVE_LLEGADA, { neg: neg, dia: dia, t: Date.now(), avisarEn: Date.now() + MIN_AVISO_LLEGADA*60000 });
+  if(!esAutomatica) renderRutaDia(dia);
+}
+function limpiarLlegada(neg){
+  var a = LS(CLAVE_LLEGADA, null);
+  if(a && (!neg || a.neg === neg)){ try{ localStorage.removeItem(CLAVE_LLEGADA); }catch(e){} }
+}
+function revisarLlegada(){
+  var a = LS(CLAVE_LLEGADA, null);
+  if(!a || !a.neg) return;
+  if(Date.now() < (a.avisarEn || 0)) return;
+  if(idxVisita(LS(claveVisitas(a.dia), []), a.neg) >= 0){ limpiarLlegada(); return; }
+  var ov = document.getElementById('lleg-ov');
+  if(!ov || ov.style.display === 'flex') return;
+  var t = document.getElementById('lleg-txt');
+  if(t) t.innerHTML = 'Llegaste a<br><b style="color:#1a237e;font-size:16.5px">'+escaparHtml(a.neg)+'</b><br>hace '+Math.round((Date.now()-a.t)/60000)+' minutos';
+  ov.style.display = 'flex';
+}
+function llegadaSiTermine(){
+  var a = LS(CLAVE_LLEGADA, null);
+  var ov = document.getElementById('lleg-ov'); if(ov) ov.style.display = 'none';
+  if(!a || !a.neg) return;
+  var key = claveVisitas(a.dia);
+  var visitas = LS(key, []);
+  if(idxVisita(visitas, a.neg) < 0){
+    visitas.push({ n: a.neg, h: new Date(a.t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}), t: a.t });
+    SS(key, visitas);
+  }
+  limpiarLlegada();
+  if(pantallaActual() === 'p-rutas') renderRutaDia(a.dia);
+}
+function llegadaPosponer(){
+  var a = LS(CLAVE_LLEGADA, null);
+  var ov = document.getElementById('lleg-ov'); if(ov) ov.style.display = 'none';
+  if(!a) return;
+  a.avisarEn = Date.now() + MIN_POSPONER_LLEGADA*60000;
+  SS(CLAVE_LLEGADA, a);
+}
+setInterval(revisarLlegada, 60000);
+
+function toggleVisita(diaKey, neg){
+  var key = claveVisitas(diaKey);
+  var visitas = LS(key,[]);
+  var idx = idxVisita(visitas, neg);
+  if(idx >= 0) visitas.splice(idx,1);
+  else visitas.push({ n: neg, h: horaAhoraTxt(), t: Date.now() });
+  SS(key, visitas);
+  limpiarLlegada(neg);
   renderRutaDia(diaKey);
 }
 
@@ -20789,6 +21038,15 @@ function verHistorialCliente(cid, modo){
 <div id="integridad-caja" style="display:none;position:fixed;left:4%;right:4%;top:5%;bottom:5%;z-index:99993;background:#fff;border-radius:16px;padding:16px;box-shadow:0 12px 44px rgba(0,0,0,.45);flex-direction:column;overflow:hidden">
   <div id="integridad-cuerpo" style="flex:1;overflow-y:auto;padding-right:2px"></div>
   <button onclick="cerrarIntegridad()" style="width:100%;padding:16px;border:none;border-radius:12px;background:#1a237e;color:#fff;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit;margin-top:12px;flex:0 0 auto">Cerrar</button>
+</div>
+
+<div id="lleg-ov" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:99996;align-items:center;justify-content:center;padding:18px">
+  <div id="lleg-box" style="background:#fff;border-radius:16px;max-width:340px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,0.4)">
+    <div style="font-size:17.5px;font-weight:900;color:#1a237e;text-align:center;margin-bottom:8px">&#9200; &#191;Ya terminaste?</div>
+    <div id="lleg-txt" style="font-size:14.5px;color:#333;text-align:center;margin-bottom:15px;line-height:1.4"></div>
+    <button onclick="llegadaSiTermine()" style="width:100%;padding:13px;background:#2E7D32;color:#fff;border:none;border-radius:11px;font-size:16px;font-weight:800;cursor:pointer;margin-bottom:9px">&#10003; S&#237;, marcar visitada</button>
+    <button onclick="llegadaPosponer()" style="width:100%;padding:12px;background:#fff;color:#555;border:1.5px solid #ccc;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer">&#9200; Todav&#237;a no &#8212; en 10 min</button>
+  </div>
 </div>
 </body>
 </html>
