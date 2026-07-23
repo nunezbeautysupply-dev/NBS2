@@ -20,7 +20,7 @@
 //  o con senal mala. La version nueva entra en la siguiente apertura.
 // ═══════════════════════════════════════════════════════════════
 
-var CACHE_NOMBRE = 'nbs2-cache-v36';
+var CACHE_NOMBRE = 'nbs2-cache-v37';
 
 // Cuanto se espera a la red cuando NO hay copia guardada (milisegundos)
 var LIMITE_RED = 4000;
@@ -28,7 +28,6 @@ var LIMITE_RED = 4000;
 var ARCHIVOS_BASE = [
   './',
   './index.html',
-  './app_prueba_firebase.html',
   './manifest.json',
   './icon-512.png'
 ];
@@ -117,7 +116,7 @@ self.addEventListener('fetch', function(event){
         // Si es abrir la app y no hay nada guardado, servir la pagina principal
         if(req.mode === 'navigate'){
           return caches.match('./index.html').then(function(r){
-            return r || caches.match('./app_prueba_firebase.html');
+            return r;
           });
         }
         return new Response('', { status: 503, statusText: 'Sin conexion' });
