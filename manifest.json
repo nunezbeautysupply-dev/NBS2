@@ -3,7 +3,7 @@
   "name": "NBS 2",
   "short_name": "NBS 2",
   "description": "Nunez Beauty Supply - OFICIAL V2.0",
-  "start_url": "./app_prueba_firebase.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
