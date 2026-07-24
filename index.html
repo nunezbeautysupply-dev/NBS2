@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260724g-OFICIAL-V2.0">
+<meta name="app-version" content="20260724i-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19154,15 +19154,35 @@ function renderRutaDia(diaKey){
     addTitle.textContent = 'Agregar a '+diaLabel;
     el.appendChild(addTitle);
 
+    // Caja de busqueda IGUAL de acentuada que el resto de la app -pedido por Sensei
+    // el 24 jul: "el boton de busqueda casi no se ve, ponlo mas grande y con el
+    // borde mas acentuado"-. Antes usaba la clase generica '.inp' (borde gris
+    // finito); ahora es la misma caja dorada gruesa que usan Clientes, Catalogo,
+    // Suplidores, etc, pero con el borde AUN MAS marcado (4px, dorado oscuro)
+    // porque en esta pantalla se pierde entre las filas de barberias.
+    var cajaAgregar = document.createElement('div');
+    cajaAgregar.className = 'busca-caja';
+    // !important porque hay una regla general (.busca-caja) que fuerza 3px
+    // dorado normal en TODAS las cajas de busqueda de la app -esta necesita
+    // ganarle a esa regla para verse MAS acentuada que las demas-.
+    // Fondo blanco (no el crema que usan las demas cajas) para que lo que
+    // Sensei escriba se note mas, y un poco menos alta -pidio "baja un
+    // poquito, esta demasiado alta"-.
+    cajaAgregar.style.cssText = 'border:4px solid #B8860B !important;background:#fff !important;box-shadow:0 4px 10px rgba(184,134,11,.5) !important;margin-bottom:8px;padding:10px 16px';
+    var iconoAgregar = document.createElement('span');
+    iconoAgregar.style.cssText = 'font-size:20px;flex-shrink:0;opacity:.85';
+    iconoAgregar.textContent = '🔍';
     var buscarAgregar = document.createElement('input');
-    buscarAgregar.className = 'inp';
+    buscarAgregar.className = 'busca-fuerte';
     buscarAgregar.id = 'ruta-buscar-agregar';
     buscarAgregar.type = 'text';
-    buscarAgregar.placeholder = '🔍 Buscar barbería para agregar...';
+    buscarAgregar.placeholder = 'Buscar barbería para agregar...';
     buscarAgregar.autocomplete = 'off';
-    buscarAgregar.style.marginBottom = '8px';
+    buscarAgregar.style.cssText = 'font-size:17px;font-weight:700';
     buscarAgregar.oninput = (function(dk){ return function(){ renderRutaAgregarLista(dk, this.value); }; })(diaKey);
-    el.appendChild(buscarAgregar);
+    cajaAgregar.appendChild(iconoAgregar);
+    cajaAgregar.appendChild(buscarAgregar);
+    el.appendChild(cajaAgregar);
 
     var listaAgregar = document.createElement('div');
     listaAgregar.id = 'ruta-agregar-lista';
