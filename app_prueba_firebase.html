@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260723h-OFICIAL-V2.0">
+<meta name="app-version" content="20260724e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3137,7 +3137,7 @@ function irProtegido(dest){
   if(PIN_ACTIVO){
     var pin = prompt('🔒 PIN de administrador:');
     if(pin === null) return;
-    if(String(pin).trim() !== String(PIN_ADMIN).trim()){ alert('PIN incorrecto. Acceso denegado.'); return; }
+    if(!verificarPinConLimite(pin)) return;
   }
   if(dest === 'exportar'){ exportD(); return; }
   if(dest === 'importar'){ document.getElementById('impf').click(); return; }
@@ -3348,7 +3348,7 @@ function filtrarVIPBusqueda(q){
   list.forEach(function(c){
     var d = document.createElement('div');
     d.style.cssText='padding:12px;border-bottom:1px solid #f0f0f0;cursor:pointer;display:flex;justify-content:space-between;align-items:center';
-    d.innerHTML='<div><div style="font-size:13px;font-weight:600">'+nombreCl(c)+'</div>'
+    d.innerHTML='<div><div style="font-size:13px;font-weight:600">'+escaparHtml(nombreCl(c))+'</div>'
       +'<div style="font-size:11px;color:#aaa">'+escaparHtml(c.negocio||'')+'</div></div>'
       +'<span style="font-size:12px;font-weight:700;padding:4px 8px;border-radius:8px;'+(c.vipActivo?'background:#FCE4EC;color:#AD1457':'background:#f0f0f0;color:#aaa')+'">'+(c.vipActivo?'⭐ Ya inscrito':'+ Inscribir')+'</span>';
     d.onclick=(function(cid){ return function(){
@@ -3437,8 +3437,8 @@ function renderVIPLista(list){
     card.style.cssText='border-left:4px solid var(--nbs-gold);border-radius:12px;box-shadow:var(--nbs-shadow-card);border-top:0.5px solid var(--nbs-line);border-right:0.5px solid var(--nbs-line);border-bottom:0.5px solid var(--nbs-line);margin-bottom:10px';
     var html='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
       +'<div class="av">'+ini(c.nombre,c.apellido)+'</div>'
-      +'<div style="flex:1"><div style="font-size:16px;font-weight:700;color:var(--nbs-ink)">'+nombreCl(c)+'</div>'
-      +(c.negocio ? '<div style="font-size:12px;color:var(--nbs-muted);margin-top:1px;display:flex;align-items:center;gap:4px">🏪'+c.negocio+'</div>' : '')
+      +'<div style="flex:1"><div style="font-size:16px;font-weight:700;color:var(--nbs-ink)">'+escaparHtml(nombreCl(c))+'</div>'
+      +(c.negocio ? '<div style="font-size:12px;color:var(--nbs-muted);margin-top:1px;display:flex;align-items:center;gap:4px">🏪'+escaparHtml(c.negocio)+'</div>' : '')
       +'</div></div>'
     if(!prods.length){
       html+='<p style="font-size:12px;color:var(--nbs-muted);text-align:center;padding:8px">Sin compras VIP todavía</p>';
@@ -3449,7 +3449,7 @@ function renderVIPLista(list){
         var esMitad = Math.abs((p.precio||0) - VIP_PRECIO_MITAD) < 0.02;
         html+='<div style="margin-bottom:10px;padding:10px;background:#FAFAFA;border-radius:10px">'
           +'<div style="display:flex;justify-content:space-between;margin-bottom:2px">'
-          +'<div style="font-size:12px;font-weight:600;color:var(--nbs-ink)">'+p.nombre+(esMitad?' <span style="font-size:10px;color:#E65100">(2 uds=$1 punto)</span>':'')+'</div>'
+          +'<div style="font-size:12px;font-weight:600;color:var(--nbs-ink)">'+escaparHtml(p.nombre)+(esMitad?' <span style="font-size:10px;color:#E65100">(2 uds=$1 punto)</span>':'')+'</div>'
           +'<div style="font-size:12px;font-weight:700;color:'+color+'">'+p.progreso+'/'+VIP_META+'</div></div>'
           +'<div style="height:8px;background:#F0F0F2;border-radius:4px;overflow:hidden;margin-bottom:4px">'
           +'<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px" class="barra-brillo"></div></div>'
@@ -3557,7 +3557,7 @@ function adminAccion(accion){
   if(PIN_ACTIVO){
     var pin = prompt('🔒 PIN de administrador:');
     if(pin === null) return;
-    if(String(pin).trim() !== String(PIN_ADMIN).trim()){ alert('PIN incorrecto. Acceso denegado.'); return; }
+    if(!verificarPinConLimite(pin)) return;
   }
   if(accion === 'huerfanas') limpiarVentasHuerfanas();
 }
@@ -5981,9 +5981,9 @@ function renderCl(q){
     var d=document.createElement('div');d.className='clrow';
     var direccionCorta = [c.dir, c.ciudad].filter(Boolean).join(', ');
     d.innerHTML=(c.foto ? '<div style="width:44px;height:44px;border-radius:50%;overflow:hidden;flex-shrink:0"><img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover"></div>' : '<div class="av">'+ini(c.nombre,c.apellido)+'</div>')
-      +'<div style="flex:1"><div style="font-size:16px;font-weight:700;color:var(--nbs-ink)">'+((c.nombre||'')+' '+(c.apellido||'')).replace(/\s+/g,' ').trim()+(c.apodo?' <span style="color:var(--nbs-gold-dark);font-weight:700">"'+c.apodo+'"</span>':'')+(c.vipActivo?' <span style="color:var(--nbs-red-text);font-size:13px">★</span>':'')+'</div>'
-      +'<div style="font-size:12px;color:var(--nbs-muted)">'+escaparHtml(c.negocio||'Cliente')+' · '+(c.tel||'Sin tel.')+'</div>'
-      +(direccionCorta ? '<div style="font-size:11px;color:var(--nbs-muted-2);margin-top:1px">📍 '+direccionCorta+'</div>' : '')
+      +'<div style="flex:1"><div style="font-size:16px;font-weight:700;color:var(--nbs-ink)">'+escaparHtml(((c.nombre||'')+' '+(c.apellido||'')).replace(/\s+/g,' ').trim())+(c.apodo?' <span style="color:var(--nbs-gold-dark);font-weight:700">"'+escaparHtml(c.apodo)+'"</span>':'')+(c.vipActivo?' <span style="color:var(--nbs-red-text);font-size:13px">★</span>':'')+'</div>'
+      +'<div style="font-size:12px;color:var(--nbs-muted)">'+escaparHtml(c.negocio||'Cliente')+' · '+escaparHtml(c.tel||'Sin tel.')+'</div>'
+      +(direccionCorta ? '<div style="font-size:11px;color:var(--nbs-muted-2);margin-top:1px">📍 '+escaparHtml(direccionCorta)+'</div>' : '')
       +'<div style="font-size:12px;font-weight:700;margin-top:2px;color:'+(balance>0?'var(--nbs-red-text)':'var(--nbs-muted-2)')+'">Balance: $'+fmtNum(balance)+'</div>'
       +'</div>'
       +'<span style="color:#ddd;font-size:20px">›</span>';
@@ -6263,8 +6263,8 @@ function renderCatalogo(q){
     card.innerHTML = '<div style="width:48px;height:48px;border-radius:10px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden">'+(p.foto?'<img src="'+p.foto+'" style="width:100%;height:100%;object-fit:cover">':'📦')+'</div>'
       +'<div style="flex:1;min-width:0">'
       +'<div style="font-size:14px;font-weight:700;line-height:1.3">'+escaparHtml(p.nombre)+'</div>'
-      +'<div style="font-size:11px;color:#999;margin-top:2px">'+(p.cat||'Sin categoria')+(p.sku?' · SKU: '+p.sku:'')+'</div>'
-      +(p.desc ? '<div style="font-size:12px;color:#555;margin-top:4px;line-height:1.4">'+p.desc+'</div>' : '')
+      +'<div style="font-size:11px;color:#999;margin-top:2px">'+escaparHtml(p.cat||'Sin categoria')+(p.sku?' · SKU: '+escaparHtml(p.sku):'')+'</div>'
+      +(p.desc ? '<div style="font-size:12px;color:#555;margin-top:4px;line-height:1.4">'+escaparHtml(p.desc)+'</div>' : '')
       +'<div style="display:flex;gap:8px;align-items:center;margin-top:4px">'
       +'<span style="font-size:13px;font-weight:700;color:#1565C0">$'+fmtNum(p.precio||0)+'</span>'
       +'<span style="font-size:11px;color:#aaa;font-weight:500">Costo: $'+fmtNum(p.costo||0)+'</span>'
@@ -10005,9 +10005,9 @@ function renderBarberias(q){
     d.style.cssText = 'padding:14px;border-bottom:1px solid #f0f0f0;cursor:pointer;border-radius:8px';
     d.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center">'
       +'<div>'
-      +'<div style="font-size:14px;font-weight:700">🏪 '+neg+'</div>'
+      +'<div style="font-size:14px;font-weight:700">🏪 '+escaparHtml(neg)+'</div>'
       +'<div style="font-size:12px;color:#aaa;margin-top:2px">'+barberias[neg].length+' barbero(s)</div>'
-      +(barberosCoinc.length ? '<div style="font-size:12px;color:#1565C0;margin-top:4px">✓ '+barberosCoinc.map(function(c){ return nombreCl(c); }).join(', ')+'</div>' : '')
+      +(barberosCoinc.length ? '<div style="font-size:12px;color:#1565C0;margin-top:4px">✓ '+barberosCoinc.map(function(c){ return escaparHtml(nombreCl(c)); }).join(', ')+'</div>' : '')
       +'</div><span style="color:#ddd;font-size:20px">›</span></div>';
     d.onclick = (function(n){ return function(){ selBarberia(n, barberias[n]); }; })(neg);
     el.appendChild(d);
@@ -10044,7 +10044,7 @@ function selBarberia(nombre, barberos){
     var d = document.createElement('div');
     d.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #f0f0f0;cursor:pointer';
     d.innerHTML = '<div class="av" style="width:36px;height:36px;font-size:14px;margin-right:10px;flex-shrink:0">'+ini(c.nombre,c.apellido)+'</div>'
-      +'<div style="flex:1"><div style="font-size:17px;font-weight:800;color:#1a237e">'+nombreCl(c)+'</div></div>'
+      +'<div style="flex:1"><div style="font-size:17px;font-weight:800;color:#1a237e">'+escaparHtml(nombreCl(c))+'</div></div>'
       +'<span style="color:#ddd;font-size:20px">›</span>';
     d.onclick = (function(cl){ return function(){ selBarbero(cl.id, nombreCl(cl)); }; })(c);
     el.appendChild(d);
@@ -10195,7 +10195,7 @@ function renderBarberiasInicio(q){
         +(seleccionado?'<span style="color:white;font-size:16px;font-weight:900">✓</span>':'')
         +'</div>'
         +'<div style="width:34px;height:34px;border-radius:8px;background:var(--nbs-gold-bg);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--nbs-gold-dark);flex-shrink:0">'+c.nombre[0]+'</div>'
-        +'<div style="font-size:15px;font-weight:'+(seleccionado?'800':'600')+';color:var(--nbs-ink);flex:1">'+nombreCompleto+'</div>'
+        +'<div style="font-size:15px;font-weight:'+(seleccionado?'800':'600')+';color:var(--nbs-ink);flex:1">'+escaparHtml(nombreCompleto)+'</div>'
         +(seleccionado?'<div style="font-size:13px;color:var(--nbs-gold-dark);font-weight:800">✓</div>':'');
 
       btn.onclick = (function(cliente, barberia, id){
@@ -11631,14 +11631,14 @@ function verCl(id){
   }
   header.innerHTML='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
     +(c.foto ? '<div style="width:56px;height:56px;border-radius:50%;overflow:hidden;flex-shrink:0"><img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover"></div>' : '<div class="av" style="width:56px;height:56px;font-size:20px">'+ini(c.nombre,c.apellido)+'</div>')
-    +'<div><div style="font-size:22px;font-weight:700">'+nombreCl(c)+'</div>'
-    +'<div style="font-size:13px;color:#aaa">'+(c.negocio||'Cliente individual')+'</div>'
+    +'<div><div style="font-size:22px;font-weight:700">'+escaparHtml(nombreCl(c))+'</div>'
+    +'<div style="font-size:13px;color:#aaa">'+(c.negocio?escaparHtml(c.negocio):'Cliente individual')+'</div>'
     +'<div style="font-size:11px;color:var(--nbs-gold-dark);font-weight:700;margin-top:2px">'+etiquetaTipo+'</div></div></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">TELEFONO</div><div style="font-size:14px;margin-top:2px">'+(c.tel||'N/A')+'</div></div>'
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">EMAIL</div><div style="font-size:14px;margin-top:2px">'+(c.email||'N/A')+'</div></div>'
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px;grid-column:span 2"><div style="font-size:10px;color:#aaa;font-weight:700">DIRECCION</div><div style="font-size:14px;margin-top:2px">'+(c.dir||'')+(c.ciudad?', '+c.ciudad:'')+(c.estado?', '+c.estado:'')+(c.zip?' '+c.zip:'')+((!c.dir&&!c.ciudad&&!c.estado)?'N/A':'')+'</div></div>'
-    +((c.contacto||c.contactoTel) ? '<div style="background:#F5F5F5;border-radius:8px;padding:10px;grid-column:span 2"><div style="font-size:10px;color:#aaa;font-weight:700">📇 CONTACTO ADICIONAL</div><div style="font-size:14px;margin-top:2px">'+(c.contacto||'Sin nombre')+(c.contactoApodo?' "'+c.contactoApodo+'"':'')+(c.contactoTel?' · '+c.contactoTel:'')+'</div></div>' : '')
+    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">TELEFONO</div><div style="font-size:14px;margin-top:2px">'+escaparHtml(c.tel||'N/A')+'</div></div>'
+    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">EMAIL</div><div style="font-size:14px;margin-top:2px">'+escaparHtml(c.email||'N/A')+'</div></div>'
+    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px;grid-column:span 2"><div style="font-size:10px;color:#aaa;font-weight:700">DIRECCION</div><div style="font-size:14px;margin-top:2px">'+escaparHtml((c.dir||'')+(c.ciudad?', '+c.ciudad:'')+(c.estado?', '+c.estado:'')+(c.zip?' '+c.zip:''))+((!c.dir&&!c.ciudad&&!c.estado)?'N/A':'')+'</div></div>'
+    +((c.contacto||c.contactoTel) ? '<div style="background:#F5F5F5;border-radius:8px;padding:10px;grid-column:span 2"><div style="font-size:10px;color:#aaa;font-weight:700">📇 CONTACTO ADICIONAL</div><div style="font-size:14px;margin-top:2px">'+escaparHtml(c.contacto||'Sin nombre')+(c.contactoApodo?' "'+escaparHtml(c.contactoApodo)+'"':'')+(c.contactoTel?' · '+escaparHtml(c.contactoTel):'')+'</div></div>' : '')
     +infoVisita
     +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">TOTAL COMPRAS</div><div style="font-size:18px;font-weight:700;color:#1565C0;margin-top:2px">$'+fmtNum(totalCompras)+'</div></div>'
     +'<div style="background:'+(cr?'#FFEBEE':'#f5f5f5')+';border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">BALANCE PENDIENTE</div><div style="font-size:18px;font-weight:700;color:'+(cr?'#C62828':'#2E7D32')+';margin-top:2px">'+(cr?'$'+fmtNum(cr.saldo):'$0.00')+'</div></div>'
@@ -11668,7 +11668,7 @@ function verCl(id){
           var pct = Math.min(100, Math.round((v.progreso/VIP_META)*100));
           var colorDet = v.gratis>0 ? '#AD1457' : '#C2185B';
           return '<div style="margin-bottom:6px">'
-            +'<div style="display:flex;justify-content:space-between;font-size:12px;color:#333;margin-bottom:2px"><span style="font-weight:600">'+v.nombre+'</span><span style="font-weight:700;color:'+colorDet+'">'+v.progreso+'/'+VIP_META+(v.gratis>0?' 🎁x'+v.gratis:'')+'</span></div>'
+            +'<div style="display:flex;justify-content:space-between;font-size:12px;color:#333;margin-bottom:2px"><span style="font-weight:600">'+escaparHtml(v.nombre)+'</span><span style="font-weight:700;color:'+colorDet+'">'+v.progreso+'/'+VIP_META+(v.gratis>0?' 🎁x'+v.gratis:'')+'</span></div>'
             +'<div style="height:6px;background:white;border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+colorDet+'"></div></div>'
             +'</div>';
         }).join('')
@@ -11876,13 +11876,44 @@ function verFactura(v){
 // El PIN se guarda en el teléfono. Si nunca se cambió, usa 8899 por defecto (el usuario
 // debería cambiarlo por el suyo desde "Cambiar PIN" para mayor seguridad).
 var PIN_ADMIN = localStorage.getItem('nbs_pin_admin') || '8899';
+
+// ═══ LIMITE DE INTENTOS DEL PIN (agregado 24 jul, pedido por Sensei) ═══
+// Antes se podia probar el PIN las veces que fueran, sin limite. Ahora, despues
+// de 5 fallos seguidos, se bloquea 5 minutos. El contador se guarda en el
+// telefono y se resetea solo con un PIN correcto.
+var CLAVE_PIN_INTENTOS = 'nbs_pin_intentos';
+var PIN_MAX_INTENTOS = 5;
+var PIN_MINUTOS_BLOQUEO = 5;
+
+function verificarPinConLimite(pinIngresado){
+  var estado = LS(CLAVE_PIN_INTENTOS, {fallos:0, bloqueadoHasta:0});
+  var ahora = Date.now();
+  if(estado.bloqueadoHasta && ahora < estado.bloqueadoHasta){
+    var minRestantes = Math.ceil((estado.bloqueadoHasta - ahora) / 60000);
+    alert('🔒 Demasiados intentos fallidos.\n\nEspera '+minRestantes+' minuto(s) antes de volver a intentar.');
+    return false;
+  }
+  if(String(pinIngresado||'').trim() === String(PIN_ADMIN).trim()){
+    SS(CLAVE_PIN_INTENTOS, {fallos:0, bloqueadoHasta:0});
+    return true;
+  }
+  estado.fallos = (estado.fallos||0) + 1;
+  if(estado.fallos >= PIN_MAX_INTENTOS){
+    SS(CLAVE_PIN_INTENTOS, {fallos:0, bloqueadoHasta: ahora + PIN_MINUTOS_BLOQUEO*60000});
+    alert('🔒 PIN incorrecto '+PIN_MAX_INTENTOS+' veces seguidas.\n\nPor tu seguridad, espera '+PIN_MINUTOS_BLOQUEO+' minutos antes de volver a intentar.');
+  } else {
+    SS(CLAVE_PIN_INTENTOS, estado);
+    alert('PIN incorrecto. Te quedan '+(PIN_MAX_INTENTOS - estado.fallos)+' intento(s).');
+  }
+  return false;
+}
 var PIN_ACTIVO = false;
 
 // Permite al usuario poner su PROPIO PIN secreto (queda guardado solo en su teléfono).
 function cambiarPinAdmin(){
   var actual = prompt('Para cambiar el PIN, primero escribe el PIN ACTUAL:');
   if(actual === null) return;
-  if(String(actual).trim() !== String(PIN_ADMIN).trim()){ alert('PIN actual incorrecto.'); return; }
+  if(!verificarPinConLimite(actual)) return;
   var nuevo = prompt('Escribe tu NUEVO PIN (solo números, de 4 a 8 dígitos):');
   if(nuevo === null) return;
   nuevo = String(nuevo).trim();
@@ -11897,7 +11928,8 @@ function cambiarPinAdmin(){
 
 function togglePin(){
   var pin = prompt('Ingresa PIN para cambiar seguridad:');
-  if(String(pin).trim() !== String(PIN_ADMIN).trim()){ alert('PIN incorrecto'); return; }
+  if(pin === null) return;
+  if(!verificarPinConLimite(pin)) return;
   PIN_ACTIVO = !PIN_ACTIVO;
   // Hay DOS interruptores de PIN: uno en el menu lateral y otro en la pantalla del menu.
   // Antes los dos tenian el MISMO nombre, el navegador solo encontraba el primero, y el
@@ -12499,10 +12531,8 @@ function guardarTodosLosProductosDeMarca(){
 function verificarPIN(callback){
   var pin = prompt('Ingresa el PIN de administrador:');
   if(pin === null) return;
-  if(pin === PIN_ADMIN){
+  if(verificarPinConLimite(pin)){
     callback();
-  } else {
-    alert('PIN incorrecto. Acceso denegado.');
   }
 }
 
@@ -12685,7 +12715,7 @@ function agregarBalanceInicial(id){
   form.innerHTML = '<p style="font-size:15px;font-weight:700;margin-bottom:4px">💰 Balance inicial</p>'
     +'<p style="font-size:12px;color:#aaa;margin-bottom:14px">Se creará una factura a crédito con este balance. Aparecerá en Cuentas por Cobrar.</p>'
     +'<div style="background:#EDE7F6;border-radius:8px;padding:10px;margin-bottom:12px">'
-    +'<div style="font-size:13px;font-weight:600;color:#6A1B9A">Cliente: '+nombreCl(cl)+'</div>'
+    +'<div style="font-size:13px;font-weight:600;color:#6A1B9A">Cliente: '+escaparHtml(nombreCl(cl))+'</div>'
     +(cl.negocio?'<div style="font-size:12px;color:#aaa">'+cl.negocio+'</div>':'')
     +'</div>'
     +'<label class="lbl">Monto del balance pendiente ($) *</label>'
@@ -13476,7 +13506,7 @@ function renderFacturasSaldadas(q){
     card.className = 'card';
     card.style.cssText = 'cursor:pointer;border:0.5px solid var(--nbs-line);border-left:3px solid var(--nbs-green-text);padding:14px';
     card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center">'
-      +'<div><div style="font-size:15px;font-weight:700">'+(cl?nombreCl(cl):v.cn)+'</div>'
+      +'<div><div style="font-size:15px;font-weight:700">'+escaparHtml(cl?nombreCl(cl):v.cn)+'</div>'
       +'<div style="font-size:11px;color:#aaa;margin-top:2px">'+(v.numFactura?'#'+v.numFactura+' · ':'')+v.fecha+' · '+(v.tipo==='credito'?'A crédito':'Contado')+'</div></div>'
       +'<div style="text-align:right"><div style="font-size:16px;font-weight:700;color:var(--nbs-green-text)">$'+fmtNum(v.total)+'</div>'
       +'<div style="font-size:10px;color:var(--nbs-green-text)">✓ saldada</div></div></div>';
@@ -13579,8 +13609,8 @@ function renderCxC(q){
       +'<div style="width:38px;height:38px;border-radius:10px;background:var(--nbs-gold-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
       +'<span style="font-size:13px;font-weight:700;color:var(--nbs-gold-dark)">'+(cl?ini(cl.nombre,cl.apellido):'?')+'</span>'
       +'</div>'
-      +'<div><div style="font-size:16px;font-weight:700;color:var(--nbs-ink)">'+(cl?nombreCl(cl):c.cn)+'</div>'
-      +(negocio ? '<div style="font-size:12px;color:var(--nbs-muted);margin-top:1px;display:flex;align-items:center;gap:4px">🏪'+negocio+'</div>' : '')
+      +'<div><div style="font-size:16px;font-weight:700;color:var(--nbs-ink)">'+escaparHtml(cl?nombreCl(cl):c.cn)+'</div>'
+      +(negocio ? '<div style="font-size:12px;color:var(--nbs-muted);margin-top:1px;display:flex;align-items:center;gap:4px">🏪'+escaparHtml(negocio)+'</div>' : '')
       +'<div style="font-size:11px;color:var(--nbs-muted-2);margin-top:3px">'+(c.total>0?'Total facturado: $'+fmtNum(c.total):'Sin facturas abiertas')+'</div></div>'
       +'</div>'
       +'<div style="text-align:right"><div style="font-size:18px;font-weight:700;color:'+(esFavorCliente?'#E65100':'var(--nbs-red-dark)')+'">$'+fmtNum(Math.abs(c.saldo))+'</div>'
@@ -13610,7 +13640,7 @@ function abrirAbono(cid){
   var negocioTxt = cl && cl.negocio ? cl.negocio.trim() : '';
   document.getElementById('cxc-lista').style.display = 'none';
   document.getElementById('cxc-abono').style.display = 'block';
-  document.getElementById('cxc-nombre').innerHTML = cn + (negocioTxt ? '<div style="font-size:14px;font-weight:600;color:var(--nbs-muted);margin-top:2px;display:flex;align-items:center;gap:5px">🏪'+negocioTxt+'</div>' : '');
+  document.getElementById('cxc-nombre').innerHTML = escaparHtml(cn) + (negocioTxt ? '<div style="font-size:14px;font-weight:600;color:var(--nbs-muted);margin-top:2px;display:flex;align-items:center;gap:5px">🏪'+escaparHtml(negocioTxt)+'</div>' : '');
   var totalFacturado = 0;
   var totalPagado = 0;
   facturasC.forEach(function(v){
@@ -15496,7 +15526,7 @@ function borrarTodo(){
   var pedirPinYSeguir = function(){
     var pin = prompt('\ud83d\udd12 Paso 2 de 3 \u2014 PIN de administrador:');
     if(pin === null) return;
-    if(String(pin).trim() !== String(PIN_ADMIN).trim()){ alert('PIN incorrecto. No se borro nada.'); return; }
+    if(!verificarPinConLimite(pin)) return;
     pedirPalabraYBorrar();
   };
   var idHuella = localStorage.getItem(CLAVE_HUELLA_ID);
@@ -15849,7 +15879,25 @@ function fmtTel(el){
   el.value = v;
 }
 
-function exportD(){
+// ═══ CIFRADO DEL RESPALDO (agregado 24 jul, pedido por Sensei) ═══
+// Antes el respaldo se guardaba en texto plano: cualquiera que abriera el
+// archivo con una computadora veia todo -clientes, deudas, ventas- sin
+// ninguna proteccion. Ahora se cifra automaticamente con la MISMA clave
+// del PIN de administrador, asi que no hay que recordar una clave nueva:
+// el respaldo pide el mismo PIN para poder abrirse.
+async function derivarLlaveBackup(pin, salBytes){
+  var enc = new TextEncoder();
+  var pepper = 'NBS2::Backup::2026';
+  var material = await crypto.subtle.importKey('raw', enc.encode(String(pin).trim()+pepper), {name:'PBKDF2'}, false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt: salBytes, iterations: 150000, hash:'SHA-256'},
+    material, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']
+  );
+}
+function bytesABase64(bytes){ var bin=''; for(var i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]); return btoa(bin); }
+function base64ABytes(b64){ var bin=atob(b64); var bytes=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); return bytes; }
+
+async function exportD(){
   loadProds();
   ventas = LS('nv', []);
   clientes = LS('ncl', []);
@@ -15881,6 +15929,22 @@ function exportD(){
     visitasBarberos:visitasBarberos, rutasPorDia:rutasPorDia, visitasRuta:visitasRuta};
   var json = JSON.stringify(d);
 
+  // Cifrar antes de guardar, con la misma clave del PIN de administrador.
+  var salBytes = crypto.getRandomValues(new Uint8Array(16));
+  var ivBytes = crypto.getRandomValues(new Uint8Array(12));
+  var jsonFinal;
+  try{
+    var llave = await derivarLlaveBackup(PIN_ADMIN, salBytes);
+    var datosCifrados = await crypto.subtle.encrypt({name:'AES-GCM', iv:ivBytes}, llave, new TextEncoder().encode(json));
+    var sobre = {app:'NBS2Backup', v:1, enc:true, fecha:fechaHoy(), sal:bytesABase64(salBytes), iv:bytesABase64(ivBytes), datos:bytesABase64(new Uint8Array(datosCifrados))};
+    jsonFinal = JSON.stringify(sobre);
+  }catch(eCifrado){
+    // Si el telefono no soporta cifrado -muy raro-, se avisa y se manda SIN cifrar para no perder el respaldo.
+    console.error('No se pudo cifrar el respaldo:', eCifrado);
+    alert('⚠️ Este respaldo se guardó SIN cifrar porque tu navegador no lo permitió. Guárdalo en un lugar seguro.');
+    jsonFinal = json;
+  }
+
   // Registrar fecha del backup
   localStorage.setItem('ultimoBackup', new Date().getTime().toString());
   // Reiniciar el contador del aviso: si bajaste el respaldo por tu cuenta -desde el menu-,
@@ -15891,7 +15955,7 @@ function exportD(){
   }catch(e){}
 
   // Descarga real - funciona en Chrome/GitHub Pages
-  var blob = new Blob([json], {type:'application/json'});
+  var blob = new Blob([jsonFinal], {type:'application/json'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
@@ -15962,9 +16026,30 @@ function copiarBackup(){
 function importD(inp){
   var file=inp.files[0];if(!file)return;
   var fr=new FileReader();
-  fr.onload=function(e){
+  fr.onload=async function(e){
     try{
-      var d=JSON.parse(e.target.result);
+      var contenido = JSON.parse(e.target.result);
+      var d;
+      if(contenido && contenido.enc === true && contenido.datos){
+        // Respaldo cifrado (24 jul en adelante): pedir el PIN para poder abrirlo.
+        var pinBackup = prompt('🔒 Este respaldo está protegido.\nEscribe el PIN de administrador para abrirlo:');
+        if(pinBackup === null){ inp.value=''; return; }
+        try{
+          var salBytes = base64ABytes(contenido.sal);
+          var ivBytes = base64ABytes(contenido.iv);
+          var llave = await derivarLlaveBackup(pinBackup, salBytes);
+          var datosBytes = base64ABytes(contenido.datos);
+          var descifrado = await crypto.subtle.decrypt({name:'AES-GCM', iv:ivBytes}, llave, datosBytes);
+          d = JSON.parse(new TextDecoder().decode(descifrado));
+        }catch(errDescifrar){
+          alert('❌ PIN incorrecto, o el archivo está dañado.\n\nNo se pudo abrir el respaldo.');
+          inp.value='';
+          return;
+        }
+      } else {
+        // Respaldo viejo, de antes del cifrado -sigue funcionando igual que siempre-.
+        d = contenido;
+      }
       if(!confirm('Importar datos? Esto reemplaza todo lo actual.'))return;
       // Limpiar los nombres que vienen en el respaldo: si el archivo es viejo -de antes de que
       // existiera la limpieza al guardar- o fue manipulado, aqui se neutraliza cualquier codigo
@@ -18429,7 +18514,7 @@ function renderDashboard(){
   +(cuentasVencidas.length > 0 ?
     '<div onclick="ir(\'p-cxc\')" style="background:#FFEBEE;border-radius:12px;padding:12px;margin-bottom:10px;cursor:pointer">'
     +'<div style="font-size:12px;color:#C62828;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:5px">⏰ Clientes atrasados hace más de 30 días ('+cuentasVencidas.length+')</div>'
-    +cuentasVencidas.slice(0,3).map(function(c){ return '<div style="font-size:12px;color:var(--nbs-ink);padding:3px 0;display:flex;justify-content:space-between"><span>• '+c.nombre+' ('+c.dias+' días)</span><span style="font-weight:700">$'+fmtNum(c.saldo)+'</span></div>'; }).join('')
+    +cuentasVencidas.slice(0,3).map(function(c){ return '<div style="font-size:12px;color:var(--nbs-ink);padding:3px 0;display:flex;justify-content:space-between"><span>• '+escaparHtml(c.nombre)+' ('+c.dias+' días)</span><span style="font-weight:700">$'+fmtNum(c.saldo)+'</span></div>'; }).join('')
     +(cuentasVencidas.length>3?'<div style="font-size:11px;color:var(--nbs-muted);margin-top:2px">...y '+(cuentasVencidas.length-3)+' más — toca para ver todas</div>':'')
     +'</div>' : '')
 
@@ -19618,7 +19703,7 @@ function abrirDevolucion(vid){
 
   var titulo = document.createElement('div');
   titulo.innerHTML = '<div style="font-size:18px;font-weight:800;color:#E65100">↩️ Procesar Devolución</div>'
-    +'<div style="font-size:13px;color:#aaa;margin-top:2px">'+(cl?nombreCl(cl):v.cn)+' · Factura '+(v.numFactura?'#'+v.numFactura+' · ':'')+v.fecha+'</div>';
+    +'<div style="font-size:13px;color:#aaa;margin-top:2px">'+escaparHtml(cl?nombreCl(cl):v.cn)+' · Factura '+(v.numFactura?'#'+v.numFactura+' · ':'')+v.fecha+'</div>';
   wrap.appendChild(titulo);
 
   var aviso = document.createElement('div');
@@ -20016,7 +20101,7 @@ function abrirPreciosPersonalizados(cid){
 
   var titulo = document.createElement('div');
   titulo.innerHTML = '<div style="font-size:18px;font-weight:800;color:#00695C">💲 Precios Especiales</div>'
-    +'<div style="font-size:13px;color:#aaa;margin-top:2px">'+nombreCl(cl)+'</div>';
+    +'<div style="font-size:13px;color:#aaa;margin-top:2px">'+escaparHtml(nombreCl(cl))+'</div>';
   wrap.appendChild(titulo);
 
   var aviso = document.createElement('div');
@@ -20258,7 +20343,7 @@ function verHistorialCliente(cid, modo){
     +'<img src="icon-512.png" alt="NBS" style="width:32px;height:32px;margin-left:auto;border-radius:8px;cursor:pointer" onclick="cerrarHistorial();ir(\'p-ped\')">'
     +'</div>'
     +'<div style="background:linear-gradient(135deg,#1a237e,#283593);color:white;border-radius:12px;padding:16px;margin-bottom:16px">'
-    +'<div style="font-size:18px;font-weight:800">'+nombreCl(cl)+'</div>'
+    +'<div style="font-size:18px;font-weight:800">'+escaparHtml(nombreCl(cl))+'</div>'
     +'<div style="font-size:13px;opacity:0.8;margin-top:4px">🏪 '+(cl.negocio||'Sin barbería')+'</div>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'
