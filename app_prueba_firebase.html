@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260724n-OFICIAL-V2.0">
+<meta name="app-version" content="20260724o-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -14132,8 +14132,13 @@ function confirmarPagoMultiple(vid, saldo){
     else msj += '   • $'+fmtNum(p.monto)+'  →  #'+p.nf+' del '+p.fecha+'  (debía $'+fmtNum(p.saldoAntes)+')\n';
   });
   if(r.sinAplicar > 0.01){
-    msj += '\n⚠️ Sobran $'+fmtNum(r.sinAplicar)+' porque el cliente ya no debe más.\n';
-    msj += 'Ese sobrante se va a quedar en esta factura como pago de más.\n';
+    // Antes esto se quedaba metido dentro de esta misma factura como "pago de mas"
+    // y no se podia usar despues. Ahora (24 jul, pedido por Sensei) se guarda como
+    // CREDITO A FAVOR del cliente, igual que ya se hacia con las devoluciones -asi
+    // se ve en su perfil y se puede aplicar solo con "Usar credito del cliente"
+    // en su proxima compra-.
+    msj += '\n💰 Sobran $'+fmtNum(r.sinAplicar)+' porque el cliente ya no debe más.\n';
+    msj += 'Ese sobrante se guardará como CRÉDITO A FAVOR del cliente, para usarlo en su próxima compra.\n';
   }
   msj += '\n¿Aplicar así?';
   if(!confirm(msj)) return;
@@ -14145,9 +14150,7 @@ function confirmarPagoMultiple(vid, saldo){
     if(!v) return;
     if(!v.pagosFactura) v.pagosFactura = [];
     var monto = p.monto;
-    // Si sobro dinero -el cliente ya no debe nada-, ese sobrante se queda en la factura
-    // donde estas cobrando, para no perderlo del balance
-    if(p.esLaActual && r.sinAplicar > 0.01) monto += r.sinAplicar;
+    // El sobrante YA NO se mete aqui -se guarda aparte como credito a favor-.
     var pago = { monto: monto, fecha: fechaPago };
     if(p.esLaActual) pago.metodos = filas;
     else pago.nota = 'Sobrante del pago de $'+fmtNum(total)+' aplicado a la factura más vieja';
@@ -14156,12 +14159,26 @@ function confirmarPagoMultiple(vid, saldo){
   });
   SS('nv', ventas);
 
+  // El dinero que sobro -el cliente ya no debia nada mas- se guarda como
+  // CREDITO A FAVOR del cliente, con el mismo sistema que ya usan las
+  // devoluciones (campo clientes[].creditoAFavor). Queda disponible para
+  // su proxima compra con "Usar credito del cliente".
+  if(r.sinAplicar > 0.01){
+    clientes = LS('ncl', []);
+    var clIdxSobra = clientes.findIndex(function(c){ return String(c.id) === String(venta.cid); });
+    if(clIdxSobra >= 0){
+      clientes[clIdxSobra].creditoAFavor = (clientes[clIdxSobra].creditoAFavor||0) + r.sinAplicar;
+      SS('ncl', clientes);
+    }
+  }
+
   var resumen = '✅ Pago de $'+fmtNum(total)+' repartido en '+aplicados+' factura(s):\n\n';
   r.plan.forEach(function(p){
-    var m = p.monto;
-    if(p.esLaActual && r.sinAplicar > 0.01) m += r.sinAplicar;
-    resumen += (p.esLaActual ? '   • $'+fmtNum(m)+'  →  esta factura\n' : '   • $'+fmtNum(p.monto)+'  →  #'+p.nf+' ('+p.fecha+')\n');
+    resumen += (p.esLaActual ? '   • $'+fmtNum(p.monto)+'  →  esta factura\n' : '   • $'+fmtNum(p.monto)+'  →  #'+p.nf+' ('+p.fecha+')\n');
   });
+  if(r.sinAplicar > 0.01){
+    resumen += '\n💰 $'+fmtNum(r.sinAplicar)+' quedó como CRÉDITO A FAVOR del cliente, para su próxima compra.';
+  }
   alert(resumen);
   // Refrescar la pantalla DESPUES de cerrar el alert, con una pausa, para que el balance
   // nuevo se vea al instante (sin salir y entrar).
