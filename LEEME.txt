@@ -1,74 +1,46 @@
-NBS 2 - RUTAS: BACKUP, HORAS Y RECORDATORIO
+NBS 2 - LO QUE MAS COMPRA EL CLIENTE, IGUAL EN TODAS PARTES
 23 de julio de 2026
 
-SOLO 3 ARCHIVOS:
-  index.html · app_prueba_firebase.html · sw.js
+*** SOLO 2 ARCHIVOS (no incluye sw.js) ***
+  index.html · app_prueba_firebase.html
 
 ═══════════════════════════════════════
-1) LAS RUTAS YA SE GUARDAN EN EL BACKUP
+LO QUE PEDISTE
 ═══════════════════════════════════════
-POR ESO SE PERDIERON antes: las rutas nunca iban en el
-respaldo. Al pasar el backup de la app vieja a la nueva
-quedaban vacias.
+Las tarjetas de "lo que más compra el cliente" se veían
+muy bien cuando entrabas por el perfil del cliente o
+armabas un pedido normal — pero no en todas partes.
 
-AHORA el respaldo guarda:
-   - El orden de tus barberias de cada dia
-   - Todas las visitas marcadas, con su hora
+Encontré los 2 lugares donde se veía distinto:
 
-Probado: se guardan las 7 barberias del miercoles, se
-borra todo, se restaura, y vuelven las 7 en el mismo
-orden y con sus horas.
+1) PEDIDO PARA VARIOS BARBEROS A LA VEZ
+   Antes: chips chiquititos, difíciles de leer y tocar
+     [Gel Fij…③] [Talco④] [Cera②]
 
-═══════════════════════════════════════
-2) CADA VISITA GUARDA SU HORA
-═══════════════════════════════════════
-   |------------------------------------|
-   | ⬆  1  🏪 MODERN CUTS BARBERSHOP    |
-   |        🕐 1:18 PM  ✏️              |
-   |    🗺  [ ✓ Visitada ]  ✕           |
-   |------------------------------------|
+   Ahora: las MISMAS tarjetas grandes que en un pedido
+   normal, con el nombre completo y el precio:
+     ┌─────────────┐  ┌─────────────┐
+     │ Gel Fijador │  │ Talco Barba │
+     │   $8.00     │  │   $6.00     │
+     └─────────────┘  └─────────────┘
+   (con el color de cada barbero, para saber de quién es)
 
-Al marcar "Visitada" guarda la hora sola.
-Y el lapiz ✏️ te deja corregirla si se te olvido marcar.
-
-Las visitas viejas (sin hora) se siguen viendo igual,
-no se pierde nada.
+2) EDITAR UN PEDIDO que ya habías empezado
+   Antes: no salía nada de lo que compra
+   Ahora: salen las mismas tarjetas también
 
 ═══════════════════════════════════════
-3) EL RECORDATORIO
+VERIFICADO
 ═══════════════════════════════════════
-A los 20 MINUTOS de llegar a una barberia, si todavia
-no la marcaste, sale esto:
+  - Al editar un pedido, las tarjetas SÍ aparecen
+  - En el pedido de varios barberos: 2 tarjetas grandes,
+    con nombre completo y precio, tamaño cómodo para
+    tocar (160x57 px, no un chip)
+  - Al tocar una tarjeta, SÍ agrega el producto al pedido
+  - Auditoría: 22 pantallas, cero errores
 
-   +----------------------------------+
-   |              🕐                  |
-   |   Ya terminaste en               |
-   |   MODERN CUTS BARBERSHOP?        |
-   |   Llegaste hace 20 minutos       |
-   |                                  |
-   |  [ ✓ Si, marcar visitada ]       |
-   |  [ ⏰ Todavia no                 |
-   |     Recuerdame en 10 minutos ]   |
-   +----------------------------------+
-
-La app sabe que llegaste cuando registras la primera
-venta o pedido a un barbero de esa barberia.
-
-Si tocas "Todavia no", te lo recuerda en 10 minutos.
-Si la marcas, ya no te molesta mas.
-
-═══════════════════════════════════════
-ADEMAS SE LIMPIO UN PROBLEMA
-═══════════════════════════════════════
-Habian quedado DOS sistemas de recordatorio duplicados
-peleandose entre si. Se dejo solo el que funciona.
-
-PROBADO:
-  - Marcar visitada guarda la hora
-  - Editar la hora funciona
-  - El aviso sale a los 20 min
-  - Posponer lo corre 10 minutos exactos
-  - Al marcarla, deja de molestar
-  - El backup guarda y restaura todo
-  - Las 27 pantallas, ninguna se queda pegada
-  - Auditoria: 22 pantallas, cero errores
+COMO SUBIRLO:
+  1. GitHub Desktop -> repositorio NBS2
+  2. Copia estos 2 archivos (reemplazando)
+  3. NO toques tu sw.js actual, no hace falta
+  4. Commit + Push, espera 2 min, refresca 2-3 veces
