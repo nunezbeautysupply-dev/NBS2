@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260724l-OFICIAL-V2.0">
+<meta name="app-version" content="20260724m-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -189,7 +189,7 @@ button:active{transform:scale(0.96);filter:brightness(0.93);}
   min-width:0;
 }
 .busca-caja:focus-within{
-  box-shadow:0 0 0 3px rgba(212,160,23,0.28);
+  box-shadow:0 0 0 3px rgba(68,68,68,0.28);
 }
 
 .inp{
@@ -314,8 +314,16 @@ button:active{transform:scale(0.96);filter:brightness(0.93);}
   color:var(--nbs-muted) !important;
   letter-spacing:0.3px;
 }
-.busca-fuerte{ font-size:15px !important; padding:18px 0 !important; }
-.busca-caja{ border-width:3px !important; border-color:var(--nbs-gold) !important; background:#FFFCF3 !important; box-shadow:0 2px 6px rgba(212,160,23,.35) !important; }
+/* Estilo UNIFICADO de todas las cajas de busqueda de la app (24 jul 2026).
+   Antes: borde dorado, fondo color crema, mas altas (18px de relleno).
+   Ahora, pedido por Sensei tras probarlo primero en Rutas: borde gris oscuro
+   #444 (no dorado, no negro puro -ya se probo y "quedo exagerado"-), fondo
+   BLANCO PURO (para que lo que escriba se note mas), y bastante mas
+   compactas (4px de relleno en vez de 18px). Se quita tambien el resaltado
+   azul que pone Chrome al tocar el campo (-webkit-tap-highlight-color),
+   que fue la causa real de que el fondo se viera "palido" al escribir. */
+.busca-fuerte{ font-size:15px !important; font-weight:700 !important; padding:4px 0 !important; background:#fff !important; -webkit-tap-highlight-color:transparent !important; }
+.busca-caja{ border:3px solid #444 !important; background:#fff !important; box-shadow:0 2px 6px rgba(0,0,0,.22) !important; -webkit-tap-highlight-color:transparent !important; }
 /* Los botones de accion tambien se leen mejor */
 .btn{ font-weight:800 !important; }
 .mlb2{ font-weight:800 !important; font-size:18.5px !important; padding:15px 12px !important; }
@@ -19175,7 +19183,10 @@ function renderRutaDia(diaKey){
     // de negro puro, 3px en vez de 5px, y un poco menos alta todavia.
     // Bajada de altura otra vez (24 jul): seguia viendose alta comparando con
     // la foto de al lado -padding 8px->4px, letra 17px->15px-.
-    cajaAgregar.style.cssText = 'border:3px solid #444 !important;background:#fff !important;box-shadow:0 2px 6px rgba(0,0,0,.22) !important;margin-bottom:8px;padding:4px 14px;-webkit-tap-highlight-color:transparent';
+    // Ya no hace falta repetir el borde/fondo/sombra a mano: la regla
+    // compartida .busca-caja de arriba (24 jul) ya deja TODAS las cajas
+    // de la app exactamente asi. Solo se deja el margen, propio de esta pantalla.
+    cajaAgregar.style.cssText = 'margin-bottom:8px';
     var iconoAgregar = document.createElement('span');
     iconoAgregar.style.cssText = 'font-size:20px;flex-shrink:0;opacity:.85';
     iconoAgregar.textContent = '🔍';
@@ -19185,7 +19196,9 @@ function renderRutaDia(diaKey){
     buscarAgregar.type = 'text';
     buscarAgregar.placeholder = 'Buscar barbería para agregar...';
     buscarAgregar.autocomplete = 'off';
-    buscarAgregar.style.cssText = 'font-size:15px;font-weight:700;-webkit-tap-highlight-color:transparent;background:#fff';
+    // Igual que arriba: la regla compartida .busca-fuerte ya pone el
+    // mismo tamano de letra, peso y fondo -no hace falta repetirlo aqui-.
+    buscarAgregar.style.cssText = '';
     buscarAgregar.oninput = (function(dk){ return function(){ renderRutaAgregarLista(dk, this.value); }; })(diaKey);
     cajaAgregar.appendChild(iconoAgregar);
     cajaAgregar.appendChild(buscarAgregar);
