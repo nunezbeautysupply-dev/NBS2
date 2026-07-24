@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260724f-OFICIAL-V2.0">
+<meta name="app-version" content="20260724g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16303,25 +16303,26 @@ function revisarVersionNueva(){
 
 function mostrarLetreroActualizacion(){
   var d = document.createElement('div');
-  // Banner discreto arriba (no pantalla completa), gris fuerte con borde negro y letras azules
+  // Banner discreto arriba (no pantalla completa), gris fuerte con borde negro y letras azules.
+  // Achicado el 24 jul (pedido por Sensei): antes ocupaba 3 renglones con un icono grande
+  // arriba; ahora son 2 renglones mas bajitos, mismo texto de siempre.
   d.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);'
     + 'width:calc(100% - 32px);max-width:360px;background:#b8bcc8;border:2px solid #111;'
-    + 'border-radius:10px;padding:12px 16px;text-align:center;z-index:99999;'
-    + 'box-shadow:0 4px 14px rgba(0,0,0,0.25);animation:bajarBanner 0.35s ease';
-  d.innerHTML = '<div style="font-size:20px;margin-bottom:4px">✅</div>'
-    + '<div style="font-size:15px;color:#0d1547">La app se actualizó — '+escaparHtml(VERSION_VISIBLE)+'</div>'
-    + '<div style="font-size:12px;color:#333;margin-top:5px">Ya tienes la versión más reciente</div>';
+    + 'border-radius:9px;padding:8px 14px;text-align:center;z-index:99999;'
+    + 'box-shadow:0 3px 11px rgba(0,0,0,0.22);animation:bajarBanner 0.35s ease';
+  d.innerHTML = '<div style="font-size:14px;font-weight:700;color:#0d1547">✅ La app se actualizó — '+escaparHtml(VERSION_VISIBLE)+'</div>'
+    + '<div style="font-size:11px;color:#333;margin-top:2px">Ya tienes la versión más reciente</div>';
   // Animación de entrada y salida
   var estilo = document.createElement('style');
   estilo.textContent = '@keyframes bajarBanner{from{opacity:0;transform:translateX(-50%) translateY(-16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}'
     + '@keyframes subirBanner{from{opacity:1;transform:translateX(-50%) translateY(0)}to{opacity:0;transform:translateX(-50%) translateY(-16px)}}';
   document.head.appendChild(estilo);
   document.body.appendChild(d);
-  // Desaparece a los 7 segundos (subido para dar tiempo de sobra a leerlo, pedido por Sensei)
+  // Desaparece a los 5 segundos (bajado de 7 a 5, pedido por Sensei el 24 jul)
   setTimeout(function(){
     d.style.animation = 'subirBanner 0.4s ease';
     setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); }, 400);
-  }, 7000);
+  }, 5000);
 }
 
 function iniciarAppDespuesDeLogin(){
