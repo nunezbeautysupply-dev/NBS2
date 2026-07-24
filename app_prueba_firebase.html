@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260724o-OFICIAL-V2.0">
+<meta name="app-version" content="20260724r-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10052,7 +10052,8 @@ function selBarberia(nombre, barberos){
     var d = document.createElement('div');
     d.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #f0f0f0;cursor:pointer';
     d.innerHTML = '<div class="av" style="width:36px;height:36px;font-size:14px;margin-right:10px;flex-shrink:0">'+ini(c.nombre,c.apellido)+'</div>'
-      +'<div style="flex:1"><div style="font-size:17px;font-weight:800;color:#1a237e">'+escaparHtml(nombreCl(c))+'</div></div>'
+      +'<div style="flex:1"><div style="font-size:17px;font-weight:800;color:#1a237e">'+escaparHtml(nombreCl(c))+'</div>'
+      +'<div style="margin-top:2px">'+etiquetaBalanceHtml(c.id)+'</div></div>'
       +'<span style="color:#ddd;font-size:20px">›</span>';
     d.onclick = (function(cl){ return function(){ selBarbero(cl.id, nombreCl(cl)); }; })(c);
     el.appendChild(d);
@@ -10074,6 +10075,10 @@ function selBarbero(cid, nombre){
   document.getElementById('ped-form-wrap').style.display = 'block';
   document.getElementById('ped-barbero-actual').textContent = nombre;
   document.getElementById('ped-barberia-actual').textContent = pedBarberiaSel||'';
+  // Balance del cliente aqui tambien -pedido por Sensei el 24 jul-, igual que en
+  // la lista de donde vino y en el resto de la app.
+  var elBal = document.getElementById('ped-balance-actual');
+  if(elBal) elBal.innerHTML = cid ? etiquetaBalanceHtml(cid, true) : '';
   pedItemsTemp = [];
   renderPedItems();
   renderFavoritosPedido();
@@ -10332,6 +10337,31 @@ function agregarHabitualMulti(idx, hi){
 
 // Calcula lo que debe cada cliente, sumando el saldo de todas sus facturas sin pagar.
 // Se hace UNA vez por dibujado -no una por cada barbero- para que no se ponga lento.
+// El balance REAL de un cliente: lo que debe y su credito a favor, POR SEPARADO -no
+// restados entre si-. Corregido el 24 jul: al principio esto mostraba un solo numero
+// neto, y Sensei aclaro que quiere ver la deuda real y el credito real cada uno aparte,
+// porque es EL QUIEN decide cuando aplicarle el credito a un cliente -no que la pantalla
+// lo de por aplicado solo con restarlo-.
+function balanceRealCliente(cid){
+  var balances = calcularBalancesClientes();
+  var deuda = balances.total[String(cid)] || 0;
+  var cl = (typeof clientes !== 'undefined' ? clientes : LS('ncl',[])).find(function(c){ return String(c.id)===String(cid); });
+  var credito = cl ? (cl.creditoAFavor||0) : 0;
+  return { deuda: deuda, credito: credito };
+}
+
+// Devuelve el HTML de una etiqueta chiquita de balance, lista para insertar.
+// Muestra la deuda Y el credito por separado si tiene los dos a la vez.
+// vacio=true cuando no tiene ninguno y no hace falta mostrar nada (menos ruido visual).
+function etiquetaBalanceHtml(cid, vacio){
+  var b = balanceRealCliente(cid);
+  var partes = [];
+  if(b.deuda > 0.01) partes.push('<span style="font-size:11px;color:var(--nbs-red-dark);font-weight:800">Debe $'+fmtNum(b.deuda)+'</span>');
+  if(b.credito > 0.01) partes.push('<span style="font-size:11px;color:#E65100;font-weight:800">💰 $'+fmtNum(b.credito)+' a favor</span>');
+  if(!partes.length) return vacio ? '' : '<span style="font-size:11px;color:#bbb;font-weight:700">✓ Al día</span>';
+  return partes.join('&nbsp;&nbsp;');
+}
+
 function calcularBalancesClientes(){
   var ventasTodas = LS('nv', []);
   var total = {}, detalle = {};
@@ -10417,7 +10447,13 @@ function descartarPedidoEnProceso(){
   if(!confirm(msj)) return;
   olvidarPedidoEnProceso();
   pedidosMultiTemp = [];
-  renderAvisoPedidoEnProceso();
+  // A PRUEBA DE BALAS (24 jul, pedido por Sensei: "debería volver al listado de todas
+  // las barberías... el botón funciona pero no saca de esa pantalla"). Antes solo se
+  // refrescaba el avisito, y si Sensei estaba DENTRO del formulario (ped-multi-wrap,
+  // ped-barbero-wrap, etc.) se quedaba ahi mismo viendo datos ya borrados. Ahora
+  // SIEMPRE se navega de vuelta a la lista completa de Pedidos Rapidos, sin importar
+  // desde donde se haya tocado "Descartar".
+  ir('p-ped');
 }
 
 // El aviso arriba de la lista, para retomar lo que dejaste a medias
@@ -10527,14 +10563,19 @@ function renderPedidosMultiples(){
     // --- El balance del barbero, SIEMPRE visible -aunque sea $0- ---
     // Siempre se muestra, incluso al dia: si dice $0.00 queda confirmado que no debe nada,
     // en vez de tener que acordarse o salir a buscarlo.
+    // El balance REAL: deuda y credito por separado -no restados entre si- (24 jul,
+    // pedido por Sensei: "yo decido cuando aplicarle su credito, no que se aplique solo").
     var debe = balances.total[String(p.cliente.id)] || 0;
+    var creditoBarbero = p.cliente.creditoAFavor || 0;
     var facturasDebe = balances.detalle[String(p.cliente.id)] || [];
-    html += '<div onclick="toggleBalanceMulti('+idx+')" style="padding:7px 12px;background:'+(debe>0.01?'#FFF3F3':'#F1F8F2')+';border-bottom:0.5px solid #f0f0f3;cursor:'+(debe>0.01?'pointer':'default')+';display:flex;align-items:center;gap:6px">'
+    var tieneCredito = creditoBarbero > 0.01;
+    html += '<div onclick="toggleBalanceMulti('+idx+')" style="padding:7px 12px;background:'+(debe>0.01?'#FFF3F3':(tieneCredito?'#FFF3E0':'#F1F8F2'))+';border-bottom:0.5px solid #f0f0f3;cursor:'+(debe>0.01?'pointer':'default')+';display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
       +'<span style="font-size:11px;color:#999;font-weight:700">BALANCE</span>'
-      +'<span style="font-size:14px;font-weight:800;color:'+(debe>0.01?'var(--nbs-red-dark)':'var(--nbs-green-text)')+'">$'+fmtNum(debe)+'</span>'
+      +(debe>0.01 ? '<span style="font-size:14px;font-weight:800;color:var(--nbs-red-dark)">$'+fmtNum(debe)+'</span>' : '')
+      +(tieneCredito ? '<span style="font-size:13px;font-weight:800;color:#E65100">💰 $'+fmtNum(creditoBarbero)+' a favor</span>' : '')
       +(debe>0.01
          ? '<span style="font-size:11px;color:#999;margin-left:auto">'+facturasDebe.length+' factura(s) ▾</span>'
-         : '<span style="font-size:11px;color:var(--nbs-green-text);margin-left:auto;font-weight:600">✓ al día</span>')
+         : (tieneCredito ? '' : '<span style="font-size:11px;color:var(--nbs-green-text);margin-left:auto;font-weight:600">✓ al día</span>'))
       +'</div>';
     if(debe > 0.01){
       html += '<div id="multi-bal-detalle-'+idx+'" style="display:none;padding:8px 12px;background:#FFF8F8;border-bottom:0.5px solid #f0f0f3">';
@@ -13554,7 +13595,7 @@ function renderCxC(q){
     var saldoBruto = Math.max(0,b.total-b.pagado);
     var saldoNeto = saldoBruto - creditoAFavor; // negativo = el negocio le debe al cliente
     return {cid:b.cid, cn:b.cn, total:b.total, saldo:saldoNeto, saldoBruto:saldoBruto, creditoAFavor:creditoAFavor, negocio: cl ? (cl.negocio||'') : ''};
-  }).filter(function(b){ return Math.abs(b.saldo) > 0.005; });
+  }).filter(function(b){ return b.saldoBruto > 0.005 || b.creditoAFavor > 0.005; }); // el REAL, no el neto
 
   // Filtrar por búsqueda (nombre, negocio, apodo, teléfono, o dirección del cliente)
   if(q && q.trim()){
@@ -13621,15 +13662,23 @@ function renderCxC(q){
       +(negocio ? '<div style="font-size:12px;color:var(--nbs-muted);margin-top:1px;display:flex;align-items:center;gap:4px">🏪'+escaparHtml(negocio)+'</div>' : '')
       +'<div style="font-size:11px;color:var(--nbs-muted-2);margin-top:3px">'+(c.total>0?'Total facturado: $'+fmtNum(c.total):'Sin facturas abiertas')+'</div></div>'
       +'</div>'
-      +'<div style="text-align:right"><div style="font-size:18px;font-weight:700;color:'+(esFavorCliente?'#E65100':'var(--nbs-red-dark)')+'">$'+fmtNum(Math.abs(c.saldo))+'</div>'
-      +'<div style="font-size:11px;color:'+(esFavorCliente?'#E65100':'var(--nbs-muted)')+';font-weight:'+(esFavorCliente?'700':'400')+'">'+(esFavorCliente?'↩️ le debes a él':'pendiente')+'</div></div></div>'
-      +(esFavorCliente
-        ? '<div style="background:#FFF3E0;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:11px;color:#E65100">Este cliente tiene crédito a favor de una devolución. Se aplicará solo a su próxima compra, o le puedes devolver el dinero.</div>'
-        : '<div style="height:6px;background:#F0F0F2;border-radius:3px;overflow:hidden;margin-bottom:8px">'
+      +'<div style="text-align:right">'
+      // El balance REAL: la deuda y el credito por separado, SIN restarlos entre si -pedido
+      // por Sensei el 24 jul: "yo decido cuando aplicarle su balance o credito pendiente a
+      // favor a cada cliente, no que el credito se aplique automaticamente"-.
+      +(c.saldoBruto>0.01 ? '<div style="font-size:18px;font-weight:700;color:var(--nbs-red-dark)">$'+fmtNum(c.saldoBruto)+'</div><div style="font-size:11px;color:var(--nbs-muted)">pendiente</div>' : '')
+      +(c.creditoAFavor>0.01 ? '<div style="font-size:'+(c.saldoBruto>0.01?'14px':'18px')+';font-weight:700;color:#E65100;margin-top:'+(c.saldoBruto>0.01?'3px':'0')+'">💰$'+fmtNum(c.creditoAFavor)+'</div><div style="font-size:11px;color:#E65100;font-weight:700">a favor</div>' : '')
+      +'</div></div>'
+      +(c.creditoAFavor>0.01
+        ? '<div style="background:#FFF3E0;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:11px;color:#E65100">💰 Tiene $'+fmtNum(c.creditoAFavor)+' de crédito a favor. Se aplica SOLO cuando tú elijas "Usar crédito del cliente" al venderle.</div>'
+        : '')
+      +(c.saldoBruto>0.01
+        ? '<div style="height:6px;background:#F0F0F2;border-radius:3px;overflow:hidden;margin-bottom:8px">'
           +'<div style="height:100%;width:'+pct+'%;background:var(--nbs-green-text);border-radius:3px"></div></div>'
           +'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--nbs-muted);margin-bottom:12px">'
-          +'<span>Pagado: '+pct+'%</span><span>Pendiente: '+(100-pct)+'%</span></div>')
-      +'<button style="width:100%;padding:10px;background:'+(esFavorCliente?'#E65100':'var(--nbs-gold)')+';color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px">'+(esFavorCliente?'👁️ Ver detalle':'💰Registrar pago')+'</button>';
+          +'<span>Pagado: '+pct+'%</span><span>Pendiente: '+(100-pct)+'%</span></div>'
+        : '')
+      +'<button style="width:100%;padding:10px;background:'+(c.saldoBruto>0.01?'var(--nbs-gold)':'#E65100')+';color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px">'+(c.saldoBruto>0.01?'💰Registrar pago':'👁️ Ver detalle')+'</button>';
     card.style.cursor='pointer';
     card.onclick=(function(cid){return function(){abrirAbono(cid);};})(c.cid);
     card.querySelector('button').onclick=(function(cid){return function(e){e.stopPropagation();abrirAbono(cid);};})(c.cid);
@@ -20667,6 +20716,7 @@ function verHistorialCliente(cid, modo){
         <div>
           <div id="ped-barbero-actual" style="font-size:18px;font-weight:800;color:#1a237e"></div>
           <div id="ped-barberia-actual" style="font-size:12px;color:#aaa;margin-top:2px"></div>
+          <div id="ped-balance-actual" style="font-size:13px;font-weight:800;margin-top:4px"></div>
         </div>
         <button onclick="cancelarPedido()" style="background:#f5f5f5;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px;color:#546E7A;font-weight:600">✕ Cancelar</button>
       </div>
