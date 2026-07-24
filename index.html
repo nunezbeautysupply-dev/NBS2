@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260724i-OFICIAL-V2.0">
+<meta name="app-version" content="20260724l-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19165,10 +19165,17 @@ function renderRutaDia(diaKey){
     // !important porque hay una regla general (.busca-caja) que fuerza 3px
     // dorado normal en TODAS las cajas de busqueda de la app -esta necesita
     // ganarle a esa regla para verse MAS acentuada que las demas-.
-    // Fondo blanco (no el crema que usan las demas cajas) para que lo que
-    // Sensei escriba se note mas, y un poco menos alta -pidio "baja un
-    // poquito, esta demasiado alta"-.
-    cajaAgregar.style.cssText = 'border:4px solid #B8860B !important;background:#fff !important;box-shadow:0 4px 10px rgba(184,134,11,.5) !important;margin-bottom:8px;padding:10px 16px';
+    // Fondo BLANCO PURO, borde NEGRO un poquito mas grueso -pedido por Sensei.
+    // OJO: el "blanco palido" que veia al escribir NO era el fondo -ya media
+    // blanco puro por getComputedStyle- sino el resaltado azul que Chrome
+    // pone solo mientras el dedo esta tocando el campo (normal en telefonos).
+    // Se quita con -webkit-tap-highlight-color:transparent.
+    // Ajuste fino pedido por Sensei (24 jul): el negro puro y 5px quedo muy
+    // exagerado -"ahi me equivoque en la eleccion"-. Ahora gris oscuro en vez
+    // de negro puro, 3px en vez de 5px, y un poco menos alta todavia.
+    // Bajada de altura otra vez (24 jul): seguia viendose alta comparando con
+    // la foto de al lado -padding 8px->4px, letra 17px->15px-.
+    cajaAgregar.style.cssText = 'border:3px solid #444 !important;background:#fff !important;box-shadow:0 2px 6px rgba(0,0,0,.22) !important;margin-bottom:8px;padding:4px 14px;-webkit-tap-highlight-color:transparent';
     var iconoAgregar = document.createElement('span');
     iconoAgregar.style.cssText = 'font-size:20px;flex-shrink:0;opacity:.85';
     iconoAgregar.textContent = '🔍';
@@ -19178,7 +19185,7 @@ function renderRutaDia(diaKey){
     buscarAgregar.type = 'text';
     buscarAgregar.placeholder = 'Buscar barbería para agregar...';
     buscarAgregar.autocomplete = 'off';
-    buscarAgregar.style.cssText = 'font-size:17px;font-weight:700';
+    buscarAgregar.style.cssText = 'font-size:15px;font-weight:700;-webkit-tap-highlight-color:transparent;background:#fff';
     buscarAgregar.oninput = (function(dk){ return function(){ renderRutaAgregarLista(dk, this.value); }; })(diaKey);
     cajaAgregar.appendChild(iconoAgregar);
     cajaAgregar.appendChild(buscarAgregar);
