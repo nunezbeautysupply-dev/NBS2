@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260724v-OFICIAL-V2.0">
+<meta name="app-version" content="20260724w-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -11722,9 +11722,28 @@ function darRegaloFidelidad(cid){
   verCl(cid);
 }
 
+// Version liviana de agruparPosiblesDuplicados para UN cliente -se usa al abrir su
+// perfil, para avisar EN EL MOMENTO si hay otra copia suya con deuda escondida-.
+function posiblesDuplicadosDe(c, listaClientes){
+  var keyNombre = normalizarTextoBusqueda((c.nombre||'')+' '+(c.apellido||''));
+  var tel = (c.tel||'').replace(/\D/g,'');
+  return listaClientes.filter(function(x){
+    if(String(x.id) === String(c.id)) return false;
+    var xKey = normalizarTextoBusqueda((x.nombre||'')+' '+(x.apellido||''));
+    if(keyNombre && xKey === keyNombre) return true;
+    var xTel = (x.tel||'').replace(/\D/g,'');
+    if(tel && tel.length>=7 && xTel === tel) return true;
+    return false;
+  });
+}
+
 function verCl(id){
   clientes=LS('ncl',[]);
   var c=clientes.find(function(x){return String(x.id)===String(id);});if(!c)return;
+  // Aviso EN EL MOMENTO si hay otra copia de este mismo cliente -pedido por Sensei el 25
+  // jul, tras preguntarle un cliente cuanto debia y la app decir $0.00 estando su deuda
+  // real escondida en una copia duplicada-.
+  var posiblesDup = posiblesDuplicadosDe(c, clientes);
   ventas=LS('nv',[]);creditos=LS('ncr',[]);
   var todasVentas=ventas.filter(function(v){return String(v.cid)===String(id);});
   var ventasActivas=todasVentas.filter(function(v){return !v.cancelada;});
@@ -11792,6 +11811,15 @@ function verCl(id){
     +(c.creditoAFavor && c.creditoAFavor > 0.005 ? '<div style="background:#FFF3E0;border-radius:8px;padding:10px;grid-column:span 2"><div style="font-size:10px;color:#E65100;font-weight:700">💰 CRÉDITO A FAVOR</div><div style="font-size:18px;font-weight:700;color:#E65100;margin-top:2px">($'+fmtNum(c.creditoAFavor)+')</div></div>' : '')
     +recordVisitasHtml
     +'</div>'
+    +(posiblesDup.length ? '<div style="background:#FFF3E0;border:2px solid #F9A825;border-radius:10px;padding:12px;margin-bottom:10px">'
+      +'<div style="font-size:13px;font-weight:800;color:#8a6d00;margin-bottom:6px">\u26a0\ufe0f \u00bfEs la misma persona que...?</div>'
+      +posiblesDup.map(function(d){
+        return '<div onclick="verCl(\''+d.id+'\')" style="background:white;border-radius:8px;padding:8px 10px;margin-bottom:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
+          +'<span style="font-size:13px;color:#555">'+escaparHtml(nombreCl(d))+(d.negocio?' \u00b7 '+escaparHtml(d.negocio):'')+'</span>'
+          +'<span style="font-size:11px;color:#1565C0;font-weight:700">Ver \u203a</span></div>';
+      }).join('')
+      +'<div style="font-size:11px;color:#8a6d00;margin-top:4px">Tienen el mismo nombre o tel\u00e9fono. Si es la misma persona, usa "Eliminar clientes duplicados" en el men\u00fa de Clientes para juntar su historial y su deuda en un solo lugar.</div>'
+      +'</div>' : '')
     +(esNoBarberia && c.intervaloVisitaDias ? '<button class="btn" style="background:#1565C0;color:white;margin-bottom:8px" onclick="marcarVisitaNegocio('+id+');verCl('+id+')">✓ Marqué la visita de hoy</button>' : '')
     +'<div style="display:flex;gap:8px">'
     +'<button class="btn" style="flex:1;background:#1565C0;color:white;margin:0" onclick="editarCl('+id+')">✏️ Editar cliente</button>'
@@ -14339,15 +14367,45 @@ function confirmarPagoMultiple(vid, saldo){
 
 
 
+// Encuentra grupos de clientes que probablemente son la MISMA persona -pedido por Sensei
+// el 25 jul, tras un cliente preguntarle cuanto debia y la app decir $0.00 cuando en
+// realidad si debia: la deuda estaba repartida entre dos copias del mismo cliente-.
+// Antes solo juntaba nombres IDENTICOS letra por letra -"Jose Perez" y "José Pérez" NO
+// se detectaban como el mismo-. Ahora usa la MISMA normalizacion que ya usa el buscador
+// -quita acentos, simbolos, espacios de mas- y TAMBIEN junta a cualquiera que comparta
+// el mismo telefono, aunque el nombre este escrito distinto.
+function agruparPosiblesDuplicados(listaClientes){
+  var padre = {};
+  function raiz(id){ if(padre[id]===undefined) padre[id]=id; while(padre[id]!==id){ id=padre[id]; } return id; }
+  function unir(a,b){ var ra=raiz(a), rb=raiz(b); if(ra!==rb) padre[ra]=rb; }
+  listaClientes.forEach(function(c){ raiz(c.id); });
+
+  var porNombre = {}, porTel = {};
+  listaClientes.forEach(function(c){
+    var keyNombre = normalizarTextoBusqueda((c.nombre||'')+' '+(c.apellido||''));
+    if(keyNombre){
+      if(porNombre[keyNombre]) unir(c.id, porNombre[keyNombre]);
+      else porNombre[keyNombre] = c.id;
+    }
+    var tel = (c.tel||'').replace(/\D/g,'');
+    if(tel && tel.length >= 7){
+      if(porTel[tel]) unir(c.id, porTel[tel]);
+      else porTel[tel] = c.id;
+    }
+  });
+
+  var grupos = {};
+  listaClientes.forEach(function(c){
+    var r = raiz(c.id);
+    if(!grupos[r]) grupos[r] = [];
+    grupos[r].push(c);
+  });
+  return grupos;
+}
+
 function eliminarDuplicadosClientes(){
   clientes = LS('ncl', []);
-  var vistos = {};
-  var grupos = {};
-  clientes.forEach(function(c){
-    var key = (c.nombre+' '+c.apellido).trim().toLowerCase();
-    if(!grupos[key]) grupos[key] = [];
-    grupos[key].push(c);
-  });
+  var grupos = agruparPosiblesDuplicados(clientes);
   var conDuplicados = Object.keys(grupos).filter(function(k){ return grupos[k].length > 1; });
   if(!conDuplicados.length){
     alert('✅ No se encontraron clientes duplicados.');
