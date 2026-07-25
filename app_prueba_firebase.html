@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260725f-OFICIAL-V2.0">
+<meta name="app-version" content="20260725g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2025,13 +2025,14 @@ function sonidoRecordatorio(){
     _pitido(880, 0.14, 0.22, 0.22);
   }catch(e){}
 }
-// 🟢 ACTUALIZACIÓN: dos notas subiendo, distinto a los otros dos -para el letrero de
-// "La app se actualizó". A ESTE se le olvidó ponerle sonido cuando se hicieron los
-// otros el 25 jul; Sensei lo notó y se corrige aquí-.
+// 🟢 ACTUALIZACIÓN: melodía de 4 notas subiendo, más larga y distinta a los otros dos
+// -pedido por Sensei el 25 jul, el de 2 notas casi ni se sentía-.
 function sonidoActualizacionApp(){
   try{
-    _pitido(660, 0,    0.14, 0.2);
-    _pitido(990, 0.13, 0.2,  0.2);
+    _pitido(523, 0,    0.22, 0.28);  // Do
+    _pitido(659, 0.20, 0.22, 0.28);  // Mi
+    _pitido(784, 0.40, 0.22, 0.28);  // Sol
+    _pitido(1047,0.60, 0.38, 0.30);  // Do agudo, la más larga, para que quede sonando al final
   }catch(e){}
 }
 
