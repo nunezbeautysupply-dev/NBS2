@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260725e-OFICIAL-V2.0">
+<meta name="app-version" content="20260725f-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1999,6 +1999,16 @@ function _pitido(frecuencia, inicioSeg, duracionSeg, volumen){
   osc.start(t0);
   osc.stop(t0 + duracionSeg + 0.02);
 }
+// DESBLOQUEO DEL SONIDO (25 jul, arregla "el aviso de actualización no suena"):
+// el teléfono NO deja sonar nada hasta que la persona toca la pantalla al menos una vez
+// -es una regla de seguridad del navegador, no un error de la app-. El aviso de
+// "actualización" sale justo al abrir/entrar, a veces ANTES de que ese primer toque
+// haya "desbloqueado" el sonido. Con este código, el simple toque de entrar a la app
+// -tocar "Entrar", poner la huella, lo que sea- ya desbloquea el sonido para el resto
+// de la sesión, así que para cuando salga el aviso, ya puede sonar.
+document.addEventListener('pointerdown', function _desbloquearSonido(){
+  _obtenerContextoAudio();
+}, { once:true, capture:true });
 // 🔴 PRECAUCION: dos pitidos cortos y agudos seguidos -mismo espiritu que la alerta
 // de Windows, para avisos importantes como "algo se borro" o "el dinero no cuadra"-.
 function sonidoPrecaucion(){
