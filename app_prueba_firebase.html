@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260725d-OFICIAL-V2.0">
+<meta name="app-version" content="20260725e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2013,6 +2013,15 @@ function sonidoRecordatorio(){
   try{
     _pitido(660, 0,    0.16, 0.22);
     _pitido(880, 0.14, 0.22, 0.22);
+  }catch(e){}
+}
+// 🟢 ACTUALIZACIÓN: dos notas subiendo, distinto a los otros dos -para el letrero de
+// "La app se actualizó". A ESTE se le olvidó ponerle sonido cuando se hicieron los
+// otros el 25 jul; Sensei lo notó y se corrige aquí-.
+function sonidoActualizacionApp(){
+  try{
+    _pitido(660, 0,    0.14, 0.2);
+    _pitido(990, 0.13, 0.2,  0.2);
   }catch(e){}
 }
 
@@ -16919,6 +16928,7 @@ function revisarVersionNueva(){
 }
 
 function mostrarLetreroActualizacion(){
+  sonidoActualizacionApp();
   var d = document.createElement('div');
   // Banner discreto arriba (no pantalla completa), gris fuerte con borde negro y letras azules.
   // Achicado el 24 jul (pedido por Sensei): antes ocupaba 3 renglones con un icono grande
