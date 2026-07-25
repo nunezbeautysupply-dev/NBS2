@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260724z-OFICIAL-V2.0">
+<meta name="app-version" content="20260725d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -6614,12 +6614,21 @@ function aplicarArregloSobrepago(vid, exceso){
 // ═══ REPORTE POR CLIENTE: comprado, pagado y ganancia (25 jul, pedido por Sensei) ═══
 // "para saber cuales son los clientes que mas me compran y apoyan". Son totales de
 // SIEMPRE -no de un rango de fechas-, con dos formas de ordenar que el mismo escoge.
-function calcularReporteClientes(){
+function calcularReporteClientes(desde, hasta){
   ventas = LS('nv', []);
   clientes = LS('ncl', []);
   var porCliente = {};
   ventas.forEach(function(v){
     if(v.cancelada || !v.cid) return;
+    // Filtro de fechas (25 jul, pedido por Sensei): si desde/hasta vienen, solo cuenta
+    // las ventas dentro del rango. Sin fechas, sigue siendo "de siempre" como antes.
+    if(desde || hasta){
+      var partesFecha = (v.fecha||'').split('/');
+      if(partesFecha.length !== 3) return;
+      var fechaVenta = new Date(parseInt(partesFecha[2]), parseInt(partesFecha[0])-1, parseInt(partesFecha[1]));
+      if(desde && fechaVenta < desde) return;
+      if(hasta && fechaVenta > hasta) return;
+    }
     var k = String(v.cid);
     if(!porCliente[k]) porCliente[k] = { comprado:0, pagado:0, ganancia:0 };
     porCliente[k].comprado += (v.total||0);
@@ -6652,20 +6661,39 @@ function mostrarReporteClientes(orden){
   if(!ov || !caja){ avisoGrande('No se pudo abrir el reporte.'); return; }
   window._topClientesOrden = orden;
 
-  var lista = calcularReporteClientes();
+  var desdeTxt = window._topClientesDesde || '';
+  var hastaTxt = window._topClientesHasta || '';
+  var desde = desdeTxt ? new Date(desdeTxt+'T00:00:00') : null;
+  var hasta = hastaTxt ? new Date(hastaTxt+'T23:59:59') : null;
+
+  var lista = calcularReporteClientes(desde, hasta);
   lista.sort(function(a,b){
     return orden==='ganancia' ? (b.ganancia - a.ganancia) : (b.comprado - a.comprado);
   });
   lista = lista.slice(0, 10);
 
   var h = '<h3 style="font-size:20px;font-weight:800;color:#1a237e;margin:0 0 10px">📊 Reporte por Cliente</h3>'
-    + '<div style="display:flex;gap:8px;margin-bottom:14px">'
+    + '<div style="display:flex;gap:8px;margin-bottom:10px">'
     + '<button onclick="mostrarReporteClientes(\'ganancia\')" style="flex:1;padding:10px;border-radius:9px;border:2px solid '+(orden==='ganancia'?'#2E7D32':'#ddd')+';background:'+(orden==='ganancia'?'#E8F5E9':'#fff')+';color:'+(orden==='ganancia'?'#2E7D32':'#888')+';font-weight:800;font-size:13px;cursor:pointer">💰 Por Ganancia</button>'
     + '<button onclick="mostrarReporteClientes(\'cantidad\')" style="flex:1;padding:10px;border-radius:9px;border:2px solid '+(orden==='cantidad'?'#1565C0':'#ddd')+';background:'+(orden==='cantidad'?'#E3F2FD':'#fff')+';color:'+(orden==='cantidad'?'#1565C0':'#888')+';font-weight:800;font-size:13px;cursor:pointer">📦 Por Cantidad</button>'
+    + '</div>'
+    // Filtro de fechas (25 jul, pedido por Sensei) -vacío = de siempre, como ya era-
+    + '<div style="background:#f5f6fb;border-radius:10px;padding:10px;margin-bottom:14px">'
+    + '<div style="display:flex;gap:8px;margin-bottom:8px">'
+    + '<div style="flex:1"><div style="font-size:10.5px;color:#666;font-weight:700;margin-bottom:2px">DESDE</div>'
+    + '<input type="date" id="topcli-desde" value="'+escaparHtml(desdeTxt)+'" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ccc;font-size:13px;font-family:inherit"></div>'
+    + '<div style="flex:1"><div style="font-size:10.5px;color:#666;font-weight:700;margin-bottom:2px">HASTA</div>'
+    + '<input type="date" id="topcli-hasta" value="'+escaparHtml(hastaTxt)+'" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ccc;font-size:13px;font-family:inherit"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="aplicarFechasReporteClientes()" style="flex:1;padding:9px;border-radius:8px;border:none;background:#1a237e;color:#fff;font-weight:800;font-size:12.5px;cursor:pointer">Aplicar fechas</button>'
+    + (desdeTxt||hastaTxt ? '<button onclick="quitarFechasReporteClientes()" style="flex:1;padding:9px;border-radius:8px;border:2px solid #999;background:#fff;color:#666;font-weight:700;font-size:12.5px;cursor:pointer">Ver de siempre</button>' : '')
+    + '</div>'
+    + (desdeTxt||hastaTxt ? '<div style="font-size:11.5px;color:#1a237e;font-weight:700;margin-top:8px;text-align:center">📅 Mostrando '+(desdeTxt?escaparHtml(desdeTxt):'el inicio')+' → '+(hastaTxt?escaparHtml(hastaTxt):'hoy')+'</div>' : '<div style="font-size:11px;color:#999;margin-top:8px;text-align:center">Mostrando de siempre -sin filtro de fechas-</div>')
     + '</div>';
 
   if(!lista.length){
-    h += '<div style="text-align:center;color:#999;padding:30px 10px">Todavía no tienes ventas registradas.</div>';
+    h += '<div style="text-align:center;color:#999;padding:30px 10px">'+((desdeTxt||hastaTxt)?'No hay ventas en ese rango de fechas.':'Todavía no tienes ventas registradas.')+'</div>';
   } else {
     lista.forEach(function(c, idx){
       h += '<div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.05)">'
@@ -6690,6 +6718,19 @@ function mostrarReporteClientes(orden){
   caja.style.display = 'flex';
 }
 
+function aplicarFechasReporteClientes(){
+  var d = document.getElementById('topcli-desde').value;
+  var h = document.getElementById('topcli-hasta').value;
+  if(d && h && d > h){ avisoGrande('La fecha "Desde" no puede ser después de la fecha "Hasta".'); return; }
+  window._topClientesDesde = d;
+  window._topClientesHasta = h;
+  mostrarReporteClientes(window._topClientesOrden);
+}
+function quitarFechasReporteClientes(){
+  window._topClientesDesde = '';
+  window._topClientesHasta = '';
+  mostrarReporteClientes(window._topClientesOrden);
+}
 function cerrarReporteClientes(){
   var ov = document.getElementById('topclientes-ov');
   var caja = document.getElementById('topclientes-caja');
@@ -6697,9 +6738,122 @@ function cerrarReporteClientes(){
   if(caja) caja.style.display = 'none';
 }
 
+// Dibuja el Reporte por Cliente como una imagen -mismo estilo que las facturas- para
+// poder compartirlo con TODAS las opciones del telefono (WhatsApp, Bluetooth,
+// PrinterShare, correo, etc.), en vez de la ventana de impresion basica de antes.
+function generarReporteClientesCanvas(lista, orden, desdeTxt, hastaTxt){
+  var W = 480, pad = 18, SCALE = 2;
+  var alturaFila = 62;
+  var alturaEstim = 260 + lista.length*alturaFila + 60;
+
+  var canvas = document.createElement('canvas');
+  canvas.width = W*SCALE; canvas.height = alturaEstim*SCALE;
+  var ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,alturaEstim);
+
+  var y = pad;
+  // Logo + nombre del negocio
+  if(LOGO_IMG_COLOR && LOGO_IMG_COLOR.naturalWidth > 0){
+    ctx.drawImage(LOGO_IMG_COLOR, pad, y, 40, 40);
+  }
+  ctx.fillStyle = '#1a237e';
+  ctx.font = '800 17px Arial'; ctx.textAlign = 'left';
+  ctx.fillText('Nunez Beauty Supply', pad+48, y+18);
+  ctx.fillStyle = '#666'; ctx.font = '12px Arial';
+  ctx.fillText('964 Atwells Ave, Providence, RI', pad+48, y+36);
+  y += 58;
+
+  ctx.strokeStyle = '#ddd'; ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke();
+  y += 24;
+
+  ctx.fillStyle = '#1a237e'; ctx.font = '800 20px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('📊 Reporte por Cliente', W/2, y);
+  y += 24;
+
+  var textoRango = (desdeTxt||hastaTxt) ? ('Del '+(desdeTxt||'inicio')+' al '+(hastaTxt||'hoy')) : 'De siempre';
+  ctx.fillStyle = '#666'; ctx.font = '12.5px Arial';
+  ctx.fillText('Ordenado por '+(orden==='ganancia'?'Ganancia':'Cantidad comprada')+' · '+textoRango, W/2, y);
+  y += 16;
+  ctx.font = '11px Arial'; ctx.fillStyle = '#999';
+  ctx.fillText('Generado el '+fechaHoy(), W/2, y);
+  y += 26;
+
+  ctx.textAlign = 'left';
+  lista.forEach(function(c, idx){
+    // tarjeta de fondo alterna, igual espiritu que la pantalla en la app
+    ctx.fillStyle = idx % 2 === 0 ? '#f7f8fc' : '#fff';
+    ctx.fillRect(pad-6, y-16, W-(pad-6)*2, alturaFila-8);
+
+    ctx.fillStyle = '#1a237e'; ctx.font = '800 14px Arial';
+    ctx.fillText((idx+1)+'. '+c.nombre, pad, y);
+    if(c.negocio){
+      ctx.fillStyle = '#999'; ctx.font = '11px Arial';
+      ctx.fillText('🏪 '+c.negocio, pad, y+15);
+    }
+    var colW = (W - pad*2)/3;
+    var yNum = y + 32;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#1565C0'; ctx.font = '9.5px Arial'; ctx.fillText('COMPRÓ', pad+colW*0.5, yNum-12);
+    ctx.font = '800 13px Arial'; ctx.fillText('$'+fmtNum(c.comprado), pad+colW*0.5, yNum);
+    ctx.fillStyle = '#2E7D32'; ctx.font = '9.5px Arial'; ctx.fillText('PAGÓ', pad+colW*1.5, yNum-12);
+    ctx.font = '800 13px Arial'; ctx.fillText('$'+fmtNum(c.pagado), pad+colW*1.5, yNum);
+    ctx.fillStyle = '#E65100'; ctx.font = '9.5px Arial'; ctx.fillText('GANANCIA', pad+colW*2.5, yNum-12);
+    ctx.font = '800 13px Arial'; ctx.fillText('$'+fmtNum(c.ganancia), pad+colW*2.5, yNum);
+    ctx.textAlign = 'left';
+    y += alturaFila;
+  });
+
+  // recortar el canvas final a lo que realmente se dibujo
+  var finalH = Math.ceil(y) + 10;
+  var final = document.createElement('canvas');
+  final.width = W*SCALE; final.height = finalH*SCALE;
+  var ctxFinal = final.getContext('2d');
+  ctxFinal.drawImage(canvas, 0, 0, W*SCALE, finalH*SCALE, 0, 0, W*SCALE, finalH*SCALE);
+  return final;
+}
+
+function compartirReporteClientes(){
+  var orden = window._topClientesOrden || 'ganancia';
+  var desdeTxt = window._topClientesDesde || '';
+  var hastaTxt = window._topClientesHasta || '';
+  var desde = desdeTxt ? new Date(desdeTxt+'T00:00:00') : null;
+  var hasta = hastaTxt ? new Date(hastaTxt+'T23:59:59') : null;
+  var lista = calcularReporteClientes(desde, hasta);
+  lista.sort(function(a,b){ return orden==='ganancia' ? (b.ganancia-a.ganancia) : (b.comprado-a.comprado); });
+  lista = lista.slice(0, 10);
+
+  if(!lista.length){ avisoGrande('No hay datos para compartir con ese filtro.'); return; }
+
+  conLogoListo(function(){
+    var canvas = generarReporteClientesCanvas(lista, orden, desdeTxt, hastaTxt);
+    canvas.toBlob(function(blob){
+      if(!blob) return;
+      var file;
+      try{ file = new File([blob], 'reporte-por-cliente.png', {type:'image/png'}); }catch(e){ file = null; }
+
+      if(file && navigator.canShare && navigator.canShare({files:[file]})){
+        navigator.share({ files:[file], title:'Reporte por Cliente NBS' }).catch(function(err){ console.log('Compartir cancelado:', err && err.message); });
+      } else if(navigator.share){
+        // Respaldo de texto si el telefono no deja compartir imagenes
+        var lineas = ['Reporte por Cliente — NBS', 'Ordenado por '+(orden==='ganancia'?'Ganancia':'Cantidad comprada')];
+        lista.forEach(function(c,idx){ lineas.push((idx+1)+'. '+c.nombre+' — Compró $'+fmtNum(c.comprado)+' · Pagó $'+fmtNum(c.pagado)+' · Ganancia $'+fmtNum(c.ganancia)); });
+        navigator.share({ title:'Reporte por Cliente NBS', text: lineas.join('\n') }).catch(function(){});
+      } else {
+        avisoGrande('Tu navegador no permite compartir directo. Toca "Cerrar" e intenta desde Chrome actualizado.');
+      }
+    }, 'image/png');
+  });
+}
+
 function imprimirReporteClientes(){
   var orden = window._topClientesOrden || 'ganancia';
-  var lista = calcularReporteClientes();
+  var desdeTxt = window._topClientesDesde || '';
+  var hastaTxt = window._topClientesHasta || '';
+  var desde = desdeTxt ? new Date(desdeTxt+'T00:00:00') : null;
+  var hasta = hastaTxt ? new Date(hastaTxt+'T23:59:59') : null;
+  var lista = calcularReporteClientes(desde, hasta);
   lista.sort(function(a,b){ return orden==='ganancia' ? (b.ganancia-a.ganancia) : (b.comprado-a.comprado); });
   lista = lista.slice(0, 10);
   var filas = lista.map(function(c, idx){
@@ -6708,8 +6862,9 @@ function imprimirReporteClientes(){
       + '<td style="text-align:right">$'+fmtNum(c.pagado)+'</td>'
       + '<td style="text-align:right">$'+fmtNum(c.ganancia)+'</td></tr>';
   }).join('');
+  var textoRango = (desdeTxt||hastaTxt) ? ' · Del '+(desdeTxt||'inicio')+' al '+(hastaTxt||'hoy') : ' · De siempre';
   var html = '<h1>Reporte por Cliente — NBS</h1>'
-    + '<p class="sub">Ordenado por '+(orden==='ganancia'?'Ganancia':'Cantidad comprada')+' · Generado el '+fechaHoy()+'</p>'
+    + '<p class="sub">Ordenado por '+(orden==='ganancia'?'Ganancia':'Cantidad comprada')+textoRango+' · Generado el '+fechaHoy()+'</p>'
     + '<table><thead><tr><th>#</th><th>Cliente</th><th style="text-align:right">Compró</th><th style="text-align:right">Pagó</th><th style="text-align:right">Ganancia</th></tr></thead>'
     + '<tbody>'+filas+'</tbody></table>';
   abrirVentanaImpresion('Reporte por Cliente NBS', html);
@@ -21673,7 +21828,7 @@ function verHistorialCliente(cid, modo){
 <div id="topclientes-caja" style="display:none;position:fixed;left:4%;right:4%;top:5%;bottom:5%;z-index:99993;background:#fff;border-radius:16px;padding:16px;box-shadow:0 12px 44px rgba(0,0,0,.45);flex-direction:column;overflow:hidden">
   <div id="topclientes-cuerpo" style="flex:1;overflow-y:auto;padding-right:2px"></div>
   <div style="display:flex;gap:8px;margin-top:12px;flex:0 0 auto">
-    <button onclick="imprimirReporteClientes()" style="flex:1;padding:14px;border:2px solid #1a237e;border-radius:12px;background:#fff;color:#1a237e;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">🖨️ Imprimir / PDF</button>
+    <button onclick="compartirReporteClientes()" style="flex:1;padding:14px;border:2px solid #1a237e;border-radius:12px;background:#fff;color:#1a237e;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">📤 Compartir</button>
     <button onclick="cerrarReporteClientes()" style="flex:1;padding:14px;border:none;border-radius:12px;background:#1a237e;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">Cerrar</button>
   </div>
 </div>
