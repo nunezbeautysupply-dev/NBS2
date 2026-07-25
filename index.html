@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260724w-OFICIAL-V2.0">
+<meta name="app-version" content="20260724x-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -630,6 +630,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <div style="font-size:10px;color:var(--nbs-muted-2);font-weight:700;letter-spacing:1px;padding:12px 8px 4px">FINANZAS</div>
     <button onclick="irMenu('p-panorama')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📊</span></span>Panorama Completo</button>
     <button onclick="irMenu('p-docs')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📁</span></span>Mis Documentos</button>
+    <button onclick="cerrarMenuLateral();setTimeout(function(){mostrarReporteClientes('ganancia')},350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📊</span></span>Reporte por Cliente</button>
     <button onclick="cerrarMenuLateral();setTimeout(revisarIntegridad,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🩺</span></span>Revisi&oacute;n de integridad</button>
     <button onclick="cerrarMenuLateral();setTimeout(verLogAtras,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🔧</span></span>Registro bot&oacute;n atr&aacute;s</button>
     <button onclick="irMenu('p-academia')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🎓</span></span>Academia</button>
@@ -6559,6 +6560,110 @@ function aplicarArregloSobrepago(vid, exceso){
 
   cerrarIntegridad();
   avisoGrande('✅ Corregido. $'+fmtNum(exceso)+' se movió a crédito a favor.', function(){ revisarIntegridad(); });
+}
+
+// ═══ REPORTE POR CLIENTE: comprado, pagado y ganancia (25 jul, pedido por Sensei) ═══
+// "para saber cuales son los clientes que mas me compran y apoyan". Son totales de
+// SIEMPRE -no de un rango de fechas-, con dos formas de ordenar que el mismo escoge.
+function calcularReporteClientes(){
+  ventas = LS('nv', []);
+  clientes = LS('ncl', []);
+  var porCliente = {};
+  ventas.forEach(function(v){
+    if(v.cancelada || !v.cid) return;
+    var k = String(v.cid);
+    if(!porCliente[k]) porCliente[k] = { comprado:0, pagado:0, ganancia:0 };
+    porCliente[k].comprado += (v.total||0);
+    porCliente[k].ganancia += (v.ganancia||0);
+    if(v.tipo === 'contado'){
+      porCliente[k].pagado += (v.total||0);
+    } else {
+      var pag = (v.pagosFactura||[]).reduce(function(s,p){
+        return s + ((typeof p.monto==='number' && !p.esDevolucion) ? p.monto : 0);
+      }, 0);
+      porCliente[k].pagado += pag;
+    }
+  });
+  var lista = [];
+  Object.keys(porCliente).forEach(function(k){
+    var c = clientes.find(function(x){ return String(x.id)===k; });
+    if(!c) return; // cliente borrado -no lo mostramos aqui, ya lo cubre "ventas huerfanas"-
+    lista.push({
+      cid: c.id, nombre: nombreCl(c), negocio: c.negocio||'',
+      comprado: porCliente[k].comprado, pagado: porCliente[k].pagado, ganancia: porCliente[k].ganancia
+    });
+  });
+  return lista;
+}
+
+function mostrarReporteClientes(orden){
+  orden = orden || 'ganancia'; // 'ganancia' o 'cantidad' (cantidad = comprado, en dinero)
+  var ov = document.getElementById('topclientes-ov');
+  var caja = document.getElementById('topclientes-caja');
+  if(!ov || !caja){ avisoGrande('No se pudo abrir el reporte.'); return; }
+  window._topClientesOrden = orden;
+
+  var lista = calcularReporteClientes();
+  lista.sort(function(a,b){
+    return orden==='ganancia' ? (b.ganancia - a.ganancia) : (b.comprado - a.comprado);
+  });
+  lista = lista.slice(0, 10);
+
+  var h = '<h3 style="font-size:20px;font-weight:800;color:#1a237e;margin:0 0 10px">📊 Reporte por Cliente</h3>'
+    + '<div style="display:flex;gap:8px;margin-bottom:14px">'
+    + '<button onclick="mostrarReporteClientes(\'ganancia\')" style="flex:1;padding:10px;border-radius:9px;border:2px solid '+(orden==='ganancia'?'#2E7D32':'#ddd')+';background:'+(orden==='ganancia'?'#E8F5E9':'#fff')+';color:'+(orden==='ganancia'?'#2E7D32':'#888')+';font-weight:800;font-size:13px;cursor:pointer">💰 Por Ganancia</button>'
+    + '<button onclick="mostrarReporteClientes(\'cantidad\')" style="flex:1;padding:10px;border-radius:9px;border:2px solid '+(orden==='cantidad'?'#1565C0':'#ddd')+';background:'+(orden==='cantidad'?'#E3F2FD':'#fff')+';color:'+(orden==='cantidad'?'#1565C0':'#888')+';font-weight:800;font-size:13px;cursor:pointer">📦 Por Cantidad</button>'
+    + '</div>';
+
+  if(!lista.length){
+    h += '<div style="text-align:center;color:#999;padding:30px 10px">Todavía no tienes ventas registradas.</div>';
+  } else {
+    lista.forEach(function(c, idx){
+      h += '<div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.05)">'
+        + '<div style="font-size:15px;font-weight:800;color:#1a237e">'+(idx+1)+'. '+escaparHtml(c.nombre)+'</div>'
+        + (c.negocio ? '<div style="font-size:11.5px;color:#999;margin-bottom:6px">🏪 '+escaparHtml(c.negocio)+'</div>' : '<div style="margin-bottom:6px"></div>')
+        + '<div style="display:flex;gap:6px">'
+        +   '<div style="flex:1;background:#E3F2FD;border-radius:8px;padding:6px 4px;text-align:center">'
+        +     '<div style="font-size:10px;color:#1565C0;font-weight:800">COMPRÓ</div>'
+        +     '<div style="font-size:13.5px;font-weight:800;color:#1565C0">$'+fmtNum(c.comprado)+'</div></div>'
+        +   '<div style="flex:1;background:#E8F5E9;border-radius:8px;padding:6px 4px;text-align:center">'
+        +     '<div style="font-size:10px;color:#2E7D32;font-weight:800">PAGÓ</div>'
+        +     '<div style="font-size:13.5px;font-weight:800;color:#2E7D32">$'+fmtNum(c.pagado)+'</div></div>'
+        +   '<div style="flex:1;background:#FFF3E0;border-radius:8px;padding:6px 4px;text-align:center">'
+        +     '<div style="font-size:10px;color:#E65100;font-weight:800">GANANCIA</div>'
+        +     '<div style="font-size:13.5px;font-weight:800;color:#E65100">$'+fmtNum(c.ganancia)+'</div></div>'
+        + '</div></div>';
+    });
+  }
+
+  document.getElementById('topclientes-cuerpo').innerHTML = h;
+  ov.style.display = 'block';
+  caja.style.display = 'flex';
+}
+
+function cerrarReporteClientes(){
+  var ov = document.getElementById('topclientes-ov');
+  var caja = document.getElementById('topclientes-caja');
+  if(ov) ov.style.display = 'none';
+  if(caja) caja.style.display = 'none';
+}
+
+function imprimirReporteClientes(){
+  var orden = window._topClientesOrden || 'ganancia';
+  var lista = calcularReporteClientes();
+  lista.sort(function(a,b){ return orden==='ganancia' ? (b.ganancia-a.ganancia) : (b.comprado-a.comprado); });
+  lista = lista.slice(0, 10);
+  var filas = lista.map(function(c, idx){
+    return '<tr><td>'+(idx+1)+'</td><td>'+escaparHtml(c.nombre)+(c.negocio?' <span style="color:#999">('+escaparHtml(c.negocio)+')</span>':'')+'</td>'
+      + '<td style="text-align:right">$'+fmtNum(c.comprado)+'</td>'
+      + '<td style="text-align:right">$'+fmtNum(c.pagado)+'</td>'
+      + '<td style="text-align:right">$'+fmtNum(c.ganancia)+'</td></tr>';
+  }).join('');
+  var html = '<h1>Reporte por Cliente — NBS</h1>'
+    + '<p class="sub">Ordenado por '+(orden==='ganancia'?'Ganancia':'Cantidad comprada')+' · Generado el '+fechaHoy()+'</p>'
+    + '<table><thead><tr><th>#</th><th>Cliente</th><th style="text-align:right">Compró</th><th style="text-align:right">Pagó</th><th style="text-align:right">Ganancia</th></tr></thead>'
+    + '<tbody>'+filas+'</tbody></table>';
+  abrirVentanaImpresion('Reporte por Cliente NBS', html);
 }
 
 function mostrarReporteIntegridad(html){
@@ -21159,7 +21264,8 @@ function verHistorialCliente(cid, modo){
 <div id="p-rpt" class="pg">
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">📊 Reportes</h2>
-  <button onclick="revisarFechasSospechosas()" style="width:100%;padding:10px;background:#FFF3E0;color:#E65100;border:1px solid #FFCC80;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:14px">🔍 Revisar si hay fechas guardadas con formato incorrecto</button>
+  <button onclick="mostrarReporteClientes('ganancia')" style="width:100%;padding:12px;background:#1a237e;color:white;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:8px">📊 Reporte por Cliente (comprado, pagado y ganancia)</button>
+    <button onclick="revisarFechasSospechosas()" style="width:100%;padding:10px;background:#FFF3E0;color:#E65100;border:1px solid #FFCC80;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:14px">🔍 Revisar si hay fechas guardadas con formato incorrecto</button>
   <div class="card">
     <div class="r2">
       <div><label class="lbl">Desde</label><input class="inp" id="rfrom" type="date"></div>
@@ -21433,6 +21539,16 @@ function verHistorialCliente(cid, modo){
 <div id="integridad-caja" style="display:none;position:fixed;left:4%;right:4%;top:5%;bottom:5%;z-index:99993;background:#fff;border-radius:16px;padding:16px;box-shadow:0 12px 44px rgba(0,0,0,.45);flex-direction:column;overflow:hidden">
   <div id="integridad-cuerpo" style="flex:1;overflow-y:auto;padding-right:2px"></div>
   <button onclick="cerrarIntegridad()" style="width:100%;padding:16px;border:none;border-radius:12px;background:#1a237e;color:#fff;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit;margin-top:12px;flex:0 0 auto">Cerrar</button>
+</div>
+
+<!-- Ventana del reporte por cliente (comprado, pagado, ganancia) -->
+<div id="topclientes-ov" onclick="cerrarReporteClientes()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.75);z-index:99992"></div>
+<div id="topclientes-caja" style="display:none;position:fixed;left:4%;right:4%;top:5%;bottom:5%;z-index:99993;background:#fff;border-radius:16px;padding:16px;box-shadow:0 12px 44px rgba(0,0,0,.45);flex-direction:column;overflow:hidden">
+  <div id="topclientes-cuerpo" style="flex:1;overflow-y:auto;padding-right:2px"></div>
+  <div style="display:flex;gap:8px;margin-top:12px;flex:0 0 auto">
+    <button onclick="imprimirReporteClientes()" style="flex:1;padding:14px;border:2px solid #1a237e;border-radius:12px;background:#fff;color:#1a237e;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">🖨️ Imprimir / PDF</button>
+    <button onclick="cerrarReporteClientes()" style="flex:1;padding:14px;border:none;border-radius:12px;background:#1a237e;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">Cerrar</button>
+  </div>
 </div>
 
 
