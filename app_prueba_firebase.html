@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260724x-OFICIAL-V2.0">
+<meta name="app-version" content="20260724z-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1970,6 +1970,52 @@ var NOMBRES_BONITOS = { ncl:'clientes', nv:'ventas', nc:'compras', np:'productos
 //             encontrado porque el aviso lo asustaba sin razon con estas dos).
 var CLAVES_SIN_VIGILAR = { npedidos:true, ncr:true };
 
+// ═══ SONIDOS DE AVISO — hechos desde cero con el propio telefono, sin archivos de
+// audio (25 jul, pedido por Sensei). No se puede copiar el sonido de Windows ni el de
+// otra app -tienen derechos de autor-, asi que se armaron dos sonidos PROPIOS con el
+// mismo espiritu: uno fuerte para avisos de precaucion, uno suave para recordatorios.
+var _contextoAudio = null;
+function _obtenerContextoAudio(){
+  try{
+    if(!_contextoAudio) _contextoAudio = new (window.AudioContext || window.webkitAudioContext)();
+    if(_contextoAudio.state === 'suspended') _contextoAudio.resume();
+    return _contextoAudio;
+  }catch(e){ return null; }
+}
+// Un pitido simple, del tono y duracion que se le pida
+function _pitido(frecuencia, inicioSeg, duracionSeg, volumen){
+  var ctx = _obtenerContextoAudio();
+  if(!ctx) return;
+  var osc = ctx.createOscillator();
+  var vol = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = frecuencia;
+  osc.connect(vol);
+  vol.connect(ctx.destination);
+  var t0 = ctx.currentTime + inicioSeg;
+  vol.gain.setValueAtTime(0, t0);
+  vol.gain.linearRampToValueAtTime(volumen, t0 + 0.02);
+  vol.gain.linearRampToValueAtTime(0, t0 + duracionSeg);
+  osc.start(t0);
+  osc.stop(t0 + duracionSeg + 0.02);
+}
+// 🔴 PRECAUCION: dos pitidos cortos y agudos seguidos -mismo espiritu que la alerta
+// de Windows, para avisos importantes como "algo se borro" o "el dinero no cuadra"-.
+function sonidoPrecaucion(){
+  try{
+    _pitido(880, 0,    0.14, 0.35);
+    _pitido(880, 0.18, 0.14, 0.35);
+  }catch(e){}
+}
+// 🔵 RECORDATORIO: un "ding-dong" suave de dos notas -parecido al tipo de sonido de
+// una notificacion normal, para el aviso de bajar respaldo y el de llegar a la barberia-.
+function sonidoRecordatorio(){
+  try{
+    _pitido(660, 0,    0.16, 0.22);
+    _pitido(880, 0.14, 0.22, 0.22);
+  }catch(e){}
+}
+
 function revisarSiFaltaAlgo(){
   var ahora = contarTodo();
   var antes;
@@ -2001,6 +2047,7 @@ function revisarSiFaltaAlgo(){
     });
     msj += '\nSi tú no los borraste, puedes volver a una copia anterior.\n\n¿Quieres ver las copias guardadas?';
     setTimeout(function(){
+      sonidoPrecaucion();
       if(confirm(msj)) irMenuProtegido('p-copias');
     }, 1200);
   }
@@ -2269,6 +2316,7 @@ function mostrarAvisoRespaldo(){
 
   var a = document.getElementById('aviso-bajar-respaldo');
   if(!a){
+    try{ sonidoRecordatorio(); }catch(eSonido){} // solo suena la PRIMERA vez que aparece, no cada minuto
     a = document.createElement('div');
     a.id = 'aviso-bajar-respaldo';
     a.innerHTML = '<span id="aviso-respaldo-texto" style="flex:1"></span>'
@@ -2541,6 +2589,7 @@ function SS(k,v){
           + '2. Libera espacio en el telefono\n'
           + '3. Cierra y vuelve a abrir la app\n\n'
           + 'NO sigas trabajando hasta resolverlo: lo que hagas no se va a guardar.';
+        try{ sonidoPrecaucion(); }catch(eSonido){}
         if(typeof avisoGrande === 'function') avisoGrande(msg);
         else if(typeof _alertNativo === 'function') _alertNativo(msg);
       }
@@ -6664,6 +6713,80 @@ function imprimirReporteClientes(){
     + '<table><thead><tr><th>#</th><th>Cliente</th><th style="text-align:right">Compró</th><th style="text-align:right">Pagó</th><th style="text-align:right">Ganancia</th></tr></thead>'
     + '<tbody>'+filas+'</tbody></table>';
   abrirVentanaImpresion('Reporte por Cliente NBS', html);
+}
+
+// ═══ RECORDARME 3 VECES AL DÍA — revisión de integridad (25 jul, pedido por Sensei) ═══
+// Un aviso DENTRO de la app solo funciona si la tiene abierta en ese momento. Para que
+// de verdad avise 3 veces al dia, tenga o no la app abierta, se usa el calendario del
+// telefono -mismo principio que "Recordarme estudiar" de la Academia-: se genera un
+// archivo .ics con 3 eventos que se repiten cada dia, cada uno con su propia alarma.
+function _validarHora12(txt){
+  txt = String(txt||'').trim().toUpperCase();
+  if(!/^\d{1,2}:\d{2}\s?(AM|PM)$/.test(txt)) return null;
+  var p = txt.replace(/\s+/g,' ').split(/[: ]/);
+  var hh = parseInt(p[0],10), mm = parseInt(p[1],10), ampm = p[2];
+  if(hh<1||hh>12||mm<0||mm>59) return null;
+  var h24 = hh % 12; if(ampm==='PM') h24 += 12;
+  return { h24:h24, mm:mm, texto:(p[0].length<2?'0':'')+p[0]+':'+p[1]+' '+ampm };
+}
+
+function configurarRecordatorioIntegridad(){
+  var sugeridas = ['09:00 AM', '02:00 PM', '07:00 PM'];
+  var horas = [];
+  for(var i=0;i<3;i++){
+    var cual = (i===0?'primera':i===1?'segunda':'tercera');
+    var txt = prompt('¿A qué hora quieres la '+cual+' revisión del día?\n\nEscríbela así:  '+sugeridas[i], sugeridas[i]);
+    if(txt === null) return; // cancelo
+    var h = _validarHora12(txt);
+    if(!h){ avisoGrande('Esa hora no se entiende.\n\nEscríbela así:\n\n   09:00 AM\n   02:30 PM'); return; }
+    horas.push(h);
+  }
+  descargarIcsIntegridad(horas);
+}
+
+function descargarIcsIntegridad(horas){
+  var manana = new Date(); manana.setDate(manana.getDate()+1);
+  var yyyy = manana.getFullYear();
+  var mm = String(manana.getMonth()+1).padStart(2,'0');
+  var dd = String(manana.getDate()).padStart(2,'0');
+
+  var eventos = horas.map(function(h, idx){
+    var hh = String(h.h24).padStart(2,'0');
+    var mi = String(h.mm).padStart(2,'0');
+    return 'BEGIN:VEVENT\r\n'
+      + 'UID:nbs2-integridad-'+idx+'-'+Date.now()+'@nunezbeauty\r\n'
+      + 'DTSTAMP:'+yyyy+mm+dd+'T000000Z\r\n'
+      + 'DTSTART;TZID=America/New_York:'+yyyy+mm+dd+'T'+hh+mi+'00\r\n'
+      + 'DTEND;TZID=America/New_York:'+yyyy+mm+dd+'T'+hh+mi+'00\r\n'
+      + 'RRULE:FREQ=DAILY\r\n'
+      + 'SUMMARY:🩺 Revisión de Integridad - NBS2\r\n'
+      + 'DESCRIPTION:Abre NBS2 y corre la Revisión de Integridad -menú lateral- para asegurarte que tus datos están bien.\r\n'
+      + 'BEGIN:VALARM\r\n'
+      + 'ACTION:DISPLAY\r\n'
+      + 'DESCRIPTION:Revisión de Integridad NBS2\r\n'
+      + 'TRIGGER:-PT0M\r\n'
+      + 'END:VALARM\r\n'
+      + 'END:VEVENT\r\n';
+  }).join('');
+
+  var contenido = 'BEGIN:VCALENDAR\r\n'
+    + 'VERSION:2.0\r\n'
+    + 'PRODID:-//NBS2//Revision de Integridad//ES\r\n'
+    + 'CALSCALE:GREGORIAN\r\n'
+    + eventos
+    + 'END:VCALENDAR\r\n';
+
+  var blob = new Blob([contenido], {type:'text/calendar'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'NBS2_Revision_Integridad.ics';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  avisoGrande('📅 Archivo descargado.\n\nÁbrelo una vez para agregarlo a tu calendario. Desde entonces, tu teléfono te avisará solo, todos los días, a las 3 horas que escogiste.');
 }
 
 function mostrarReporteIntegridad(html){
@@ -19747,6 +19870,7 @@ function mostrarRecordatorioVisita(negocio, minutos){
   var ov   = document.getElementById('recvis-ov');
   var caja = document.getElementById('recvis-caja');
   if(!ov || !caja) return;
+  if(caja.style.display !== 'block'){ try{ sonidoRecordatorio(); }catch(eSonido){} } // solo al aparecer
   document.getElementById('recvis-neg').textContent = negocio;
   document.getElementById('recvis-min').textContent = 'Llegaste hace ' + minutos + ' minutos';
   caja.setAttribute('data-neg', negocio);
@@ -21538,7 +21662,10 @@ function verHistorialCliente(cid, modo){
 <div id="integridad-ov" onclick="cerrarIntegridad()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.75);z-index:99992"></div>
 <div id="integridad-caja" style="display:none;position:fixed;left:4%;right:4%;top:5%;bottom:5%;z-index:99993;background:#fff;border-radius:16px;padding:16px;box-shadow:0 12px 44px rgba(0,0,0,.45);flex-direction:column;overflow:hidden">
   <div id="integridad-cuerpo" style="flex:1;overflow-y:auto;padding-right:2px"></div>
-  <button onclick="cerrarIntegridad()" style="width:100%;padding:16px;border:none;border-radius:12px;background:#1a237e;color:#fff;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit;margin-top:12px;flex:0 0 auto">Cerrar</button>
+  <div style="display:flex;gap:8px;margin-top:12px;flex:0 0 auto">
+    <button onclick="configurarRecordatorioIntegridad()" style="flex:1;padding:14px;border:2px solid #1a237e;border-radius:12px;background:#fff;color:#1a237e;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">🔔 Recordarme 3 veces al día</button>
+    <button onclick="cerrarIntegridad()" style="flex:1;padding:14px;border:none;border-radius:12px;background:#1a237e;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">Cerrar</button>
+  </div>
 </div>
 
 <!-- Ventana del reporte por cliente (comprado, pagado, ganancia) -->
