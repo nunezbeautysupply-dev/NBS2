@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260725g-OFICIAL-V2.0">
+<meta name="app-version" content="20260725i-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19681,6 +19681,117 @@ function revisarDireccionesDeNegocios(){
   overlay.style.display = 'block';
 }
 
+// ═══ OPTIMIZAR RUTA CON TRÁFICO EN TIEMPO REAL (25 jul, pedido por Sensei) ═══
+// Usa el servicio de rutas de Google -gratis hasta 5,000 usos al mes, muy por encima
+// de lo que un negocio como el tuyo llegaría a usar-. NUNCA cambia tu orden solo:
+// siempre te pregunta antes, y tú decides si lo usas o te quedas con el tuyo.
+//
+// ⚠️ PENDIENTE: pon aquí tu clave de Google cuando la tengas (Google Cloud Console ->
+// APIs y servicios -> Directions API). Mientras diga "PON_AQUI_TU_LLAVE", el botón
+// avisa que falta configurar esto, en vez de fallar en silencio.
+var GOOGLE_MAPS_API_KEY = 'AIzaSyAlvn7rugmOA1ZBpYeTKCwtQgqPPI4u0dQ';
+
+// Busca la direccion de una barberia usando el primer cliente que tenga ese negocio
+function direccionDeBarberia(negocio){
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return (x.negocio||'').trim() === negocio; });
+  if(!c || !c.dir) return null;
+  return c.dir + (c.ciudad ? ', '+c.ciudad : '') + (c.estado ? ', '+c.estado : '');
+}
+
+function optimizarRutaConTrafico(diaKey){
+  if(GOOGLE_MAPS_API_KEY === 'PON_AQUI_TU_LLAVE'){
+    avisoGrande('🚦 Esta función todavía necesita configurarse.\n\nFalta conectar la clave de Google Maps. Pídele a Claude que te guíe a sacarla, y pégala en el código donde dice GOOGLE_MAPS_API_KEY.');
+    return;
+  }
+  var rutasPorDia = LS('rutas_por_dia', {});
+  var rutaHoy = rutasPorDia[diaKey] || [];
+  if(rutaHoy.length < 2){ avisoGrande('Necesitas al menos 2 barberías en la ruta para optimizar.'); return; }
+
+  // Revisar que todas tengan direccion antes de llamar a Google
+  var direcciones = rutaHoy.map(function(neg){ return { negocio: neg, dir: direccionDeBarberia(neg) }; });
+  var sinDireccion = direcciones.filter(function(d){ return !d.dir; });
+  if(sinDireccion.length){
+    avisoGrande('⚠️ Estas barberías no tienen dirección guardada, así que no se pueden incluir en la optimización:\n\n'
+      + sinDireccion.map(function(d){ return '• '+d.negocio; }).join('\n')
+      + '\n\nAgrégales la dirección en el perfil de un cliente de esa barbería.');
+    return;
+  }
+
+  avisoGrande('🚦 Buscando tu ubicación...');
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var origen = pos.coords.latitude + ',' + pos.coords.longitude;
+    var destino = direcciones[direcciones.length-1].dir;
+    var intermedias = direcciones.slice(0, -1).map(function(d){ return d.dir; });
+
+    var url = 'https://maps.googleapis.com/maps/api/directions/json'
+      + '?origin=' + encodeURIComponent(origen)
+      + '&destination=' + encodeURIComponent(destino)
+      + '&waypoints=optimize:true|' + intermedias.map(encodeURIComponent).join('|')
+      + '&departure_time=now'
+      + '&key=' + GOOGLE_MAPS_API_KEY;
+
+    fetch(url).then(function(r){ return r.json(); }).then(function(data){
+      if(data.status !== 'OK'){
+        avisoGrande('No se pudo calcular la ruta con tráfico ahora mismo (' + (data.status||'error') + '). Inténtalo de nuevo en un momento, o revisa tu conexión.');
+        return;
+      }
+      var orden = data.routes[0].waypoint_order; // indices del nuevo orden para las intermedias
+      var nuevoOrden = orden.map(function(i){ return direcciones[i].negocio; });
+      nuevoOrden.push(direcciones[direcciones.length-1].negocio); // el destino se queda al final
+
+      var segundosTotal = data.routes[0].legs.reduce(function(s,l){ return s + (l.duration_in_traffic ? l.duration_in_traffic.value : l.duration.value); }, 0);
+      var minutos = Math.round(segundosTotal/60);
+
+      mostrarComparacionRuta(diaKey, rutaHoy, nuevoOrden, minutos);
+    }).catch(function(err){
+      avisoGrande('No se pudo conectar con el servicio de rutas. Revisa tu internet e inténtalo de nuevo.');
+    });
+  }, function(err){
+    avisoGrande('No se pudo obtener tu ubicación. Revisa que le diste permiso de ubicación a la app en tu teléfono.');
+  }, { enableHighAccuracy:true, timeout:10000 });
+}
+
+function mostrarComparacionRuta(diaKey, ordenActual, ordenSugerido, minutosEstimados){
+  var cambio = JSON.stringify(ordenActual) !== JSON.stringify(ordenSugerido);
+  var html = '<h3 style="font-size:19px;font-weight:800;color:#1a237e;margin:0 0 6px">🚦 Ruta con el tráfico de ahora</h3>'
+    + '<p style="font-size:13px;color:#666;margin:0 0 16px">Tiempo estimado con este orden: <b>'+minutosEstimados+' minutos</b> de manejo entre paradas</p>';
+  if(!cambio){
+    html += '<div style="background:#E8F5E9;border-radius:10px;padding:14px;text-align:center;color:#2E7D32;font-weight:700">✓ Tu orden actual ya es el más eficiente con el tráfico de ahora.</div>';
+  } else {
+    html += '<div style="display:flex;gap:10px;margin-bottom:16px">'
+      + '<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#999;margin-bottom:6px">TU ORDEN ACTUAL</div>'
+      + ordenActual.map(function(n,i){ return '<div style="background:#f5f5f5;border-radius:8px;padding:8px;margin-bottom:4px;font-size:12px">'+(i+1)+'. '+escaparHtml(n)+'</div>'; }).join('')
+      + '</div>'
+      + '<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#1565C0;margin-bottom:6px">ORDEN SUGERIDO</div>'
+      + ordenSugerido.map(function(n,i){ return '<div style="background:#E3F2FD;border-radius:8px;padding:8px;margin-bottom:4px;font-size:12px;font-weight:700">'+(i+1)+'. '+escaparHtml(n)+'</div>'; }).join('')
+      + '</div></div>';
+  }
+  html += '<div style="display:flex;gap:8px;margin-top:8px">'
+    + (cambio ? '<button onclick="aplicarOrdenSugerido(\''+diaKey+'\')" style="flex:1;padding:13px;border:none;border-radius:10px;background:#1565C0;color:#fff;font-weight:800;cursor:pointer">Usar este orden</button>' : '')
+    + '<button onclick="cerrarComparacionRuta()" style="flex:1;padding:13px;border:2px solid #999;border-radius:10px;background:#fff;color:#666;font-weight:700;cursor:pointer">'+(cambio?'Quedarme con el mío':'Cerrar')+'</button>'
+    + '</div>';
+
+  var ov = document.createElement('div');
+  ov.id = 'comparar-ruta-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99995;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">'+html+'</div>';
+  document.body.appendChild(ov);
+  window._ordenSugeridoTemp = ordenSugerido;
+}
+function cerrarComparacionRuta(){
+  var ov = document.getElementById('comparar-ruta-ov');
+  if(ov) ov.remove();
+}
+function aplicarOrdenSugerido(diaKey){
+  var rutasPorDia = LS('rutas_por_dia', {});
+  rutasPorDia[diaKey] = window._ordenSugeridoTemp;
+  SS('rutas_por_dia', rutasPorDia);
+  cerrarComparacionRuta();
+  renderRutaDia(diaKey);
+  avisoGrande('✓ Orden actualizado con el tráfico de ahora.');
+}
+
 function renderRutaDia(diaKey){
   var el = document.getElementById('ruta-dia-contenido');
   if(!el) return;
@@ -19708,6 +19819,16 @@ function renderRutaDia(diaKey){
   header.innerHTML = '<div><div style="font-size:15px;font-weight:800;color:#1a237e">📅 '+diaLabel+'</div><div style="font-size:11px;color:#aaa;margin-top:1px">'+fechaDeEsteDia+(diaKey!==getDiaHoy()?' · día pasado':' · hoy')+'</div></div>'
     +'<div style="font-size:12px;color:#aaa">'+rutaHoy.length+' barbería(s)</div>';
   el.appendChild(header);
+
+  // Boton de optimizar con trafico -25 jul, solo para HOY y con 2+ paradas- (Sensei pidio
+  // esto despues de comparar NBS2 contra apps de ruta profesionales)
+  if(diaKey === getDiaHoy() && rutaHoy.length >= 2){
+    var btnOpt = document.createElement('button');
+    btnOpt.textContent = '🚦 Optimizar con el tráfico de ahora';
+    btnOpt.style.cssText = 'width:100%;padding:12px;border:2px solid #1565C0;border-radius:10px;background:#E3F2FD;color:#1565C0;font-weight:800;font-size:13.5px;cursor:pointer;margin-bottom:12px';
+    btnOpt.onclick = function(){ optimizarRutaConTrafico(diaKey); };
+    el.appendChild(btnOpt);
+  }
 
   // Lista de barberías en la ruta
   if(rutaHoy.length === 0){
