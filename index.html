@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260725i-OFICIAL-V2.0">
+<meta name="app-version" content="20260726a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19681,15 +19681,103 @@ function revisarDireccionesDeNegocios(){
   overlay.style.display = 'block';
 }
 
-// ═══ OPTIMIZAR RUTA CON TRÁFICO EN TIEMPO REAL (25 jul, pedido por Sensei) ═══
-// Usa el servicio de rutas de Google -gratis hasta 5,000 usos al mes, muy por encima
-// de lo que un negocio como el tuyo llegaría a usar-. NUNCA cambia tu orden solo:
-// siempre te pregunta antes, y tú decides si lo usas o te quedas con el tuyo.
+// ═══ OPTIMIZAR RUTA CON TRÁFICO EN TIEMPO REAL ═══
+// (25 jul: primera versión. 26 jul: REHECHA porque no funcionaba.)
 //
-// ⚠️ PENDIENTE: pon aquí tu clave de Google cuando la tengas (Google Cloud Console ->
-// APIs y servicios -> Directions API). Mientras diga "PON_AQUI_TU_LLAVE", el botón
-// avisa que falta configurar esto, en vez de fallar en silencio.
+// POR QUÉ SE REHIZO: la primera versión llamaba al SERVICIO WEB de Google
+// -maps.googleapis.com/maps/api/directions/json- con fetch() desde el navegador.
+// Ese servicio NO manda la cabecera Access-Control-Allow-Origin, así que el
+// navegador BLOQUEA la llamada SIEMPRE (CORS). No fallaba a veces: no podía
+// funcionar nunca desde una página web. Ahora se usa la librería de JavaScript de
+// Google -DirectionsService-, que sí está hecha para correr dentro de una página
+// y funciona con la clave restringida por HTTP referrer (nbs2.pages.dev).
+//
+// REQUISITO EN GOOGLE CLOUD: proyecto "nbs-rutas" con "Maps JavaScript API"
+// habilitada, además de Directions API.
+//
+// ⚠️ LÍMITE DOCUMENTADO DE GOOGLE: duration_in_traffic -los minutos con tráfico
+// real- NO viene cuando la petición lleva paradas intermedias. Por eso se hace en
+// DOS PASOS: (1) una llamada con todas las paradas para que Google devuelva el
+// ORDEN óptimo, y (2) una llamada por cada tramo suelto -A→B, sin paradas en
+// medio- para sacar los minutos CON tráfico de verdad. Los tramos se piden todos
+// a la vez -en paralelo- para que no se sienta lento en la ruta.
+
 var GOOGLE_MAPS_API_KEY = 'AIzaSyAlvn7rugmOA1ZBpYeTKCwtQgqPPI4u0dQ';
+
+var _gmapsPromesa = null;
+
+// Google llama a esta función él solo si rechaza la clave -restricción mal puesta,
+// API sin habilitar, facturación apagada-. Sin esto el fallo sería mudo.
+window.gm_authFailure = function(){
+  _gmapsPromesa = null;
+  cerrarCargandoRuta();
+  avisoGrande('🔑 Google rechazó la clave de mapas.\n\nRevisa en Google Cloud Console, proyecto "nbs-rutas":\n\n• Que "Maps JavaScript API" esté habilitada\n• Que la restricción de la clave incluya  nbs2.pages.dev/*\n• Que la facturación esté activa\n\nTu ruta sigue funcionando normal — esto solo afecta el botón de optimizar.');
+};
+
+// Carga la librería de Google la PRIMERA vez que se toca el botón, no al abrir la
+// app -así no la hace más lenta de arrancar-.
+function cargarGoogleMaps(){
+  if(window.google && window.google.maps && window.google.maps.DirectionsService){
+    return Promise.resolve();
+  }
+  if(_gmapsPromesa) return _gmapsPromesa;
+  _gmapsPromesa = new Promise(function(resolve, reject){
+    var listo = false;
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(GOOGLE_MAPS_API_KEY) + '&language=es&region=US';
+    s.onload = function(){
+      if(window.google && window.google.maps && window.google.maps.DirectionsService){
+        listo = true; resolve();
+      } else {
+        _gmapsPromesa = null; reject(new Error('SIN_LIBRERIA'));
+      }
+    };
+    s.onerror = function(){ _gmapsPromesa = null; reject(new Error('SIN_RED')); };
+    setTimeout(function(){
+      if(!listo){ _gmapsPromesa = null; reject(new Error('TARDO')); }
+    }, 20000);
+    document.head.appendChild(s);
+  });
+  return _gmapsPromesa;
+}
+
+// Traduce los códigos de Google a español claro. Nunca más un "revisa tu internet"
+// a ciegas cuando el problema es otro.
+function explicarFalloRuta(codigo){
+  var m = {
+    'ZERO_RESULTS':          'Google no encontró forma de manejar entre esas direcciones. Revisa que estén bien escritas en los perfiles de tus clientes.',
+    'NOT_FOUND':             'Google no pudo ubicar una de las direcciones. Revisa que estén completas -calle, ciudad y estado- en los perfiles de tus clientes.',
+    'MAX_WAYPOINTS_EXCEEDED':'Son demasiadas paradas para una sola consulta. Divide la ruta del día.',
+    'OVER_QUERY_LIMIT':      'Pasaste el límite de consultas de Google por ahora. Espera un rato e inténtalo de nuevo.',
+    'REQUEST_DENIED':        'Google rechazó la consulta. Casi siempre es que falta habilitar "Maps JavaScript API" en el proyecto nbs-rutas, o que la restricción de la clave no incluye nbs2.pages.dev/*',
+    'INVALID_REQUEST':       'La consulta salió mal armada. Avísale a Claude con este código: INVALID_REQUEST.',
+    'UNKNOWN_ERROR':         'Google tuvo un problema pasajero de su lado. Inténtalo otra vez en un momento.',
+    'SIN_RED':               'No se pudo descargar el mapa de Google. Revisa tu señal e inténtalo de nuevo.',
+    'SIN_LIBRERIA':          'El mapa de Google se descargó incompleto. Cierra la app, ábrela de nuevo e inténtalo.',
+    'TARDO':                 'Google tardó demasiado en responder. Puede ser señal lenta — inténtalo de nuevo.',
+    'SIN_UBICACION':         'No se pudo obtener tu ubicación. Revisa que le diste permiso de ubicación a la app en tu teléfono.'
+  };
+  return m[codigo] || ('No se pudo calcular la ruta (' + codigo + '). Inténtalo de nuevo en un momento.');
+}
+
+// Letrero de "trabajando" mientras se consulta -para que no parezca colgada-
+function mostrarCargandoRuta(txt){
+  var ov = document.getElementById('cargando-ruta-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'cargando-ruta-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99996;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:22px 20px;max-width:320px;width:100%;text-align:center"><div id="cargando-ruta-txt" style="font-size:15px;font-weight:700;color:#1a237e"></div></div>';
+    document.body.appendChild(ov);
+  }
+  var t = document.getElementById('cargando-ruta-txt');
+  if(t) t.textContent = txt;
+}
+function cerrarCargandoRuta(){
+  var ov = document.getElementById('cargando-ruta-ov');
+  if(ov) ov.remove();
+}
 
 // Busca la direccion de una barberia usando el primer cliente que tenga ese negocio
 function direccionDeBarberia(negocio){
@@ -19699,16 +19787,61 @@ function direccionDeBarberia(negocio){
   return c.dir + (c.ciudad ? ', '+c.ciudad : '') + (c.estado ? ', '+c.estado : '');
 }
 
-function optimizarRutaConTrafico(diaKey){
-  if(GOOGLE_MAPS_API_KEY === 'PON_AQUI_TU_LLAVE'){
-    avisoGrande('🚦 Esta función todavía necesita configurarse.\n\nFalta conectar la clave de Google Maps. Pídele a Claude que te guíe a sacarla, y pégala en el código donde dice GOOGLE_MAPS_API_KEY.');
-    return;
+// Envuelve la llamada de Google en una promesa, para poder encadenarla
+function pedirRutaGoogle(peticion){
+  return new Promise(function(resolve, reject){
+    var svc = new google.maps.DirectionsService();
+    svc.route(peticion, function(res, status){
+      if(status === 'OK' && res && res.routes && res.routes.length) resolve(res);
+      else reject(new Error(status || 'UNKNOWN_ERROR'));
+    });
+  });
+}
+
+function ubicacionActual(){
+  return new Promise(function(resolve, reject){
+    if(!navigator.geolocation){ reject(new Error('SIN_UBICACION')); return; }
+    navigator.geolocation.getCurrentPosition(
+      function(pos){ resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+      function(){ reject(new Error('SIN_UBICACION')); },
+      { enableHighAccuracy:true, timeout:15000, maximumAge:60000 }
+    );
+  });
+}
+
+// PASO 2: minutos CON tráfico real, tramo por tramo -sin paradas intermedias, que
+// es la única forma en que Google devuelve duration_in_traffic-. Todos a la vez.
+function minutosConTrafico(puntos){
+  var ahora = new Date();
+  var tramos = [];
+  for(var i=0; i<puntos.length-1; i++){
+    tramos.push(pedirRutaGoogle({
+      origin: puntos[i],
+      destination: puntos[i+1],
+      travelMode: google.maps.TravelMode.DRIVING,
+      drivingOptions: { departureTime: ahora, trafficModel: 'bestguess' }
+    }));
   }
+  return Promise.all(tramos).then(function(resultados){
+    var seg = 0, conTrafico = true;
+    resultados.forEach(function(r){
+      var leg = r.routes[0].legs[0];
+      if(leg.duration_in_traffic) seg += leg.duration_in_traffic.value;
+      else { conTrafico = false; seg += leg.duration.value; }
+    });
+    return { minutos: Math.round(seg/60), conTrafico: conTrafico };
+  });
+}
+
+function optimizarRutaConTrafico(diaKey, incluirUltima){
+  incluirUltima = !!incluirUltima;
+  cerrarComparacionRuta();
+
   var rutasPorDia = LS('rutas_por_dia', {});
   var rutaHoy = rutasPorDia[diaKey] || [];
   if(rutaHoy.length < 2){ avisoGrande('Necesitas al menos 2 barberías en la ruta para optimizar.'); return; }
 
-  // Revisar que todas tengan direccion antes de llamar a Google
+  // Revisar que todas tengan direccion ANTES de molestar a Google
   var direcciones = rutaHoy.map(function(neg){ return { negocio: neg, dir: direccionDeBarberia(neg) }; });
   var sinDireccion = direcciones.filter(function(d){ return !d.dir; });
   if(sinDireccion.length){
@@ -19718,55 +19851,111 @@ function optimizarRutaConTrafico(diaKey){
     return;
   }
 
-  avisoGrande('🚦 Buscando tu ubicación...');
-  navigator.geolocation.getCurrentPosition(function(pos){
-    var origen = pos.coords.latitude + ',' + pos.coords.longitude;
-    var destino = direcciones[direcciones.length-1].dir;
-    var intermedias = direcciones.slice(0, -1).map(function(d){ return d.dir; });
+  mostrarCargandoRuta('📍 Buscando tu ubicación...');
 
-    var url = 'https://maps.googleapis.com/maps/api/directions/json'
-      + '?origin=' + encodeURIComponent(origen)
-      + '&destination=' + encodeURIComponent(destino)
-      + '&waypoints=optimize:true|' + intermedias.map(encodeURIComponent).join('|')
-      + '&departure_time=now'
-      + '&key=' + GOOGLE_MAPS_API_KEY;
+  var origenGuardado = null;
 
-    fetch(url).then(function(r){ return r.json(); }).then(function(data){
-      if(data.status !== 'OK'){
-        avisoGrande('No se pudo calcular la ruta con tráfico ahora mismo (' + (data.status||'error') + '). Inténtalo de nuevo en un momento, o revisa tu conexión.');
-        return;
-      }
-      var orden = data.routes[0].waypoint_order; // indices del nuevo orden para las intermedias
-      var nuevoOrden = orden.map(function(i){ return direcciones[i].negocio; });
-      nuevoOrden.push(direcciones[direcciones.length-1].negocio); // el destino se queda al final
+  ubicacionActual().then(function(origen){
+    origenGuardado = origen;
+    mostrarCargandoRuta('🚦 Conectando con Google...');
+    return cargarGoogleMaps();
+  }).then(function(){
+    mostrarCargandoRuta('🚦 Calculando el mejor orden...');
+    var peticion;
+    if(incluirUltima){
+      // TODAS las paradas se pueden reordenar. Se vuelve al punto de partida para
+      // que ninguna quede clavada; el tramo de regreso NO se cuenta en los minutos.
+      peticion = {
+        origin: origenGuardado,
+        destination: origenGuardado,
+        waypoints: direcciones.map(function(d){ return { location: d.dir, stopover: true }; }),
+        optimizeWaypoints: true,
+        travelMode: google.maps.TravelMode.DRIVING
+      };
+    } else {
+      // La última parada del día se queda clavada de última.
+      peticion = {
+        origin: origenGuardado,
+        destination: direcciones[direcciones.length-1].dir,
+        waypoints: direcciones.slice(0, -1).map(function(d){ return { location: d.dir, stopover: true }; }),
+        optimizeWaypoints: true,
+        travelMode: google.maps.TravelMode.DRIVING
+      };
+    }
+    return pedirRutaGoogle(peticion);
+  }).then(function(res){
+    var orden = res.routes[0].waypoint_order || [];
+    var nuevoOrden = orden.map(function(i){ return direcciones[i].negocio; });
+    if(!incluirUltima) nuevoOrden.push(direcciones[direcciones.length-1].negocio);
 
-      var segundosTotal = data.routes[0].legs.reduce(function(s,l){ return s + (l.duration_in_traffic ? l.duration_in_traffic.value : l.duration.value); }, 0);
-      var minutos = Math.round(segundosTotal/60);
+    // Seguridad: si algo raro pasara y el orden no trae las mismas barberías, no
+    // se le ofrece cambiar nada -mejor no tocar que tocar mal-.
+    var a = rutaHoy.slice().sort().join('|');
+    var b = nuevoOrden.slice().sort().join('|');
+    if(a !== b){
+      cerrarCargandoRuta();
+      avisoGrande('La respuesta de Google no coincidió con tu lista de barberías, así que no se cambió nada. Inténtalo de nuevo.');
+      return null;
+    }
 
-      mostrarComparacionRuta(diaKey, rutaHoy, nuevoOrden, minutos);
-    }).catch(function(err){
-      avisoGrande('No se pudo conectar con el servicio de rutas. Revisa tu internet e inténtalo de nuevo.');
+    mostrarCargandoRuta('🚦 Midiendo el tráfico de ahora...');
+    var puntos = [origenGuardado].concat(nuevoOrden.map(function(n){ return direccionDeBarberia(n); }));
+    return minutosConTrafico(puntos).then(function(t){
+      return { orden: nuevoOrden, minutos: t.minutos, conTrafico: t.conTrafico };
+    }).catch(function(){
+      // Si los tramos fallan, igual se muestra el orden -lo importante- sin minutos
+      return { orden: nuevoOrden, minutos: null, conTrafico: false };
     });
-  }, function(err){
-    avisoGrande('No se pudo obtener tu ubicación. Revisa que le diste permiso de ubicación a la app en tu teléfono.');
-  }, { enableHighAccuracy:true, timeout:10000 });
+  }).then(function(d){
+    cerrarCargandoRuta();
+    if(!d) return;
+    mostrarComparacionRuta(diaKey, rutaHoy, d.orden, d.minutos, d.conTrafico, incluirUltima);
+  }).catch(function(err){
+    cerrarCargandoRuta();
+    avisoGrande('🚦 ' + explicarFalloRuta(err && err.message ? err.message : 'UNKNOWN_ERROR'));
+  });
 }
 
-function mostrarComparacionRuta(diaKey, ordenActual, ordenSugerido, minutosEstimados){
+function mostrarComparacionRuta(diaKey, ordenActual, ordenSugerido, minutosEstimados, conTrafico, incluirUltima){
   var cambio = JSON.stringify(ordenActual) !== JSON.stringify(ordenSugerido);
-  var html = '<h3 style="font-size:19px;font-weight:800;color:#1a237e;margin:0 0 6px">🚦 Ruta con el tráfico de ahora</h3>'
-    + '<p style="font-size:13px;color:#666;margin:0 0 16px">Tiempo estimado con este orden: <b>'+minutosEstimados+' minutos</b> de manejo entre paradas</p>';
-  if(!cambio){
-    html += '<div style="background:#E8F5E9;border-radius:10px;padding:14px;text-align:center;color:#2E7D32;font-weight:700">✓ Tu orden actual ya es el más eficiente con el tráfico de ahora.</div>';
+  var ultima = ordenSugerido[ordenSugerido.length-1];
+
+  var lineaTiempo;
+  if(minutosEstimados === null || minutosEstimados === undefined){
+    lineaTiempo = 'No se pudo medir el tiempo de manejo, pero el orden sí se calculó.';
+  } else if(conTrafico){
+    lineaTiempo = 'Con el tráfico de ahora: <b>'+minutosEstimados+' minutos</b> de manejo entre paradas';
   } else {
-    html += '<div style="display:flex;gap:10px;margin-bottom:16px">'
+    lineaTiempo = 'Tiempo normal -sin tráfico en vivo-: <b>'+minutosEstimados+' minutos</b> de manejo';
+  }
+
+  var html = '<h3 style="font-size:19px;font-weight:800;color:#1a237e;margin:0 0 6px">🚦 Ruta con el tráfico de ahora</h3>'
+    + '<p style="font-size:13px;color:#666;margin:0 0 12px">'+lineaTiempo+'</p>';
+
+  // Casilla para dejar que Google escoja tambien la ultima parada
+  html += '<label style="display:flex;align-items:center;gap:9px;background:#FFF8E1;border:1px solid #FFE082;border-radius:9px;padding:9px 11px;margin-bottom:14px;cursor:pointer">'
+    + '<input type="checkbox" id="chk-ultima-libre" '+(incluirUltima?'checked':'')+' style="width:19px;height:19px;flex-shrink:0;cursor:pointer" onchange="optimizarRutaConTrafico(\'' + diaKey + '\', this.checked)">'
+    + '<span style="font-size:12.5px;color:#6D4C41;line-height:1.3">Dejar que Google escoja también la <b>última parada</b></span>'
+    + '</label>';
+
+  if(!cambio){
+    html += '<div style="background:#E8F5E9;border-radius:10px;padding:14px;text-align:center;color:#2E7D32;font-weight:700;font-size:13px">✓ Tu orden actual ya es el más eficiente con el tráfico de ahora.</div>';
+  } else {
+    html += '<div style="display:flex;gap:10px;margin-bottom:14px">'
       + '<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#999;margin-bottom:6px">TU ORDEN ACTUAL</div>'
       + ordenActual.map(function(n,i){ return '<div style="background:#f5f5f5;border-radius:8px;padding:8px;margin-bottom:4px;font-size:12px">'+(i+1)+'. '+escaparHtml(n)+'</div>'; }).join('')
       + '</div>'
       + '<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#1565C0;margin-bottom:6px">ORDEN SUGERIDO</div>'
-      + ordenSugerido.map(function(n,i){ return '<div style="background:#E3F2FD;border-radius:8px;padding:8px;margin-bottom:4px;font-size:12px;font-weight:700">'+(i+1)+'. '+escaparHtml(n)+'</div>'; }).join('')
+      + ordenSugerido.map(function(n,i){
+          var pin = (!incluirUltima && n === ultima) ? ' 📌' : '';
+          return '<div style="background:#E3F2FD;border-radius:8px;padding:8px;margin-bottom:4px;font-size:12px;font-weight:700">'+(i+1)+'. '+escaparHtml(n)+pin+'</div>';
+        }).join('')
       + '</div></div>';
+    if(!incluirUltima){
+      html += '<div style="font-size:11px;color:#999;margin:-6px 0 12px">📌 = parada fija, no se mueve</div>';
+    }
   }
+
   html += '<div style="display:flex;gap:8px;margin-top:8px">'
     + (cambio ? '<button onclick="aplicarOrdenSugerido(\''+diaKey+'\')" style="flex:1;padding:13px;border:none;border-radius:10px;background:#1565C0;color:#fff;font-weight:800;cursor:pointer">Usar este orden</button>' : '')
     + '<button onclick="cerrarComparacionRuta()" style="flex:1;padding:13px;border:2px solid #999;border-radius:10px;background:#fff;color:#666;font-weight:700;cursor:pointer">'+(cambio?'Quedarme con el mío':'Cerrar')+'</button>'
