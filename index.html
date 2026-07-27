@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260727j-OFICIAL-V2.0">
+<meta name="app-version" content="20260727k-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16322,8 +16322,13 @@ function buscarProductoParaFactura(q){
   var el = document.getElementById('fact-edit-resultados');
   loadProds();
   if(!q || !q.trim()){ el.style.display = 'none'; el.innerHTML=''; return; }
-  var ql = q.toLowerCase();
-  var lista = productos.filter(function(p){ return p.nombre.toLowerCase().indexOf(ql) >= 0; }).slice(0, 15);
+  // Usa el MISMO motor de busqueda de Vender y Compras -filtrarPorBusqueda-, que
+  // encuentra las palabras en cualquier orden y aguanta errores de tecleo. Antes
+  // aqui se buscaba el texto PEGADO, asi que "olive 5" no encontraba
+  // "ECO OLIVE OIL 5 LBS". -27 jul-
+  var lista = filtrarPorBusqueda(productos, q, function(p){
+    return (p.nombre || '') + ' ' + (p.marca || '') + ' ' + (p.sku || '');
+  }).slice(0, 15);
   if(!lista.length){
     el.style.display = 'block';
     el.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--nbs-muted);text-align:center">Sin resultados — puedes escribir el nombre manualmente y agregarlo abajo</div>';
@@ -21999,8 +22004,12 @@ function buscarProductoParaCambio(vid){
   var q = document.getElementById('dev-cambio-buscar').value.trim().toLowerCase();
   var elRes = document.getElementById('dev-cambio-resultados');
   if(!q){ elRes.style.display = 'none'; elRes.innerHTML = ''; return; }
-  var encontrados = productos.filter(function(p){
-    return (p.nombre||'').toLowerCase().indexOf(q) >= 0;
+  // Usa el MISMO motor de busqueda de Vender y Compras -filtrarPorBusqueda-, que
+  // encuentra las palabras en cualquier orden y aguanta errores de tecleo. Antes
+  // aqui se buscaba el texto PEGADO, asi que "olive 5" no encontraba
+  // "ECO OLIVE OIL 5 LBS". -27 jul-
+  var encontrados = filtrarPorBusqueda(productos, q, function(p){
+    return (p.nombre || '') + ' ' + (p.marca || '') + ' ' + (p.sku || '');
   }).slice(0, 8);
   if(!encontrados.length){ elRes.innerHTML = '<div style="padding:10px;font-size:12px;color:#aaa">Sin resultados</div>'; elRes.style.display='block'; return; }
   elRes.innerHTML = encontrados.map(function(p){
@@ -22351,7 +22360,10 @@ function abrirPreciosPersonalizados(cid){
     loadProds();
     var q = buscarProd.value.trim().toLowerCase();
     if(!q){ resultadosBusqueda.style.display='none'; return; }
-    var encontrados = productos.filter(function(p){ return (p.nombre||'').toLowerCase().indexOf(q)>=0; }).slice(0,8);
+    // Mismo motor de busqueda que Vender y Compras -27 jul-
+    var encontrados = filtrarPorBusqueda(productos, q, function(p){
+      return (p.nombre || '') + ' ' + (p.marca || '') + ' ' + (p.sku || '');
+    }).slice(0, 8);
     if(!encontrados.length){ resultadosBusqueda.innerHTML = '<div style="padding:10px;font-size:12px;color:#aaa">Sin resultados</div>'; resultadosBusqueda.style.display='block'; return; }
     resultadosBusqueda.innerHTML = encontrados.map(function(p){
       return '<div data-pid="'+p.id+'" style="padding:10px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:13px">'
