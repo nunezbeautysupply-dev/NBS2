@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260726g-OFICIAL-V2.0">
+<meta name="app-version" content="20260727a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -20167,18 +20167,35 @@ function optimizarRutaConTrafico(diaKey, incluirUltima){
     }
 
     mostrarCargandoRuta('🚦 Midiendo el tráfico de ahora...');
-    var puntos = [origenGuardado].concat(nuevoOrden.map(function(n){ return direccionDeBarberia(n); }));
-    return minutosConTrafico(puntos).then(function(t){
-      return { orden: nuevoOrden, minutos: t.minutos, conTrafico: t.conTrafico };
-    }).catch(function(){
-      // Si los tramos fallan, igual se muestra el orden -lo importante- sin minutos
-      return { orden: nuevoOrden, minutos: null, conTrafico: false };
+    // Se miden LOS DOS: el que sugiere Google y el que Sensei tiene puesto -26 jul-.
+    // Asi el puede comparar los dos numeros y decidir el, en vez de creerle a Google
+    // a ciegas. Los dos se miden IGUAL -desde donde esta parado, parada por parada,
+    // sin contar regreso- para que la comparacion sea justa.
+    var direccionesDe = function(lista){
+      return [origenGuardado].concat(lista.map(function(n){ return direccionDeBarberia(n); }));
+    };
+    var mismoOrden = JSON.stringify(rutaHoy) === JSON.stringify(nuevoOrden);
+    var medirSugerido = minutosConTrafico(direccionesDe(nuevoOrden))
+      .catch(function(){ return null; });
+    // Si los dos ordenes son iguales no se gasta una segunda tanda de consultas
+    var medirActual = mismoOrden
+      ? medirSugerido
+      : minutosConTrafico(direccionesDe(rutaHoy)).catch(function(){ return null; });
+
+    return Promise.all([medirSugerido, medirActual]).then(function(par){
+      var sug = par[0], act = par[1];
+      return {
+        orden: nuevoOrden,
+        minutos: sug ? sug.minutos : null,
+        conTrafico: sug ? sug.conTrafico : false,
+        minutosActual: act ? act.minutos : null
+      };
     });
   }).then(function(d){
     cerrarCargandoRuta();
     if(_rutaCancelada) return;
     if(!d) return;
-    mostrarComparacionRuta(diaKey, rutaHoy, d.orden, d.minutos, d.conTrafico, incluirUltima);
+    mostrarComparacionRuta(diaKey, rutaHoy, d.orden, d.minutos, d.conTrafico, incluirUltima, d.minutosActual);
   }).catch(function(err){
     cerrarCargandoRuta();
     if(_rutaCancelada) return;
@@ -20186,17 +20203,25 @@ function optimizarRutaConTrafico(diaKey, incluirUltima){
   });
 }
 
-function mostrarComparacionRuta(diaKey, ordenActual, ordenSugerido, minutosEstimados, conTrafico, incluirUltima){
+function mostrarComparacionRuta(diaKey, ordenActual, ordenSugerido, minutosEstimados, conTrafico, incluirUltima, minutosActual){
   var cambio = JSON.stringify(ordenActual) !== JSON.stringify(ordenSugerido);
   var ultima = ordenSugerido[ordenSugerido.length-1];
+  var haySug = (minutosEstimados !== null && minutosEstimados !== undefined);
+  var hayAct = (minutosActual !== null && minutosActual !== undefined);
 
   var lineaTiempo;
-  if(minutosEstimados === null || minutosEstimados === undefined){
+  if(!haySug){
     lineaTiempo = 'No se pudo medir el tiempo de manejo, pero el orden sí se calculó.';
   } else if(conTrafico){
-    lineaTiempo = 'Con el tráfico de ahora: <b>'+minutosEstimados+' minutos</b> de manejo entre paradas';
+    lineaTiempo = 'Minutos de manejo entre paradas, con el tráfico de ahora';
   } else {
-    lineaTiempo = 'Tiempo normal -sin tráfico en vivo-: <b>'+minutosEstimados+' minutos</b> de manejo';
+    lineaTiempo = 'Minutos de manejo entre paradas -tiempo normal, sin tráfico en vivo-';
+  }
+
+  // Un reloj para poner debajo del titulo de cada columna
+  function reloj(min, color){
+    if(min === null || min === undefined) return '';
+    return '<div style="font-size:16px;font-weight:900;color:'+color+';margin-bottom:6px">⏱ '+min+' min</div>';
   }
 
   var html = '<div style="display:flex;align-items:flex-start;gap:8px;margin:0 0 6px">'
@@ -20212,20 +20237,41 @@ function mostrarComparacionRuta(diaKey, ordenActual, ordenSugerido, minutosEstim
     + '</label>';
 
   if(!cambio){
-    html += '<div style="background:#E8F5E9;border-radius:10px;padding:14px;text-align:center;color:#2E7D32;font-weight:700;font-size:13px">✓ Tu orden actual ya es el más eficiente con el tráfico de ahora.</div>';
+    html += '<div style="background:#E8F5E9;border-radius:10px;padding:14px;text-align:center;color:#2E7D32;font-weight:800;font-size:13.5px">'
+      + '✓ Tu orden ya es el más rápido.'
+      + (haySug ? '<div style="font-size:17px;font-weight:900;margin-top:6px">⏱ '+minutosEstimados+' min</div>' : '')
+      + '</div>';
   } else {
     html += '<div style="display:flex;gap:10px;margin-bottom:14px">'
-      + '<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#999;margin-bottom:6px">TU ORDEN ACTUAL</div>'
+      + '<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#999;margin-bottom:4px">TU ORDEN ACTUAL</div>'
+      + reloj(minutosActual, '#666')
       + ordenActual.map(function(n,i){ return '<div style="background:#f5f5f5;border-radius:8px;padding:8px;margin-bottom:4px;font-size:12px">'+(i+1)+'. '+escaparHtml(n)+'</div>'; }).join('')
       + '</div>'
-      + '<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#1565C0;margin-bottom:6px">ORDEN SUGERIDO</div>'
+      + '<div style="flex:1"><div style="font-size:11px;font-weight:800;color:#1565C0;margin-bottom:4px">ORDEN SUGERIDO</div>'
+      + reloj(minutosEstimados, '#1565C0')
       + ordenSugerido.map(function(n,i){
           var pin = (!incluirUltima && n === ultima) ? ' 📌' : '';
           return '<div style="background:#E3F2FD;border-radius:8px;padding:8px;margin-bottom:4px;font-size:12px;font-weight:700">'+(i+1)+'. '+escaparHtml(n)+pin+'</div>';
         }).join('')
       + '</div></div>';
     if(!incluirUltima){
-      html += '<div style="font-size:11px;color:#999;margin:-6px 0 12px">📌 = parada fija, no se mueve</div>';
+      html += '<div style="font-size:11px;color:#999;margin:-6px 0 10px">📌 = parada fija, no se mueve</div>';
+    }
+
+    // EL VEREDICTO: con los dos numeros en la mano, Sensei decide -26 jul-.
+    // Puede ganar Google, puede ganar el. Se dice tal cual, sin maquillar.
+    if(haySug && hayAct){
+      var dif = minutosActual - minutosEstimados;
+      if(dif > 0){
+        html += '<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:11px;text-align:center;color:#2E7D32;font-weight:800;font-size:13.5px;margin-bottom:12px">'
+          + '✓ Te ahorras '+dif+' minuto'+(dif===1?'':'s')+'</div>';
+      } else if(dif < 0){
+        html += '<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:10px;padding:11px;text-align:center;color:#6D4C41;font-weight:800;font-size:13.5px;margin-bottom:12px">'
+          + '🏆 Tu orden es '+Math.abs(dif)+' minuto'+(Math.abs(dif)===1?'':'s')+' MÁS RÁPIDO que el que sugiere Google</div>';
+      } else {
+        html += '<div style="background:#f5f5f5;border-radius:10px;padding:11px;text-align:center;color:#666;font-weight:700;font-size:13px;margin-bottom:12px">'
+          + 'Los dos tardan lo mismo</div>';
+      }
     }
   }
 
