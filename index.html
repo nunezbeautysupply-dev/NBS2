@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260727a-OFICIAL-V2.0">
+<meta name="app-version" content="20260727b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19933,6 +19933,112 @@ function revisarDireccionesDeNegocios(){
   overlay.style.display = 'block';
 }
 
+// ═══ NAVEGAR LA RUTA — Google Maps y Waze (27 jul, pedido de Sensei) ═══
+//
+// LA DIFERENCIA ENTRE LOS DOS -verificada en la documentacion de ambos-:
+//   · GOOGLE MAPS si acepta rutas de VARIAS paradas, por el parametro waypoints.
+//     Tope: 9 paradas intermedias, o sea 10 paradas en total por enlace.
+//   · WAZE NO acepta varias paradas. Su enlace solo admite UN destino. No es
+//     limitacion nuestra: Waze no tiene ese parametro. Por eso Waze se ofrece
+//     parada por parada, que ademas encaja con como trabaja Sensei -se baja,
+//     atiende 20 minutos, y sigue-.
+//
+// Si un dia tiene MAS de 10 paradas en un mismo dia, la ruta se parte sola en
+// tramos de 10, y cada tramo arranca donde termino el anterior para que no
+// quede ningun hueco.
+
+var MAX_PARADAS_MAPS = 10;   // 9 intermedias + la de destino
+
+// Parte la lista en tramos que Google Maps si acepta. Cada tramo despues del
+// primero arranca en la ULTIMA parada del anterior, para que la ruta siga
+// completa sin saltos.
+function tramosParaMaps(paradas){
+  var tramos = [], i = 0;
+  while(i < paradas.length){
+    var fin = Math.min(i + MAX_PARADAS_MAPS, paradas.length);
+    tramos.push({ origen: (i === 0 ? null : paradas[i-1]), lista: paradas.slice(i, fin) });
+    i = fin;
+  }
+  return tramos;
+}
+
+// Arma el enlace de Google Maps. Si no se le da origen, Maps arranca desde
+// DONDE ESTE Sensei en ese momento -que es lo que queremos en el primer tramo-.
+function urlMapsRuta(origen, lista){
+  var destino = lista[lista.length - 1];
+  var intermedias = lista.slice(0, -1);
+  var u = 'https://www.google.com/maps/dir/?api=1&travelmode=driving';
+  if(origen) u += '&origin=' + encodeURIComponent(origen);
+  u += '&destination=' + encodeURIComponent(destino);
+  if(intermedias.length){
+    u += '&waypoints=' + intermedias.map(encodeURIComponent).join('%7C');
+  }
+  return u;
+}
+
+// Junta las direcciones del dia y avisa si a alguna barberia le falta la suya
+function direccionesDelDia(diaKey){
+  var rutasPorDia = LS('rutas_por_dia', {});
+  var rutaHoy = rutasPorDia[diaKey] || [];
+  if(!rutaHoy.length){
+    avisoGrande('No hay barberías en la ruta de ese día.');
+    return null;
+  }
+  var faltan = [], dirs = [];
+  rutaHoy.forEach(function(neg){
+    var d = direccionDeBarberia(neg);
+    if(d) dirs.push(d); else faltan.push(neg);
+  });
+  if(faltan.length){
+    avisoGrande('⚠️ Estas barberías no tienen dirección guardada, así que no se pueden poner en el mapa:\n\n'
+      + faltan.map(function(n){ return '• ' + n; }).join('\n')
+      + '\n\nAgrégales la dirección en el perfil de un cliente de esa barbería.');
+    return null;
+  }
+  return dirs;
+}
+
+// Botón "Navegar toda la ruta"
+function navegarRutaCompleta(diaKey){
+  var dirs = direccionesDelDia(diaKey);
+  if(!dirs) return;
+  if(dirs.length === 1){ window.open(urlMapsRuta(null, dirs), '_blank'); return; }
+
+  var tramos = tramosParaMaps(dirs);
+  if(tramos.length === 1){
+    window.open(urlMapsRuta(tramos[0].origen, tramos[0].lista), '_blank');
+    return;
+  }
+
+  // Mas de 10 paradas: se abre por tramos. Se le explica por que.
+  var opciones = tramos.map(function(t, i){
+    var desde = (i === 0 ? 1 : i*MAX_PARADAS_MAPS + 1);
+    var hasta = desde + t.lista.length - 1;
+    return ['🗺️ Tramo ' + (i+1) + ' — paradas ' + desde + ' a ' + hasta,
+            function(){ window.open(urlMapsRuta(t.origen, t.lista), '_blank'); }];
+  });
+  avisoGrande('Tienes ' + dirs.length + ' paradas hoy, y Google Maps solo acepta 10 por ruta.\n\n'
+    + 'La partí en ' + tramos.length + ' tramos. Cada uno arranca donde termina el anterior, '
+    + 'así que no se te queda ninguna parada fuera.\n\nAbre el tramo que vayas a manejar.',
+    function(){ mostrarMenuOpcionesFoto(opciones); });
+}
+
+// El 🗺️ de cada barbería: ahora deja escoger entre Maps y Waze
+function menuNavegarParada(negocio){
+  var dir = direccionDeBarberia(negocio);
+  mostrarMenuOpcionesFoto([
+    ['🗺️ Google Maps', function(){ navegarANegocio(negocio); }],
+    ['🚗 Waze', function(){
+      if(!dir){
+        avisoGrande('⚠️ "' + negocio + '" no tiene dirección guardada.\n\nAgrégasela en el perfil de un cliente de esa barbería.');
+        return;
+      }
+      // Waze solo admite UN destino. Con q= busca la direccion y arranca a navegar.
+      window.open('https://waze.com/ul?q=' + encodeURIComponent(dir) + '&navigate=yes', '_blank');
+    }]
+  ]);
+}
+
 // ═══ OPTIMIZAR RUTA CON TRÁFICO EN TIEMPO REAL ═══
 // (25 jul: primera versión. 26 jul: REHECHA porque no funcionaba.)
 //
@@ -20338,6 +20444,16 @@ function renderRutaDia(diaKey){
     el.appendChild(btnOpt);
   }
 
+  // Boton para abrir TODA la ruta del dia en Google Maps, en el orden guardado
+  // -o sea, el que quedo despues de la eleccion de Sensei- (27 jul)
+  if(rutaHoy.length >= 1){
+    var btnNavTodo = document.createElement('button');
+    btnNavTodo.textContent = '🗺️ Navegar toda la ruta';
+    btnNavTodo.style.cssText = 'width:100%;padding:12px;border:2px solid #2E7D32;border-radius:10px;background:#E8F5E9;color:#2E7D32;font-weight:800;font-size:13.5px;cursor:pointer;margin-bottom:12px';
+    btnNavTodo.onclick = (function(dk){ return function(){ navegarRutaCompleta(dk); }; })(diaKey);
+    el.appendChild(btnNavTodo);
+  }
+
   // Lista de barberías en la ruta
   if(rutaHoy.length === 0){
     var empty = document.createElement('div');
@@ -20385,9 +20501,9 @@ function renderRutaDia(diaKey){
 
       var btnNav = document.createElement('button');
       btnNav.textContent = '🗺️';
-      btnNav.title = 'Navegar con Google Maps';
+      btnNav.title = 'Navegar con Google Maps o Waze';
       btnNav.style.cssText = 'background:#E3F2FD;color:#1565C0;border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:15px;flex-shrink:0';
-      btnNav.onclick = (function(n){ return function(){ navegarANegocio(n); }; })(neg);
+      btnNav.onclick = (function(n){ return function(){ menuNavegarParada(n); }; })(neg);
 
       var btnQuit = document.createElement('button');
       btnQuit.textContent = '✕';
