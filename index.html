@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260727i-OFICIAL-V2.0">
+<meta name="app-version" content="20260727j-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16703,6 +16703,11 @@ window.addEventListener('popstate', function(){
   //       saltaba y llegaba hasta el letrero de "salir de la app". Ahora las
   //       cierra y devuelve a Ruta de Visitas. Solo estas dos: NO se toco el
   //       resto de la app, por decision de Sensei.
+  if(document.getElementById('buscar-prod-ov')){
+    logAtras('  -> cerro buscador de producto');
+    cerrarBuscadorProducto();
+    return;
+  }
   if(document.getElementById('comparar-ruta-ov')){
     logAtras('  -> cerro comparacion de ruta');
     cerrarComparacionRuta();
@@ -20429,10 +20434,9 @@ function pintarRevisionFactura(){
   }
 
   // Lista de productos para los desplegables
-  var opcionesTodos = '';
-  productos.forEach(function(p){
-    opcionesTodos += '<option value="' + p.id + '">' + escaparHtml(p.nombre) + '</option>';
-  });
+  // Ya no se arma la lista de 386 productos aqui: ahora hay un BUSCADOR -27 jul, pedido
+  // de Sensei: "se despliega la lista completa y encontrar el producto correcto cuesta
+  // mucho, pero si se pudiera escribir en la busqueda fuera muchisimo mas facil"-.
 
   items.forEach(function(it, i){
     var cuadraLinea = Math.abs(it.cant * it.costo - it.total) < 0.015;
@@ -20446,20 +20450,18 @@ function pintarRevisionFactura(){
 
     var etiqueta = it.comoLoSupo === 'aprendido'
       ? '<span style="font-size:10.5px;color:#2E7D32;font-weight:800"> · ya lo sabía</span>' : '';
-    // Las mas parecidas, de primeras, para que no tenga que buscar entre 386
-    var sug = sugerenciasPara(it.descripcion, 5);
-    var opciones = '<option value="">⚠️ Escoge el producto</option><option value="NUEVO">➕ Es un producto nuevo</option>';
-    if(sug.length){
-      opciones += '<optgroup label="Los que más se parecen">';
-      sug.forEach(function(p){ opciones += '<option value="' + p.id + '">' + escaparHtml(p.nombre) + '</option>'; });
-      opciones += '</optgroup><optgroup label="Todos tus productos">' + opcionesTodos + '</optgroup>';
-    } else {
-      opciones += opcionesTodos;
-    }
+    // Boton que abre el BUSCADOR, en vez de una lista de 386 para desplazar
+    var elegido = null;
+    if(it.pid) elegido = productos.find(function(p){ return String(p.id) === String(it.pid); });
+    var textoBoton = elegido ? escaparHtml(elegido.nombre)
+                   : (it.esNuevo ? '➕ Producto nuevo' : '⚠️ Escoge el producto');
+    var colorBorde = (elegido || it.esNuevo) ? '#c8e6c9' : '#FFCC80';
+    var colorTexto = (elegido || it.esNuevo) ? '#1a237e' : '#E65100';
     html += '<div style="font-size:10.5px;color:#999;font-weight:800;margin-bottom:3px">TU PRODUCTO' + etiqueta + '</div>'
-      + '<select onchange="cambiarProductoFactura(' + i + ', this.value)" style="width:100%;padding:8px;border:2px solid ' + (it.pid ? '#c8e6c9' : '#FFCC80') + ';border-radius:8px;font-size:12.5px;margin-bottom:8px;background:#fff">'
-      + (it.pid ? opciones.split('value="' + it.pid + '"').join('value="' + it.pid + '" selected') : opciones)
-      + '</select>';
+      + '<button onclick="abrirBuscadorProducto(' + i + ')" style="width:100%;display:flex;align-items:center;gap:8px;text-align:left;padding:10px;border:2px solid ' + colorBorde + ';border-radius:8px;font-size:12.5px;font-weight:700;margin-bottom:8px;background:#fff;color:' + colorTexto + ';cursor:pointer">'
+      + '<span style="flex:1;line-height:1.3">' + textoBoton + '</span>'
+      + '<span style="flex-shrink:0;font-size:17px">🔍</span>'
+      + '</button>';
 
     html += '<div style="display:flex;gap:6px;align-items:center">'
       + '<div style="flex:1"><div style="font-size:10px;color:#999;font-weight:700">CANTIDAD</div>'
@@ -20494,6 +20496,109 @@ function pintarRevisionFactura(){
   }
   ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:16px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto">' + html + '</div>';
   ov.style.display = 'flex';
+}
+
+// ── EL BUSCADOR DE PRODUCTOS (27 jul) ──
+// Sensei tiene 386 productos. Desplazar una lista de 386 en el telefono para encontrar
+// uno era lo que mas tiempo le quitaba al meter una factura. Ahora escribe 3 letras.
+var _buscadorLinea = null;
+
+function abrirBuscadorProducto(i){
+  _buscadorLinea = i;
+  var ov = document.getElementById('buscar-prod-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'buscar-prod-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:99996;display:flex;flex-direction:column';
+    document.body.appendChild(ov);
+  }
+  var it = (window._facturaItems || [])[i] || { descripcion: '' };
+  ov.innerHTML =
+      '<div style="flex-shrink:0;padding:12px;border-bottom:2px solid #eee">'
+    +   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+    +     '<div style="flex:1;font-size:16px;font-weight:900;color:#1a237e">Buscar producto</div>'
+    +     '<button onclick="cerrarBuscadorProducto()" style="flex-shrink:0;width:34px;height:34px;border:none;border-radius:9px;background:#f0f0f0;color:#666;font-size:20px;font-weight:800;cursor:pointer">✕</button>'
+    +   '</div>'
+    +   '<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:8px;margin-bottom:8px">'
+    +     '<div style="font-size:10px;color:#8D6E63;font-weight:800;margin-bottom:2px">DICE LA FACTURA</div>'
+    +     '<div style="font-size:12.5px;color:#5D4037;font-weight:700;line-height:1.3">' + escaparHtml(it.descripcion) + '</div>'
+    +   '</div>'
+    +   '<input id="buscar-prod-txt" type="search" inputmode="search" autocomplete="off" placeholder="🔍 Escribe parte del nombre..." '
+    +     'oninput="pintarResultadosBuscador()" style="width:100%;padding:12px;border:2px solid #1565C0;border-radius:10px;font-size:15px;font-weight:600">'
+    + '</div>'
+    + '<div id="buscar-prod-lista" style="flex:1;overflow-y:auto;padding:8px 12px"></div>'
+    + '<div style="flex-shrink:0;padding:10px 12px;border-top:2px solid #eee">'
+    +   '<button onclick="escogerProductoBuscador(\'NUEVO\')" style="width:100%;padding:13px;border:2px solid #2E7D32;border-radius:10px;background:#E8F5E9;color:#2E7D32;font-weight:800;font-size:13.5px;cursor:pointer">➕ Es un producto nuevo</button>'
+    + '</div>';
+  ov.style.display = 'flex';
+  pintarResultadosBuscador();
+  var caja = document.getElementById('buscar-prod-txt');
+  if(caja) setTimeout(function(){ try { caja.focus(); } catch(e){} }, 60);
+}
+
+function cerrarBuscadorProducto(){
+  var ov = document.getElementById('buscar-prod-ov');
+  if(ov) ov.remove();
+  _buscadorLinea = null;
+}
+
+function pintarResultadosBuscador(){
+  var cont = document.getElementById('buscar-prod-lista');
+  if(!cont) return;
+  loadProds();
+  var it = (window._facturaItems || [])[_buscadorLinea] || { descripcion: '' };
+  var texto = (document.getElementById('buscar-prod-txt') || {}).value || '';
+  var palabras = normalizarTexto(texto).split(' ').filter(function(w){ return w; });
+
+  var lista, conEstrella = {};
+  if(!palabras.length){
+    // Sin escribir nada: primero las que mas se parecen a lo que dice la factura
+    var sug = sugerenciasPara(it.descripcion, 6);
+    sug.forEach(function(p){ conEstrella[String(p.id)] = true; });
+    var resto = productos.filter(function(p){ return !conEstrella[String(p.id)]; });
+    lista = sug.concat(resto);
+  } else {
+    // TODAS las palabras tienen que estar, en cualquier orden: "olive 5" encuentra
+    // "ECO OLIVE OIL 5 LBS"
+    lista = productos.filter(function(p){
+      var np = normalizarTexto((p.nombre || '') + ' ' + (p.marca || '') + ' ' + (p.sku || ''));
+      for(var k = 0; k < palabras.length; k++){ if(np.indexOf(palabras[k]) < 0) return false; }
+      return true;
+    });
+    var sug2 = sugerenciasPara(it.descripcion, 6);
+    sug2.forEach(function(p){ conEstrella[String(p.id)] = true; });
+    lista.sort(function(a, b){
+      var ea = conEstrella[String(a.id)] ? 0 : 1, eb = conEstrella[String(b.id)] ? 0 : 1;
+      return ea - eb;
+    });
+  }
+
+  if(!lista.length){
+    cont.innerHTML = '<div style="text-align:center;padding:30px 14px;color:#999;font-size:13.5px">'
+      + 'No hay ningún producto con esas palabras.<br><br>Prueba con menos letras, o usa<br>"➕ Es un producto nuevo" de abajo.</div>';
+    return;
+  }
+
+  var html = '';
+  lista.slice(0, 120).forEach(function(p){
+    var estrella = conEstrella[String(p.id)] ? '<span style="color:#F9A825">⭐ </span>' : '';
+    var costo = (typeof p.costo === 'number' && p.costo > 0) ? ' · $' + fmtNum(p.costo) : '';
+    html += '<button onclick="escogerProductoBuscador(\'' + p.id + '\')" style="width:100%;text-align:left;padding:11px;border:none;border-bottom:1px solid #eee;background:#fff;cursor:pointer">'
+      + '<div style="font-size:13.5px;font-weight:700;color:#1a237e;line-height:1.3">' + estrella + escaparHtml(p.nombre) + '</div>'
+      + '<div style="font-size:11.5px;color:#888;margin-top:2px">' + escaparHtml(p.marca || 'Sin marca') + costo + '</div>'
+      + '</button>';
+  });
+  if(lista.length > 120){
+    html += '<div style="text-align:center;padding:14px;color:#999;font-size:12px">y ' + (lista.length - 120) + ' más — escribe algo para achicar la lista</div>';
+  }
+  cont.innerHTML = html;
+}
+
+function escogerProductoBuscador(pid){
+  var i = _buscadorLinea;
+  cerrarBuscadorProducto();
+  if(i === null || i === undefined) return;
+  cambiarProductoFactura(i, String(pid));
 }
 
 function marcarLineaFactura(i, val){
