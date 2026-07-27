@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260726e-OFICIAL-V2.0">
+<meta name="app-version" content="20260726g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5580,7 +5580,9 @@ function editarCompra(cid, sid){
   inputCamaraEdit.onchange = function(){ cargarFotoEditCompra(inputCamaraEdit); };
   wrap.appendChild(inputCamaraEdit);
   var inputGaleriaEdit = document.createElement('input');
-  inputGaleriaEdit.type = 'file'; inputGaleriaEdit.accept = 'image/jpeg,image/png,image/gif,image/webp';
+  inputGaleriaEdit.type = 'file'; inputGaleriaEdit.accept = 'image/*';  // era una lista corta que dejaba
+  // FUERA el formato HEIC -el que usa el Samsung de Sensei por defecto-, asi que en esta pantalla
+  // se le escondia media galeria. Ahora pide lo mismo que los otros 11 inputs de foto -26 jul-.
   inputGaleriaEdit.style.display = 'none'; inputGaleriaEdit.id = 'compra-edit-foto-galeria';
   inputGaleriaEdit.onchange = function(){ cargarFotoEditCompra(inputGaleriaEdit); };
   wrap.appendChild(inputGaleriaEdit);
@@ -5588,8 +5590,8 @@ function editarCompra(cid, sid){
   fotoPreviewEdit.onclick = function(){
     var opciones = c.foto
       ? [['👁️ Ver en grande', function(){ verFotoGasto(document.getElementById('compra-edit-foto-data').value); }],
-         ['📷 Tomar otra foto', function(){ document.getElementById('compra-edit-foto-camara').click(); }],
-         ['🖼️ Elegir otra de galería', function(){ document.getElementById('compra-edit-foto-galeria').click(); }],
+         ['📷 Tomar otra foto', function(){ recrearInputFoto('compra-edit-foto-camara', cargarFotoEditCompra).click(); }],
+         ['🖼️ Elegir otra de galería', function(){ recrearInputFoto('compra-edit-foto-galeria', cargarFotoEditCompra).click(); }],
          ['🗑️ Quitar foto', function(){
            document.getElementById('compra-edit-foto-data').value = '';
            fotoPreviewEdit.innerHTML = '📷';
@@ -5598,8 +5600,8 @@ function editarCompra(cid, sid){
            fotoInfoTxt.textContent = 'Todavía no tiene foto — toca para agregar una.';
            c.foto = null;
          }]]
-      : [['📷 Tomar foto', function(){ document.getElementById('compra-edit-foto-camara').click(); }],
-         ['🖼️ Elegir de galería', function(){ document.getElementById('compra-edit-foto-galeria').click(); }]];
+      : [['📷 Tomar foto', function(){ recrearInputFoto('compra-edit-foto-camara', cargarFotoEditCompra).click(); }],
+         ['🖼️ Elegir de galería', function(){ recrearInputFoto('compra-edit-foto-galeria', cargarFotoEditCompra).click(); }]];
     mostrarMenuOpcionesFoto(opciones);
   };
 
@@ -8702,26 +8704,49 @@ function abrirRecortarFoto(dataUrlOriginal, onConfirmar, salidaMaxCustom){
     manijas[lado] = m;
   });
 
-  // ── Fila para girar -26 jul- ──
-  var filaGiro = document.createElement('div');
-  filaGiro.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:12px;width:100%;max-width:'+MAXW+'px';
-  function botonGiro(txt){
+  // ── Girar -26 jul- ──
+  // OJO: la primera version tenia UNA sola barra de -45 a +45. Sensei la probo y dijo que
+  // estaba "muy sensitiva": 90 grados metidos en el ancho del telefono hacen que un
+  // milimetro de dedo sean varios grados, imposible dejarla en un punto exacto. Ahora la
+  // barra va de -20 a +20 -menos de la mitad de brincona en el mismo ancho- y ademas hay
+  // botones - y + que mueven EXACTAMENTE 1 grado por toque, sin arrastrar nada.
+  var TOPE_FINO = 20;
+
+  function botonGiro(txt, ancho){
     var b = document.createElement('button');
     b.textContent = txt;
-    b.style.cssText = 'flex-shrink:0;width:44px;height:38px;background:#333;color:white;border:none;border-radius:9px;font-size:19px;font-weight:700;cursor:pointer';
+    b.style.cssText = 'flex-shrink:0;'+(ancho ? 'flex:1;' : 'width:46px;')
+      + 'height:40px;background:#333;color:white;border:none;border-radius:9px;font-size:16px;font-weight:800;cursor:pointer';
     return b;
   }
-  var btnIzq = botonGiro('↺');
-  var btnDer = botonGiro('↻');
-  var barra = document.createElement('input');
-  barra.type = 'range'; barra.min = '-45'; barra.max = '45'; barra.step = '1'; barra.value = '0';
-  barra.style.cssText = 'flex:1;min-width:0;accent-color:var(--nbs-gold)';
+
+  // Fila 1: los saltos de 90 grados, con los grados en grande en el medio
+  var filaGiro = document.createElement('div');
+  filaGiro.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:12px;width:100%;max-width:'+MAXW+'px';
+  var btnIzq = botonGiro('↺ 90°', true);
+  var btnDer = botonGiro('↻ 90°', true);
   var etiquetaGrados = document.createElement('div');
   etiquetaGrados.textContent = '0°';
-  etiquetaGrados.style.cssText = 'flex-shrink:0;width:42px;text-align:center;color:#ddd;font-size:13px;font-weight:700';
-  filaGiro.appendChild(btnIzq); filaGiro.appendChild(barra);
-  filaGiro.appendChild(etiquetaGrados); filaGiro.appendChild(btnDer);
+  etiquetaGrados.style.cssText = 'flex-shrink:0;width:64px;text-align:center;color:var(--nbs-gold);font-size:19px;font-weight:900';
+  filaGiro.appendChild(btnIzq); filaGiro.appendChild(etiquetaGrados); filaGiro.appendChild(btnDer);
   overlay.appendChild(filaGiro);
+
+  // Fila 2: el ajuste fino -1 grado por toque, o la barrita mansa-
+  var filaFina = document.createElement('div');
+  filaFina.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:8px;width:100%;max-width:'+MAXW+'px';
+  var btnMenos = botonGiro('−');
+  var btnMas = botonGiro('+');
+  var barra = document.createElement('input');
+  barra.type = 'range';
+  barra.min = String(-TOPE_FINO); barra.max = String(TOPE_FINO); barra.step = '1'; barra.value = '0';
+  barra.style.cssText = 'flex:1;min-width:0;accent-color:var(--nbs-gold);height:34px';
+  filaFina.appendChild(btnMenos); filaFina.appendChild(barra); filaFina.appendChild(btnMas);
+  overlay.appendChild(filaFina);
+
+  var pista = document.createElement('div');
+  pista.textContent = 'Los botones − y + mueven 1 grado exacto';
+  pista.style.cssText = 'color:#888;font-size:11px;margin-top:5px;text-align:center';
+  overlay.appendChild(pista);
 
   // ── Boton de mejorar la luz -26 jul- ──
   var btnMejorar = document.createElement('button');
@@ -8860,14 +8885,26 @@ function abrirRecortarFoto(dataUrlOriginal, onConfirmar, salidaMaxCustom){
   btnIzq.onclick = function(){ giroBase -= 90; actualizarEtiqueta(); regenerarVista(false); };
   btnDer.onclick = function(){ giroBase += 90; actualizarEtiqueta(); regenerarVista(false); };
 
-  // La barrita regenera con un respiro de 130ms, para que arrastrarla no ahogue el telefono
+  // Regenera con un respiro, para que arrastrar o tocar rapido no ahogue el telefono
   var relojBarra = null;
-  barra.oninput = function(){
-    giroFino = parseInt(barra.value, 10) || 0;
-    actualizarEtiqueta();
+  function pedirRegenerar(ms){
     if(relojBarra) clearTimeout(relojBarra);
-    relojBarra = setTimeout(function(){ regenerarVista(false); }, 130);
+    relojBarra = setTimeout(function(){ regenerarVista(false); }, ms);
+  }
+  function ponerGiroFino(g){
+    if(g < -TOPE_FINO) g = -TOPE_FINO;
+    if(g > TOPE_FINO) g = TOPE_FINO;
+    giroFino = g;
+    barra.value = String(g);
+    actualizarEtiqueta();
+  }
+  barra.oninput = function(){
+    ponerGiroFino(parseInt(barra.value, 10) || 0);
+    pedirRegenerar(130);
   };
+  // Un toque = UN grado exacto. Asi no hay que atinarle arrastrando -26 jul-
+  btnMenos.onclick = function(){ ponerGiroFino(giroFino - 1); pedirRegenerar(200); };
+  btnMas.onclick   = function(){ ponerGiroFino(giroFino + 1); pedirRegenerar(200); };
 
   btnMejorar.onclick = function(){
     mejorar = !mejorar;
