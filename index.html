@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260726b-OFICIAL-V2.0">
+<meta name="app-version" content="20260726c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16416,6 +16416,21 @@ window.addEventListener('popstate', function(){
     return;
   }
 
+  // 1.6) VENTANAS DE LA OPTIMIZACION DE RUTA -26 jul-. Antes, el atras se las
+  //       saltaba y llegaba hasta el letrero de "salir de la app". Ahora las
+  //       cierra y devuelve a Ruta de Visitas. Solo estas dos: NO se toco el
+  //       resto de la app, por decision de Sensei.
+  if(document.getElementById('comparar-ruta-ov')){
+    logAtras('  -> cerro comparacion de ruta');
+    cerrarComparacionRuta();
+    return;
+  }
+  if(document.getElementById('cargando-ruta-ov')){
+    logAtras('  -> cancelo busqueda de ruta');
+    cancelarBusquedaRuta();
+    return;
+  }
+
   // 2) Si el letrero esta abierto y AUN asi llega un aviso de atras, es que
   //    quedaban guardianes: se cierra el letrero y se repone la proteccion.
   //    -Lo normal es que no llegue: al mostrar el letrero la app queda en el
@@ -19706,6 +19721,11 @@ var GOOGLE_MAPS_API_KEY = 'AIzaSyDUQgiuZAvXWuhTC0By_liXlvbYbP3JjQQ';
 
 var _gmapsPromesa = null;
 
+// Se pone en true si Sensei cancela la busqueda -con la X, el boton Cancelar, o
+// el boton atras del celular-. Si esta en true, cuando Google conteste NO se le
+// muestra nada: ya se salio de ahi a proposito -26 jul-.
+var _rutaCancelada = false;
+
 // Google llama a esta función él solo si rechaza la clave -restricción mal puesta,
 // API sin habilitar, facturación apagada-. Sin esto el fallo sería mudo.
 window.gm_authFailure = function(){
@@ -19768,7 +19788,10 @@ function mostrarCargandoRuta(txt){
     ov = document.createElement('div');
     ov.id = 'cargando-ruta-ov';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99996;display:flex;align-items:center;justify-content:center;padding:20px';
-    ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:22px 20px;max-width:320px;width:100%;text-align:center"><div id="cargando-ruta-txt" style="font-size:15px;font-weight:700;color:#1a237e"></div></div>';
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:22px 20px;max-width:320px;width:100%;text-align:center">'
+      + '<div id="cargando-ruta-txt" style="font-size:15px;font-weight:700;color:#1a237e"></div>'
+      + '<button onclick="cancelarBusquedaRuta()" style="margin-top:14px;padding:9px 18px;border:2px solid #999;border-radius:9px;background:#fff;color:#666;font-weight:700;font-size:13.5px;cursor:pointer">Cancelar</button>'
+      + '</div>';
     document.body.appendChild(ov);
   }
   var t = document.getElementById('cargando-ruta-txt');
@@ -19777,6 +19800,13 @@ function mostrarCargandoRuta(txt){
 function cerrarCargandoRuta(){
   var ov = document.getElementById('cargando-ruta-ov');
   if(ov) ov.remove();
+}
+
+// Cancelar la busqueda a medias. No se puede "desllamar" a Google, pero se marca
+// la bandera para que cuando conteste no se muestre nada -26 jul-.
+function cancelarBusquedaRuta(){
+  _rutaCancelada = true;
+  cerrarCargandoRuta();
 }
 
 // Busca la direccion de una barberia usando el primer cliente que tenga ese negocio
@@ -19835,6 +19865,7 @@ function minutosConTrafico(puntos){
 
 function optimizarRutaConTrafico(diaKey, incluirUltima){
   incluirUltima = !!incluirUltima;
+  _rutaCancelada = false;
   cerrarComparacionRuta();
 
   var rutasPorDia = LS('rutas_por_dia', {});
@@ -19908,10 +19939,12 @@ function optimizarRutaConTrafico(diaKey, incluirUltima){
     });
   }).then(function(d){
     cerrarCargandoRuta();
+    if(_rutaCancelada) return;
     if(!d) return;
     mostrarComparacionRuta(diaKey, rutaHoy, d.orden, d.minutos, d.conTrafico, incluirUltima);
   }).catch(function(err){
     cerrarCargandoRuta();
+    if(_rutaCancelada) return;
     avisoGrande('🚦 ' + explicarFalloRuta(err && err.message ? err.message : 'UNKNOWN_ERROR'));
   });
 }
@@ -19929,7 +19962,10 @@ function mostrarComparacionRuta(diaKey, ordenActual, ordenSugerido, minutosEstim
     lineaTiempo = 'Tiempo normal -sin tráfico en vivo-: <b>'+minutosEstimados+' minutos</b> de manejo';
   }
 
-  var html = '<h3 style="font-size:19px;font-weight:800;color:#1a237e;margin:0 0 6px">🚦 Ruta con el tráfico de ahora</h3>'
+  var html = '<div style="display:flex;align-items:flex-start;gap:8px;margin:0 0 6px">'
+    + '<h3 style="flex:1;font-size:19px;font-weight:800;color:#1a237e;margin:0">🚦 Ruta con el tráfico de ahora</h3>'
+    + '<button onclick="cerrarComparacionRuta()" aria-label="Cerrar" style="flex-shrink:0;width:34px;height:34px;line-height:1;border:none;border-radius:9px;background:#f0f0f0;color:#666;font-size:20px;font-weight:800;cursor:pointer">✕</button>'
+    + '</div>'
     + '<p style="font-size:13px;color:#666;margin:0 0 12px">'+lineaTiempo+'</p>';
 
   // Casilla para dejar que Google escoja tambien la ultima parada
