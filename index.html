@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260726c-OFICIAL-V2.0">
+<meta name="app-version" content="20260726d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -832,7 +832,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
         <div id="ep-foto-preview" onclick="abrirOpcionesFotoProducto()" style="width:56px;height:56px;border-radius:10px;background:var(--nbs-gold-bg);border:2px dashed var(--nbs-gold);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden;cursor:pointer">📷</div>
       </div>
       <input type="file" id="ep-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoProducto(this)">
-      <input type="file" id="ep-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoProducto(this)">
+      <input type="file" id="ep-foto-galeria" style="display:none" onchange="cargarFotoProducto(this)">
       <input type="hidden" id="ep-foto-data">
 
       <label class="lbl">Marca *</label>
@@ -3717,6 +3717,7 @@ function cargarFotoGasto(input, prefijo){
   prefijo = prefijo || 'gasto';
   var file = input.files[0];
   if(!file) return;
+  if(!esFotoValida(file)){ input.value = ''; return; }
   var reader = new FileReader();
   reader.onload = function(e){
     // Fotos de facturas y recibos -gasto, compra- necesitan mucha mas resolucion que una foto
@@ -3730,7 +3731,7 @@ function cargarFotoGasto(input, prefijo){
       prev.style.border = 'none';
       if(prefijo === 'cc'){
         var btnOcr = document.getElementById('cc-btn-ocr');
-        if(btnOcr) btnOcr.style.display = 'block';
+        if(btnOcr) btnOcr.style.display = 'block';  // ya se ve siempre; esto lo repone si estaba oculto
       }
     }, resolucionAlta);
   };
@@ -3892,7 +3893,10 @@ function prepararFotoParaOCR(dataUrl, callback){
 
 function leerTextoFacturaCompra(){
   var foto = document.getElementById('cc-foto-data').value;
-  if(!foto){ alert('Primero toma o elige la foto de la factura.'); return; }
+  if(!foto){
+    avisoGrande('📷 Primero toma o escoge la foto de la factura del suplidor.\n\nDespués toca este botón y te saco el texto que se lea en ella.');
+    return;
+  }
   var btn = document.getElementById('cc-btn-ocr');
   var resultadoDiv = document.getElementById('cc-ocr-resultado');
   var textoArea = document.getElementById('cc-ocr-texto');
@@ -3931,7 +3935,7 @@ function quitarFotoGasto(prefijo){
   prev.style.border = '2px dashed var(--nbs-gold)';
   if(prefijo === 'cc'){
     var btnOcr = document.getElementById('cc-btn-ocr');
-    if(btnOcr) btnOcr.style.display = 'none';
+    if(btnOcr) btnOcr.style.display = 'block';  // se deja visible aunque no haya foto -26 jul-
     var resOcr = document.getElementById('cc-ocr-resultado');
     if(resOcr) resOcr.style.display = 'none';
   }
@@ -4016,6 +4020,7 @@ function mostrarMenuOpcionesFoto(opciones){
 function cargarFotoEditCompra(input){
   var file = input.files[0];
   if(!file) return;
+  if(!esFotoValida(file)){ input.value = ''; return; }
   var reader = new FileReader();
   reader.onload = function(e){
     abrirRecortarFoto(e.target.result, function(dataFinal){
@@ -4276,7 +4281,7 @@ function editarGasto(g){
     +'</div>'
     +'<input type="hidden" id="eg-foto-data" value="'+(g.foto||'')+'">'
     +'<input type="file" id="eg-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoGasto(this,\'eg\')">'
-    +'<input type="file" id="eg-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this,\'eg\')">'
+    +'<input type="file" id="eg-foto-galeria" style="display:none" onchange="cargarFotoGasto(this,\'eg\')">'
     +'<button class="btn" style="background:#2E7D32;color:white" onclick="guardarEdicionGasto('+g.id+')">✓ Guardar cambios</button>';
   el.appendChild(card);
   window._gastoEditando = g;
@@ -8630,6 +8635,16 @@ function abrirRecortarFoto(dataUrlOriginal, onConfirmar, salidaMaxCustom){
   var MAXW = 320, MAXH = 420; // tamano maximo del area donde se ve la foto completa en pantalla
   var SALIDA_MAX = salidaMaxCustom || 600; // resolucion maxima del lado mas largo de la imagen final -mas alta para facturas/recibos, donde hay que poder leer numeros chiquitos-
   var MIN_RECT = 40; // tamano minimo del recuadro de recorte, en pixeles de pantalla
+  var MAX_TRABAJO = 1600; // resolucion con la que se trabaja al girar -mas que suficiente,
+                          // porque la foto final sale a SALIDA_MAX (600 u 900)-
+
+  // ── Girar y mejorar -26 jul, pedido de Sensei- ──
+  // giroBase = los saltos de 90 grados. giroFino = la barrita de -45 a +45 para enderezar.
+  // SIEMPRE se parte de la foto ORIGINAL, nunca de la ya girada, para que no se vaya
+  // poniendo borrosa cada vez que se toca algo.
+  var giroBase = 0, giroFino = 0, mejorar = false;
+  var imgOrig = null;        // la foto original, sin tocar
+  var preservarRecuadro = false;
 
   var overlay = document.getElementById('crop-foto-overlay');
   if(!overlay){
@@ -8641,12 +8656,12 @@ function abrirRecortarFoto(dataUrlOriginal, onConfirmar, salidaMaxCustom){
   overlay.innerHTML = '';
 
   var titulo = document.createElement('div');
-  titulo.textContent = 'Ajusta el recorte';
+  titulo.textContent = 'Ajusta la foto';
   titulo.style.cssText = 'color:white;font-size:15px;font-weight:700;margin-bottom:6px';
   overlay.appendChild(titulo);
 
   var subtitulo = document.createElement('div');
-  subtitulo.textContent = 'Arrastra cualquier borde para recortar ese lado — o el centro para mover todo';
+  subtitulo.textContent = 'Arrastra los bordes para recortar · Gira si salió chueca · ✨ para aclararla';
   subtitulo.style.cssText = 'color:#ccc;font-size:12px;margin-bottom:14px;text-align:center;max-width:300px';
   overlay.appendChild(subtitulo);
 
@@ -8687,8 +8702,35 @@ function abrirRecortarFoto(dataUrlOriginal, onConfirmar, salidaMaxCustom){
     manijas[lado] = m;
   });
 
+  // ── Fila para girar -26 jul- ──
+  var filaGiro = document.createElement('div');
+  filaGiro.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:12px;width:100%;max-width:'+MAXW+'px';
+  function botonGiro(txt){
+    var b = document.createElement('button');
+    b.textContent = txt;
+    b.style.cssText = 'flex-shrink:0;width:44px;height:38px;background:#333;color:white;border:none;border-radius:9px;font-size:19px;font-weight:700;cursor:pointer';
+    return b;
+  }
+  var btnIzq = botonGiro('↺');
+  var btnDer = botonGiro('↻');
+  var barra = document.createElement('input');
+  barra.type = 'range'; barra.min = '-45'; barra.max = '45'; barra.step = '1'; barra.value = '0';
+  barra.style.cssText = 'flex:1;min-width:0;accent-color:var(--nbs-gold)';
+  var etiquetaGrados = document.createElement('div');
+  etiquetaGrados.textContent = '0°';
+  etiquetaGrados.style.cssText = 'flex-shrink:0;width:42px;text-align:center;color:#ddd;font-size:13px;font-weight:700';
+  filaGiro.appendChild(btnIzq); filaGiro.appendChild(barra);
+  filaGiro.appendChild(etiquetaGrados); filaGiro.appendChild(btnDer);
+  overlay.appendChild(filaGiro);
+
+  // ── Boton de mejorar la luz -26 jul- ──
+  var btnMejorar = document.createElement('button');
+  btnMejorar.textContent = '✨ Mejorar la luz';
+  btnMejorar.style.cssText = 'margin-top:10px;width:100%;max-width:'+MAXW+'px;padding:11px;background:#333;color:white;border:2px solid #555;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer';
+  overlay.appendChild(btnMejorar);
+
   var botones = document.createElement('div');
-  botones.style.cssText = 'display:flex;gap:10px;margin-top:18px;width:100%;max-width:'+MAXW+'px';
+  botones.style.cssText = 'display:flex;gap:10px;margin-top:14px;width:100%;max-width:'+MAXW+'px';
   var btnCancelar = document.createElement('button');
   btnCancelar.textContent = 'Cancelar';
   btnCancelar.style.cssText = 'flex:1;padding:12px;background:#444;color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer';
@@ -8728,16 +8770,112 @@ function abrirRecortarFoto(dataUrlOriginal, onConfirmar, salidaMaxCustom){
     manijas.right.style.top = (ry+rh/2)+'px'; manijas.right.style.left = (rx+rw-5)+'px';
   }
 
+  // Sube la luz y el contraste automaticamente -"auto niveles"-. Busca el punto mas oscuro
+  // y el mas claro de verdad de la foto -dejando fuera el 1% de cada extremo, que suelen ser
+  // motas sueltas- y estira todo lo de en medio para que use el rango completo. Le da un
+  // empujoncito extra a las sombras. Sirve mucho con las fotos oscuras de las barberias y
+  // con las facturas donde el texto se pierde -26 jul-.
+  function mejorarLuzYContraste(cx, w, h){
+    try{
+      var d = cx.getImageData(0, 0, w, h);
+      var p = d.data, total = w*h, hist = new Uint32Array(256), i;
+      for(i = 0; i < p.length; i += 4){
+        hist[(p[i]*299 + p[i+1]*587 + p[i+2]*114)/1000 | 0]++;
+      }
+      var corte = Math.max(1, Math.round(total*0.01));
+      var acum = 0, lo = 0, hi = 255;
+      for(i = 0; i < 256; i++){ acum += hist[i]; if(acum > corte){ lo = i; break; } }
+      acum = 0;
+      for(i = 255; i >= 0; i--){ acum += hist[i]; if(acum > corte){ hi = i; break; } }
+      if(hi - lo < 12) return;   // la foto ya usa casi todo el rango: mejor no tocarla
+      var mapa = new Uint8ClampedArray(256), rango = hi - lo, v;
+      for(i = 0; i < 256; i++){
+        v = (i - lo)/rango;
+        if(v < 0) v = 0; else if(v > 1) v = 1;
+        mapa[i] = Math.round(Math.pow(v, 0.85)*255);  // 0.85 = aclara un poco las sombras
+      }
+      for(i = 0; i < p.length; i += 4){
+        p[i] = mapa[p[i]]; p[i+1] = mapa[p[i+1]]; p[i+2] = mapa[p[i+2]];
+      }
+      cx.putImageData(d, 0, 0);
+    }catch(e){
+      // Si el navegador no deja leer el lienzo, se deja la foto tal cual -sin romper nada-
+      console.warn('No se pudo mejorar la luz de la foto:', e);
+    }
+  }
+
+  // Rehace la vista previa a partir de la foto ORIGINAL, con el giro y la mejora puestos.
+  function regenerarVista(preservar){
+    if(!imgOrig) return;
+    preservarRecuadro = !!preservar;
+    var grados = giroBase + giroFino;
+    var ow = imgOrig.naturalWidth, oh = imgOrig.naturalHeight;
+    var esc = Math.min(MAX_TRABAJO/Math.max(ow, oh), 1);
+    var w = Math.round(ow*esc), h = Math.round(oh*esc);
+    var rad = grados*Math.PI/180;
+    var cosA = Math.abs(Math.cos(rad)), sinA = Math.abs(Math.sin(rad));
+    var cw = Math.round(w*cosA + h*sinA), ch = Math.round(w*sinA + h*cosA);
+    var c = document.createElement('canvas');
+    c.width = cw; c.height = ch;
+    var cx = c.getContext('2d');
+    cx.fillStyle = '#ffffff';           // las esquinas que quedan vacias al girar, en blanco
+    cx.fillRect(0, 0, cw, ch);
+    cx.translate(cw/2, ch/2);
+    cx.rotate(rad);
+    cx.drawImage(imgOrig, -w/2, -h/2, w, h);
+    cx.setTransform(1, 0, 0, 1, 0, 0);
+    if(mejorar) mejorarLuzYContraste(cx, cw, ch);
+    img.src = c.toDataURL('image/jpeg', 0.92);
+  }
+
   img.onload = function(){
     var natW = img.naturalWidth, natH = img.naturalHeight;
     var escala = Math.min(MAXW/natW, MAXH/natH, 1);
+    var antesW = dispW, antesH = dispH;
     dispW = Math.round(natW*escala); dispH = Math.round(natH*escala);
     img.style.width = dispW+'px'; img.style.height = dispH+'px';
     lienzo.style.width = dispW+'px'; lienzo.style.height = dispH+'px';
-    posicionInicialRecuadro();
-    dibujar();
+    // Al girar cambia el tamano y hay que reiniciar el recuadro. Al solo "mejorar" la luz
+    // el tamano es el mismo, asi que se le respeta a Sensei el recorte que ya habia hecho.
+    if(preservarRecuadro && antesW === dispW && antesH === dispH && rw && rh){
+      dibujar();
+    } else {
+      posicionInicialRecuadro();
+      dibujar();
+    }
+    preservarRecuadro = false;
   };
-  img.src = dataUrlOriginal;
+
+  imgOrig = new Image();
+  imgOrig.onload = function(){ regenerarVista(false); };
+  imgOrig.src = dataUrlOriginal;
+
+  // ── Que hacen los controles nuevos ──
+  function actualizarEtiqueta(){
+    var g = giroBase + giroFino;
+    while(g > 180) g -= 360;
+    while(g <= -180) g += 360;
+    etiquetaGrados.textContent = g + '°';
+  }
+  btnIzq.onclick = function(){ giroBase -= 90; actualizarEtiqueta(); regenerarVista(false); };
+  btnDer.onclick = function(){ giroBase += 90; actualizarEtiqueta(); regenerarVista(false); };
+
+  // La barrita regenera con un respiro de 130ms, para que arrastrarla no ahogue el telefono
+  var relojBarra = null;
+  barra.oninput = function(){
+    giroFino = parseInt(barra.value, 10) || 0;
+    actualizarEtiqueta();
+    if(relojBarra) clearTimeout(relojBarra);
+    relojBarra = setTimeout(function(){ regenerarVista(false); }, 130);
+  };
+
+  btnMejorar.onclick = function(){
+    mejorar = !mejorar;
+    btnMejorar.textContent = mejorar ? '✨ Mejorada — tocar para deshacer' : '✨ Mejorar la luz';
+    btnMejorar.style.background = mejorar ? 'var(--nbs-gold)' : '#333';
+    btnMejorar.style.borderColor = mejorar ? 'var(--nbs-gold)' : '#555';
+    regenerarVista(true);   // el recorte que ya hizo se respeta
+  };
 
   function posDe(e){
     if(e.touches && e.touches.length) return {x:e.touches[0].clientX, y:e.touches[0].clientY};
@@ -8793,7 +8931,16 @@ function abrirRecortarFoto(dataUrlOriginal, onConfirmar, salidaMaxCustom){
   window.addEventListener('mouseup', terminar);
   window.addEventListener('touchend', terminar);
 
-  btnReiniciar.onclick = function(){ posicionInicialRecuadro(); dibujar(); };
+  btnReiniciar.onclick = function(){
+    // Deja la foto como llego: sin giro, sin mejora y con el recorte completo -26 jul-
+    giroBase = 0; giroFino = 0; mejorar = false;
+    barra.value = '0';
+    actualizarEtiqueta();
+    btnMejorar.textContent = '✨ Mejorar la luz';
+    btnMejorar.style.background = '#333';
+    btnMejorar.style.borderColor = '#555';
+    regenerarVista(false);
+  };
 
   function cerrar(){
     overlay.style.display = 'none';
@@ -8827,6 +8974,7 @@ function abrirRecortarFoto(dataUrlOriginal, onConfirmar, salidaMaxCustom){
 function cargarFotoProducto(input){
   var file = input.files[0];
   if(!file) return;
+  if(!esFotoValida(file)){ input.value = ''; return; }
   var reader = new FileReader();
   reader.onload = function(e){
     abrirRecortarFoto(e.target.result, function(dataFinal){
@@ -8843,6 +8991,19 @@ function cargarFotoProducto(input){
 
 // Recrea un <input type=file> para forzar que el selector de archivos se abra
 // de forma confiable en Android cada vez (algunos navegadores no reabren el mismo input dos veces).
+// Sin el filtro accept="image/*" el explorador de Android muestra TODO -que es lo que
+// Sensei necesitaba-, pero entonces se puede escoger un PDF o un video por error. Esta
+// funcion lo revisa y avisa claro, en vez de romperse en silencio -26 jul-.
+function esFotoValida(file){
+  if(!file) return false;
+  var tipo = (file.type || '').toLowerCase();
+  var nombre = (file.name || '').toLowerCase();
+  var porNombre = /\.(jpe?g|png|gif|bmp|webp|heic|heif)$/.test(nombre);
+  if(tipo.indexOf('image/') === 0 || porNombre) return true;
+  avisoGrande('📷 Eso no parece una foto.\n\nEscogiste: ' + (file.name || 'un archivo') + '\n\nEscoge una imagen (JPG, PNG, etc.).');
+  return false;
+}
+
 function recrearInputFoto(id, handler){
   var viejo = document.getElementById(id);
   var nuevo = document.createElement('input');
@@ -8868,6 +9029,7 @@ function quitarFotoProducto(){
 function cargarFotoCliente(input){
   var file = input.files[0];
   if(!file) return;
+  if(!esFotoValida(file)){ input.value = ''; return; }
   var reader = new FileReader();
   reader.onload = function(e){
     // salidaMax 300 = foto chica y liviana (Sensei eligió liviana para los 117 clientes)
@@ -8883,17 +9045,54 @@ function cargarFotoCliente(input){
   input.value = '';
 }
 
+// ANTES usaba prompt() -"escribe 1, 2 o 3"-. PROBLEMA REAL que reporto Sensei el 26 jul:
+// la opcion 2 -galeria- no hacia NADA. Al darle OK al letrero de Android, el toque cuenta
+// como hecho en el LETRERO del sistema y no dentro de la pagina, asi que Chrome bloquea el
+// .click() al input de archivos. Ahora usa el MISMO menu de botones que ya usan los
+// productos y los gastos -codigo ya probado en la app-, donde el toque si es de verdad.
 function abrirOpcionesFotoCliente(){
-  var tieneFoto = !!document.getElementById('ecl-foto-data').value;
-  var opciones = tieneFoto
-    ? ['📷 Tomar foto', '🖼️ Elegir de galería', '🗑️ Quitar foto']
-    : ['📷 Tomar foto', '🖼️ Elegir de galería'];
-  // Menú simple con confirm/prompt para no depender de más HTML
-  var msg = '¿Qué quieres hacer con la foto?\n\n1 = Tomar foto\n2 = Elegir de galería'+(tieneFoto?'\n3 = Quitar foto':'');
-  var op = prompt(msg, '1');
-  if(op === '1'){ recrearInputFoto('ecl-foto-camara', cargarFotoCliente).click(); }
-  else if(op === '2'){ recrearInputFoto('ecl-foto-galeria', cargarFotoCliente).click(); }
-  else if(op === '3' && tieneFoto){ quitarFotoCliente(); }
+  var tieneFoto = !!(document.getElementById('ecl-foto-data').value);
+  var overlay = document.getElementById('foto-acciones-overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'foto-acciones-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99998;backdrop-filter:blur(6px);display:flex;align-items:flex-end;overflow-y:auto';
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = '';
+  overlay.onclick = function(e){ if(e.target === overlay) overlay.style.display = 'none'; };
+
+  var sheet = document.createElement('div');
+  sheet.style.cssText = 'background:white;width:100%;max-width:480px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;box-shadow:0 -4px 20px rgba(0,0,0,0.3)';
+
+  var titulo = document.createElement('div');
+  titulo.style.cssText = 'text-align:center;font-size:13px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:12px';
+  titulo.textContent = 'Foto del cliente';
+  sheet.appendChild(titulo);
+
+  var opciones = [
+    ['📷 Tomar foto', 'var(--nbs-ink)', function(){ recrearInputFoto('ecl-foto-camara', cargarFotoCliente).click(); }],
+    ['🖼️ Elegir de galería', 'var(--nbs-ink)', function(){ recrearInputFoto('ecl-foto-galeria', cargarFotoCliente).click(); }]
+  ];
+  if(tieneFoto){
+    opciones.push(['🗑️ Quitar foto', 'var(--nbs-red-text)', function(){ quitarFotoCliente(); }]);
+  }
+  opciones.forEach(function(op){
+    var btn = document.createElement('button');
+    btn.textContent = op[0];
+    btn.style.cssText = 'display:block;width:100%;text-align:left;padding:14px 16px;background:#f5f5f5;color:'+op[1]+';border:none;border-radius:12px;font-size:15.5px;font-weight:700;margin-bottom:8px;cursor:pointer';
+    btn.onclick = function(){ overlay.style.display = 'none'; op[2](); };
+    sheet.appendChild(btn);
+  });
+
+  var btnCancelar = document.createElement('button');
+  btnCancelar.textContent = 'Cancelar';
+  btnCancelar.style.cssText = 'display:block;width:100%;text-align:center;padding:14px 16px;background:none;color:#999;border:none;font-size:15px;font-weight:700;cursor:pointer';
+  btnCancelar.onclick = function(){ overlay.style.display = 'none'; };
+  sheet.appendChild(btnCancelar);
+
+  overlay.appendChild(sheet);
+  overlay.style.display = 'flex'; overlay.scrollTop = 0;
 }
 
 function quitarFotoCliente(){
@@ -12860,6 +13059,7 @@ function abrirOpcionesFotoMarca(i){
 function cargarFotoProductoMarca(input, i){
   var file = input.files[0];
   if(!file) return;
+  if(!esFotoValida(file)){ input.value = ''; return; }
   var reader = new FileReader();
   reader.onload = function(e){
     abrirRecortarFoto(e.target.result, function(dataFinal){
@@ -12967,7 +13167,7 @@ function abrirEditarProductosDeMarca(){
       +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
       +'<div id="epml-foto-preview-'+i+'" onclick="abrirOpcionesFotoMarca('+i+')" style="width:56px;height:56px;border-radius:10px;background:'+(p.foto?'#f0f0f0':'var(--nbs-gold-bg)')+';border:'+(p.foto?'none':'2px dashed var(--nbs-gold)')+';display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden;cursor:pointer">'+(p.foto?'<img src="'+p.foto+'" style="width:100%;height:100%;object-fit:cover">':'📷')+'</div>'
       +'<input type="file" id="epml-foto-camara-'+i+'" accept="image/*" capture="environment" style="display:none" onchange="cargarFotoProductoMarca(this,'+i+')">'
-      +'<input type="file" id="epml-foto-galeria-'+i+'" accept="image/*" style="display:none" onchange="cargarFotoProductoMarca(this,'+i+')">'
+      +'<input type="file" id="epml-foto-galeria-'+i+'" style="display:none" onchange="cargarFotoProductoMarca(this,'+i+')">'
       +'<input type="hidden" id="epml-foto-data-'+i+'" value="'+(p.foto||'').replace(/"/g,"'")+'">'
       +'</div>'
       +'<label class="lbl">Nombre del producto</label>'
@@ -13364,7 +13564,7 @@ function editarCl(id){
   form.className = 'card';
   form.innerHTML = '<p style="font-size:15px;font-weight:700;margin-bottom:12px">✏️ Editar cliente</p>'
     +'<input type="file" id="ecl-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoCliente(this)">'
-    +'<input type="file" id="ecl-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoCliente(this)">'
+    +'<input type="file" id="ecl-foto-galeria" style="display:none" onchange="cargarFotoCliente(this)">'
     +'<input type="hidden" id="ecl-foto-data" value="'+(c.foto||'')+'">'
     +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
     +'<div id="ecl-foto-preview" onclick="abrirOpcionesFotoCliente()" style="width:64px;height:64px;border-radius:12px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden;'+(c.foto?'background:#f0f0f0':'background:var(--nbs-gold-bg);border:2px dashed var(--nbs-gold)')+'">'+(c.foto?'<img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover">':'📷')+'</div>'
@@ -21709,8 +21909,8 @@ function verHistorialCliente(cid, modo){
     </div>
     <input type="hidden" id="cc-foto-data">
     <input type="file" id="cc-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoGasto(this,'cc')">
-    <input type="file" id="cc-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this,'cc')">
-    <button type="button" id="cc-btn-ocr" style="display:none;width:100%;padding:10px;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px" onclick="leerTextoFacturaCompra()">🔍 Leer el texto de la foto -para copiar y pegar más rápido</button>
+    <input type="file" id="cc-foto-galeria" style="display:none" onchange="cargarFotoGasto(this,'cc')">
+    <button type="button" id="cc-btn-ocr" style="width:100%;padding:10px;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px" onclick="leerTextoFacturaCompra()">🔍 Leer el texto de la foto -para copiar y pegar más rápido</button>
     <div id="cc-ocr-resultado" style="display:none;background:#FAFAFA;border:1px solid #ddd;border-radius:8px;padding:10px;margin-bottom:10px">
       <div style="font-size:11px;color:#777;font-weight:700;margin-bottom:6px">TEXTO ENCONTRADO EN LA FOTO -tócalo y cópialo, no siempre sale perfecto-</div>
       <textarea id="cc-ocr-texto" readonly style="width:100%;min-height:100px;border:none;background:white;border-radius:6px;padding:8px;font-size:12px;font-family:monospace;resize:vertical"></textarea>
@@ -21898,7 +22098,7 @@ function verHistorialCliente(cid, modo){
         </div>
         <input type="hidden" id="gasto-foto-data">
         <input type="file" id="gasto-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoGasto(this)">
-        <input type="file" id="gasto-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this)">
+        <input type="file" id="gasto-foto-galeria" style="display:none" onchange="cargarFotoGasto(this)">
         <button class="btn" style="background:#C62828;color:white" onclick="saveGasto()">✓ Registrar gasto</button>
         <button class="btn" style="background:#546E7A;color:white" onclick="document.getElementById('gastos-n').style.display='none';document.getElementById('gastos-l').style.display='block'">← Volver a la lista</button>
         <div class="snk" id="mk-gasto">Gasto registrado</div>
