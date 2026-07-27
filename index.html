@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260727b-OFICIAL-V2.0">
+<meta name="app-version" content="20260727f-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19933,6 +19933,539 @@ function revisarDireccionesDeNegocios(){
   overlay.style.display = 'block';
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  LEER LA FACTURA DEL SUPLIDOR DESDE EL PDF  (27 jul, pedido de Sensei)
+// ═══════════════════════════════════════════════════════════════════
+//
+// COMO LLEGA: Sensei pide por correo y le mandan la factura en PDF. Eso es lo
+// mejor que podia pasar: un PDF trae el TEXTO ADENTRO, no hay que adivinar
+// letra por letra como con una foto.
+//
+// LA IDEA QUE HACE ESTO SEGURO PARA EL DINERO: no se confia en lo que leyo.
+// Se COMPRUEBA con las cuentas de la propia factura, dos veces:
+//   1. Por linea:   cantidad x precio = total de la linea
+//   2. En conjunto: la suma de las lineas = el Subtotal impreso
+// Si algo no cuadra, se marca en rojo y NO se mete callado a la compra.
+//
+// LO ELEGANTE: las cuentas mismas dicen cual numero es cual. En Kanar hay una
+// columna B/O -pedido pendiente- metida entre la cantidad y el precio:
+//     NISHMAN AFTER SHAVE ... 400ML   8   16   3.48   27.84
+// Un lector tonto agarraria el 16 y le meteria al inventario 16 unidades que
+// NUNCA LLEGARON. Aqui se prueban las combinaciones y solo 8 x 3.48 = 27.84
+// cuadra, asi que el 16 se descarta solo, sin tener que saber el formato.
+//
+// APRENDE: cada vez que Sensei empareja una linea con un producto suyo, se
+// guarda. La proxima factura de ese suplidor ya sale emparejada sola.
+
+var PDFJS_URL   = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+var PDFJS_WORKER= 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+var CLAVE_EMPAREJADOS = 'nbs_facturas_emparejadas';
+var _pdfjsPromesa = null;
+
+// Los suplidores que ya conoce. Se reconoce por palabras de la propia factura.
+// Para agregar uno nuevo: copiar un bloque y poner sus senas.
+var SUPLIDORES_FACTURA = [
+  { id:'vecina',  nombre:'Vecina Beauty Supply',
+    senas:['VECINA','MARSTON','LAWRENCE'],
+    columnaIzquierda:'marca' },   // Vecina trae la MARCA en la primera columna
+  { id:'kanar',   nombre:'Kanar',
+    senas:['KANAR','KERO ROAD','CARLSTADT'],
+    columnaIzquierda:'modelo' },  // Kanar trae el CODIGO del suplidor
+  { id:'monkeys', nombre:'Monkeys Group',
+    senas:['MONKEYS','MONKEYSGROUP'],
+    columnaIzquierda:'ninguna',
+    ignorarLineas:['ORIGINAL PRICE','CREDICARD','VIEW ONLINE','SQUAREUP','PAGE '] }
+];
+
+function cargarPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve();
+  if(_pdfjsPromesa) return _pdfjsPromesa;
+  _pdfjsPromesa = new Promise(function(resolve, reject){
+    var listo = false;
+    var sc = document.createElement('script');
+    sc.src = PDFJS_URL;
+    sc.onload = function(){
+      if(window.pdfjsLib){
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+        listo = true; resolve();
+      } else { _pdfjsPromesa = null; reject(new Error('SIN_LIBRERIA')); }
+    };
+    sc.onerror = function(){ _pdfjsPromesa = null; reject(new Error('SIN_RED')); };
+    setTimeout(function(){ if(!listo){ _pdfjsPromesa = null; reject(new Error('TARDO')); } }, 25000);
+    document.head.appendChild(sc);
+  });
+  return _pdfjsPromesa;
+}
+
+// Saca el texto del PDF agrupado en LINEAS, con la posicion de cada palabra.
+// Junta todas las paginas seguidas -Monkeys manda facturas de 2 paginas-.
+function sacarLineasDelPdf(datos){
+  return window.pdfjsLib.getDocument({ data: datos }).promise.then(function(pdf){
+    var trabajos = [];
+    for(var i = 1; i <= pdf.numPages; i++){
+      trabajos.push(pdf.getPage(i).then(function(pg){ return pg.getTextContent(); }));
+    }
+    return Promise.all(trabajos).then(function(paginas){
+      var lineas = [];
+      paginas.forEach(function(tc, np){
+        var porFila = {};
+        tc.items.forEach(function(it){
+          if(!it.str || !it.str.trim()) return;
+          var x = it.transform[4], y = it.transform[5];
+          var clave = Math.round(y / 3);           // agrupa lo que esta a la misma altura
+          if(!porFila[clave]) porFila[clave] = [];
+          porFila[clave].push({ t: it.str.trim(), x: x });
+        });
+        Object.keys(porFila)
+          .sort(function(a,b){ return b - a; })    // de arriba hacia abajo
+          .forEach(function(k){
+            var pal = porFila[k].sort(function(a,b){ return a.x - b.x; });
+            lineas.push({ pagina: np+1, palabras: pal, texto: pal.map(function(p){ return p.t; }).join(' ') });
+          });
+      });
+      return lineas;
+    });
+  });
+}
+
+function esNumeroFactura(t){
+  return /^-?\$?[\d,]+\.?\d*$/.test(t) && /\d/.test(t);
+}
+function aNumero(t){
+  return parseFloat(String(t).replace(/[$,]/g, ''));
+}
+
+// De una linea saca {descripcion, cant, costo, total} usando las CUENTAS.
+// Devuelve null si esa linea no es un producto.
+function leerLineaDeFactura(linea){
+  var pal = linea.palabras;
+  if(pal.length < 3) return null;
+
+  // 1) La tira de numeros pegados al final. Se para en cuanto aparece algo que
+  //    no sea numero puro -asi "500ML", "5lb" o "5 ROLL" no confunden-.
+  var nums = [], i = pal.length - 1;
+  while(i >= 0 && esNumeroFactura(pal[i].t)){ nums.unshift(aNumero(pal[i].t)); i--; }
+  if(nums.length < 3) return null;              // hacen falta al menos cant, precio y total
+
+  var total = nums[nums.length - 1];
+  if(!(total > 0)) return null;
+
+  // 2) Buscar QUE PAR de numeros multiplicado da el total. Se prueba de derecha a
+  //    izquierda, que es donde estan las columnas de verdad -asi si la descripcion
+  //    dejo colado un numero, gana el par correcto-.
+  var cant = null, costo = null;
+  for(var a = nums.length - 2; a >= 0 && cant === null; a--){
+    for(var b = a - 1; b >= 0; b--){
+      var q = nums[b], pr = nums[a];
+      if(q > 0 && Number.isInteger(q) && pr > 0 && Math.abs(q * pr - total) < 0.015){
+        cant = q; costo = pr; break;
+      }
+      // tambien al reves, por si el precio va antes que la cantidad
+      if(pr > 0 && Number.isInteger(pr) && q > 0 && Math.abs(pr * q - total) < 0.015){
+        cant = pr; costo = q; break;
+      }
+    }
+  }
+  if(cant === null) return null;
+
+  // 3) La descripcion es todo lo que quedo antes de los numeros
+  var desc = pal.slice(0, pal.length - nums.length).map(function(p){ return p.t; }).join(' ').trim();
+  if(desc.length < 3) return null;
+
+  return { descripcion: desc, cant: cant, costo: costo, total: total,
+           x0: pal[0].x, cuadra: true };
+}
+
+function detectarSuplidorFactura(textoCompleto){
+  var T = textoCompleto.toUpperCase();
+  for(var i = 0; i < SUPLIDORES_FACTURA.length; i++){
+    var s = SUPLIDORES_FACTURA[i];
+    for(var j = 0; j < s.senas.length; j++){
+      if(T.indexOf(s.senas[j]) >= 0) return s;
+    }
+  }
+  return null;
+}
+
+// Busca el Subtotal impreso, para la segunda comprobacion
+function subtotalImpreso(lineas){
+  for(var i = lineas.length - 1; i >= 0; i--){
+    var T = lineas[i].texto.toUpperCase();
+    if(T.indexOf('SUBTOTAL') >= 0){
+      var pal = lineas[i].palabras;
+      for(var j = pal.length - 1; j >= 0; j--){
+        if(esNumeroFactura(pal[j].t)){
+          var v = aNumero(pal[j].t);
+          if(v > 0) return v;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// ── Emparejar con el catalogo de Sensei ──
+function normalizarTexto(t){
+  return canonizarMedidas(t)
+    .replace(/[ÁÀÄÂ]/g,'A').replace(/[ÉÈËÊ]/g,'E').replace(/[ÍÌÏÎ]/g,'I')
+    .replace(/[ÓÒÖÔ]/g,'O').replace(/[ÚÙÜÛ]/g,'U').replace(/Ñ/g,'N')
+    .replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+function emparejadosGuardados(){ return LS(CLAVE_EMPAREJADOS, {}); }
+
+// Saca las MEDIDAS de un texto -5LB, 32OZ, 500ML...-. Esto salio de una prueba con la
+// factura real de Vecina: trae "OLIVE OIL STYLING GEL - GREEN 5lb" Y "... GREEN 32oz",
+// dos productos DISTINTOS que comparten casi todas las palabras. Sin mirar la medida, el
+// emparejador metia los dos en el mismo producto y sumaba las cantidades -un error de
+// inventario y de dinero-. Si los dos textos traen medida y NINGUNA coincide, no es el
+// mismo producto y punto.
+// Deja todas las medidas escritas IGUAL, venga como venga: "5 LBS", "5lb" y "5 Lb"
+// terminan siendo "5LB". Hace falta porque el suplidor y Sensei las escriben distinto:
+// la factura de Vecina dice "GREEN 5lb" y su producto se llama "ECO OLIVE OIL 5 LBS".
+function canonizarMedidas(t){
+  return String(t || '').toUpperCase().replace(/,/g, '')
+    .replace(/(\d+(?:\.\d+)?)\s*(OZ|ML|LBS|LB|KG|GR|G|PK|CT)\b/g, function(m, num, uni){
+      var u = uni === 'LBS' ? 'LB' : (uni === 'GR' ? 'G' : uni);
+      return num.replace('.', '') + u;
+    });
+}
+
+function medidasDe(t){
+  var n = canonizarMedidas(t);
+  var out = [], re = /(\d+)(OZ|ML|LB|KG|G|PK|CT)\b/g, m;
+  while((m = re.exec(n))) out.push(m[1] + m[2]);
+  return out;
+}
+function medidasChocan(a, b){
+  var ma = medidasDe(a), mb = medidasDe(b);
+  if(!ma.length || !mb.length) return false;      // si alguno no dice medida, no se puede juzgar
+  for(var i = 0; i < ma.length; i++){
+    if(mb.indexOf(ma[i]) >= 0) return false;       // comparten al menos una: van bien
+  }
+  return true;                                     // los dos dicen medida y ninguna coincide
+}
+
+function recordarEmparejado(supId, desc, pid){
+  var m = emparejadosGuardados();
+  m[supId + '|' + normalizarTexto(desc)] = pid;
+  SS(CLAVE_EMPAREJADOS, m);
+}
+
+// SOLO devuelve un producto si Sensei YA lo emparejo antes. NUNCA adivina.
+//
+// POR QUE: se probo el emparejado automatico contra su catalogo REAL de 386 productos
+// y el resultado fue malo Y PELIGROSO: de la factura de Vecina emparejo 1 de 12, y ese
+// 1 estaba EQUIVOCADO -metia "OLIVE OIL STYLING GEL 32oz" dentro de "ECO HAIR GEL
+// CANNABIS SATIVA OIL 32oz", que es otro producto-. Lo mismo en Kanar. La razon es
+// simple: Sensei nombra sus productos a su manera y el suplidor a la suya.
+// Un emparejado equivocado le mete mercancia al producto equivocado SIN AVISAR, que es
+// peor que no emparejar nada. Asi que ahora solo se propone -las mas parecidas salen
+// arriba en la lista- y el escoge. Lo que escoge se aprende y ya no se le pregunta mas.
+function buscarProductoParecido(supId, desc){
+  loadProds();
+  var aprendidos = emparejadosGuardados();
+  var guardado = aprendidos[supId + '|' + normalizarTexto(desc)];
+  if(guardado){
+    var yaEsta = productos.find(function(p){ return String(p.id) === String(guardado); });
+    if(yaEsta) return { pid: yaEsta.id, comoLoSupo: 'aprendido' };
+  }
+  return null;
+}
+
+// Los productos que MAS SE PARECEN, para ponerlos de primeros en la lista y que Sensei
+// no tenga que buscar entre 386. No escoge por el: solo se los acerca.
+function sugerenciasPara(desc, cuantas){
+  loadProds();
+  var palabras = normalizarTexto(desc).split(' ').filter(function(w){ return w.length > 2; });
+  if(!palabras.length) return [];
+  var lista = [];
+  productos.forEach(function(p){
+    if(medidasChocan(desc, p.nombre)) return;   // 5lb no es 32oz
+    var np = normalizarTexto(p.nombre + ' ' + (p.marca || ''));
+    var aciertos = 0;
+    palabras.forEach(function(w){ if(np.indexOf(w) >= 0) aciertos++; });
+    if(aciertos) lista.push({ p: p, punto: aciertos / palabras.length });
+  });
+  lista.sort(function(a, b){ return b.punto - a.punto; });
+  return lista.slice(0, cuantas || 5).map(function(x){ return x.p; });
+}
+
+
+// ── LA PANTALLA DE REVISION DE LA FACTURA (27 jul) ──
+// Nada entra solo a la compra: Sensei revisa linea por linea y confirma.
+
+function abrirLectorFactura(){
+  var inp = document.getElementById('factura-pdf-input');
+  if(!inp) return;
+  inp.value = '';
+  inp.click();
+}
+
+function procesarPdfFactura(input){
+  var file = input.files && input.files[0];
+  if(!file) return;
+  var nombre = (file.name || '').toLowerCase();
+  if(nombre.slice(-4) !== '.pdf' && (file.type || '').indexOf('pdf') < 0){
+    avisoGrande('📄 Eso no es un PDF.\n\nEscogiste: ' + (file.name || 'un archivo') + '\n\nBusca el PDF que te mandó el suplidor por correo.');
+    input.value = '';
+    return;
+  }
+
+  mostrarCargandoRuta('📄 Abriendo la factura...');
+  var lector = new FileReader();
+  lector.onload = function(ev){
+    var datos = new Uint8Array(ev.target.result);
+    mostrarCargandoRuta('📄 Leyendo la factura...');
+    cargarPdfJs()
+      .then(function(){ return sacarLineasDelPdf(datos); })
+      .then(function(lineas){
+        cerrarCargandoRuta();
+        analizarFacturaYMostrar(lineas);
+      })
+      .catch(function(err){
+        cerrarCargandoRuta();
+        var c = (err && err.message) || 'UNKNOWN';
+        var m = {
+          'SIN_RED':      'No se pudo descargar el lector de PDF. Revisa tu señal e inténtalo de nuevo.\n\nLa primera vez hace falta internet; después queda guardado.',
+          'SIN_LIBRERIA': 'El lector de PDF se descargó incompleto. Cierra la app, ábrela de nuevo e inténtalo.',
+          'TARDO':        'Tardó demasiado en cargar el lector. Puede ser señal lenta — inténtalo otra vez.'
+        };
+        avisoGrande('📄 ' + (m[c] || ('No se pudo leer ese PDF (' + c + ').\n\nSi el suplidor te mandó una FOTO escaneada en vez de un PDF de texto, no hay texto que leer y hay que meterlo a mano.')));
+      });
+  };
+  lector.onerror = function(){ cerrarCargandoRuta(); avisoGrande('📄 No se pudo abrir ese archivo.'); };
+  lector.readAsArrayBuffer(file);
+  input.value = '';
+}
+
+function analizarFacturaYMostrar(lineas){
+  var textoCompleto = lineas.map(function(l){ return l.texto; }).join('\n');
+  var sup = detectarSuplidorFactura(textoCompleto);
+  var supId = sup ? sup.id : 'desconocido';
+  var ignorar = (sup && sup.ignorarLineas) || [];
+
+  var items = [];
+  lineas.forEach(function(l){
+    var T = l.texto.toUpperCase();
+    var saltar = false;
+    ignorar.forEach(function(x){ if(T.indexOf(x) >= 0) saltar = true; });
+    // Encabezados y pies que nunca son productos
+    ['SUBTOTAL','TOTAL','QTY','QUANTITY','DESCRIPTION','SHIPPING','TAX','INVOICE #','ORDER #','BILL TO','SHIP TO','TOTAL UNITS'].forEach(function(x){
+      if(T.indexOf(x) >= 0) saltar = true;
+    });
+    if(saltar) return;
+    var it = leerLineaDeFactura(l);
+    if(it) items.push(it);
+  });
+
+  if(!items.length){
+    avisoGrande('📄 No encontré renglones de productos en ese PDF.\n\nPuede ser que el suplidor lo haya mandado como foto escaneada, o que su formato sea distinto a los que conozco.\n\nMándale el PDF a Claude y le agrego la receta de ese suplidor.');
+    return;
+  }
+
+  // Emparejar con el catalogo
+  items.forEach(function(it){
+    var m = buscarProductoParecido(supId, it.descripcion);
+    it.pid = m ? m.pid : null;
+    it.comoLoSupo = m ? m.comoLoSupo : null;
+    it.marcado = true;
+  });
+
+  var sub = subtotalImpreso(lineas);
+  window._facturaItems = items;
+  window._facturaSup = { id: supId, nombre: sup ? sup.nombre : 'Suplidor no reconocido' };
+  window._facturaSubtotal = sub;
+  pintarRevisionFactura();
+}
+
+function pintarRevisionFactura(){
+  loadProds();
+  var items = window._facturaItems || [];
+  var sup = window._facturaSup || { nombre: '' };
+  var sub = window._facturaSubtotal;
+
+  var suma = 0;
+  items.forEach(function(it){ if(it.marcado) suma += it.cant * it.costo; });
+  var sumaTodo = items.reduce(function(a, it){ return a + it.cant * it.costo; }, 0);
+
+  var cuadraGlobal = (sub !== null && sub !== undefined) ? (Math.abs(sumaTodo - sub) < 0.05) : null;
+
+  var html = '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">'
+    + '<div style="flex:1"><div style="font-size:17px;font-weight:900;color:#1a237e">📄 ' + escaparHtml(sup.nombre) + '</div>'
+    + '<div style="font-size:12px;color:#666">' + items.length + ' renglones encontrados</div></div>'
+    + '<button onclick="cerrarRevisionFactura()" style="flex-shrink:0;width:34px;height:34px;border:none;border-radius:9px;background:#f0f0f0;color:#666;font-size:20px;font-weight:800;cursor:pointer">✕</button>'
+    + '</div>';
+
+  // La comprobacion en conjunto
+  if(cuadraGlobal === true){
+    html += '<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:9px;padding:9px;margin-bottom:10px;font-size:12.5px;color:#2E7D32;font-weight:800">'
+      + '✓ Las cuentas cuadran con el Subtotal de la factura ($' + fmtNum(sub) + ')</div>';
+  } else if(cuadraGlobal === false){
+    html += '<div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:9px;padding:9px;margin-bottom:10px;font-size:12.5px;color:#E65100;font-weight:800">'
+      + '⚠️ La suma de los renglones ($' + fmtNum(sumaTodo) + ') no coincide con el Subtotal de la factura ($' + fmtNum(sub) + ').<br>'
+      + '<span style="font-weight:600">Puede faltar un renglón o sobrar alguno. Revísalos bien antes de agregar.</span></div>';
+  } else {
+    html += '<div style="background:#f5f5f5;border-radius:9px;padding:9px;margin-bottom:10px;font-size:12px;color:#666">'
+      + 'No encontré el Subtotal impreso para comprobar la suma. Revisa los renglones uno por uno.</div>';
+  }
+
+  // Lista de productos para los desplegables
+  var opcionesTodos = '';
+  productos.forEach(function(p){
+    opcionesTodos += '<option value="' + p.id + '">' + escaparHtml(p.nombre) + '</option>';
+  });
+
+  items.forEach(function(it, i){
+    var cuadraLinea = Math.abs(it.cant * it.costo - it.total) < 0.015;
+    var fondo = it.marcado ? '#fff' : '#FAFAFA';
+    var borde = cuadraLinea ? '#e0e0e0' : '#FFB74D';
+    html += '<div style="border:1px solid ' + borde + ';border-radius:10px;padding:10px;margin-bottom:8px;background:' + fondo + (it.marcado ? '' : ';opacity:.55') + '">'
+      + '<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:7px">'
+      + '<input type="checkbox" ' + (it.marcado ? 'checked' : '') + ' onchange="marcarLineaFactura(' + i + ', this.checked)" style="width:19px;height:19px;flex-shrink:0;margin-top:2px;cursor:pointer">'
+      + '<span style="flex:1;font-size:12.5px;font-weight:700;color:#333;line-height:1.3">' + escaparHtml(it.descripcion) + '</span>'
+      + '</label>';
+
+    var etiqueta = it.comoLoSupo === 'aprendido'
+      ? '<span style="font-size:10.5px;color:#2E7D32;font-weight:800"> · ya lo sabía</span>' : '';
+    // Las mas parecidas, de primeras, para que no tenga que buscar entre 386
+    var sug = sugerenciasPara(it.descripcion, 5);
+    var opciones = '<option value="">⚠️ Escoge el producto</option><option value="NUEVO">➕ Es un producto nuevo</option>';
+    if(sug.length){
+      opciones += '<optgroup label="Los que más se parecen">';
+      sug.forEach(function(p){ opciones += '<option value="' + p.id + '">' + escaparHtml(p.nombre) + '</option>'; });
+      opciones += '</optgroup><optgroup label="Todos tus productos">' + opcionesTodos + '</optgroup>';
+    } else {
+      opciones += opcionesTodos;
+    }
+    html += '<div style="font-size:10.5px;color:#999;font-weight:800;margin-bottom:3px">TU PRODUCTO' + etiqueta + '</div>'
+      + '<select onchange="cambiarProductoFactura(' + i + ', this.value)" style="width:100%;padding:8px;border:2px solid ' + (it.pid ? '#c8e6c9' : '#FFCC80') + ';border-radius:8px;font-size:12.5px;margin-bottom:8px;background:#fff">'
+      + (it.pid ? opciones.split('value="' + it.pid + '"').join('value="' + it.pid + '" selected') : opciones)
+      + '</select>';
+
+    html += '<div style="display:flex;gap:6px;align-items:center">'
+      + '<div style="flex:1"><div style="font-size:10px;color:#999;font-weight:700">CANTIDAD</div>'
+      + '<input type="number" inputmode="numeric" value="' + it.cant + '" onchange="cambiarNumeroFactura(' + i + ',\'cant\',this.value)" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13.5px;font-weight:700"></div>'
+      + '<div style="flex:1"><div style="font-size:10px;color:#999;font-weight:700">COSTO</div>'
+      + '<input type="number" step="0.01" inputmode="decimal" value="' + it.costo.toFixed(2) + '" onchange="cambiarNumeroFactura(' + i + ',\'costo\',this.value)" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13.5px;font-weight:700"></div>'
+      + '<div style="flex:1"><div style="font-size:10px;color:#999;font-weight:700">TOTAL</div>'
+      + '<div style="padding:7px;font-size:13.5px;font-weight:900;color:' + (cuadraLinea ? '#2E7D32' : '#E65100') + '">'
+      + (cuadraLinea ? '✓ ' : '⚠️ ') + '$' + fmtNum(it.cant * it.costo) + '</div></div>'
+      + '</div>';
+
+    if(!cuadraLinea){
+      html += '<div style="font-size:11px;color:#E65100;margin-top:5px;font-weight:700">La factura dice $' + fmtNum(it.total) + ' en este renglón. Revisa la cantidad y el costo.</div>';
+    }
+    html += '</div>';
+  });
+
+  var marcadas = items.filter(function(it){ return it.marcado; }).length;
+  html += '<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:2px solid #eee;margin-top:6px">'
+    + '<div style="text-align:center;font-size:13px;color:#666;margin-bottom:8px">Vas a agregar <b>' + marcadas + '</b> renglones · <b>$' + fmtNum(suma) + '</b></div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="agregarFacturaALaCompra()" style="flex:2;padding:13px;border:none;border-radius:10px;background:#2E7D32;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer">Agregar las marcadas</button>'
+    + '<button onclick="cerrarRevisionFactura()" style="flex:1;padding:13px;border:2px solid #999;border-radius:10px;background:#fff;color:#666;font-weight:700;cursor:pointer">Cancelar</button>'
+    + '</div></div>';
+
+  var ov = document.getElementById('factura-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'factura-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99994;display:flex;align-items:center;justify-content:center;padding:14px';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:16px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto">' + html + '</div>';
+  ov.style.display = 'flex';
+}
+
+function marcarLineaFactura(i, val){
+  if(window._facturaItems && window._facturaItems[i]){ window._facturaItems[i].marcado = !!val; pintarRevisionFactura(); }
+}
+function cambiarNumeroFactura(i, campo, val){
+  var it = window._facturaItems && window._facturaItems[i];
+  if(!it) return;
+  var v = parseFloat(val) || 0;
+  it[campo] = campo === 'cant' ? Math.round(v) : v;
+  pintarRevisionFactura();
+}
+function cambiarProductoFactura(i, val){
+  var it = window._facturaItems && window._facturaItems[i];
+  if(!it) return;
+  if(val === 'NUEVO'){ it.pid = null; it.esNuevo = true; }
+  else if(val){
+    it.pid = val; it.esNuevo = false;
+    // APRENDE: la proxima factura de este suplidor ya sale emparejada sola
+    recordarEmparejado(window._facturaSup.id, it.descripcion, val);
+    it.comoLoSupo = 'aprendido';
+  } else { it.pid = null; it.esNuevo = false; }
+  pintarRevisionFactura();
+}
+function cerrarRevisionFactura(){
+  var ov = document.getElementById('factura-ov');
+  if(ov) ov.remove();
+}
+
+function agregarFacturaALaCompra(){
+  var items = (window._facturaItems || []).filter(function(it){ return it.marcado; });
+  if(!items.length){ avisoGrande('No marcaste ningún renglón.'); return; }
+
+  var sinProducto = items.filter(function(it){ return !it.pid && !it.esNuevo; });
+  if(sinProducto.length){
+    avisoGrande('⚠️ ' + sinProducto.length + ' renglón(es) no tienen producto escogido:\n\n'
+      + sinProducto.slice(0,5).map(function(it){ return '• ' + it.descripcion; }).join('\n')
+      + '\n\nEscoge el producto en la lista, o marca "Es un producto nuevo", o desmárcalos.');
+    return;
+  }
+
+  // Dos renglones de la MISMA factura apuntando al MISMO producto casi siempre es un
+  // emparejado equivocado -presentaciones distintas del mismo articulo-. Antes se sumaban
+  // calladas y quedaba una cantidad inflada con el costo del ultimo. Ahora se avisa y no
+  // se agrega nada hasta que Sensei lo corrija.
+  var vistos = {}, repetidos = [];
+  items.forEach(function(it){
+    if(!it.pid) return;
+    if(vistos[it.pid]) repetidos.push([vistos[it.pid], it.descripcion]);
+    else vistos[it.pid] = it.descripcion;
+  });
+  if(repetidos.length){
+    loadProds();
+    var texto = repetidos.map(function(par){
+      return '• "' + par[0] + '"\n  y\n• "' + par[1] + '"';
+    }).join('\n\n');
+    avisoGrande('⚠️ Dos renglones apuntan al MISMO producto tuyo:\n\n' + texto
+      + '\n\nCasi siempre son presentaciones distintas -por ejemplo 5lb y 32oz-. Escoge el producto correcto en cada uno, o desmarca el que no vaya.\n\nNo se agregó nada todavía.');
+    return;
+  }
+
+  loadProds();
+  var agregados = 0;
+  items.forEach(function(it){
+    if(it.pid){
+      var prod = productos.find(function(p){ return String(p.id) === String(it.pid); });
+      if(!prod) return;
+      var yaEsta = false;
+      for(var j = 0; j < iCC.length; j++){
+        if(String(iCC[j].pid) === String(it.pid)){
+          iCC[j].cant += it.cant; iCC[j].costo = it.costo; yaEsta = true; break;
+        }
+      }
+      if(!yaEsta){
+        iCC.push({ pid: prod.id, nombre: prod.nombre, cant: it.cant, costo: it.costo,
+                   esNuevo: false, precioVenta: prod.precio });
+      }
+    } else {
+      iCC.push({ pid: null, nombre: it.descripcion, cat: '', marca: '',
+                 cant: it.cant, costo: it.costo, esNuevo: true, precioVenta: 0 });
+    }
+    agregados++;
+  });
+
+  cerrarRevisionFactura();
+  renderICC();
+  avisoGrande('✓ Se agregaron ' + agregados + ' renglones a la compra.\n\nRevísalos abajo y guarda la compra cuando estés listo.');
+}
+
 // ═══ NAVEGAR LA RUTA — Google Maps y Waze (27 jul, pedido de Sensei) ═══
 //
 // LA DIFERENCIA ENTRE LOS DOS -verificada en la documentacion de ambos-:
@@ -22110,6 +22643,8 @@ function verHistorialCliente(cid, modo){
     <input type="file" id="cc-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoGasto(this,'cc')">
     <input type="file" id="cc-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this,'cc')">
     <button type="button" id="cc-btn-ocr" style="width:100%;padding:10px;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px" onclick="leerTextoFacturaCompra()">🔍 Leer el texto de la foto -para copiar y pegar más rápido</button>
+    <button type="button" onclick="abrirLectorFactura()" style="width:100%;padding:12px;background:#E8F5E9;color:#2E7D32;border:2px solid #2E7D32;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;margin-bottom:10px">📄 Leer factura del suplidor (PDF)</button>
+    <input type="file" id="factura-pdf-input" accept="application/pdf,.pdf" style="display:none" onchange="procesarPdfFactura(this)">
     <div id="cc-ocr-resultado" style="display:none;background:#FAFAFA;border:1px solid #ddd;border-radius:8px;padding:10px;margin-bottom:10px">
       <div style="font-size:11px;color:#777;font-weight:700;margin-bottom:6px">TEXTO ENCONTRADO EN LA FOTO -tócalo y cópialo, no siempre sale perfecto-</div>
       <textarea id="cc-ocr-texto" readonly style="width:100%;min-height:100px;border:none;background:white;border-radius:6px;padding:8px;font-size:12px;font-family:monospace;resize:vertical"></textarea>
