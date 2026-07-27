@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260727k-OFICIAL-V2.0">
+<meta name="app-version" content="20260727l-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10581,7 +10581,8 @@ function renderICC(){
       if(totalLineaInp) totalLineaInp.value = (iCC[i].cant*iCC[i].costo).toFixed(2);
       var totGeneral = iCC.reduce(function(s,it){ return s+(it.cant*it.costo); },0);
       var costoEnvioEl2 = document.getElementById('cc-envio');
-      var envio2 = costoEnvioEl2 ? (parseFloat(costoEnvioEl2.value)||0) : 0;
+      var envio2 = (costoEnvioEl2 ? (parseFloat(costoEnvioEl2.value)||0) : 0)
+                 + (parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0);
       document.getElementById('cctot').textContent = '$' + fmtNum(totGeneral + envio2);
     };
     inp.onblur = function(){
@@ -10592,7 +10593,8 @@ function renderICC(){
       if(totalLineaInp) totalLineaInp.value = (iCC[i].cant*iCC[i].costo).toFixed(2);
       var totGeneral = iCC.reduce(function(s,it){ return s+(it.cant*it.costo); },0);
       var costoEnvioEl2b = document.getElementById('cc-envio');
-      var envio2b = costoEnvioEl2b ? (parseFloat(costoEnvioEl2b.value)||0) : 0;
+      var envio2b = (costoEnvioEl2b ? (parseFloat(costoEnvioEl2b.value)||0) : 0)
+                  + (parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0);
       document.getElementById('cctot').textContent = '$' + fmtNum(totGeneral + envio2b);
     };
   });
@@ -10610,7 +10612,8 @@ function renderICC(){
       if(costoInp) costoInp.value = costoCalculado;
       var totGeneral = iCC.reduce(function(s,it){ return s+(it.cant*it.costo); },0);
       var costoEnvioEl3 = document.getElementById('cc-envio');
-      var envio3 = costoEnvioEl3 ? (parseFloat(costoEnvioEl3.value)||0) : 0;
+      var envio3 = (costoEnvioEl3 ? (parseFloat(costoEnvioEl3.value)||0) : 0)
+                 + (parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0);
       document.getElementById('cctot').textContent = '$' + fmtNum(totGeneral + envio3);
     };
     inp.onblur = function(){
@@ -10624,13 +10627,19 @@ function renderICC(){
       if(costoInp) costoInp.value = costoCalculado;
       var totGeneral = iCC.reduce(function(s,it){ return s+(it.cant*it.costo); },0);
       var costoEnvioEl3b = document.getElementById('cc-envio');
-      var envio3b = costoEnvioEl3b ? (parseFloat(costoEnvioEl3b.value)||0) : 0;
+      var envio3b = (costoEnvioEl3b ? (parseFloat(costoEnvioEl3b.value)||0) : 0)
+                  + (parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0);
       document.getElementById('cctot').textContent = '$' + fmtNum(totGeneral + envio3b);
     };
   });
   var costoEnvioEl = document.getElementById('cc-envio');
   var costoEnvio = costoEnvioEl ? (parseFloat(costoEnvioEl.value)||0) : 0;
-  document.getElementById('cctot').textContent = '$' + fmtNum(tot + costoEnvio);
+  // Cargo por tarjeta -27 jul-. Algunos suplidores lo cobran aparte, como Monkeys Group
+  // -"Credicard Fee"-. Va igual que el envio: se suma al total de la compra pero NO se
+  // reparte entre los productos, asi el costo de cada uno se queda como esta.
+  var cargoTarjetaEl = document.getElementById('cc-tarjeta');
+  var cargoTarjeta = cargoTarjetaEl ? (parseFloat(cargoTarjetaEl.value)||0) : 0;
+  document.getElementById('cctot').textContent = '$' + fmtNum(tot + costoEnvio + cargoTarjeta);
 }
 
 function rmICC(i){ iCC.splice(i,1); renderICC(); }
@@ -10646,7 +10655,8 @@ function saveCC(){
   var metodosPago = (window._pagoMetodos && window._pagoMetodos['ccini']) ? window._pagoMetodos['ccini'].filter(function(m){ return m.monto>0; }) : [];
   var ini = metodosPago.reduce(function(s,m){ return s+m.monto; }, 0);
   var costoEnvio = parseFloat(document.getElementById('cc-envio').value) || 0;
-  var tot = iCC.reduce(function(s,it){ return s + it.cant*it.costo; }, 0) + costoEnvio;
+  var cargoTarjeta = parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0;
+  var tot = iCC.reduce(function(s,it){ return s + it.cant*it.costo; }, 0) + costoEnvio + cargoTarjeta;
   if(tipo==='contado' && ini < tot){
     if(!confirm('Marcaste "Contado" pero el pago que registraste ($'+fmtNum(ini)+') no cubre el total ($'+fmtNum(tot)+'). ¿Continuar de todas formas?')) return;
   }
@@ -10666,7 +10676,7 @@ function saveCC(){
       if(p){ p.stock += it.cant; p.costo = it.costo; }
     }
   });
-  tot += costoEnvio;
+  tot += costoEnvio + cargoTarjeta;
 
   var pagosIniciales = [];
   if(ini > 0) pagosIniciales.push({ monto: ini, fecha: fechaHoy(), nota: 'Pago inicial', metodos: metodosPago });
@@ -10674,7 +10684,7 @@ function saveCC(){
   compras = LS('nc', []);
   compras.push({
     id: Date.now(), sid: sid, sn: sn, tipo: tipo,
-    items: iCC.slice(), total: tot, envio: costoEnvio,
+    items: iCC.slice(), total: tot, envio: costoEnvio, cargoTarjeta: cargoTarjeta,
     fecha: fechaHoy(),
     hora: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}),
     pagosFactura: pagosIniciales,
@@ -10686,6 +10696,8 @@ function saveCC(){
   document.getElementById('ccsup').value = '';
   document.getElementById('cctipo').value = 'credito';
   document.getElementById('cc-envio').value = '';
+  var ccTarjEl = document.getElementById('cc-tarjeta');
+  if(ccTarjEl) ccTarjEl.value = '';
   quitarFotoGasto('cc');
   var ocrResEl = document.getElementById('cc-ocr-resultado');
   if(ocrResEl) ocrResEl.style.display = 'none';
@@ -20144,6 +20156,29 @@ function detectarSuplidorFactura(textoCompleto){
   return null;
 }
 
+// Busca en la factura los cargos que NO son productos: el envio y el cargo por tarjeta.
+// Sale de las facturas reales de Sensei: Vecina pone "Shipping Charges: 10.00" y Monkeys
+// pone "Credicard Fee $30.17" -27 jul-.
+function cargosDeLaFactura(lineas){
+  var r = { envio: 0, tarjeta: 0 };
+  var senasEnvio   = ['SHIPPING','FLETE','ENVIO','FREIGHT','DELIVERY CHARGE'];
+  var senasTarjeta = ['CREDICARD','CREDIT CARD','CARD FEE','TARJETA','SURCHARGE','PROCESSING FEE'];
+  lineas.forEach(function(l){
+    var T = l.texto.toUpperCase();
+    var esEnvio = senasEnvio.some(function(x){ return T.indexOf(x) >= 0; });
+    var esTarjeta = senasTarjeta.some(function(x){ return T.indexOf(x) >= 0; });
+    if(!esEnvio && !esTarjeta) return;
+    // El ultimo numero de la linea es el monto
+    var pal = l.palabras, monto = null;
+    for(var j = pal.length - 1; j >= 0; j--){
+      if(esNumeroFactura(pal[j].t)){ monto = aNumero(pal[j].t); break; }
+    }
+    if(monto === null || !(monto > 0)) return;
+    if(esTarjeta) r.tarjeta += monto; else r.envio += monto;
+  });
+  return r;
+}
+
 // Busca el Subtotal impreso, para la segunda comprobacion
 function subtotalImpreso(lineas){
   for(var i = lineas.length - 1; i >= 0; i--){
@@ -20401,6 +20436,7 @@ function analizarFacturaYMostrar(lineas){
   });
 
   var sub = subtotalImpreso(lineas);
+  window._facturaCargos = cargosDeLaFactura(lineas);
   window._facturaItems = items;
   window._facturaSup = { id: supId, nombre: sup ? sup.nombre : 'Suplidor no reconocido' };
   window._facturaSubtotal = sub;
@@ -20442,6 +20478,17 @@ function pintarRevisionFactura(){
   // Ya no se arma la lista de 386 productos aqui: ahora hay un BUSCADOR -27 jul, pedido
   // de Sensei: "se despliega la lista completa y encontrar el producto correcto cuesta
   // mucho, pero si se pudiera escribir en la busqueda fuera muchisimo mas facil"-.
+
+  // Los cargos que no son productos, para que Sensei los vea antes de confirmar
+  var cargos = window._facturaCargos || { envio: 0, tarjeta: 0 };
+  if(cargos.envio > 0 || cargos.tarjeta > 0){
+    html += '<div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:9px;padding:9px;margin-bottom:10px;font-size:12.5px;color:#1565C0;font-weight:700">'
+      + 'Además de los productos, la factura trae:'
+      + (cargos.envio > 0   ? '<div style="margin-top:4px">🚚 Envío: <b>$' + fmtNum(cargos.envio) + '</b></div>' : '')
+      + (cargos.tarjeta > 0 ? '<div style="margin-top:4px">💳 Cargo por tarjeta: <b>$' + fmtNum(cargos.tarjeta) + '</b></div>' : '')
+      + '<div style="font-size:11.5px;font-weight:600;margin-top:5px">Se pondrán en la compra al agregar los renglones.</div>'
+      + '</div>';
+  }
 
   items.forEach(function(it, i){
     var cuadraLinea = Math.abs(it.cant * it.costo - it.total) < 0.015;
@@ -20688,9 +20735,23 @@ function agregarFacturaALaCompra(){
     agregados++;
   });
 
+  // Poner los cargos de la factura en sus campos -27 jul-
+  var cg = window._facturaCargos || { envio: 0, tarjeta: 0 };
+  var puestos = '';
+  if(cg.envio > 0){
+    var elEnv = document.getElementById('cc-envio');
+    if(elEnv){ elEnv.value = cg.envio.toFixed(2); puestos += '\n🚚 Envío: $' + fmtNum(cg.envio); }
+  }
+  if(cg.tarjeta > 0){
+    var elTar = document.getElementById('cc-tarjeta');
+    if(elTar){ elTar.value = cg.tarjeta.toFixed(2); puestos += '\n💳 Cargo por tarjeta: $' + fmtNum(cg.tarjeta); }
+  }
+
   cerrarRevisionFactura();
   renderICC();
-  avisoGrande('✓ Se agregaron ' + agregados + ' renglones a la compra.\n\nRevísalos abajo y guarda la compra cuando estés listo.');
+  avisoGrande('✓ Se agregaron ' + agregados + ' renglones a la compra.'
+    + (puestos ? '\n\nTambién se pusieron:' + puestos : '')
+    + '\n\nRevísalos abajo y guarda la compra cuando estés listo.');
 }
 
 // ═══ NAVEGAR LA RUTA — Google Maps y Waze (27 jul, pedido de Sensei) ═══
@@ -22915,6 +22976,8 @@ function verHistorialCliente(cid, modo){
     <div id="iccp" style="margin:8px 0"></div>
     <label class="lbl">Costo de envío -shipping- -opcional</label>
     <input class="inp" id="cc-envio" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);renderICC()">
+    <label class="lbl">Cargo por tarjeta de crédito -opcional</label>
+    <input class="inp" id="cc-tarjeta" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);renderICC()">
     <div style="background:#EFEBE9;border-radius:8px;padding:12px;margin:8px 0">
       <div style="display:flex;justify-content:space-between"><span>Total compra</span><span id="cctot" style="font-weight:700;font-size:18px;color:#5D4037">$0.00</span></div>
     </div>
