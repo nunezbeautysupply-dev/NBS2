@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260726d-OFICIAL-V2.0">
+<meta name="app-version" content="20260726e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -832,7 +832,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
         <div id="ep-foto-preview" onclick="abrirOpcionesFotoProducto()" style="width:56px;height:56px;border-radius:10px;background:var(--nbs-gold-bg);border:2px dashed var(--nbs-gold);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden;cursor:pointer">📷</div>
       </div>
       <input type="file" id="ep-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoProducto(this)">
-      <input type="file" id="ep-foto-galeria" style="display:none" onchange="cargarFotoProducto(this)">
+      <input type="file" id="ep-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoProducto(this)">
       <input type="hidden" id="ep-foto-data">
 
       <label class="lbl">Marca *</label>
@@ -4281,7 +4281,7 @@ function editarGasto(g){
     +'</div>'
     +'<input type="hidden" id="eg-foto-data" value="'+(g.foto||'')+'">'
     +'<input type="file" id="eg-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoGasto(this,\'eg\')">'
-    +'<input type="file" id="eg-foto-galeria" style="display:none" onchange="cargarFotoGasto(this,\'eg\')">'
+    +'<input type="file" id="eg-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this,\'eg\')">'
     +'<button class="btn" style="background:#2E7D32;color:white" onclick="guardarEdicionGasto('+g.id+')">✓ Guardar cambios</button>';
   el.appendChild(card);
   window._gastoEditando = g;
@@ -8991,9 +8991,9 @@ function cargarFotoProducto(input){
 
 // Recrea un <input type=file> para forzar que el selector de archivos se abra
 // de forma confiable en Android cada vez (algunos navegadores no reabren el mismo input dos veces).
-// Sin el filtro accept="image/*" el explorador de Android muestra TODO -que es lo que
-// Sensei necesitaba-, pero entonces se puede escoger un PDF o un video por error. Esta
-// funcion lo revisa y avisa claro, en vez de romperse en silencio -26 jul-.
+// Red de seguridad: aunque el filtro accept="image/*" ya le pide fotos a Android, algunos
+// exploradores dejan colar un PDF o un video igual. Esta funcion lo revisa y avisa claro,
+// en vez de romperse en silencio -26 jul-.
 function esFotoValida(file){
   if(!file) return false;
   var tipo = (file.type || '').toLowerCase();
@@ -13167,7 +13167,7 @@ function abrirEditarProductosDeMarca(){
       +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
       +'<div id="epml-foto-preview-'+i+'" onclick="abrirOpcionesFotoMarca('+i+')" style="width:56px;height:56px;border-radius:10px;background:'+(p.foto?'#f0f0f0':'var(--nbs-gold-bg)')+';border:'+(p.foto?'none':'2px dashed var(--nbs-gold)')+';display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden;cursor:pointer">'+(p.foto?'<img src="'+p.foto+'" style="width:100%;height:100%;object-fit:cover">':'📷')+'</div>'
       +'<input type="file" id="epml-foto-camara-'+i+'" accept="image/*" capture="environment" style="display:none" onchange="cargarFotoProductoMarca(this,'+i+')">'
-      +'<input type="file" id="epml-foto-galeria-'+i+'" style="display:none" onchange="cargarFotoProductoMarca(this,'+i+')">'
+      +'<input type="file" id="epml-foto-galeria-'+i+'" accept="image/*" style="display:none" onchange="cargarFotoProductoMarca(this,'+i+')">'
       +'<input type="hidden" id="epml-foto-data-'+i+'" value="'+(p.foto||'').replace(/"/g,"'")+'">'
       +'</div>'
       +'<label class="lbl">Nombre del producto</label>'
@@ -13564,7 +13564,7 @@ function editarCl(id){
   form.className = 'card';
   form.innerHTML = '<p style="font-size:15px;font-weight:700;margin-bottom:12px">✏️ Editar cliente</p>'
     +'<input type="file" id="ecl-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoCliente(this)">'
-    +'<input type="file" id="ecl-foto-galeria" style="display:none" onchange="cargarFotoCliente(this)">'
+    +'<input type="file" id="ecl-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoCliente(this)">'
     +'<input type="hidden" id="ecl-foto-data" value="'+(c.foto||'')+'">'
     +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
     +'<div id="ecl-foto-preview" onclick="abrirOpcionesFotoCliente()" style="width:64px;height:64px;border-radius:12px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden;'+(c.foto?'background:#f0f0f0':'background:var(--nbs-gold-bg);border:2px dashed var(--nbs-gold)')+'">'+(c.foto?'<img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover">':'📷')+'</div>'
@@ -21909,7 +21909,7 @@ function verHistorialCliente(cid, modo){
     </div>
     <input type="hidden" id="cc-foto-data">
     <input type="file" id="cc-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoGasto(this,'cc')">
-    <input type="file" id="cc-foto-galeria" style="display:none" onchange="cargarFotoGasto(this,'cc')">
+    <input type="file" id="cc-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this,'cc')">
     <button type="button" id="cc-btn-ocr" style="width:100%;padding:10px;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px" onclick="leerTextoFacturaCompra()">🔍 Leer el texto de la foto -para copiar y pegar más rápido</button>
     <div id="cc-ocr-resultado" style="display:none;background:#FAFAFA;border:1px solid #ddd;border-radius:8px;padding:10px;margin-bottom:10px">
       <div style="font-size:11px;color:#777;font-weight:700;margin-bottom:6px">TEXTO ENCONTRADO EN LA FOTO -tócalo y cópialo, no siempre sale perfecto-</div>
@@ -22098,7 +22098,7 @@ function verHistorialCliente(cid, modo){
         </div>
         <input type="hidden" id="gasto-foto-data">
         <input type="file" id="gasto-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoGasto(this)">
-        <input type="file" id="gasto-foto-galeria" style="display:none" onchange="cargarFotoGasto(this)">
+        <input type="file" id="gasto-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this)">
         <button class="btn" style="background:#C62828;color:white" onclick="saveGasto()">✓ Registrar gasto</button>
         <button class="btn" style="background:#546E7A;color:white" onclick="document.getElementById('gastos-n').style.display='none';document.getElementById('gastos-l').style.display='block'">← Volver a la lista</button>
         <div class="snk" id="mk-gasto">Gasto registrado</div>
