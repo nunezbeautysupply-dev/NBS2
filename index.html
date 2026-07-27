@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260727f-OFICIAL-V2.0">
+<meta name="app-version" content="20260727h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5096,6 +5096,25 @@ function verSup(id, modo){
     +'</div>'
     +'<button class="btn" style="background:#6A1B9A;color:white;margin-top:8px" onclick="agregarBalanceInicialSuplidor('+id+')">💰 Agregar balance inicial</button>';
   el.appendChild(header);
+
+  // Atajos para comprarle a ESTE suplidor -27 jul, idea de Sensei-. Antes habia que ir a
+  // Compras y buscar el suplidor en la lista; ahora se llega con el ya escogido.
+  var atajos = document.createElement('div');
+  atajos.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin:12px 0';
+
+  var btnCompra = document.createElement('button');
+  btnCompra.textContent = '🛒 Nueva compra a este suplidor';
+  btnCompra.style.cssText = 'width:100%;padding:12px;border:2px solid #1565C0;border-radius:10px;background:#E3F2FD;color:#1565C0;font-weight:800;font-size:13.5px;cursor:pointer';
+  btnCompra.onclick = (function(sid){ return function(){ nuevaCompraASuplidor(sid, false); }; })(id);
+
+  var btnFactura = document.createElement('button');
+  btnFactura.textContent = '📄 Leer factura PDF de este suplidor';
+  btnFactura.style.cssText = 'width:100%;padding:12px;border:2px solid #2E7D32;border-radius:10px;background:#E8F5E9;color:#2E7D32;font-weight:800;font-size:13.5px;cursor:pointer';
+  btnFactura.onclick = (function(sid){ return function(){ nuevaCompraASuplidor(sid, true); }; })(id);
+
+  atajos.appendChild(btnCompra);
+  atajos.appendChild(btnFactura);
+  el.appendChild(atajos);
 
   var tabs = document.createElement('div');
   tabs.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px';
@@ -20192,6 +20211,77 @@ function sugerenciasPara(desc, cuantas){
   return lista.slice(0, cuantas || 5).map(function(x){ return x.p; });
 }
 
+
+// ── ATAJO: comprarle a un suplidor desde su perfil (27 jul) ──
+// Lleva a la pantalla de Compras con ese suplidor ya escogido, y si se le pide,
+// abre de una vez el buscador del PDF.
+//
+// EL CUIDADO IMPORTANTE: si ya hay renglones sin guardar de OTRA compra, mezclarlos
+// seria un enredo de dinero. Asi que se pregunta antes y nunca se borra nada callado.
+function nuevaCompraASuplidor(sid, abrirPdf){
+  function seguir(){
+    ir('p-comp');
+    setTimeout(function(){
+      var sel = document.getElementById('ccsup');
+      if(sel) sel.value = String(sid);
+      if(abrirPdf) setTimeout(abrirLectorFactura, 250);
+    }, 120);
+  }
+
+  if(iCC.length){
+    var sel = document.getElementById('ccsup');
+    var mismoSuplidor = sel && String(sel.value) === String(sid);
+    if(mismoSuplidor){ seguir(); return; }   // es la misma compra, no hay nada que mezclar
+
+    suplidores = LS('nsup', []);
+    var nombreViejo = '';
+    if(sel && sel.value){
+      var sv = suplidores.find(function(x){ return String(x.id) === String(sel.value); });
+      if(sv) nombreViejo = ' a ' + sv.nombre;
+    }
+    var nuevo = suplidores.find(function(x){ return String(x.id) === String(sid); });
+    var nombreNuevo = nuevo ? nuevo.nombre : 'este suplidor';
+
+    preguntarDescartarCompra(iCC.length, nombreViejo, nombreNuevo, function(){
+      iCC.length = 0;
+      renderICC();
+      seguir();
+    });
+    return;
+  }
+  seguir();
+}
+
+function preguntarDescartarCompra(cuantos, nombreViejo, nombreNuevo, alDescartar){
+  // Se apunta el suplidor que ya tenia escogido: al volver a la pantalla de Compras se
+  // vuelve a dibujar la lista y se perdia la seleccion -bug encontrado en pruebas-.
+  var selAntes = document.getElementById('ccsup');
+  var valorAntes = selAntes ? selAntes.value : '';
+  var ov = document.getElementById('descartar-compra-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'descartar-compra-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99993;display:flex;align-items:center;justify-content:center;padding:20px';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;max-width:380px;width:100%">'
+    + '<div style="font-size:15px;font-weight:800;color:#1a237e;margin-bottom:8px">⚠️ Tienes una compra a medias</div>'
+    + '<div style="font-size:13.5px;color:#555;line-height:1.45;margin-bottom:16px">Hay <b>' + cuantos + '</b> renglón(es) sin guardar'
+    + escaparHtml(nombreViejo) + '.<br><br>Si empiezas una compra a <b>' + escaparHtml(nombreNuevo) + '</b>, esos renglones se pierden.</div>'
+    + '<button id="desc-seguir" style="width:100%;padding:13px;border:none;border-radius:10px;background:#1565C0;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer;margin-bottom:8px">Seguir con la que tengo</button>'
+    + '<button id="desc-tirar" style="width:100%;padding:13px;border:2px solid #C62828;border-radius:10px;background:#fff;color:#C62828;font-weight:800;font-size:13.5px;cursor:pointer">Descartarlos y empezar la nueva</button>'
+    + '</div>';
+  ov.style.display = 'flex';
+  document.getElementById('desc-seguir').onclick = function(){
+    ov.remove();
+    ir('p-comp');
+    setTimeout(function(){
+      var sel = document.getElementById('ccsup');
+      if(sel && valorAntes) sel.value = valorAntes;   // se lo devolvemos tal como estaba
+    }, 120);
+  };
+  document.getElementById('desc-tirar').onclick = function(){ ov.remove(); alDescartar(); };
+}
 
 // ── LA PANTALLA DE REVISION DE LA FACTURA (27 jul) ──
 // Nada entra solo a la compra: Sensei revisa linea por linea y confirma.
