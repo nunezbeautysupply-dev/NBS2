@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260727h-OFICIAL-V2.0">
+<meta name="app-version" content="20260727i-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -869,11 +869,23 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       <select class="inp" id="ep-proveedor-pref"><option value="">Sin asignar</option></select>
       <label class="lbl">Descripción del producto</label>
       <textarea class="inp" id="ep-desc" rows="3" placeholder="Ej: Navaja de afeitar profesional, pack de 10 unidades, color rojo..." style="resize:vertical;font-size:14px"></textarea>
+      <!-- El de siempre se queda, para quien baje hasta aqui -->
       <button class="btn" style="background:#1565C0;color:white" onclick="guardarEdicionProducto()">✓ Guardar cambios</button>
       <button class="btn" style="background:#6A1B9A;color:white" onclick="verHistorialCostoSuplidor(productoEditandoId)">📊 Historial de costo por suplidor</button>
       <button class="btn" style="background:#546E7A;color:white" onclick="cerrarEdicionProducto()">← Volver al catalogo</button>
       <button class="btn" id="ep-btn-eliminar" style="background:#B71C1C;color:white" onclick="eliminarProductoCatalogo()">🗑️ Eliminar producto</button>
       <div class="snk" id="mk-ep">Producto actualizado</div>
+      <!-- Espacio para que la barra pegada no tape el ultimo boton -->
+      <div style="height:74px"></div>
+    </div>
+    <!-- BARRA PEGADA ABAJO -27 jul-. Sensei reporto que tenia que bajar hasta el final
+         para encontrar el boton de guardar, y como no veia respuesta inmediata creia que
+         no habia guardado y lo tocaba otra vez. Ahora el boton esta SIEMPRE a la vista. -->
+    <div id="ep-barra-guardar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:9000;background:#fff;border-top:2px solid #e0e0e0;padding:10px 12px;box-shadow:0 -3px 12px rgba(0,0,0,.12)">
+      <div style="max-width:520px;margin:0 auto;display:flex;gap:8px">
+        <button onclick="cerrarEdicionProducto()" style="flex:1;padding:14px;border:2px solid #999;border-radius:10px;background:#fff;color:#666;font-weight:800;font-size:14px;cursor:pointer">← Volver</button>
+        <button onclick="guardarEdicionProducto()" style="flex:2;padding:14px;border:none;border-radius:10px;background:#1565C0;color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">✓ Guardar cambios</button>
+      </div>
     </div>
   </div>
 </div>
@@ -9224,6 +9236,9 @@ function verProductoCatalogo(p){
   document.getElementById('ep-btn-eliminar').style.display = 'block';
   document.getElementById('cat-lista-wrap').style.display = 'none';
   document.getElementById('cat-edit-wrap').style.display = 'block';
+  var barraEp = document.getElementById('ep-barra-guardar');
+  if(barraEp) barraEp.style.display = 'block';
+  window.scrollTo(0, 0);
   // Si el producto ya tiene marca separada, usarla. Si no, separar de la primera palabra del nombre (compatibilidad con productos antiguos)
   if(p.marca){
     document.getElementById('ep-marca').value = p.marca;
@@ -9266,6 +9281,9 @@ function nuevoProductoCatalogo(){
   document.getElementById('ep-btn-eliminar').style.display = 'none';
   document.getElementById('cat-lista-wrap').style.display = 'none';
   document.getElementById('cat-edit-wrap').style.display = 'block';
+  var barraEp = document.getElementById('ep-barra-guardar');
+  if(barraEp) barraEp.style.display = 'block';
+  window.scrollTo(0, 0);
   document.getElementById('ep-foto-data').value = '';
   var prevNuevo = document.getElementById('ep-foto-preview');
   prevNuevo.innerHTML = '📷';
@@ -9446,6 +9464,8 @@ function onCategoriaInput(inputId){
 
 function cerrarEdicionProducto(){
   document.getElementById('cat-edit-wrap').style.display = 'none';
+  var barraEp = document.getElementById('ep-barra-guardar');
+  if(barraEp) barraEp.style.display = 'none';
   productoEditandoId = null;
   if(window._volverAMarcaTrasEditar && window._epmlMarcaActual){
     window._volverAMarcaTrasEditar = false;
@@ -9475,7 +9495,11 @@ function guardarEdicionProducto(){
 
   // -confirmacion redundante quitada, el boton de Guardar ya es la confirmacion-
 
-  var costoAntes = null;
+  // OJO: hay que apuntar el precio y el costo ANTES de sobreescribirlos. Antes el codigo
+  // comparaba DESPUES, sobre el mismo objeto ya modificado, asi que "el precio de antes" y
+  // "el precio nuevo" siempre salian iguales y el HISTORIAL DE PRECIOS NUNCA SE REGISTRABA.
+  // Comprobado en pruebas: cero registros guardados. -arreglado 27 jul-
+  var costoAntes = null, precioAntes = null;
   if(productoEditandoId === null){
     var nuevoId = 'custom_' + Date.now();
     productos.push({ id: nuevoId, marca: marca, nombreCorto: nombre, nombre: nombreCompleto, cat: cat, sku: sku, costo: costo, precio: precio, stock: stock, min: min, foto: foto, unidad: unidad, proveedorPref: proveedorPref, desc: desc });
@@ -9483,6 +9507,7 @@ function guardarEdicionProducto(){
     var p = productos.find(function(x){ return String(x.id) === String(productoEditandoId); });
     if(!p) return;
     costoAntes = p.costo || 0;
+    precioAntes = (typeof p.precio === 'number') ? p.precio : parseFloat(p.precio) || 0;
     p.marca = marca;
     p.nombreCorto = nombre;
     p.nombre = nombreCompleto;
@@ -9497,10 +9522,9 @@ function guardarEdicionProducto(){
     p.proveedorPref = proveedorPref;
     p.desc = desc;
   }
-  // Registrar cambio de precio si hubo
-  if(productoEditandoId !== null){
-    var pAntes = productos.find(function(x){ return String(x.id)===String(productoEditandoId); });
-    if(pAntes && pAntes.precio !== precio) registrarCambioPrecio(nombreCompleto, pAntes.precio, precio);
+  // Registrar cambio de precio si hubo -ahora si compara contra el valor de ANTES-
+  if(productoEditandoId !== null && precioAntes !== null && precioAntes !== precio){
+    registrarCambioPrecio(nombreCompleto, precioAntes, precio);
   }
   var idProductoEditado = productoEditandoId;
   SS('np', productos);
@@ -9533,10 +9557,13 @@ function guardarEdicionProducto(){
       }
     }
   }
-  setTimeout(function(){
-    cerrarEdicionProducto();
-    renderCatalogo(document.getElementById('catbuscar').value || '');
-  }, 900);
+  // Antes esto esperaba 900ms antes de cerrar, y encima dejaba la pagina donde estaba
+  // -a media lista-. Sensei no veia respuesta y creia que no habia guardado. Ahora se
+  // cierra al instante, sube al principio de la lista y lo dice claro. -27 jul-
+  cerrarEdicionProducto();
+  renderCatalogo(document.getElementById('catbuscar').value || '');
+  window.scrollTo(0, 0);
+  avisoGrande('✓ Producto guardado\n\n' + nombreCompleto);
 }
 
 function eliminarProductoCatalogo(){
