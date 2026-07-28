@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260727r-OFICIAL-V2.0">
+<meta name="app-version" content="20260728a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1709,7 +1709,8 @@ function descomprimirTexto(base64){
 // ATRAS. Eso es lo que le faltaba.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var CLAVES_A_RESPALDAR = ['ncl','nv','nc','ncr','np','nsup','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','np_eliminados','nvisitas_barberos','historial_precios','rutas_por_dia'];
+var CLAVES_A_RESPALDAR = ['ncl','nv','nc','ncr','np','nsup','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','np_eliminados','nvisitas_barberos','historial_precios','rutas_por_dia',
+  'nvan','nrelleno','nbs_facturas_emparejadas'];  // agregados el 28 jul: la van, el relleno y lo aprendido del lector de facturas
 var HORAS_ENTRE_COPIAS = 0.25; // cada 15 minutos (pedido por Sensei, 19 jul 2026)
 var DIAS_QUE_SE_GUARDAN = 15;
 var CLAVE_ULTIMA_COPIA = 'nbs_ultima_copia_auto';
@@ -2200,7 +2201,8 @@ function tocarHoraUltimaCopiaLocal(){
 // llevaban, asi que una copia local no era una foto completa del negocio. Encontrado en
 // la auditoria del 27 jul.
 var CLAVES_COPIA_LOCAL = ['nv','ncl','nc','ncr','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','nvisitas_barberos',
-                          'np','nsup','historial_precios','nvan','nrelleno','rutas_por_dia'];
+                          'np','nsup','historial_precios','nvan','nrelleno','rutas_por_dia',
+                          'nbs_facturas_emparejadas'];
 var FACTURAS_ENTRE_COPIAS = 5;
 var COPIAS_LOCALES_QUE_SE_GUARDAN = 40; // 40 copias del teléfono (cada 15 min ≈ el último día de trabajo)
 var CLAVE_COPIAS_LOCALES = 'nbs_copias_locales';
@@ -17012,7 +17014,11 @@ async function exportD(){
     // archivo perdia el historial de precios, lo cargado en la van y la lista de relleno.
     historialPrecios: LS('historial_precios', []),
     van: LS('nvan', null),
-    listaRelleno: LS('nrelleno', null)};
+    listaRelleno: LS('nrelleno', null),
+    // Lo que APRENDIO el lector de facturas: que producto suyo es cada linea de cada
+    // suplidor. Es trabajo de Sensei, uno por uno; sin esto, al perder el telefono
+    // habria que empezar de cero con cada suplidor -agregado 28 jul-.
+    facturasEmparejadas: LS(CLAVE_EMPAREJADOS, {})};
   var json = JSON.stringify(d);
 
   // Cifrar antes de guardar, con la misma clave del PIN de administrador.
@@ -17181,6 +17187,7 @@ function importD(inp){
       if(d.historialPrecios){ SS('historial_precios', d.historialPrecios); }
       if(d.van){ SS('nvan', d.van); }
       if(d.listaRelleno){ SS('nrelleno', d.listaRelleno); }
+      if(d.facturasEmparejadas){ SS(CLAVE_EMPAREJADOS, d.facturasEmparejadas); }
       if(d.visitasRuta){
         for(var kV in d.visitasRuta){
           if(d.visitasRuta.hasOwnProperty(kV)) SS(kV, d.visitasRuta[kV]);
