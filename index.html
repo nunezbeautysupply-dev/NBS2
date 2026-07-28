@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260727p-OFICIAL-V2.0">
+<meta name="app-version" content="20260727q-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -806,6 +806,10 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       <p style="font-size:12px;color:var(--nbs-muted);margin-bottom:14px">Elige la marca y luego edita cada uno de sus productos (precio, categoría, nombre, proveedor). Guardas todos los cambios juntos al final.</p>
 
       <label class="lbl">Marca a editar</label>
+      <!-- Buscador de marcas -27 jul-. Sensei tiene 90 marcas distintas; desplazar la lista
+           entera para encontrar una era un castigo. Ahora escribe 3 letras y listo. -->
+      <input class="inp" id="epm-buscar" type="search" inputmode="search" autocomplete="off"
+             placeholder="🔍 Escribe la marca..." oninput="filtrarMarcasEditar()" style="margin-bottom:6px">
       <select class="inp" id="epm-marca" onchange="actualizarConteoMarca()" style="margin-bottom:4px"></select>
       <p id="epm-conteo" style="font-size:12px;color:var(--nbs-gold-dark);font-weight:600;margin-bottom:16px">0 productos</p>
 
@@ -817,6 +821,14 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <div class="card">
       <p id="epml-titulo" style="font-size:16px;font-weight:700;margin-bottom:4px;color:var(--nbs-ink)">Editar productos</p>
       <p style="font-size:12px;color:var(--nbs-muted);margin-bottom:14px">Edita lo que necesites en cada producto. Los cambios se guardan todos juntos al final con el botón de abajo.</p>
+    </div>
+    <!-- Buscador dentro de la marca -27 jul-. INMORTAL tiene 29 productos, BARBER 28,
+         BABYLISS 26: sin esto hay que desplazar toda la lista para llegar a uno. -->
+    <input class="inp" id="epml-buscar" type="search" inputmode="search" autocomplete="off"
+           placeholder="🔍 Buscar dentro de esta marca..." oninput="filtrarProductosDeMarca()"
+           style="margin-bottom:8px">
+    <div id="epml-sinres" style="display:none;text-align:center;padding:18px;color:#999;font-size:13px">
+      Ningún producto de esta marca con esas letras.
     </div>
     <div id="epml-lista"></div>
     <button class="btn" style="background:var(--nbs-gold);color:white;font-weight:700" onclick="guardarTodosLosProductosDeMarca()">✓ Guardar todos los cambios</button>
@@ -13058,9 +13070,39 @@ function abrirEditarPorMarca(){
   var conteo = {};
   productos.forEach(function(p){ var m = marcaDe(p); conteo[m] = (conteo[m]||0)+1; });
   var marcas = Object.keys(conteo).sort();
+  // Se guardan todas para poder filtrarlas sin volver a calcularlas -27 jul-
+  window._epmTodasLasMarcas = marcas.map(function(m){ return { nombre: m, cuantos: conteo[m] }; });
+  var cajaB = document.getElementById('epm-buscar');
+  if(cajaB) cajaB.value = '';
   var sel = document.getElementById('epm-marca');
   sel.innerHTML = marcas.map(function(m){ return '<option value="'+m+'">'+m+' ('+conteo[m]+' productos)</option>'; }).join('');
 
+  actualizarConteoMarca();
+}
+
+// Filtra la lista de marcas mientras Sensei escribe. Guarda TODAS las marcas en
+// window._epmTodasLasMarcas la primera vez, para poder volver a llenarla al borrar
+// lo escrito. Usa el mismo motor de busqueda de Vender y Compras -palabras en
+// cualquier orden, sin importar tildes-. -27 jul-
+function filtrarMarcasEditar(){
+  var caja = document.getElementById('epm-buscar');
+  var sel  = document.getElementById('epm-marca');
+  if(!sel || !window._epmTodasLasMarcas) return;
+  var q = caja ? caja.value.trim() : '';
+  var lista = window._epmTodasLasMarcas;
+
+  if(q){
+    lista = filtrarPorBusqueda(lista, q, function(m){ return m.nombre; });
+  }
+  if(!lista.length){
+    sel.innerHTML = '<option value="">(ninguna marca con esas letras)</option>';
+    var elC = document.getElementById('epm-conteo');
+    if(elC) elC.textContent = 'Ninguna marca coincide';
+    return;
+  }
+  sel.innerHTML = lista.map(function(m){
+    return '<option value="' + escaparHtml(m.nombre) + '">' + escaparHtml(m.nombre) + ' (' + m.cuantos + ' productos)</option>';
+  }).join('');
   actualizarConteoMarca();
 }
 
@@ -13229,6 +13271,10 @@ function abrirEditarProductosDeMarca(){
   document.getElementById('cat-marca-wrap').style.display = 'none';
   document.getElementById('cat-marca-lista-wrap').style.display = 'block';
   document.getElementById('epml-titulo').textContent = marcaSel + ' — ' + afectados.length + ' producto(s)';
+  var cajaEpml = document.getElementById('epml-buscar');
+  if(cajaEpml) cajaEpml.value = '';
+  var sinResEpml = document.getElementById('epml-sinres');
+  if(sinResEpml) sinResEpml.style.display = 'none';
 
   var opcionesProveedor = '<option value="">-- Sin proveedor --</option>' + suplidores.map(function(s){ return '<option value="'+s.nombre.replace(/"/g,"'")+'">'+escaparHtml(s.nombre)+'</option>'; }).join('');
 
@@ -13303,6 +13349,44 @@ function abrirEditarProductosDeMarca(){
 
   // Guardar referencia de los ids afectados para el guardado
   window._epmlIds = afectados.map(function(p){ return p.id; });
+}
+
+// Esconde o enseña cada renglon segun lo que escriba. NO vuelve a dibujar la lista:
+// solo tapa lo que no coincide, para que NO SE PIERDA nada de lo que Sensei ya haya
+// escrito en los campos de los otros productos. -27 jul-
+//
+// OJO — POR QUE NO SE FILTRA POR EL TEXTO DEL RENGLON: el textContent de cada renglon
+// mide 1.000 caracteres porque incluye TODAS las opciones de sus listas desplegables
+// (las 90 marcas y todas las categorias), y ademas NO incluye el nombre del producto,
+// que vive dentro de un <input value="...">. Filtrar por ahi no podia funcionar.
+// Se filtra por los CAMPOS de verdad: nombre, marca y categoria de ese renglon.
+function filtrarProductosDeMarca(){
+  var caja = document.getElementById('epml-buscar');
+  var cont = document.getElementById('epml-lista');
+  var sinRes = document.getElementById('epml-sinres');
+  if(!cont) return;
+  var q = caja ? caja.value.trim() : '';
+  var filas = cont.children;
+  var visibles = 0;
+
+  if(!q){
+    for(var i = 0; i < filas.length; i++) filas[i].style.display = '';
+    if(sinRes) sinRes.style.display = 'none';
+    return;
+  }
+
+  for(var j = 0; j < filas.length; j++){
+    var nom = document.getElementById('epml-nombre-' + j);
+    var mar = document.getElementById('epml-marca-' + j);
+    var cat = document.getElementById('epml-cat-' + j);
+    var texto = ((nom && nom.value) || '') + ' '
+              + ((mar && mar.value) || '') + ' '
+              + ((cat && cat.value) || '');
+    var calza = filtrarPorBusqueda([{ t: texto }], q, function(x){ return x.t; }).length > 0;
+    filas[j].style.display = calza ? '' : 'none';
+    if(calza) visibles++;
+  }
+  if(sinRes) sinRes.style.display = visibles ? 'none' : 'block';
 }
 
 function cerrarEditarProductosDeMarca(){
