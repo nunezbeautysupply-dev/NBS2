@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260728a-OFICIAL-V2.0">
+<meta name="app-version" content="20260728b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -748,8 +748,8 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
         <label class="lbl">Nombre de la empresa *</label><input class="inp" id="sn" type="text" placeholder="Ej: Barber Distributors Inc" onblur="capitalizarFinal(this)">
         <label class="lbl">Persona de contacto</label><input class="inp" id="sct" type="text" placeholder="Nombre del representante" onblur="capitalizarFinal(this)">
         <div class="r2">
-          <div><label class="lbl">Tel. Empresa</label><input class="inp" id="stel" type="tel" placeholder="+1 (401) 000-0000" oninput="fmtTel(this)" maxlength="17"></div>
-          <div><label class="lbl">Tel. Contacto</label><input class="inp" id="stelc" type="tel" placeholder="+1 (401) 000-0000" oninput="fmtTel(this)" maxlength="17"></div>
+          <div><label class="lbl">Tel. Empresa</label><input class="inp" id="stel" type="tel" placeholder="+1 (401) 000-0000" oninput="fmtTel(this)" maxlength="17" autocomplete="off" autocorrect="off"></div>
+          <div><label class="lbl">Tel. Contacto</label><input class="inp" id="stelc" type="tel" placeholder="+1 (401) 000-0000" oninput="fmtTel(this)" maxlength="17" autocomplete="off" autocorrect="off"></div>
         </div>
         <label class="lbl">Email</label><input class="inp" id="sem" type="email" placeholder="correo@empresa.com">
         <label class="lbl">Direccion</label><input class="inp" id="sdir" type="text" placeholder="123 Main St" autocomplete="off" oninput="onDireccionInput('sdir')" onblur="ocultarDropdown('sdir')">
@@ -1145,12 +1145,12 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
         <input class="inp" id="cintervalo" type="number" min="1" placeholder="Ej: 15" style="margin-bottom:0">
       </div>
       <label class="lbl">Negocio</label><input class="inp" id="cne" type="text" placeholder="Barberia El Estilo" autocomplete="off" oninput="onNegocioInput('cne')" onblur="capitalizarFinal(this);ocultarDropdown('cne')">
-      <label class="lbl">Telefono</label><input class="inp" id="ct" type="tel" placeholder="+1 (401) 000-0000" oninput="fmtTel(this)" maxlength="17">
+      <label class="lbl">Telefono</label><input class="inp" id="ct" type="tel" placeholder="+1 (401) 000-0000" oninput="fmtTel(this)" maxlength="17" autocomplete="off" autocorrect="off">
       <div style="background:#F5F5F5;border-radius:10px;padding:10px;margin-bottom:8px">
         <div style="font-size:11px;font-weight:700;color:#666;margin-bottom:6px">📇 CONTACTO ADICIONAL (opcional)</div>
         <label class="lbl">Nombre del contacto</label><input class="inp" id="ccontacto" type="text" placeholder="Ej: encargado, gerente, otro dueño..." onblur="capitalizarFinal(this)">
         <label class="lbl">Apodo del contacto</label><input class="inp" id="ccontactoapodo" type="text" placeholder="Ej: Robertico, Nena...">
-        <label class="lbl" style="margin-bottom:0">Teléfono del contacto</label><input class="inp" id="ccontactotel" type="tel" placeholder="+1 (401) 000-0000" oninput="fmtTel(this)" maxlength="17" style="margin-bottom:0">
+        <label class="lbl" style="margin-bottom:0">Teléfono del contacto</label><input class="inp" id="ccontactotel" type="tel" placeholder="+1 (401) 000-0000" oninput="fmtTel(this)" maxlength="17" style="margin-bottom:0" autocomplete="off" autocorrect="off">
       </div>
       <label class="lbl">Email</label><input class="inp" id="ce" type="email" placeholder="correo@email.com">
       <label class="lbl">Direccion</label>
@@ -6582,6 +6582,98 @@ function revisarIntegridad(){
   else oks.push('Espacio usado: '+mb+' MB (hay de sobra)');
 
   // ── Armar el reporte ──
+  // ═══ REVISIONES AGREGADAS EL 28 JUL ═══
+  // Salieron de auditar los datos REALES de Sensei. Antes la revision solo miraba las
+  // ventas y los clientes: las compras, las devoluciones, el inventario y la ganancia
+  // no se revisaban en absoluto.
+
+  // ── Las COMPRAS ──
+  var COMP = LS('nc', []);
+  var SUP  = LS('nsup', []);
+  var idsSup = {};
+  SUP.forEach(function(x){ idsSup[String(x.id)] = true; });
+
+  var compSinSup = COMP.filter(function(c){ return c.sid && !idsSup[String(c.sid)]; });
+  if(compSinSup.length){
+    var mSinSup = compSinSup.reduce(function(a,c){ return a + (parseFloat(c.total)||0); }, 0);
+    avisos.push(compSinSup.length + ' compra(s) de suplidores que ya borraste, por $' + fmtNum(mSinSup) + '.');
+  } else oks.push('Todas las compras tienen su suplidor (' + COMP.length + ' revisadas)');
+
+  var compPagadasDeMas = COMP.filter(function(c){
+    var pg = (c.pagos || []).reduce(function(a,p){ return a + (parseFloat(p.monto)||0); }, 0);
+    return pg - (parseFloat(c.total)||0) > 0.005;
+  });
+  if(compPagadasDeMas.length){
+    problemas.push(compPagadasDeMas.length + ' compra(s) donde pagaste MAS de lo que costaron. Revisa esos pagos.');
+  } else oks.push('Ninguna compra pagada de mas');
+
+  var compDescuadre = COMP.filter(function(c){
+    var items = c.items || [];
+    if(!items.length) return false;
+    var suma = items.reduce(function(a,i){ return a + (parseFloat(i.cant)||0) * (parseFloat(i.costo)||0); }, 0);
+    var tot  = (parseFloat(c.total)||0) - (parseFloat(c.envio)||0) - (parseFloat(c.cargoTarjeta)||0);
+    return Math.abs(suma - tot) > 0.05;
+  });
+  if(compDescuadre.length){
+    problemas.push(compDescuadre.length + ' compra(s) donde los productos no suman el total de la compra.');
+  } else if(COMP.length) oks.push('En todas las compras, los productos suman el total');
+
+  // ── Las DEVOLUCIONES ──
+  var DEV = LS('ndevoluciones', []);
+  var idsVenta = {};
+  V.forEach(function(v){ idsVenta[String(v.id)] = true; });
+  var devSinVenta = DEV.filter(function(x){ return x.vid && !idsVenta[String(x.vid)]; });
+  if(devSinVenta.length){
+    avisos.push(devSinVenta.length + ' devolucion(es) que apuntan a facturas que ya no existen.');
+  } else if(DEV.length) oks.push('Todas las devoluciones tienen su factura (' + DEV.length + ' revisadas)');
+
+  // ── El INVENTARIO ──
+  loadProds();
+  var stockNeg = productos.filter(function(p){ return (parseFloat(p.stock)||0) < 0; });
+  if(stockNeg.length){
+    avisos.push(stockNeg.length + ' producto(s) con existencia NEGATIVA. Significa que vendiste mas de lo que la app creia que tenias: '
+      + stockNeg.slice(0,3).map(function(p){ return p.nombre + ' (' + (parseFloat(p.stock)||0) + ')'; }).join(', ')
+      + (stockNeg.length > 3 ? ' y ' + (stockNeg.length-3) + ' mas' : '') + '.');
+  } else oks.push('Ningun producto con existencia negativa');
+
+  var bajoCosto = productos.filter(function(p){
+    var pr = parseFloat(p.precio)||0, co = parseFloat(p.costo)||0;
+    return pr > 0 && co > 0 && pr < co;
+  });
+  if(bajoCosto.length){
+    problemas.push(bajoCosto.length + ' producto(s) que vendes MAS BARATO de lo que te cuestan: '
+      + bajoCosto.slice(0,3).map(function(p){ return p.nombre; }).join(', ') + '.');
+  } else oks.push('Ningun producto se vende por debajo de su costo');
+
+  // ── La GANANCIA de cada venta ──
+  // OJO IMPORTANTE: los "Balance inicial traido de sistema anterior" NO son ventas, son
+  // deudas que Sensei paso a mano al cambiarse de app. Su ganancia es CERO y esta BIEN
+  // asi. Si se "arreglaran" se le inventaria una ganancia que nunca existio. Se saltan
+  // siempre. -28 jul-
+  window._ganMal = [];
+  V.forEach(function(v){
+    if(v.cancelada) return;
+    var items = v.items || [];
+    if(!items.length) return;
+    if(esBalanceInicial(v)) return;                       // nunca se tocan
+    var completo = true, calc = 0;
+    items.forEach(function(i){
+      if(i.costo === undefined || i.costo === null){ completo = false; return; }
+      calc += ((parseFloat(i.precio)||0) - (parseFloat(i.costo)||0)) * (parseFloat(i.cant)||0);
+    });
+    if(!completo) return;
+    var g = parseFloat(v.ganancia) || 0;
+    if(Math.abs(calc - g) > 0.05) window._ganMal.push({ id: v.id, cn: v.cn, fecha: v.fecha, dice: g, real: calc });
+  });
+  if(window._ganMal.length){
+    var difG = window._ganMal.reduce(function(a,x){ return a + (x.real - x.dice); }, 0);
+    problemas.push(window._ganMal.length + ' venta(s) donde la ganancia guardada no coincide con sus productos. '
+      + 'Tus reportes de ganancia estan ' + (difG > 0 ? 'por DEBAJO' : 'por ENCIMA') + ' de lo real en $'
+      + fmtNum(Math.abs(difG)) + '. Se pueden arreglar de un toque abajo.');
+  } else oks.push('La ganancia guardada cuadra en todas las ventas');
+
+
+
   var h = '<h3 style="font-size:21px;font-weight:800;color:#1a237e;margin:0 0 4px">\ud83e\ude7a Revisi\u00f3n de integridad</h3>'
     + '<p style="font-size:14px;color:#666;margin:6px 0 14px">Revis\u00e9 '+V.length+' ventas, '+C.length+' clientes, '+CO.length+' compras y '+G.length+' gastos. No toqu\u00e9 nada: solo revis\u00e9.</p>';
 
@@ -6621,12 +6713,73 @@ function revisarIntegridad(){
     h += '</div>';
   }
 
+  // Boton para arreglar las ganancias mal guardadas -28 jul-
+  if(window._ganMal && window._ganMal.length){
+    h += '<div style="background:#E8F5E9;border:2px solid #2E7D32;border-radius:12px;padding:14px;margin-bottom:12px">'
+      + '<div style="font-size:15px;font-weight:900;color:#2E7D32;margin-bottom:6px">\ud83d\udd27 ARREGLAR LAS GANANCIAS</div>'
+      + '<div style="font-size:13px;color:#33691E;line-height:1.45;margin-bottom:10px">'
+      + 'Se van a recalcular ' + window._ganMal.length + ' venta(s) usando el precio y el costo que YA estan guardados en cada renglon. '
+      + 'No se inventa ningun numero.<br><br>'
+      + '<b>Los "Balance inicial traido de sistema anterior" NO se tocan</b> — esos no son ventas y su ganancia cero es correcta.'
+      + '</div>';
+    window._ganMal.slice(0, 8).forEach(function(x){
+      h += '<div style="font-size:12.5px;color:#33691E;margin-bottom:3px">\u2022 ' + escaparHtml(String(x.cn||'')).slice(0,26)
+        + ' ' + escaparHtml(String(x.fecha||'')) + ': dice $' + fmtNum(x.dice) + ' \u2192 $' + fmtNum(x.real) + '</div>';
+    });
+    if(window._ganMal.length > 8) h += '<div style="font-size:12px;color:#558B2F">y ' + (window._ganMal.length-8) + ' mas...</div>';
+    h += '<button onclick="arreglarGanancias()" style="width:100%;margin-top:10px;padding:13px;border:none;border-radius:10px;background:#2E7D32;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer">Arreglar las ' + window._ganMal.length + ' ganancias</button>'
+      + '</div>';
+  }
+
   h += '<div style="background:#F4F6FB;border:1px solid #d9dcec;border-radius:12px;padding:14px">'
     + '<div style="font-size:14px;font-weight:900;color:#1a237e;margin-bottom:8px">\u2705 REVISADO Y CORRECTO ('+oks.length+')</div>';
   oks.forEach(function(x){ h += '<div style="font-size:13.5px;line-height:1.5;color:#444;margin-bottom:5px">\u2022 '+escaparHtml(x)+'</div>'; });
   h += '</div>';
 
+
   mostrarReporteIntegridad(h);
+}
+
+// Reconoce los renglones que NO son una venta de verdad, sino la deuda que Sensei paso a
+// mano cuando se cambio de la app vieja a NBS2. Esos van con ganancia CERO a proposito.
+// Recalcula la ganancia de las ventas donde no cuadra, usando el precio y el costo que
+// YA estan guardados en cada renglon de esa misma venta. No inventa nada y NUNCA toca
+// los balances iniciales. Pide huella, como toda accion de dinero. -28 jul-
+function arreglarGanancias(){
+  var lista = window._ganMal || [];
+  if(!lista.length){ avisoGrande('No hay ganancias que arreglar.'); return; }
+
+  var difTotal = lista.reduce(function(a,x){ return a + (x.real - x.dice); }, 0);
+  var msg = 'Se van a recalcular ' + lista.length + ' venta(s).\n\n'
+          + 'Tu ganancia total cambiaria en $' + fmtNum(Math.abs(difTotal))
+          + (difTotal > 0 ? ' hacia ARRIBA.' : ' hacia ABAJO.') + '\n\n'
+          + 'Los balances iniciales NO se tocan.\n\n¿Seguir?';
+  if(!confirm(msg)) return;
+
+  protegerConHuella(function(){
+    var V = LS('nv', []);
+    var mapa = {};
+    lista.forEach(function(x){ mapa[String(x.id)] = x.real; });
+    var cambiadas = 0;
+    V.forEach(function(v){
+      var nuevo = mapa[String(v.id)];
+      if(nuevo === undefined) return;
+      if(esBalanceInicial(v)) return;        // red de seguridad, por si acaso
+      v.ganancia = Math.round(nuevo * 100) / 100;
+      cambiadas++;
+    });
+    ventas = V;
+    SS('nv', ventas);
+    avisoGrande('\u2713 Se arreglaron ' + cambiadas + ' ganancia(s).\n\nTus reportes ya muestran la ganancia real.', function(){
+      revisarIntegridad();
+    });
+  });
+}
+
+function esBalanceInicial(v){
+  return (v.items || []).some(function(i){
+    return String(i.nombre || '').toLowerCase().indexOf('balance inicial') >= 0;
+  });
 }
 
 // ═══ ARREGLAR UN SOBREPAGO VIEJO — mueve el sobrante a credito a favor (25 jul) ═══
@@ -13792,12 +13945,12 @@ function editarCl(id){
     +'<input class="inp" id="ecl-intervalo" type="number" min="1" placeholder="Ej: 15" value="'+(c.intervaloVisitaDias||'')+'" style="margin-bottom:0">'
     +'</div>'
     +'<label class="lbl">Negocio / Barberia</label><input class="inp" id="ecl-ne" type="text" value="'+escaparHtml(c.negocio||'')+'" autocomplete="off" oninput="onNegocioInput(\'ecl-ne\')" onblur="capitalizarFinal(this);ocultarDropdown(\'ecl-ne\')">'
-    +'<label class="lbl">Telefono</label><input class="inp" id="ecl-t" type="tel" value="'+(c.tel||'')+'" oninput="fmtTel(this)" maxlength="17">'
+    +'<label class="lbl">Telefono</label><input class="inp" id="ecl-t" type="tel" value="'+(c.tel||'')+'" oninput="fmtTel(this)" maxlength="17" autocomplete="off" autocorrect="off">'
     +'<div style="background:#F5F5F5;border-radius:10px;padding:10px;margin-bottom:8px">'
     +'<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:6px">📇 CONTACTO ADICIONAL (opcional)</div>'
     +'<label class="lbl">Nombre del contacto</label><input class="inp" id="ecl-contacto" type="text" value="'+(c.contacto||'')+'" placeholder="Ej: encargado, gerente, otro dueño..." onblur="capitalizarFinal(this)">'
     +'<label class="lbl">Apodo del contacto</label><input class="inp" id="ecl-contactoapodo" type="text" value="'+(c.contactoApodo||'')+'" placeholder="Ej: Robertico, Nena...">'
-    +'<label class="lbl" style="margin-bottom:0">Teléfono del contacto</label><input class="inp" id="ecl-contactotel" type="tel" value="'+(c.contactoTel||'')+'" oninput="fmtTel(this)" maxlength="17" style="margin-bottom:0">'
+    +'<label class="lbl" style="margin-bottom:0">Teléfono del contacto</label><input class="inp" id="ecl-contactotel" type="tel" value="'+(c.contactoTel||'')+'" oninput="fmtTel(this)" maxlength="17" style="margin-bottom:0" autocomplete="off" autocorrect="off">'
     +'</div>'
     +'<label class="lbl">Email</label><input class="inp" id="ecl-e" type="email" value="'+(c.email||'')+'">'
     +'<label class="lbl">Direccion</label><input class="inp" id="ecl-d" type="text" value="'+(c.dir||'')+'" autocomplete="off" oninput="mostrarDirSugerencias(\'ecl-d\',\'ecl-d-drop\',this.value)" onblur="setTimeout(function(){var e=document.getElementById(\'ecl-d-drop\');if(e)e.style.display=\'none\';},200)">'
