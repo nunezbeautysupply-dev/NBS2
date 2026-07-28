@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260728b-OFICIAL-V2.0">
+<meta name="app-version" content="20260728d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -20847,7 +20847,9 @@ function pintarRevisionFactura(){
     var elegido = null;
     if(it.pid) elegido = productos.find(function(p){ return String(p.id) === String(it.pid); });
     var textoBoton = elegido ? escaparHtml(elegido.nombre)
-                   : (it.esNuevo ? '➕ Producto nuevo' : '⚠️ Escoge el producto');
+                   : (it.esNuevo ? '➕ ' + escaparHtml(it.nombreNuevo || 'Producto nuevo')
+                                   + (it.precioVentaNuevo ? ' · venta $' + fmtNum(it.precioVentaNuevo) : ' · SIN precio de venta')
+                                 : '⚠️ Escoge el producto');
     var colorBorde = (elegido || it.esNuevo) ? '#c8e6c9' : '#FFCC80';
     var colorTexto = (elegido || it.esNuevo) ? '#1a237e' : '#E65100';
     html += '<div style="font-size:10.5px;color:#999;font-weight:800;margin-bottom:3px">TU PRODUCTO' + etiqueta + '</div>'
@@ -20991,7 +20993,126 @@ function escogerProductoBuscador(pid){
   var i = _buscadorLinea;
   cerrarBuscadorProducto();
   if(i === null || i === undefined) return;
+  if(String(pid) === 'NUEVO'){ abrirFormProductoNuevo(i); return; }
   cambiarProductoFactura(i, String(pid));
+}
+
+// ── CREAR UN PRODUCTO SIN SALIR DE LA FACTURA (28 jul) ──
+// Sensei: "no hay forma de que yo pueda salir de esa parte sin que se me cierre e ir al
+// catalogo... si salgo se pierde el progreso de la factura". ANTES, marcar "producto
+// nuevo" solo lo apuntaba, y al guardar la compra se creaba SIN marca, SIN categoria y
+// con precio de venta en CERO — o sea que despues habia que ir a arreglarlo igual.
+// Ahora se le piden esos tres datos aqui mismo, con el nombre y el costo ya puestos
+// desde la factura.
+function abrirFormProductoNuevo(i){
+  loadProds();
+  var it = (window._facturaItems || [])[i];
+  if(!it) return;
+
+  // Marcas y categorias que ya usa, para no escribirlas a mano
+  // Se usa marcaDe(p), la MISMA que usa "editar toda una marca": muchos productos de
+  // Sensei no tienen el campo marca lleno, la marca va dentro del nombre. Con p.marca
+  // solo salian 2 marcas; con marcaDe salen las 90 de verdad. -28 jul-
+  var marcas = {}, cats = {};
+  productos.forEach(function(p){
+    var m = String(marcaDe(p) || '').trim(); if(m) marcas[m] = true;
+    var c = (p.cat || '').trim();            if(c) cats[c] = true;
+  });
+  var listaM = Object.keys(marcas).sort();
+  var listaC = Object.keys(cats).sort();
+
+  var ov = document.getElementById('prod-nuevo-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'prod-nuevo-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99997;display:flex;align-items:center;justify-content:center;padding:14px';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:16px;max-width:440px;width:100%;max-height:88vh;overflow-y:auto">'
+    + '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px">'
+    +   '<div style="flex:1;font-size:17px;font-weight:900;color:#2E7D32">\u2795 Producto nuevo</div>'
+    +   '<button onclick="cerrarFormProductoNuevo()" style="flex-shrink:0;width:34px;height:34px;border:none;border-radius:9px;background:#f0f0f0;color:#666;font-size:20px;font-weight:800;cursor:pointer">\u2715</button>'
+    + '</div>'
+    + '<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:8px;margin-bottom:12px">'
+    +   '<div style="font-size:10px;color:#8D6E63;font-weight:800;margin-bottom:2px">DICE LA FACTURA</div>'
+    +   '<div style="font-size:12.5px;color:#5D4037;font-weight:700;line-height:1.3">' + escaparHtml(it.descripcion) + '</div>'
+    + '</div>'
+
+    + '<label class="lbl">Nombre del producto *</label>'
+    + '<input class="inp" id="pn-nombre" type="text" autocomplete="off" value="' + escaparHtml(it.descripcion) + '">'
+
+    + '<label class="lbl">Marca</label>'
+    + '<select class="inp" id="pn-marca-sel" onchange="pnCambioMarca()">'
+    +   '<option value="">(sin marca)</option>'
+    +   listaM.map(function(m){ return '<option value="' + escaparHtml(m) + '">' + escaparHtml(m) + '</option>'; }).join('')
+    +   '<option value="__otra__">\u2795 Otra marca (escribir)</option>'
+    + '</select>'
+    + '<input class="inp" id="pn-marca-otra" type="text" placeholder="Escribe la marca" autocomplete="off" style="display:none">'
+
+    + '<label class="lbl">Categor\u00eda</label>'
+    + '<select class="inp" id="pn-cat-sel" onchange="pnCambioCat()">'
+    +   '<option value="">(sin categor\u00eda)</option>'
+    +   listaC.map(function(c){ return '<option value="' + escaparHtml(c) + '">' + escaparHtml(c) + '</option>'; }).join('')
+    +   '<option value="__otra__">\u2795 Otra categor\u00eda (escribir)</option>'
+    + '</select>'
+    + '<input class="inp" id="pn-cat-otra" type="text" placeholder="Escribe la categor\u00eda" autocomplete="off" style="display:none">'
+
+    + '<div style="display:flex;gap:8px;margin-top:8px">'
+    +   '<div style="flex:1"><label class="lbl">Costo (de la factura)</label>'
+    +     '<div style="padding:11px;background:#f5f5f5;border-radius:8px;font-size:15px;font-weight:800;color:#666">$' + fmtNum(it.costo) + '</div></div>'
+    +   '<div style="flex:1"><label class="lbl">Precio de venta *</label>'
+    +     '<input class="inp" id="pn-precio" type="text" inputmode="decimal" placeholder="$0.00" oninput="formatoMoneda(this)"></div>'
+    + '</div>'
+    + '<div style="font-size:11.5px;color:#888;margin-top:4px">Si lo dejas vac\u00edo, el producto queda con precio $0.00 y te va a salir en la Revisi\u00f3n de integridad.</div>'
+
+    + '<div style="display:flex;gap:8px;margin-top:14px">'
+    +   '<button onclick="guardarProductoNuevoFactura(' + i + ')" style="flex:2;padding:13px;border:none;border-radius:10px;background:#2E7D32;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer">\u2713 Crear y usarlo</button>'
+    +   '<button onclick="cerrarFormProductoNuevo()" style="flex:1;padding:13px;border:2px solid #999;border-radius:10px;background:#fff;color:#666;font-weight:700;cursor:pointer">Cancelar</button>'
+    + '</div>'
+    + '</div>';
+  ov.style.display = 'flex';
+  setTimeout(function(){ var c = document.getElementById('pn-nombre'); if(c){ try{ c.focus(); c.select(); }catch(e){} } }, 60);
+}
+
+function pnCambioMarca(){
+  var sel = document.getElementById('pn-marca-sel');
+  var otra = document.getElementById('pn-marca-otra');
+  if(sel && otra) otra.style.display = (sel.value === '__otra__') ? 'block' : 'none';
+}
+function pnCambioCat(){
+  var sel = document.getElementById('pn-cat-sel');
+  var otra = document.getElementById('pn-cat-otra');
+  if(sel && otra) otra.style.display = (sel.value === '__otra__') ? 'block' : 'none';
+}
+function cerrarFormProductoNuevo(){
+  var ov = document.getElementById('prod-nuevo-ov');
+  if(ov) ov.remove();
+}
+
+function guardarProductoNuevoFactura(i){
+  var it = (window._facturaItems || [])[i];
+  if(!it) return;
+  var nombre = (document.getElementById('pn-nombre').value || '').trim();
+  if(!nombre){ avisoGrande('Ponle un nombre al producto.'); return; }
+
+  var mSel = document.getElementById('pn-marca-sel').value;
+  var marca = (mSel === '__otra__') ? (document.getElementById('pn-marca-otra').value || '').trim() : mSel;
+  var cSel = document.getElementById('pn-cat-sel').value;
+  var cat = (cSel === '__otra__') ? (document.getElementById('pn-cat-otra').value || '').trim() : cSel;
+  var precio = parseFloat(document.getElementById('pn-precio').value) || 0;
+
+  // Se guarda en el renglon. El producto se crea de verdad al GUARDAR LA COMPRA -asi si
+  // Sensei cancela la compra, no le queda un producto suelto en el catalogo-.
+  it.pid = null;
+  it.esNuevo = true;
+  it.nombreNuevo = nombre;
+  it.marcaNueva = marca;
+  it.catNueva = cat;
+  it.precioVentaNuevo = precio;
+  it.comoLoSupo = null;
+
+  cerrarFormProductoNuevo();
+  pintarRevisionFactura();
 }
 
 function marcarLineaFactura(i, val){
@@ -21019,6 +21140,31 @@ function cambiarProductoFactura(i, val){
 function cerrarRevisionFactura(){
   var ov = document.getElementById('factura-ov');
   if(ov) ov.remove();
+  mostrarBotonVolverFactura();
+}
+
+// Enseña el boton de "volver a la factura" si quedo una a medias. Los renglones viven en
+// window._facturaItems, asi que Sensei puede irse al catalogo, arreglar lo que necesite y
+// volver justo donde iba -28 jul-.
+function mostrarBotonVolverFactura(){
+  var b = document.getElementById('cc-volver-factura');
+  if(!b) return;
+  var hay = window._facturaItems && window._facturaItems.length;
+  b.style.display = hay ? 'block' : 'none';
+  if(hay){
+    var marcadas = window._facturaItems.filter(function(x){ return x.marcado; }).length;
+    b.textContent = '📄 Volver a la factura (' + marcadas + ' renglones marcados)';
+  }
+}
+
+function volverALaFactura(){
+  if(!(window._facturaItems && window._facturaItems.length)){
+    avisoGrande('No hay ninguna factura a medias.');
+    mostrarBotonVolverFactura();
+    return;
+  }
+  ir('p-comp');
+  setTimeout(pintarRevisionFactura, 100);
 }
 
 function agregarFacturaALaCompra(){
@@ -21070,8 +21216,11 @@ function agregarFacturaALaCompra(){
                    esNuevo: false, precioVenta: prod.precio });
       }
     } else {
-      iCC.push({ pid: null, nombre: it.descripcion, cat: '', marca: '',
-                 cant: it.cant, costo: it.costo, esNuevo: true, precioVenta: 0 });
+      // Con lo que Sensei puso en el formulario, para que el producto nazca completo
+      iCC.push({ pid: null, nombre: it.nombreNuevo || it.descripcion,
+                 cat: it.catNueva || '', marca: it.marcaNueva || '',
+                 cant: it.cant, costo: it.costo, esNuevo: true,
+                 precioVenta: it.precioVentaNuevo || 0 });
     }
     agregados++;
   });
@@ -21088,6 +21237,7 @@ function agregarFacturaALaCompra(){
     if(elTar){ elTar.value = cg.tarjeta.toFixed(2); puestos += '\n💳 Cargo por tarjeta: $' + fmtNum(cg.tarjeta); }
   }
 
+  window._facturaItems = null;      // ya se agregaron: no hay nada a medias
   cerrarRevisionFactura();
   renderICC();
   avisoGrande('✓ Se agregaron ' + agregados + ' renglones a la compra.'
@@ -23280,6 +23430,9 @@ function verHistorialCliente(cid, modo){
     <input type="file" id="cc-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this,'cc')">
     <button type="button" id="cc-btn-ocr" style="width:100%;padding:10px;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px" onclick="leerTextoFacturaCompra()">🔍 Leer el texto de la foto -para copiar y pegar más rápido</button>
     <button type="button" onclick="abrirLectorFactura()" style="width:100%;padding:12px;background:#E8F5E9;color:#2E7D32;border:2px solid #2E7D32;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;margin-bottom:10px">📄 Leer factura del suplidor (PDF)</button>
+    <!-- Solo sale si dejo una factura a medias -28 jul-. Asi puede salir al catalogo a
+         arreglar un producto y volver sin perder lo que llevaba revisado. -->
+    <button type="button" id="cc-volver-factura" onclick="volverALaFactura()" style="display:none;width:100%;padding:12px;background:#FFF8E1;color:#8D6E63;border:2px solid #F9A825;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;margin-bottom:10px">📄 Volver a la factura que estaba leyendo</button>
     <input type="file" id="factura-pdf-input" accept="application/pdf,.pdf" style="display:none" onchange="procesarPdfFactura(this)">
     <div id="cc-ocr-resultado" style="display:none;background:#FAFAFA;border:1px solid #ddd;border-radius:8px;padding:10px;margin-bottom:10px">
       <div style="font-size:11px;color:#777;font-weight:700;margin-bottom:6px">TEXTO ENCONTRADO EN LA FOTO -tócalo y cópialo, no siempre sale perfecto-</div>
@@ -23746,8 +23899,8 @@ function verHistorialCliente(cid, modo){
 </div>
 
 <!-- Letrero de avisos GRANDE (reemplaza al chiquito del telefono) -->
-<div id="aviso-ov" onclick="cerrarAviso()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.72);z-index:99990"></div>
-<div id="aviso-caja" style="display:none;position:fixed;left:5%;right:5%;top:50%;transform:translateY(-50%);max-height:80%;z-index:99991;background:#fff;border-radius:18px;padding:24px 20px 20px;box-shadow:0 12px 44px rgba(0,0,0,.45);overflow-y:auto">
+<div id="aviso-ov" onclick="cerrarAviso()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.72);z-index:2000000"></div>
+<div id="aviso-caja" style="display:none;position:fixed;left:5%;right:5%;top:50%;transform:translateY(-50%);max-height:80%;z-index:2000001;background:#fff;border-radius:18px;padding:24px 20px 20px;box-shadow:0 12px 44px rgba(0,0,0,.45);overflow-y:auto">
   <div id="aviso-texto" style="font-size:18.5px;line-height:1.55;color:#1a1a1a;font-weight:600;text-align:center;margin-bottom:20px;word-break:break-word"></div>
   <button onclick="cerrarAviso()" style="width:100%;padding:17px;border:none;border-radius:13px;background:#1a237e;color:#fff;font-size:19px;font-weight:800;cursor:pointer;font-family:inherit">Entendido</button>
 </div>
