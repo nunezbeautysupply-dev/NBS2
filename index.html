@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260727l-OFICIAL-V2.0">
+<meta name="app-version" content="20260727p-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2183,7 +2183,12 @@ function tocarHoraUltimaCopiaLocal(){
 // Solo se guardan los datos del NEGOCIO -ventas, clientes, compras, cobros...-, no los
 // productos: las fotos de productos pesan 1 MB y llenarian la memoria del telefono en 10
 // copias. Los productos casi no cambian y estan a salvo en las copias de la nube.
-var CLAVES_COPIA_LOCAL = ['nv','ncl','nc','ncr','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','nvisitas_barberos'];
+// Se agregaron np -los productos con sus precios, costos, stock y fotos-, nsup -los
+// suplidores-, historial_precios, nvan y nrelleno. Antes las copias del telefono no los
+// llevaban, asi que una copia local no era una foto completa del negocio. Encontrado en
+// la auditoria del 27 jul.
+var CLAVES_COPIA_LOCAL = ['nv','ncl','nc','ncr','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','nvisitas_barberos',
+                          'np','nsup','historial_precios','nvan','nrelleno','rutas_por_dia'];
 var FACTURAS_ENTRE_COPIAS = 5;
 var COPIAS_LOCALES_QUE_SE_GUARDAN = 40; // 40 copias del teléfono (cada 15 min ≈ el último día de trabajo)
 var CLAVE_COPIAS_LOCALES = 'nbs_copias_locales';
@@ -4535,7 +4540,7 @@ function renderCXP(){
     var comprasS = compras.filter(function(c){ return String(c.sid)===String(s.id) && c.tipo==='credito'; });
     var totalS = 0;
     comprasS.forEach(function(c){
-      var pagado = c.pagosFactura ? c.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s2,p){return s2+p.monto;},0) : 0;
+      var pagado = c.pagosFactura ? (c.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s2,p){return s2+p.monto;},0) : 0;
       totalS += Math.max(0, c.total - pagado);
     });
     if(totalS > 0.001){ totalSuplidores += totalS; suplidoresConDeuda.push({ nombre: s.nombre, id: s.id, total: totalS }); }
@@ -4879,7 +4884,7 @@ function renderSup(q){
     var comprasS = compras.filter(function(c){ return String(c.sid)===String(s.id); });
     var totalComprado = comprasS.reduce(function(sum,c){ return sum+c.total; },0);
     var totalPagado = comprasS.filter(function(c){ return c.tipo==='credito'; }).reduce(function(sum,c){
-      var pf = c.pagosFactura ? c.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(sp,p){return sp+p.monto;},0) : 0;
+      var pf = c.pagosFactura ? (c.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(sp,p){return sp+p.monto;},0) : 0;
       return sum+pf;
     },0);
     var totalCredito = comprasS.filter(function(c){ return c.tipo==='credito'; }).reduce(function(sum,c){ return sum+c.total; },0);
@@ -5073,7 +5078,7 @@ function verSup(id, modo){
 
   var todasComprasS = compras.filter(function(c){ return String(c.sid)===String(id); });
   todasComprasS.forEach(function(c){
-    var pagado = c.pagosFactura ? c.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s2,p){return s2+p.monto;},0) : 0;
+    var pagado = c.pagosFactura ? (c.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s2,p){return s2+p.monto;},0) : 0;
     c._pagado = pagado;
     c._saldo = Math.max(0, c.total - pagado);
   });
@@ -5153,9 +5158,9 @@ function verSup(id, modo){
       card.style.cursor = 'pointer';
       card.style.borderLeft = '4px solid ' + (c.tipo==='credito' ? (esSaldoPendiente(saldo)?'#C62828':'#2E7D32') : '#1565C0');
       var pagosHtml = '';
-      if(modo==='completo' && c.tipo==='credito' && c.pagosFactura && c.pagosFactura.length){
+      if(modo==='completo' && c.tipo==='credito' && c.pagosFactura && (c.pagosFactura || []).length){
         pagosHtml = '<div style="margin-top:6px;padding-top:6px;border-top:0.5px dashed #ddd">'
-          +c.pagosFactura.filter(function(p){return p.monto>0;}).map(function(p){
+          +(c.pagosFactura || []).filter(function(p){return p.monto>0;}).map(function(p){
             var detalle = (p.metodos && p.metodos.length) ? p.metodos.map(function(m){ return METODOS_PAGO_LABELS[m.tipo]+' $'+fmtNum(m.monto); }).join(' + ') : '';
             return '<div style="font-size:11px;color:#2E7D32;padding:2px 0">✓ '+p.fecha+' — Pagué $'+fmtNum(p.monto)+(detalle?' ('+detalle+')':'')+'</div>';
           }).join('')
@@ -5163,7 +5168,7 @@ function verSup(id, modo){
       }
       card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center">'
         +'<div><div style="font-size:14px;font-weight:700">'+c.fecha+' - '+c.hora+(c.foto?' 📷':'')+'</div>'
-        +'<div style="font-size:12px;color:#aaa;margin-top:2px">'+c.items.length+' producto(s)</div>'
+        +'<div style="font-size:12px;color:#aaa;margin-top:2px">'+(c.items || []).length+' producto(s)</div>'
         +'<div style="margin-top:4px"><span style="font-size:13px;padding:3px 9px;border-radius:10px;font-weight:500;'+(c.tipo==='credito'?'background:#FFF8E1;color:#E65100':'background:#E8F5E9;color:#2E7D32')+'">'+(c.tipo==='credito'?'a credito':'contado')+'</span></div></div>'
         +'<div style="text-align:right"><div style="font-size:18px;font-weight:700;color:#1565C0">$'+fmtNum(c.total)+'</div>'
         +(c.tipo==='credito'?'<div style="font-size:12px;color:'+(esSaldoPendiente(saldo)?'#C62828':'#2E7D32')+'">'+(esSaldoPendiente(saldo)?'Debo: $'+fmtNum(saldo):'Pagado')+'</div>':'')
@@ -5181,7 +5186,7 @@ function verFacturaCompra(c, sid){
   var el = document.getElementById('sup-perfil-contenido');
   el.innerHTML = '';
 
-  var pagado = c.pagosFactura ? c.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0;
+  var pagado = c.pagosFactura ? (c.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0;
   var saldo = Math.max(0, c.total-pagado);
 
   var back = document.createElement('button');
@@ -5222,7 +5227,7 @@ function verFacturaCompra(c, sid){
   var prodCard = document.createElement('div');
   prodCard.className = 'card';
   prodCard.innerHTML = '<div style="font-size:13px;font-weight:700;color:#5D4037;margin-bottom:10px">PRODUCTOS</div>';
-  c.items.forEach(function(it){
+  (c.items || []).forEach(function(it){
     var cantSegura = Number(it.cant); if(!isFinite(cantSegura) || cantSegura <= 0) cantSegura = 1;
     var costoSeguro = Number(it.costo); if(!isFinite(costoSeguro) || costoSeguro < 0) costoSeguro = 0;
     var row = document.createElement('div');
@@ -5234,11 +5239,11 @@ function verFacturaCompra(c, sid){
   });
   el.appendChild(prodCard);
 
-  if(c.pagosFactura && c.pagosFactura.length){
+  if(c.pagosFactura && (c.pagosFactura || []).length){
     var pagCard = document.createElement('div');
     pagCard.className = 'card';
     pagCard.innerHTML = '<div style="font-size:13px;font-weight:700;color:#5D4037;margin-bottom:10px">PAGOS APLICADOS</div>';
-    c.pagosFactura.filter(function(p){return typeof p.monto==='number';}).forEach(function(p){
+    (c.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).forEach(function(p){
       var row = document.createElement('div');
       row.style.cssText = 'display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px';
       row.innerHTML = '<span style="color:#777">'+p.fecha+(p.nota?' · '+p.nota:'')+'</span>'
@@ -5325,7 +5330,7 @@ function eliminarCompra(cid, sid){
 
     loadProds();
     var avisosStock = [];
-    c.items.forEach(function(it){
+    (c.items || []).forEach(function(it){
       var p = null;
       if(it.pid) p = productos.find(function(x){ return String(x.id)===String(it.pid); });
       if(!p && it.esNuevo){
@@ -5357,7 +5362,7 @@ function editarCompra(cid, sid){
   var c = compras.find(function(x){ return String(x.id)===String(cid); });
   if(!c) return;
 
-  window._compraEditItems = c.items.map(function(it){
+  window._compraEditItems = (c.items || []).map(function(it){
     var cantSegura = Number(it.cant);
     if(!isFinite(cantSegura) || cantSegura <= 0) cantSegura = 1;
     var costoSeguro = Number(it.costo);
@@ -6106,7 +6111,7 @@ function renderCl(q){
     var ventasC = ventas.filter(function(v){ return String(v.cid)===String(c.id) && v.tipo==='credito' && !v.cancelada; });
     var totalCred = ventasC.reduce(function(s,v){ return s+v.total; },0);
     var totalPag = ventasC.reduce(function(s,v){
-      var pf = v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(sp,p){return sp+p.monto;},0) : 0;
+      var pf = v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(sp,p){return sp+p.monto;},0) : 0;
       return s+pf;
     },0);
     var balance = Math.max(0, totalCred - totalPag);
@@ -6490,7 +6495,7 @@ function revisarIntegridad(){
   var sobrepago = [];
   V.forEach(function(v){
     if(v.tipo!=='credito' || !v.pagosFactura) return;
-    var pag = v.pagosFactura.reduce(function(s,p){ return s+(typeof p.monto==='number'?p.monto:0); },0);
+    var pag = (v.pagosFactura || []).reduce(function(s,p){ return s+(typeof p.monto==='number'?p.monto:0); },0);
     if(pag > (v.total||0) + 0.01) sobrepago.push({id:v.id, total:v.total, pag:pag, cid:v.cid, cn:v.cn});
   });
   if(sobrepago.length){
@@ -6615,7 +6620,7 @@ function arreglarSobrepagoFactura(vid){
   ventas = LS('nv', []);
   var v = ventas.find(function(x){ return String(x.id) === String(vid); });
   if(!v || !v.pagosFactura){ alert('No encontré esa factura.'); return; }
-  var pagado = v.pagosFactura.reduce(function(s,p){ return s+(typeof p.monto==='number'?p.monto:0); },0);
+  var pagado = (v.pagosFactura || []).reduce(function(s,p){ return s+(typeof p.monto==='number'?p.monto:0); },0);
   var exceso = pagado - (v.total||0);
   if(exceso <= 0.01){ avisoGrande('Esta factura ya no tiene sobrepago.', function(){ revisarIntegridad(); }); return; }
 
@@ -6645,7 +6650,7 @@ function aplicarArregloSobrepago(vid, exceso){
   // Recorrer los pagos del mas reciente al mas viejo, reduciendo hasta agotar el exceso.
   // Asi el pago mas antiguo -el original, el que de verdad salda la factura- queda intacto.
   var restante = exceso;
-  for(var i=v.pagosFactura.length-1; i>=0 && restante>0.005; i--){
+  for(var i=(v.pagosFactura || []).length-1; i>=0 && restante>0.005; i--){
     var p = v.pagosFactura[i];
     if(typeof p.monto !== 'number') continue;
     if(p.monto <= restante + 0.005){
@@ -8146,7 +8151,7 @@ function llenarRellenoAuto(){
     if(modo === 'poco' && stock > min){ saltadosPorStock++; return; }
 
     var yaIdx = -1;
-    for(var i=0; i<listaRelleno.items.length; i++){
+    for(var i=0; i<(listaRelleno.items || []).length; i++){
       if(String(listaRelleno.items[i].pid) === String(prod.id)){ yaIdx = i; break; }
     }
     if(yaIdx >= 0){
@@ -8181,18 +8186,18 @@ function renderRelleno(){
   var acciones = document.getElementById('rel-acciones');
   if(!el) return;
 
-  if(!listaRelleno.items.length){
+  if(!(listaRelleno.items || []).length){
     el.innerHTML = '<div class="card" style="text-align:center;color:#bbb;font-size:13px;padding:20px">Tu lista está vacía.<br>Busca un producto arriba para agregarlo.</div>';
     acciones.style.display = 'none';
     return;
   }
   acciones.style.display = 'block';
 
-  var totalUnidades = listaRelleno.items.reduce(function(s,it){ return s + (it.cant||0); }, 0);
+  var totalUnidades = (listaRelleno.items || []).reduce(function(s,it){ return s + (it.cant||0); }, 0);
   var html = '<div class="card" style="margin-bottom:10px;padding:12px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center">'
     +'<span style="font-size:13px;font-weight:700;color:var(--nbs-ink)">📋 Tu lista</span>'
-    +'<span style="font-size:13px;font-weight:800;color:var(--nbs-gold-dark)">'+listaRelleno.items.length+' producto(s) · '+totalUnidades+' piezas en total</span>'
+    +'<span style="font-size:13px;font-weight:800;color:var(--nbs-gold-dark)">'+(listaRelleno.items || []).length+' producto(s) · '+totalUnidades+' piezas en total</span>'
     +'</div></div>';
 
   // ─── AGRUPAR POR MARCA (pedido por Sensei, 19 jul 2026) ───
@@ -8202,7 +8207,7 @@ function renderRelleno(){
   var productos = LS('np', []);
   var grupos = {}; // marca -> [ {it, i} ]
   var ordenMarcas = [];
-  listaRelleno.items.forEach(function(it, i){
+  (listaRelleno.items || []).forEach(function(it, i){
     // Buscar la marca del producto original
     var prod = productos.find(function(p){ return String(p.id) === String(it.pid); });
     var marca = (prod && prod.marca) ? prod.marca.toUpperCase() : 'SIN MARCA';
@@ -8263,7 +8268,7 @@ function filterRelleno(q){
 
   lista.forEach(function(p){
     var vend = vendidos[String(p.id)] || 0;
-    var yaEsta = listaRelleno.items.some(function(it){ return String(it.pid) === String(p.id); });
+    var yaEsta = (listaRelleno.items || []).some(function(it){ return String(it.pid) === String(p.id); });
     var d = document.createElement('div');
     d.style.cssText = 'padding:10px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:13px;background:'+(yaEsta?'#F1F8E9':'white')+';display:flex;align-items:center;gap:9px';
     d.innerHTML = '<div style="flex:1;min-width:0">'
@@ -8284,7 +8289,7 @@ function filterRelleno(q){
 
 function agregarARelleno(prod, vendidas){
   var yaIdx = -1;
-  for(var i=0; i<listaRelleno.items.length; i++){
+  for(var i=0; i<(listaRelleno.items || []).length; i++){
     if(String(listaRelleno.items[i].pid) === String(prod.id)){ yaIdx = i; break; }
   }
   if(yaIdx >= 0){
@@ -8332,7 +8337,7 @@ function quitarDeRelleno(i){
 }
 
 function vaciarListaRelleno(){
-  if(!listaRelleno.items.length) return;
+  if(!(listaRelleno.items || []).length) return;
   if(!confirm('¿Vaciar la lista y empezar de nuevo?')) return;
   listaRelleno.items = [];
   renderRelleno();
@@ -8426,10 +8431,10 @@ function generarCanvasRelleno(){
 }
 
 function compartirListaRelleno(){
-  if(!listaRelleno.items.length){ alert('Tu lista está vacía.'); return; }
+  if(!(listaRelleno.items || []).length){ alert('Tu lista está vacía.'); return; }
   loadProds();
   var lineas = ['LISTA DE RELLENO — NBS', fechaHoy(), ''];
-  listaRelleno.items.forEach(function(it){
+  (listaRelleno.items || []).forEach(function(it){
     // Buscar el producto para sacar marca y nombre por separado si los tiene
     var prod = productos.find(function(p){ return String(p.id) === String(it.pid); });
     var marca = (prod && prod.marca) ? prod.marca.trim() : '';
@@ -8445,7 +8450,7 @@ function compartirListaRelleno(){
     lineas.push(linea);
     lineas.push('');
   });
-  lineas.push('Total: ' + listaRelleno.items.length + ' productos para reponer');
+  lineas.push('Total: ' + (listaRelleno.items || []).length + ' productos para reponer');
   var texto = lineas.join('\n');
 
   if(navigator.share){
@@ -10742,7 +10747,7 @@ function editarPedido(idx){
   var p = pedidos[idx];
   if(!p) return;
   pedidoEditandoIdx = idx;
-  pedItemsTemp = p.items.slice();
+  pedItemsTemp = (p.items || []).slice();
   pedBarberoCid = p.cid || null;
   pedBarberoNombre = p.nombre || null;
   pedBarberiaSel = p.barberia || null;
@@ -11120,7 +11125,7 @@ function agregarHabitualMulti(idx, hi){
   if(!p || !p._habituales || !p._habituales[hi]) return;
   var h = p._habituales[hi];
   var yaEsta = false;
-  for(var j=0; j<p.items.length; j++){
+  for(var j=0; j<(p.items || []).length; j++){
     if(String(p.items[j].pid) === String(h.prod.id)){ p.items[j].cant += h.cant; yaEsta = true; break; }
   }
   if(!yaEsta) p.items.push({ pid: h.prod.id, nombre: h.prod.nombre, cant: h.cant, precio: h.prod.precio, costo: h.prod.costo });
@@ -11232,7 +11237,7 @@ function retomarPedidoEnProceso(){
 function descartarPedidoEnProceso(){
   var d = hayPedidoEnProceso();
   if(!d) return;
-  var conItems = d.barberos.filter(function(p){ return p.items && p.items.length; }).length;
+  var conItems = d.barberos.filter(function(p){ return p.items && (p.items || []).length; }).length;
   var msj = conItems
     ? '¿Descartar el pedido a medias?\n\nTiene ' + conItems + ' barbero(s) con productos ya agregados. Se van a perder.'
     : '¿Descartar el pedido a medias?';
@@ -11330,7 +11335,7 @@ function renderPedidosMultiples(){
   var balances = calcularBalancesClientes();
 
   pedidosMultiTemp.forEach(function(p, idx){
-    var totalBarbero = p.items.reduce(function(s,it){ return s + (it.cant * it.precio); }, 0);
+    var totalBarbero = (p.items || []).reduce(function(s,it){ return s + (it.cant * it.precio); }, 0);
     totalGeneral += totalBarbero;
     var nombreCompleto = nombreCl(p.cliente);
     var pidSel = pedMultiSel[idx];
@@ -11429,8 +11434,8 @@ function renderPedidosMultiples(){
 
     // --- Productos ya agregados a este barbero, editables aqui mismo ---
     html += '<div style="padding:4px 12px 12px">';
-    if(p.items.length){
-      p.items.forEach(function(it, itIdx){
+    if((p.items || []).length){
+      (p.items || []).forEach(function(it, itIdx){
         var sub = it.cant * it.precio;
         html += '<div style="padding:8px;margin-top:6px;border:0.5px solid var(--nbs-line);border-radius:9px;background:#FCFCFD">'
           +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
@@ -11459,7 +11464,7 @@ function renderPedidosMultiples(){
   });
 
   var btnGuardar = document.getElementById('ped-multi-guardar');
-  var conItems = pedidosMultiTemp.filter(function(p){ return p.items.length > 0; }).length;
+  var conItems = pedidosMultiTemp.filter(function(p){ return (p.items || []).length > 0; }).length;
   if(conItems > 0){
     btnGuardar.textContent = '✓ Guardar ' + conItems + ' pedido(s) · $' + fmtNum(totalGeneral);
     btnGuardar.style.opacity = '1';
@@ -11530,7 +11535,7 @@ function addItemMulti(idx){
   var cant = pedMultiCant[idx] || 1;
   // Si ya le habias agregado ese mismo producto, se le suma la cantidad en vez de repetirlo
   var yaEsta = false;
-  for(var j=0; j<p.items.length; j++){
+  for(var j=0; j<(p.items || []).length; j++){
     if(String(p.items[j].pid) === String(pid)){ p.items[j].cant += cant; yaEsta = true; break; }
   }
   if(!yaEsta) p.items.push({ pid: prod.id, nombre: prod.nombre, cant: cant, precio: prod.precio, costo: prod.costo });
@@ -11565,7 +11570,7 @@ function actualizarSubtotalItemMulti(idx, itIdx){
   var it = p.items[itIdx];
   var sub = document.getElementById('multi-isub-'+idx+'-'+itIdx);
   if(sub) sub.textContent = '$'+fmtNum(it.cant * it.precio);
-  var totalBarbero = p.items.reduce(function(s,x){ return s + (x.cant * x.precio); }, 0);
+  var totalBarbero = (p.items || []).reduce(function(s,x){ return s + (x.cant * x.precio); }, 0);
   var totEl = document.getElementById('multi-total-'+idx);
   if(totEl){
     totEl.textContent = '$'+fmtNum(totalBarbero);
@@ -11579,9 +11584,9 @@ function actualizarBotonGuardarMulti(){
   if(!btn) return;
   var totalGeneral = 0, conItems = 0;
   pedidosMultiTemp.forEach(function(p){
-    var t = p.items.reduce(function(s,x){ return s + (x.cant * x.precio); }, 0);
+    var t = (p.items || []).reduce(function(s,x){ return s + (x.cant * x.precio); }, 0);
     totalGeneral += t;
-    if(p.items.length) conItems++;
+    if((p.items || []).length) conItems++;
   });
   if(conItems > 0){
     btn.textContent = '✓ Guardar ' + conItems + ' pedido(s) · $' + fmtNum(totalGeneral);
@@ -11604,7 +11609,7 @@ function quitarBarberoMulti(idx){
   var p = pedidosMultiTemp[idx];
   if(!p) return;
   var nombre = nombreCl(p.cliente);
-  var aviso = p.items.length
+  var aviso = (p.items || []).length
     ? '¿Quitar a '+nombre+'? Se perderá lo que ya le agregaste, y quedará registrado que hoy NO compró.'
     : '¿'+nombre+' no va a comprar hoy?\n\nQuedará registrado en su récord como una visita sin compra.';
   if(!confirm(aviso)) return;
@@ -11641,7 +11646,7 @@ function registrarVisitaBarbero(cid, compro){
 }
 
 function guardarTodosLosPedidosMultiples(){
-  var conItems = pedidosMultiTemp.filter(function(p){ return p.items.length > 0; });
+  var conItems = pedidosMultiTemp.filter(function(p){ return (p.items || []).length > 0; });
   if(!conItems.length){ alert('Agrégale al menos un producto a alguno de los barberos.'); return; }
   pedidos = LS('npedidos', []);
   var ahora = Date.now();
@@ -11651,7 +11656,7 @@ function guardarTodosLosPedidosMultiples(){
       cid: p.cliente.id,
       nombre: nombreCl(p.cliente),
       barberia: p.barberia,
-      items: p.items.slice()
+      items: (p.items || []).slice()
     });
     registrarVisitaBarbero(p.cliente.id, true);
   });
@@ -11674,7 +11679,7 @@ function guardarTodosLosPedidosMultiples(){
 }
 
 function cancelarPedidoMultiple(){
-  var hayAlgo = pedidosMultiTemp.some(function(p){ return p.items.length > 0; });
+  var hayAlgo = pedidosMultiTemp.some(function(p){ return (p.items || []).length > 0; });
   if(hayAlgo && !confirm('¿Cancelar? Se perderá lo que le agregaste a los barberos.')) return;
   pedidosMultiTemp = [];
   pedMultiSel = {};
@@ -11695,14 +11700,14 @@ function renderPedidosPendientes(){
 
   el.innerHTML = '<div style="font-size:11px;font-weight:600;color:var(--nbs-gold-dark);letter-spacing:0.5px;text-transform:uppercase;padding:8px 0 6px;display:flex;align-items:center;gap:5px">⚡Pedidos pendientes ('+pedidos.length+')</div>';
   pedidos.forEach(function(p, idx){
-    var totalItems = p.items.reduce(function(s,it){ return s+it.cant; },0);
-    var totalMonto = p.items.reduce(function(s,it){ return s+(it.cant*it.precio); },0);
+    var totalItems = (p.items || []).reduce(function(s,it){ return s+it.cant; },0);
+    var totalMonto = (p.items || []).reduce(function(s,it){ return s+(it.cant*it.precio); },0);
     var card = document.createElement('div');
     card.style.cssText = 'background:white;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;border:0.5px solid var(--nbs-line);box-shadow:var(--nbs-shadow-card);display:flex;justify-content:space-between;align-items:center';
     card.innerHTML = '<div>'
       +'<div style="font-size:15px;font-weight:600;color:var(--nbs-ink)">'+escaparHtml(p.nombre)+'</div>'
       +'<div style="font-size:12px;color:var(--nbs-muted)">'+(p.barberia||'')+'</div>'
-      +'<div style="font-size:12px;color:var(--nbs-gold-dark);margin-top:2px;font-weight:500">'+p.items.length+' producto(s) · $'+fmtNum(totalMonto)+'</div>'
+      +'<div style="font-size:12px;color:var(--nbs-gold-dark);margin-top:2px;font-weight:500">'+(p.items || []).length+' producto(s) · $'+fmtNum(totalMonto)+'</div>'
       +'</div>'
       +'<div style="display:flex;gap:6px">'
       +'<button onclick="editarPedido('+idx+')" style="padding:8px 10px;background:var(--nbs-gold-bg);color:var(--nbs-gold-dark);border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">✏️</button>'
@@ -12351,7 +12356,7 @@ function convertirPedidoAVenta(idx){
   var p = pedidos[idx];
   if(!p) return;
   loadProds();
-  iV = p.items.map(function(it){
+  iV = (p.items || []).map(function(it){
     var prod = productos.find(function(x){ return String(x.id)===String(it.pid); });
     // El PRECIO siempre debe ser el que quedo guardado en el pedido -respetando cualquier
     // ajuste manual que se le haya hecho-, NUNCA se debe sobreescribir con el precio del catalogo.
@@ -12447,7 +12452,7 @@ function verCl(id){
   var totalCompras=ventasActivas.reduce(function(s,v){return s+v.total;},0);
   // Calculate real balance from invoice payments (excluding cancelled)
   var totalPagado=ventasActivas.filter(function(v){return v.tipo==='credito';}).reduce(function(s,v){
-    var pf=v.pagosFactura?v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(sp,p){return sp+p.monto;},0):0;
+    var pf=v.pagosFactura?(v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(sp,p){return sp+p.monto;},0):0;
     return s+pf;
   },0);
   var totalCredito=ventasActivas.filter(function(v){return v.tipo==='credito';}).reduce(function(s,v){return s+v.total;},0);
@@ -12576,7 +12581,7 @@ function verCl(id){
     el.appendChild(tit);
 
     todasVentas.slice().reverse().forEach(function(v){
-      var pagado=v.pagosFactura?v.pagosFactura.filter(function(p){return p.monto!==undefined&&typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0):0;
+      var pagado=v.pagosFactura?(v.pagosFactura || []).filter(function(p){return p.monto!==undefined&&typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0):0;
       var saldo=Math.max(0,v.total-pagado);
       var card=document.createElement('div');
       card.className='card';
@@ -12586,14 +12591,14 @@ function verCl(id){
         card.style.opacity='0.7';
         card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center">'
           +'<div><div style="font-size:14px;font-weight:700;text-decoration:line-through;color:#aaa">'+v.fecha+' - '+v.hora+'</div>'
-          +'<div style="font-size:12px;color:#aaa;margin-top:2px">'+v.items.length+' producto(s)</div>'
+          +'<div style="font-size:12px;color:#aaa;margin-top:2px">'+(v.items || []).length+' producto(s)</div>'
           +'<div style="margin-top:4px"><span style="font-size:13px;padding:3px 9px;border-radius:10px;font-weight:600;background:#FFEBEE;color:#B71C1C">🚫 Cancelada</span></div></div>'
           +'<div style="text-align:right"><div style="font-size:18px;font-weight:700;color:#aaa;text-decoration:line-through">$'+fmtNum(v.total)+'</div></div></div>';
       } else {
         card.style.borderLeft='4px solid '+(v.tipo==='credito'?(esSaldoPendiente(saldo)?'#C62828':'#2E7D32'):'#1565C0');
         card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center">'
           +'<div><div style="font-size:14px;font-weight:700">'+v.fecha+' - '+v.hora+'</div>'
-          +'<div style="font-size:12px;color:#aaa;margin-top:2px">'+v.items.length+' producto(s)'+(v.modificada?' · <span style="color:#E65100">Modificada</span>':'')+'</div>'
+          +'<div style="font-size:12px;color:#aaa;margin-top:2px">'+(v.items || []).length+' producto(s)'+(v.modificada?' · <span style="color:#E65100">Modificada</span>':'')+'</div>'
           +'<div style="margin-top:4px"><span style="font-size:16px;padding:4px 11px;border-radius:10px;font-weight:600;'+(v.tipo==='credito'?'background:#FFF8E1;color:#E65100':'background:#E8F5E9;color:#2E7D32')+'">'+(v.tipo==='credito'?'a credito':v.tipo)+'</span></div></div>'
           +'<div style="text-align:right">'
           +'<div style="font-size:18px;font-weight:700;color:#1565C0">$'+fmtNum(v.total)+'</div>'
@@ -12616,7 +12621,7 @@ function verCl(id){
 
 function verFactura(v){
   var el=document.getElementById('cl-factura-contenido');el.innerHTML='';
-  var pagado=v.pagosFactura?v.pagosFactura.filter(function(p){return p.monto!==undefined&&typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0):0;
+  var pagado=v.pagosFactura?(v.pagosFactura || []).filter(function(p){return p.monto!==undefined&&typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0):0;
   var saldo=Math.max(0,v.total-pagado);
 
   var card=document.createElement('div');card.className='card';
@@ -12640,7 +12645,7 @@ function verFactura(v){
   // Products
   var prodCard=document.createElement('div');prodCard.className='card';
   prodCard.innerHTML='<div style="font-size:13px;font-weight:700;color:#1a237e;margin-bottom:10px">PRODUCTOS</div>';
-  v.items.forEach(function(it){
+  (v.items || []).forEach(function(it){
     var row=document.createElement('div');
     row.style.cssText='display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px';
     row.innerHTML='<div><div style="font-weight:600">'+escaparHtml(it.nombre)+'</div>'
@@ -12651,10 +12656,10 @@ function verFactura(v){
   el.appendChild(prodCard);
 
   // Payment history
-  if(v.pagosFactura&&v.pagosFactura.length){
+  if(v.pagosFactura&&(v.pagosFactura || []).length){
     var pagCard=document.createElement('div');pagCard.className='card';
     pagCard.innerHTML='<div style="font-size:13px;font-weight:700;color:#1a237e;margin-bottom:10px">PAGOS APLICADOS</div>';
-    v.pagosFactura.filter(function(p){ return p.monto !== undefined && typeof p.monto === 'number'; }).forEach(function(p){
+    (v.pagosFactura || []).filter(function(p){ return p.monto !== undefined && typeof p.monto === 'number'; }).forEach(function(p){
       var row=document.createElement('div');
       row.style.cssText='display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px';
       row.innerHTML='<span style="color:#777">'+p.fecha+(p.nota?' · '+p.nota:'')+'</span>'
@@ -13466,7 +13471,7 @@ function modificarFactura(v){
       +'<div style="font-size:12px;color:#aaa;margin-bottom:16px">'+nombreVentaClienteConNegocio(v)+' · '+v.fecha+'</div>';
     el.appendChild(titulo);
 
-    var itemsEdit = v.items.map(function(it){ return Object.assign({}, it); });
+    var itemsEdit = (v.items || []).map(function(it){ return Object.assign({}, it); });
 
     function renderEdicion(){
       var lista = document.getElementById('edit-items-lista');
@@ -13956,7 +13961,7 @@ function genRpt(){
   });
   var totalDevuelto = devFiltradas.reduce(function(s,d){ return s+d.monto; },0);
   var gananciaPerdidaEnDev = devFiltradas.reduce(function(s,d){
-    return s + d.items.reduce(function(s2,it){ return s2+(it.cant*(it.precio-(it.costo||0))); },0);
+    return s + (d.items || []).reduce(function(s2,it){ return s2+(it.cant*(it.precio-(it.costo||0))); },0);
   },0);
 
   var card = document.createElement('div'); card.className='card';
@@ -14030,7 +14035,7 @@ function genRpt(){
       porNegocioRuta[negocioV].entregado += v.total;
       porNegocioRuta[negocioV].facturas += 1;
       if(v.tipo === 'credito'){
-        var pagadoV = v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0;
+        var pagadoV = v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0;
         porNegocioRuta[negocioV].pendiente += Math.max(0, v.total - pagadoV);
       }
     });
@@ -14347,7 +14352,7 @@ function renderFacturasSaldadas(q){
   var saldadas = ventas.filter(function(v){
     if(v.cancelada) return false;
     var pagado = v.tipo==='credito'
-      ? (v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0)
+      ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0)
       : v.total;
     return (v.total - pagado) <= 0.005;
   });
@@ -14403,7 +14408,7 @@ function renderCxC(q){
     var key = String(v.cid);
     if(!balancesPorCliente[key]) balancesPorCliente[key] = {cid:v.cid, cn:v.cn, total:0, pagado:0};
     balancesPorCliente[key].total += v.total;
-    var pf = v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0;
+    var pf = v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0;
     balancesPorCliente[key].pagado += pf;
   });
   // Asegurar que tambien aparezcan los clientes que tienen credito a favor -por una devolucion-
@@ -14527,8 +14532,8 @@ function abrirAbono(cid){
   var totalPagado = 0;
   facturasC.forEach(function(v){
     totalFacturado += v.total;
-    if(v.pagosFactura && v.pagosFactura.length){
-      totalPagado += v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0);
+    if(v.pagosFactura && (v.pagosFactura || []).length){
+      totalPagado += (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0);
     }
   });
   var saldoReal = Math.max(0, totalFacturado - totalPagado);
@@ -14560,16 +14565,16 @@ function abrirAbono(cid){
     // y el mismo dia son dos pagos distintos, y los dos se respetan.
     var huboLimpieza = false;
     facturasCredito.forEach(function(v){
-      if(v.pagosFactura && v.pagosFactura.length > 1){
+      if(v.pagosFactura && (v.pagosFactura || []).length > 1){
         var vistos = {};
-        var antes = v.pagosFactura.length;
-        v.pagosFactura = v.pagosFactura.filter(function(p){
+        var antes = (v.pagosFactura || []).length;
+        v.pagosFactura = (v.pagosFactura || []).filter(function(p){
           if(!p || !p.pid) return true;       // sin identificador: NUNCA se borra
           if(vistos[p.pid]) return false;     // mismo pid = el mismo pago guardado dos veces
           vistos[p.pid] = true;
           return true;
         });
-        if(v.pagosFactura.length !== antes) huboLimpieza = true;
+        if((v.pagosFactura || []).length !== antes) huboLimpieza = true;
       }
     });
     if(huboLimpieza) SS('nv', ventas);
@@ -14582,7 +14587,7 @@ function abrirAbono(cid){
     facturasCredito.forEach(function(v){
       // Calculate how much has been paid on this invoice
       var pagadoFactura = 0;
-      if(v.pagosFactura) pagadoFactura = v.pagosFactura.filter(function(p){return p.monto!==undefined&&typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0);
+      if(v.pagosFactura) pagadoFactura = (v.pagosFactura || []).filter(function(p){return p.monto!==undefined&&typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0);
       var saldoFactura = v.total - pagadoFactura;
       if(saldoFactura < 0) saldoFactura = 0;
 
@@ -14596,19 +14601,19 @@ function abrirAbono(cid){
         +'<button type="button" onclick="verFacturaProfesional(\''+v.id+'\')" style="width:100%;padding:8px;background:#E8EAF6;color:#1a237e;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:8px">👁️ Ver factura completa / Editar productos y pagos</button>';
 
       // Items of the invoice
-      var items = (v.items && v.items.length) ? v.items.map(function(it){ return it.nombre+' x'+it.cant; }).join(', ') : '';
+      var items = (v.items && (v.items || []).length) ? (v.items || []).map(function(it){ return it.nombre+' x'+it.cant; }).join(', ') : '';
       var itemDiv = document.createElement('div');
       itemDiv.style.cssText = 'font-size:11px;color:#777;margin-bottom:8px;border-top:1px solid #eee;padding-top:6px';
       itemDiv.textContent = items;
       card.appendChild(itemDiv);
 
       // Payment history for this invoice
-      if(v.pagosFactura && v.pagosFactura.length){
+      if(v.pagosFactura && (v.pagosFactura || []).length){
         var ph = document.createElement('div');
         ph.style.cssText = 'font-size:11px;font-weight:700;color:#6A1B9A;margin-bottom:4px';
         ph.textContent = 'Pagos aplicados:';
         card.appendChild(ph);
-        v.pagosFactura.forEach(function(p, pidx){
+        (v.pagosFactura || []).forEach(function(p, pidx){
           if(!p.monto || p.monto <= 0) return;
           var pr = document.createElement('div');
           pr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-bottom:0.5px solid #f0f0f0';
@@ -15277,7 +15282,7 @@ function renderFacturas(q){
   var totalPendiente = 0;
   var countAbiertas = 0;
   lista.forEach(function(v){
-    var pagadoT = v.tipo==='credito' ? (v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
+    var pagadoT = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
     var saldoT = Math.max(0, v.total - pagadoT);
     totalGeneral += v.total;
     if(saldoT > 0){ totalPendiente += saldoT; countAbiertas++; }
@@ -15351,7 +15356,7 @@ function renderFacturas(q){
 }
 
 function crearTarjetaFactura(v){
-    var pagado = v.tipo==='credito' ? (v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
+    var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
     var saldo = Math.max(0, v.total - pagado);
     var numFact = v.numFactura || String(v.id).slice(-6);
     var clForCard = clientes.find(function(x){return String(x.id)===String(v.cid);});
@@ -15382,7 +15387,7 @@ function crearTarjetaFactura(v){
 
     // Items resumidos
     var items = '<div style="font-size:12px;color:var(--nbs-muted);border-top:0.5px solid var(--nbs-line);padding-top:10px;margin-bottom:10px">'
-      +v.items.map(function(it){ return '<span style="display:inline-block;background:#F7F7F8;color:var(--nbs-muted);border-radius:6px;padding:3px 8px;margin:2px 4px 2px 0;font-size:11px">'+escaparHtml(it.nombre)+' x'+it.cant+'</span>'; }).join('')
+      +(v.items || []).map(function(it){ return '<span style="display:inline-block;background:#F7F7F8;color:var(--nbs-muted);border-radius:6px;padding:3px 8px;margin:2px 4px 2px 0;font-size:11px">'+escaparHtml(it.nombre)+' x'+it.cant+'</span>'; }).join('')
       +'</div>';
 
     // Botones de acción
@@ -15407,7 +15412,7 @@ function verFacturaProfesional(vid){
   var v = ventas.find(function(x){ return String(x.id)===String(vid); });
   if(!v) return;
   var cl = clientes.find(function(c){ return String(c.id)===String(v.cid); });
-  var pagado = v.tipo==='credito' ? (v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
+  var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
   var saldo = Math.max(0, v.total - pagado);
   var numFact = v.numFactura || String(v.id).slice(-6);
 
@@ -15507,7 +15512,7 @@ function verFacturaProfesional(vid){
   }
 
   // Contenido de la factura
-  var itemsHTML = v.items.map(function(it, idx){
+  var itemsHTML = (v.items || []).map(function(it, idx){
     var bg = idx % 2 === 0 ? 'transparent' : '#FAFAFA';
     return '<tr style="background:'+bg+'">'
       +'<td style="padding:9px 6px;border-bottom:0.5px solid #f0f0f0;font-size:13px">'+escaparHtml(it.nombre)+'</td>'
@@ -15562,10 +15567,10 @@ function verFacturaProfesional(vid){
     +'<span style="font-size:17px;font-weight:800;color:#1a237e">TOTAL</span>'
     +'<span style="font-size:20px;font-weight:800;color:#1565C0">$'+fmtNum(v.total)+'</span>'
     +'</div>'
-    +(v.tipo==='credito' && v.pagosFactura && v.pagosFactura.filter(function(p){ return p.monto>0; }).length > 0 ?
+    +(v.tipo==='credito' && v.pagosFactura && (v.pagosFactura || []).filter(function(p){ return p.monto>0; }).length > 0 ?
       '<div style="margin-top:10px;background:#F1F8E9;border-radius:8px;padding:10px">'
       +'<div style="font-size:11px;font-weight:700;color:#2E7D32;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">📋 Historial de abonos</div>'
-      +v.pagosFactura.filter(function(p){ return typeof p.monto==='number' && p.monto>0; }).map(function(p){
+      +(v.pagosFactura || []).filter(function(p){ return typeof p.monto==='number' && p.monto>0; }).map(function(p){
         return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:0.5px solid #C8E6C9;font-size:12px">'
           +'<span style="color:#555">'+(p.fecha||'')+(p.nota?' · '+p.nota:'')+'</span>'
           +'<span style="font-weight:700;color:#2E7D32">$'+fmtNum(p.monto)+'</span>'
@@ -15600,7 +15605,7 @@ function imprimirFacturaBT(vid){
   var v = ventas.find(function(x){ return String(x.id)===String(vid); });
   if(!v) return;
   var cl = clientes.find(function(c){ return String(c.id)===String(v.cid); });
-  var pagado = v.tipo==='credito' ? (v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
+  var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
   var saldo = Math.max(0, v.total - pagado);
   var numFact = v.numFactura || String(v.id).slice(-6);
 
@@ -15624,7 +15629,7 @@ function imprimirFacturaBT(vid){
     if(cl&&cl.negocio) lineas.push(cl.negocio.substring(0,32));
   }
   lineas.push('--------------------------------');
-  v.items.forEach(function(it){
+  (v.items || []).forEach(function(it){
     // Antes se cortaba el nombre a la fuerza a 32 caracteres con substring, perdiendo partes
     // importantes como "700ml"/"220ml" que distinguen productos con el mismo nombre base.
     // Ahora se envuelve en varias lineas completas, sin perder ninguna palabra.
@@ -15645,7 +15650,7 @@ function imprimirFacturaBT(vid){
   });
   lineas.push('--------------------------------');
   lineas.push(linea('TOTAL:','$'+fmtNum(v.total)));
-  if(v.pagosFactura) v.pagosFactura.filter(function(p){return p.monto>0;}).forEach(function(p){
+  if(v.pagosFactura) (v.pagosFactura || []).filter(function(p){return p.monto>0;}).forEach(function(p){
     lineas.push(linea('Abono '+(p.fecha||''),'$'+fmtNum(p.monto)));
   });
   lineas.push(linea('BALANCE:','$'+fmtNum(saldo)));
@@ -16045,7 +16050,7 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
 function generarFacturaCanvas(v, cl, pagado, saldo, numFact, colorMode){
   var W = colorMode ? 480 : 384, pad = 16;
   var SCALE = colorMode ? 2 : 4; // b/n en resolucion 4 = texto nitido/profesional en la Epson termica; color en 2 (se ve nitida al hacer zoom en el celular)
-  var abonos = (v.tipo==='credito' && v.pagosFactura) ? v.pagosFactura.filter(function(p){ return typeof p.monto==='number' && p.monto>0; }) : [];
+  var abonos = (v.tipo==='credito' && v.pagosFactura) ? (v.pagosFactura || []).filter(function(p){ return typeof p.monto==='number' && p.monto>0; }) : [];
 
   var tmp = document.createElement('canvas');
   tmp.width = W*SCALE; tmp.height = 2200*SCALE;
@@ -16104,7 +16109,7 @@ function imprimirFacturaDiseno(vid){
   var v = ventas.find(function(x){ return String(x.id)===String(vid); });
   if(!v) return;
   var cl = clientes.find(function(c){ return String(c.id)===String(v.cid); });
-  var pagado = v.tipo==='credito' ? (v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
+  var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
   var saldo = Math.max(0, v.total - pagado);
   var numFact = v.numFactura || String(v.id).slice(-6);
 
@@ -16135,7 +16140,7 @@ function compartirFactura(vid){
   var v = ventas.find(function(x){ return String(x.id)===String(vid); });
   if(!v) return;
   var cl = clientes.find(function(c){ return String(c.id)===String(v.cid); });
-  var pagado = v.tipo==='credito' ? (v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
+  var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
   var saldo = Math.max(0, v.total - pagado);
   var numFact = v.numFactura || String(v.id).slice(-6);
 
@@ -16156,7 +16161,7 @@ function compartirFactura(vid){
         var lineas = ['NUNEZ BEAUTY SUPPLY','964 Atwells Ave, Providence, RI 02909','401-305-0188','------------------------','FACTURA #'+numFact,'Fecha: '+v.fecha+' '+v.hora,'Cliente: '+v.cn];
         if(cl&&cl.negocio) lineas.push('Negocio: '+cl.negocio);
         lineas.push('------------------------');
-        v.items.forEach(function(it){ lineas.push(it.nombre); lineas.push('  '+it.cant+' x $'+fmtNum(it.precio)+' = $'+fmtNum(it.cant*it.precio)); });
+        (v.items || []).forEach(function(it){ lineas.push(it.nombre); lineas.push('  '+it.cant+' x $'+fmtNum(it.precio)+' = $'+fmtNum(it.cant*it.precio)); });
         lineas.push('------------------------');
         lineas.push('TOTAL: $'+fmtNum(v.total));
         lineas.push(esSaldoPendiente(saldo)?'Balance pendiente: $'+fmtNum(saldo):'PAGADO COMPLETO');
@@ -16180,7 +16185,7 @@ function editarFactura(vid){
   if(!v) return;
 
   // Copia editable de los productos - permite agregar/quitar antes de guardar
-  window._facturaEditItems = v.items.map(function(it){ return { nombre: it.nombre, cant: it.cant, precio: it.precio, pid: it.pid || null, costo: it.costo || 0 }; });
+  window._facturaEditItems = (v.items || []).map(function(it){ return { nombre: it.nombre, cant: it.cant, precio: it.precio, pid: it.pid || null, costo: it.costo || 0 }; });
   window._facturaEditVid = vid;
 
   var overlay = document.getElementById('fact-edit-overlay');
@@ -16428,23 +16433,48 @@ function guardarEdicionFactura(vid){
 }
 
 
+// ⚠️ ESTA FUNCION BORRA VENTAS. Hasta la auditoria del 27 jul lo hacia SIN preguntar y
+// SIN huella: un toque por error en el menu y las ventas se iban, sin vuelta atras.
+// Ahora: (1) primero CUENTA lo que se iria y dice cuanto dinero es, (2) pide confirmacion
+// enseñando los numeros, (3) pide la huella -o el PIN si no hay huella- como el resto de
+// las acciones de dinero. Solo despues borra.
 function limpiarVentasHuerfanas(){
   clientes = LS('ncl', []);
   ventas = LS('nv', []);
   var idsClientes = clientes.map(function(c){ return String(c.id); });
-  var antes = ventas.length;
-  // Mantener ventas de cliente general (cid null/0) y de clientes existentes
-  ventas = ventas.filter(function(v){
-    if(!v.cid) return true; // cliente general, mantener
-    return idsClientes.includes(String(v.cid));
+
+  // Primero MIRAR, sin tocar nada
+  var aBorrar = ventas.filter(function(v){
+    if(!v.cid) return false;                      // cliente general: nunca se toca
+    return !idsClientes.includes(String(v.cid));
   });
-  var eliminadas = antes - ventas.length;
-  if(eliminadas === 0){
-    alert('No se encontraron ventas de clientes eliminados.');
+
+  if(!aBorrar.length){
+    avisoGrande('✓ No hay ventas de clientes borrados.\n\nNo hay nada que limpiar.');
     return;
   }
-  SS('nv', ventas);
-  alert(eliminadas + ' venta(s) de clientes eliminados han sido borradas.');
+
+  var monto = aBorrar.reduce(function(a, v){ return a + (parseFloat(v.total) || 0); }, 0);
+  var conDeuda = aBorrar.filter(function(v){ return v.tipo === 'credito' && !v.cancelada; }).length;
+
+  var msg = '⚠️ Se van a BORRAR ' + aBorrar.length + ' venta(s) de clientes que ya no existen.\n\n'
+          + 'Suman $' + fmtNum(monto) + '.\n';
+  if(conDeuda) msg += '\nDe esas, ' + conDeuda + ' son a CRÉDITO y todavía aparecen como deuda.\n';
+  msg += '\nEsto NO se puede deshacer.\n\n¿Seguro que quieres borrarlas?';
+
+  if(!confirm(msg)) return;
+
+  protegerConHuella(function(){
+    var ventasAhora = LS('nv', []);
+    var quedan = ventasAhora.filter(function(v){
+      if(!v.cid) return true;
+      return idsClientes.includes(String(v.cid));
+    });
+    var eliminadas = ventasAhora.length - quedan.length;
+    ventas = quedan;
+    SS('nv', ventas);
+    avisoGrande('🗑️ Se borraron ' + eliminadas + ' venta(s) de clientes eliminados.\n\nSumaban $' + fmtNum(monto) + '.');
+  });
 }
 
 function borrarTodo(){
@@ -16883,7 +16913,13 @@ async function exportD(){
   }catch(eR){}
   var d = {v:2, productos:productos, ventas:ventas, compras:compras, creditos:creditos, clientes:clientes, suplidores:suplidores, gastos:gastos,
     tarjetas:tarjetas, otrasDeudas:otrasDeudas, pedidos:pedidos, devoluciones:devoluciones, productosEliminados:productosEliminados,
-    visitasBarberos:visitasBarberos, rutasPorDia:rutasPorDia, visitasRuta:visitasRuta};
+    visitasBarberos:visitasBarberos, rutasPorDia:rutasPorDia, visitasRuta:visitasRuta,
+    // Faltaban en el respaldo descargable -encontrado en la auditoria del 27 jul-. El
+    // respaldo de la nube si las llevaba, pero este no: si Sensei restauraba desde el
+    // archivo perdia el historial de precios, lo cargado en la van y la lista de relleno.
+    historialPrecios: LS('historial_precios', []),
+    van: LS('nvan', null),
+    listaRelleno: LS('nrelleno', null)};
   var json = JSON.stringify(d);
 
   // Cifrar antes de guardar, con la misma clave del PIN de administrador.
@@ -17049,6 +17085,9 @@ function importD(inp){
       if(d.visitasBarberos){SS('nvisitas_barberos',d.visitasBarberos);}
       // ── RUTAS (23 jul) ──
       if(d.rutasPorDia){ SS('rutas_por_dia', d.rutasPorDia); }
+      if(d.historialPrecios){ SS('historial_precios', d.historialPrecios); }
+      if(d.van){ SS('nvan', d.van); }
+      if(d.listaRelleno){ SS('nrelleno', d.listaRelleno); }
       if(d.visitasRuta){
         for(var kV in d.visitasRuta){
           if(d.visitasRuta.hasOwnProperty(kV)) SS(kV, d.visitasRuta[kV]);
@@ -17061,9 +17100,9 @@ function importD(inp){
 }
 
 function imprimirFactura(v){
-  var pagado = v.tipo==='credito' ? (v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
+  var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
   var saldo = v.tipo==='credito' ? Math.max(0, v.total - pagado) : 0;
-  var items = (v.items && v.items.length) ? v.items.map(function(it){
+  var items = (v.items && (v.items || []).length) ? (v.items || []).map(function(it){
     return '<tr><td style="padding:8px;border-bottom:1px solid #eee">'+escaparHtml(it.nombre)+'</td>'
       +'<td style="padding:8px;border-bottom:1px solid #eee;text-align:center">'+it.cant+'</td>'
       +'<td style="padding:8px;border-bottom:1px solid #eee;text-align:right">$'+fmtNum(it.precio)+'</td>'
@@ -17102,9 +17141,9 @@ function imprimirFactura(v){
 
 
 function emailFactura(v){
-  var pagado = v.tipo==='credito' ? (v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
+  var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
   var saldo = v.tipo==='credito' ? Math.max(0, v.total - pagado) : 0;
-  var items = (v.items && v.items.length) ? v.items.map(function(it){ return it.nombre+' x'+it.cant+' = $'+(it.cant*it.precio).toFixed(2); }).join('\n') : '';
+  var items = (v.items && (v.items || []).length) ? (v.items || []).map(function(it){ return it.nombre+' x'+it.cant+' = $'+(it.cant*it.precio).toFixed(2); }).join('\n') : '';
   var body = 'Estimado/a '+v.cn+',\n\n'
     +'Aqui el detalle de su factura de Nunez Beauty Supply:\n\n'
     +'Fecha: '+v.fecha+' '+v.hora+'\n'
@@ -17166,7 +17205,7 @@ function limpiarDatosGuardadosUnaVez(){
         if(sucio(o[c])){ o[c] = limpiarTexto(o[c]); cambio = true; limpiados++; }
       });
       if(Array.isArray(o.items)){
-        o.items.forEach(function(it){
+        (o.items || []).forEach(function(it){
           if(it && sucio(it.nombre)){ it.nombre = limpiarTexto(it.nombre); cambio = true; limpiados++; }
         });
       }
@@ -17283,7 +17322,51 @@ function mostrarLetreroActualizacion(){
   }, 5000);
 }
 
+// ═══ REPARAR DATOS SUELTOS AL ARRANCAR (auditoria del 27 jul) ═══
+// En la auditoria se encontro que la pantalla de FACTURAS se rompia entera
+// -"Cannot read properties of undefined (reading 'map')"- si alguna venta no traia su
+// lista de productos. En el archivo hay 72 usos de .items y solo 24 iban protegidos, asi
+// que en vez de parchar 48 sitios uno por uno, se repara el DATO: al arrancar se recorren
+// ventas, compras y pedidos y al que le falte la lista se le pone una vacia.
+//
+// ES A PRUEBA DE TONTOS: solo AGREGA la lista que falta. No cambia ni un numero, ni un
+// precio, ni una fecha. Y si no habia nada que reparar, no guarda nada.
+function repararListasQueFaltan(){
+  var arreglos = 0;
+
+  function revisar(clave, nombreLegible){
+    var lista;
+    try { lista = JSON.parse(localStorage.getItem(clave) || '[]'); } catch(e){ return; }
+    if(!Array.isArray(lista)) return;
+    var cambio = false;
+    lista.forEach(function(reg){
+      if(reg && typeof reg === 'object' && !Array.isArray(reg.items)){
+        reg.items = [];
+        cambio = true; arreglos++;
+      }
+      // Los pagos de una factura, igual
+      if(reg && typeof reg === 'object' && reg.pagosFactura !== undefined && !Array.isArray(reg.pagosFactura)){
+        reg.pagosFactura = [];
+        cambio = true; arreglos++;
+      }
+    });
+    if(cambio){
+      try { localStorage.setItem(clave, JSON.stringify(lista)); } catch(e){}
+      console.warn('Reparadas listas que faltaban en ' + nombreLegible);
+    }
+  }
+
+  revisar('nv', 'ventas');
+  revisar('nc', 'compras');
+  revisar('npedidos', 'pedidos');
+  revisar('ndevoluciones', 'devoluciones');
+
+  if(arreglos > 0) console.warn('Se repararon ' + arreglos + ' registros a los que les faltaba una lista.');
+  return arreglos;
+}
+
 function iniciarAppDespuesDeLogin(){
+  try { repararListasQueFaltan(); } catch(e){ console.error('No se pudo reparar:', e); }
   window._appInicializada = true;
   detectarActualizacion();            // muestra "LA APP SE ACTUALIZÓ" si la versión cambió
   // Revisar si hay versión nueva en GitHub: a los 8 seg de abrir, y luego cada 30 min
@@ -18237,7 +18320,7 @@ function calcularTotalPorPagar(){
   var totalSup = 0;
   sups.forEach(function(s){
     compras.filter(function(c){ return String(c.sid)===String(s.id) && c.tipo==='credito'; }).forEach(function(c){
-      var pagado = c.pagosFactura ? c.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s2,p){return s2+p.monto;},0) : 0;
+      var pagado = c.pagosFactura ? (c.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s2,p){return s2+p.monto;},0) : 0;
       totalSup += Math.max(0, (c.total||0) - pagado);
     });
   });
@@ -18645,7 +18728,7 @@ function pintarMiniResumen(){
         if(v.tipo === 'contado') cobrado += (v.total || 0);
       }
       if(v.tipo === 'credito' && v.pagosFactura){
-        v.pagosFactura.forEach(function(p){
+        (v.pagosFactura || []).forEach(function(p){
           if(typeof p.monto !== 'number' || p.monto <= 0 || p.esDevolucion) return;
           if(dentro(p.fecha || v.fecha)) cobrado += p.monto;
         });
@@ -18757,8 +18840,8 @@ function calcularResumen(){
       else { credito += t; }
     }
     // ── COBRADO: abonos pagados en el rango, sea cual sea la fecha de la factura ──
-    if(v.tipo === 'credito' && v.pagosFactura && v.pagosFactura.length){
-      v.pagosFactura.forEach(function(p){
+    if(v.tipo === 'credito' && v.pagosFactura && (v.pagosFactura || []).length){
+      (v.pagosFactura || []).forEach(function(p){
         if(typeof p.monto !== 'number' || p.monto <= 0) return;
         if(p.esDevolucion) return;
         if(dentro(p.fecha || v.fecha)){
@@ -19331,7 +19414,7 @@ function renderDashboard(){
   });
   var totalDevueltoMes = devolucionesMes.reduce(function(s,d){ return s+d.monto; },0);
   var gananciaPerdidaMes = devolucionesMes.reduce(function(s,d){
-    return s + d.items.reduce(function(s2,it){ return s2+(it.cant*(it.precio-(it.costo||0))); },0);
+    return s + (d.items || []).reduce(function(s2,it){ return s2+(it.cant*(it.precio-(it.costo||0))); },0);
   },0);
   gananciaMes = gananciaMes - gananciaPerdidaMes;
 
@@ -19341,7 +19424,7 @@ function renderDashboard(){
     var key = String(v.cid);
     if(!balancesPorCliente[key]) balancesPorCliente[key] = {total:0,pagado:0};
     balancesPorCliente[key].total += v.total;
-    var pf = v.pagosFactura ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0):0;
+    var pf = v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0):0;
     balancesPorCliente[key].pagado += pf;
   });
   var totalCreditoAFavorTodos = clientes.reduce(function(s,c){ return s+(c.creditoAFavor||0); }, 0);
@@ -19376,7 +19459,7 @@ function renderDashboard(){
   suplidores.forEach(function(s){
     var comprasS = compras.filter(function(c){ return String(c.sid)===String(s.id) && c.tipo==='credito'; });
     comprasS.forEach(function(c){
-      var pagadoC = c.pagosFactura ? c.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s2,p){return s2+p.monto;},0) : 0;
+      var pagadoC = c.pagosFactura ? (c.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s2,p){return s2+p.monto;},0) : 0;
       totalCxPSuplidores += Math.max(0, c.total - pagadoC);
     });
   });
@@ -20078,7 +20161,7 @@ function sacarLineasDelPdf(datos){
       var lineas = [];
       paginas.forEach(function(tc, np){
         var porFila = {};
-        tc.items.forEach(function(it){
+        (tc.items || []).forEach(function(it){
           if(!it.str || !it.str.trim()) return;
           var x = it.transform[4], y = it.transform[5];
           var clave = Math.round(y / 3);           // agrupa lo que esta a la misma altura
@@ -20197,7 +20280,12 @@ function subtotalImpreso(lineas){
 }
 
 // ── Emparejar con el catalogo de Sensei ──
-function normalizarTexto(t){
+// OJO: NO llamarla normalizarTexto. Ya existe una funcion con ese nombre para el
+// buscador de la Ayuda -linea ~7603-, que devuelve MINUSCULAS. Al ponerle el mismo
+// nombre a esta, la de la Ayuda quedaba pisada y sus SINONIMOS dejaban de funcionar
+// -buscar "editar" ya no encontraba "cambiar" ni "modificar"-. Encontrado en la
+// auditoria del 27 jul. Esta devuelve MAYUSCULAS y es solo para facturas.
+function normTextoFactura(t){
   return canonizarMedidas(t)
     .replace(/[ÁÀÄÂ]/g,'A').replace(/[ÉÈËÊ]/g,'E').replace(/[ÍÌÏÎ]/g,'I')
     .replace(/[ÓÒÖÔ]/g,'O').replace(/[ÚÙÜÛ]/g,'U').replace(/Ñ/g,'N')
@@ -20240,7 +20328,7 @@ function medidasChocan(a, b){
 
 function recordarEmparejado(supId, desc, pid){
   var m = emparejadosGuardados();
-  m[supId + '|' + normalizarTexto(desc)] = pid;
+  m[supId + '|' + normTextoFactura(desc)] = pid;
   SS(CLAVE_EMPAREJADOS, m);
 }
 
@@ -20257,7 +20345,7 @@ function recordarEmparejado(supId, desc, pid){
 function buscarProductoParecido(supId, desc){
   loadProds();
   var aprendidos = emparejadosGuardados();
-  var guardado = aprendidos[supId + '|' + normalizarTexto(desc)];
+  var guardado = aprendidos[supId + '|' + normTextoFactura(desc)];
   if(guardado){
     var yaEsta = productos.find(function(p){ return String(p.id) === String(guardado); });
     if(yaEsta) return { pid: yaEsta.id, comoLoSupo: 'aprendido' };
@@ -20269,12 +20357,12 @@ function buscarProductoParecido(supId, desc){
 // no tenga que buscar entre 386. No escoge por el: solo se los acerca.
 function sugerenciasPara(desc, cuantas){
   loadProds();
-  var palabras = normalizarTexto(desc).split(' ').filter(function(w){ return w.length > 2; });
+  var palabras = normTextoFactura(desc).split(' ').filter(function(w){ return w.length > 2; });
   if(!palabras.length) return [];
   var lista = [];
   productos.forEach(function(p){
     if(medidasChocan(desc, p.nombre)) return;   // 5lb no es 32oz
-    var np = normalizarTexto(p.nombre + ' ' + (p.marca || ''));
+    var np = normTextoFactura(p.nombre + ' ' + (p.marca || ''));
     var aciertos = 0;
     palabras.forEach(function(w){ if(np.indexOf(w) >= 0) aciertos++; });
     if(aciertos) lista.push({ p: p, punto: aciertos / palabras.length });
@@ -20600,7 +20688,7 @@ function pintarResultadosBuscador(){
   loadProds();
   var it = (window._facturaItems || [])[_buscadorLinea] || { descripcion: '' };
   var texto = (document.getElementById('buscar-prod-txt') || {}).value || '';
-  var palabras = normalizarTexto(texto).split(' ').filter(function(w){ return w; });
+  var palabras = normTextoFactura(texto).split(' ').filter(function(w){ return w; });
 
   var lista, conEstrella = {};
   if(!palabras.length){
@@ -20613,7 +20701,7 @@ function pintarResultadosBuscador(){
     // TODAS las palabras tienen que estar, en cualquier orden: "olive 5" encuentra
     // "ECO OLIVE OIL 5 LBS"
     lista = productos.filter(function(p){
-      var np = normalizarTexto((p.nombre || '') + ' ' + (p.marca || '') + ' ' + (p.sku || ''));
+      var np = normTextoFactura((p.nombre || '') + ' ' + (p.marca || '') + ' ' + (p.sku || ''));
       for(var k = 0; k < palabras.length; k++){ if(np.indexOf(palabras[k]) < 0) return false; }
       return true;
     });
@@ -21729,7 +21817,7 @@ function cancelarFacturaCompleta(vid){
     loadProds();
     v.cancelada = true;
     v.fechaCancelacion = fechaHoy();
-    v.items.forEach(function(it){
+    (v.items || []).forEach(function(it){
       if(!it.pid) return;
       var p = productos.find(function(x){ return String(x.id)===String(it.pid); });
       if(p) p.stock = (p.stock||0) + it.cant;
@@ -21951,7 +22039,7 @@ function abrirDevolucion(vid){
 
   var itemsWrap = document.createElement('div');
   itemsWrap.id = 'dev-items-wrap';
-  v.items.forEach(function(it, idx){
+  (v.items || []).forEach(function(it, idx){
     var card = document.createElement('div');
     card.style.cssText = 'background:#FAFAFA;border-radius:10px;padding:12px;margin-bottom:8px;border:0.5px solid #eee';
     card.innerHTML = '<div style="font-size:14px;font-weight:700;margin-bottom:2px">'+escaparHtml(it.nombre)+'</div>'
@@ -22035,7 +22123,7 @@ function calcularTotalDevolucion(vid){
   var v = ventas.find(function(x){ return String(x.id)===String(vid); });
   if(!v) return;
   var total = 0;
-  v.items.forEach(function(it, idx){
+  (v.items || []).forEach(function(it, idx){
     var el = document.getElementById('dev-cant-'+idx);
     var cant = el ? (parseInt(el.value)||0) : 0;
     if(cant > it.cant){ cant = it.cant; el.value = it.cant; }
@@ -22162,7 +22250,7 @@ function procesarDevolucion(vid){
 
   var itemsDevueltos = [];
   var totalDevuelto = 0;
-  v.items.forEach(function(it, idx){
+  (v.items || []).forEach(function(it, idx){
     var el = document.getElementById('dev-cant-'+idx);
     var cant = el ? (parseInt(el.value)||0) : 0;
     if(cant > 0){
@@ -22471,7 +22559,7 @@ function deshacerDevolucion(devId){
   if(idx < 0){ alert('No se encontró esa devolución -puede que ya se haya deshecho-.'); return; }
   var d = devoluciones[idx];
 
-  var resumenItems = d.items.map(function(it){ return it.nombre+' x'+it.cant; }).join(', ');
+  var resumenItems = (d.items || []).map(function(it){ return it.nombre+' x'+it.cant; }).join(', ');
   var resumenCambio = d.esCambio && d.itemsNuevos && d.itemsNuevos.length
     ? '\nProducto que se había entregado a cambio: '+d.itemsNuevos.map(function(it){ return it.nombre+' x'+it.cant; }).join(', ')
     : '';
@@ -22480,7 +22568,7 @@ function deshacerDevolucion(devId){
   loadProds();
   // Revertir el inventario: lo que se habia restaurado -por ser devuelto- se vuelve a descontar;
   // lo que se habia descontado -por ser el producto nuevo de un cambio- se vuelve a restaurar.
-  d.items.forEach(function(it){
+  (d.items || []).forEach(function(it){
     if(it.pid){
       var p = productos.find(function(x){ return String(x.id)===String(it.pid); });
       if(p) p.stock = Math.max(0, (p.stock||0) - it.cant);
@@ -22551,7 +22639,7 @@ function verHistorialCliente(cid, modo){
 
   // Calcular saldo de cada venta a credito
   todasVentasCl.forEach(function(v){
-    var pagado = (v.tipo==='credito' && v.pagosFactura) ? v.pagosFactura.filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : v.total;
+    var pagado = (v.tipo==='credito' && v.pagosFactura) ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : v.total;
     v._pagado = pagado;
     v._saldo = Math.max(0, v.total - pagado);
   });
@@ -22679,7 +22767,7 @@ function verHistorialCliente(cid, modo){
       return '<div style="background:#FFF3E0;border-radius:12px;padding:12px;margin-bottom:16px">'
         +'<div style="font-size:12px;color:#E65100;font-weight:700;margin-bottom:8px">↩️ DEVOLUCIONES ('+devoluciones.length+' · $'+fmtNum(totalDev)+' en total)</div>'
         +devoluciones.map(function(d){
-          var itemsTxt = d.items.map(function(it){ return it.nombre+' x'+it.cant; }).join(', ');
+          var itemsTxt = (d.items || []).map(function(it){ return it.nombre+' x'+it.cant; }).join(', ');
           return '<div style="background:white;border-radius:8px;padding:8px 10px;margin-bottom:6px">'
             +'<div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:700">'+d.fecha+'</span><span style="font-size:12px;font-weight:700;color:#E65100">$'+fmtNum(d.monto)+'</span></div>'
             +'<div style="font-size:11px;color:#777;margin-top:2px">'+itemsTxt+(d.nota?' · '+d.nota:'')+'</div>'
@@ -22693,9 +22781,9 @@ function verHistorialCliente(cid, modo){
     +(!ventasCl.length ? '<p style="color:#aaa;text-align:center;padding:20px;font-size:13px">'+(modo==='abiertas'?'No hay facturas abiertas — todo está al día.':'Sin compras registradas.')+'</p>' : '')
     +ventasCl.map(function(v){
       var pagosHtml = '';
-      if(modo==='completo' && v.tipo==='credito' && v.pagosFactura && v.pagosFactura.length){
+      if(modo==='completo' && v.tipo==='credito' && v.pagosFactura && (v.pagosFactura || []).length){
         pagosHtml = '<div style="margin-top:6px;padding-top:6px;border-top:0.5px dashed #ddd">'
-          +v.pagosFactura.map(function(p, pidx){
+          +(v.pagosFactura || []).map(function(p, pidx){
             if(!(p.monto > 0)) return '';
             var detalle = (p.metodos && p.metodos.length) ? p.metodos.map(function(m){ return METODOS_PAGO_LABELS[m.tipo]+' $'+fmtNum(m.monto); }).join(' + ') : '';
             var lapizPago = '<button onclick="editarPagoDesdeHistorial(\''+cid+'\','+v.id+','+pidx+')" title="Editar este pago" style="background:#E8EAF6;border:none;border-radius:7px;padding:4px 9px;font-size:14px;cursor:pointer;margin-left:auto;flex:0 0 auto">✏️</button>';
@@ -22709,7 +22797,7 @@ function verHistorialCliente(cid, modo){
         +'<span style="font-size:13px;font-weight:700;color:#1a237e">'+v.fecha+' <span style="font-size:10px;color:#aaa;font-weight:400">('+(v.tipo==='credito'?'crédito':'contado')+')</span></span>'
         +'<span style="font-size:14px;font-weight:800;color:#1565C0">$'+fmtNum(v.total)+'</span>'
         +'</div>'
-        +'<div style="font-size:11px;color:#aaa;margin-top:4px">'+v.items.map(function(it){ return it.nombre+' x'+it.cant; }).join(', ')+'</div>'
+        +'<div style="font-size:11px;color:#aaa;margin-top:4px">'+(v.items || []).map(function(it){ return it.nombre+' x'+it.cant; }).join(', ')+'</div>'
         +(v.tipo==='credito' ? '<div style="font-size:11px;font-weight:700;margin-top:4px;color:'+(esSaldoPendiente(v._saldo)?'#C62828':'#2E7D32')+'">'+(esSaldoPendiente(v._saldo)?'Saldo pendiente: $'+fmtNum(v._saldo):'✓ Pagada completa')+'</div>' : '')
         +pagosHtml
         +'</div>';
