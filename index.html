@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260727q-OFICIAL-V2.0">
+<meta name="app-version" content="20260727r-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -13423,7 +13423,10 @@ function guardarProductoIndividualDeMarca(i){
   p.foto = fotoInput ? fotoInput.value : (p.foto || '');
   p.cat = (catSelInput.value === '__otra__' ? catInput.value.trim() : catSelInput.value);
   p.costo = parseFloat(costoInput.value) || 0;
+  // Igual que arriba: apuntar el precio de ANTES para poder compararlo -27 jul-
+  var precioAntesI = (typeof p.precio === 'number') ? p.precio : parseFloat(p.precio) || 0;
   p.precio = parseFloat(precioInput.value) || 0;
+  if(precioAntesI !== p.precio) registrarCambioPrecio(p.nombre, precioAntesI, p.precio);
   p.proveedorPref = supInput.value;
 
   SS('np', productos);
@@ -13473,22 +13476,28 @@ function guardarTodosLosProductosDeMarca(){
     p.foto = fotoInput ? fotoInput.value : (p.foto || '');
     p.cat = (catSelInput.value === '__otra__' ? catInput.value.trim() : catSelInput.value);
     p.costo = parseFloat(costoInput.value) || 0;
+    // El precio de ANTES se apunta primero, para poder compararlo. Si se lee despues de
+    // asignarlo se lee el nuevo y nunca se registra nada -mismo error que tenia el editor
+    // de un producto suelto, encontrado el 27 jul-.
+    var precioAntesM = (typeof p.precio === 'number') ? p.precio : parseFloat(p.precio) || 0;
     p.precio = parseFloat(precioInput.value) || 0;
+    if(precioAntesM !== p.precio) registrarCambioPrecio(p.nombre, precioAntesM, p.precio);
     p.proveedorPref = supInput.value;
   });
 
   SS('np_eliminados', eliminados);
   SS('np', productos);
-  alert('✅ Listo. ' + (cantEditar>0 ? cantEditar+' producto(s) actualizado(s). ' : '') + (cantEliminar>0 ? cantEliminar+' producto(s) eliminado(s).' : ''));
-  // Regresar a la MISMA marca (no al catalogo completo) para poder seguir haciendo cambios ahi
-  var marcaParaVolver = window._epmlMarcaActual;
-  if(marcaParaVolver){
-    document.getElementById('epm-marca').value = marcaParaVolver;
-    abrirEditarProductosDeMarca();
-  } else {
-    cerrarEditarProductosDeMarca();
-    renderCatalogo('');
-  }
+  // Antes se quedaba DENTRO de la misma marca, a proposito, "para poder seguir haciendo
+  // cambios ahi". Sensei pidio el 27 jul que lo llevara de vuelta al listado de todos los
+  // productos, que es lo que espera al terminar de guardar.
+  cerrarEditarProductosDeMarca();
+  cerrarEditarPorMarca();
+  renderCatalogo(document.getElementById('catbuscar') ? (document.getElementById('catbuscar').value || '') : '');
+  window.scrollTo(0, 0);
+  avisoGrande('✓ Listo.\n\n'
+    + (cantEditar > 0 ? cantEditar + ' producto(s) actualizado(s).\n' : '')
+    + (cantEliminar > 0 ? cantEliminar + ' producto(s) eliminado(s).\n' : '')
+    + '\nVolviste al catálogo.');
 }
 
 function verificarPIN(callback){
