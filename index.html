@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260728e-OFICIAL-V2.0">
+<meta name="app-version" content="20260728h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -935,6 +935,12 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
   <div class="card" style="margin-bottom:10px">
     <p style="font-size:13px;color:var(--nbs-muted);margin-bottom:8px;line-height:1.45">Si agregaste fotos de productos desde otro aparato y aquí no se ven, tócalo.</p>
     <button class="btn" style="background:#E8F5E9;color:#2E7D32;border:2px solid #2E7D32;font-weight:800" onclick="bajarFotosQueFaltan()">🔄 Bajar las fotos que me falten</button>
+  </div>
+  <!-- Puente entre la PC y el telefono -28 jul-. Trae SOLO nombre, precio y costo. -->
+  <div class="card" style="margin-bottom:10px">
+    <p style="font-size:13px;color:var(--nbs-muted);margin-bottom:8px;line-height:1.45">Si corregiste precios, costos o nombres en otro aparato, baja un respaldo allá y tráelos aquí. Solo cambia esos tres datos.</p>
+    <button class="btn" style="background:#E3F2FD;color:#1565C0;border:2px solid #1565C0;font-weight:800" onclick="abrirTraerCambiosProductos()">📥 Traer cambios de productos de un respaldo</button>
+    <input type="file" id="traer-prod-input" accept=".json,application/json" style="display:none" onchange="leerRespaldoParaComparar(this)">
   </div>
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:4px">🛡️ Copias de Seguridad</h2>
@@ -2499,6 +2505,269 @@ function sincronizarFotosClientes(cls){
 }
 
 // Baja de la nube las fotos de clientes que este teléfono no tenga
+
+// ═══════════════════════════════════════════════════════════════════
+//  TRAER CAMBIOS DE PRODUCTOS DE UN RESPALDO  (28 jul)
+// ═══════════════════════════════════════════════════════════════════
+//
+// POR QUE EXISTE: Sensei trabaja en la PC cuando esta en la casa -pantalla grande, mas
+// comodo para corregir precios y nombres- y en el telefono cuando anda en la calle. Pero
+// la sincronizacion usa la regla "el mas nuevo gana", asi que el aparato que va mas
+// adelante le pasa por encima al otro. El 28 de julio perdio 7 precios, 16 costos y 8
+// nombres que habia corregido en la PC.
+//
+// ESTO ES UN PUENTE ENTRE LOS DOS APARATOS: lee un respaldo, compara SOLO los productos,
+// le enseña las diferencias una por una, y aplica unicamente las que el marque.
+//
+// ⚠️ LO QUE NUNCA TOCA: ventas, clientes, pagos, compras, gastos, devoluciones, stock ni
+// fotos. Solo NOMBRE, PRECIO y COSTO de productos. Ni una cosa mas.
+
+var _difProd = null;
+
+function abrirTraerCambiosProductos(){
+  var inp = document.getElementById('traer-prod-input');
+  if(!inp) return;
+  inp.value = '';
+  inp.click();
+}
+
+function leerRespaldoParaComparar(input){
+  var file = input.files && input.files[0];
+  if(!file) return;
+  var fr = new FileReader();
+  fr.onload = async function(ev){
+    input.value = '';
+    var d;
+    try {
+      var contenido = JSON.parse(ev.target.result);
+      if(contenido && contenido.enc === true && contenido.datos){
+        var pin = prompt('🔒 Ese respaldo está protegido.\nEscribe el PIN con el que se bajó:');
+        if(pin === null) return;
+        try {
+          var llave = await derivarLlaveBackup(pin, base64ABytes(contenido.sal));
+          var claro = await crypto.subtle.decrypt(
+            { name:'AES-GCM', iv: base64ABytes(contenido.iv) }, llave, base64ABytes(contenido.datos));
+          d = JSON.parse(new TextDecoder().decode(claro));
+        } catch(e){
+          avisoGrande('🔒 PIN incorrecto, o el archivo está dañado.\n\nRecuerda: cada aparato tiene su propio PIN. Si el respaldo lo bajaste de la computadora, puede tener un PIN distinto al de este teléfono.');
+          return;
+        }
+      } else {
+        d = contenido;
+      }
+    } catch(e){
+      avisoGrande('📄 Ese archivo no se entiende. ¿Es un respaldo de NBS 2?');
+      return;
+    }
+
+    if(!d || !Array.isArray(d.productos)){
+      avisoGrande('📄 Ese respaldo no trae productos.');
+      return;
+    }
+    compararProductosDelRespaldo(d.productos);
+  };
+  fr.onerror = function(){ avisoGrande('📄 No se pudo abrir ese archivo.'); };
+  fr.readAsText(file);
+}
+
+function nMon(x){
+  var v = parseFloat(x);
+  return isFinite(v) ? Math.round(v * 100) / 100 : 0;
+}
+
+function compararProductosDelRespaldo(delRespaldo){
+  // Red de seguridad: aunque la pantalla ya comprueba que el archivo traiga productos,
+  // esta funcion no debe romperse nunca si le llega algo raro -28 jul-
+  if(!Array.isArray(delRespaldo) || !delRespaldo.length){
+    avisoGrande('📄 Ese respaldo no trae productos que comparar.');
+    return;
+  }
+  loadProds();
+  var mios = {};
+  productos.forEach(function(p){ mios[String(p.id)] = p; });
+
+  var difs = { nombre: [], precio: [], costo: [] };
+  delRespaldo.forEach(function(r){
+    var m = mios[String(r.id)];
+    if(!m) return;                                  // producto que aqui no existe: no se toca
+    var nomR = String(r.nombre || '').trim();
+    var nomM = String(m.nombre || '').trim();
+    if(nomR && nomR !== nomM){
+      difs.nombre.push({ id: r.id, mio: nomM, delArchivo: nomR,
+                         marca: r.marca, nombreCorto: r.nombreCorto });
+    }
+    if(Math.abs(nMon(r.precio) - nMon(m.precio)) > 0.005){
+      difs.precio.push({ id: r.id, nombre: nomM || nomR, mio: nMon(m.precio), delArchivo: nMon(r.precio) });
+    }
+    if(Math.abs(nMon(r.costo) - nMon(m.costo)) > 0.005){
+      difs.costo.push({ id: r.id, nombre: nomM || nomR, mio: nMon(m.costo), delArchivo: nMon(r.costo) });
+    }
+  });
+
+  var total = difs.nombre.length + difs.precio.length + difs.costo.length;
+  if(!total){
+    avisoGrande('✓ No hay ninguna diferencia.\n\nLos productos de ese respaldo son iguales a los de este teléfono.');
+    return;
+  }
+  // Todas marcadas al principio; el decide cuales quitar
+  ['nombre','precio','costo'].forEach(function(k){
+    difs[k].forEach(function(x){ x.marcado = true; });
+  });
+  _difProd = difs;
+  pintarDiferenciasProductos();
+}
+
+function pintarDiferenciasProductos(){
+  var d = _difProd;
+  if(!d) return;
+  var marcadas = ['nombre','precio','costo'].reduce(function(a,k){
+    return a + d[k].filter(function(x){ return x.marcado; }).length; }, 0);
+  var total = d.nombre.length + d.precio.length + d.costo.length;
+
+  var h = '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">'
+    + '<div style="flex:1"><div style="font-size:17px;font-weight:900;color:#1a237e">📥 Cambios de productos</div>'
+    + '<div style="font-size:12.5px;color:#666">' + total + ' diferencia(s) encontradas</div></div>'
+    + '<button onclick="cerrarDiferenciasProductos()" style="flex-shrink:0;width:34px;height:34px;border:none;border-radius:9px;background:#f0f0f0;color:#666;font-size:20px;font-weight:800;cursor:pointer">✕</button>'
+    + '</div>'
+    + '<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:9px;padding:9px;margin-bottom:12px;font-size:12px;color:#2E7D32;line-height:1.4">'
+    + '<b>Solo se cambia el nombre, el precio y el costo.</b><br>'
+    + 'NO se tocan tus ventas, clientes, pagos, compras, existencias ni fotos.'
+    + '</div>';
+
+  function bloque(clave, titulo, icono, pintarFila){
+    var lista = d[clave];
+    if(!lista.length) return '';
+    var cuantas = lista.filter(function(x){ return x.marcado; }).length;
+    var t = '<div style="background:#fff;border:1px solid #ddd;border-radius:11px;padding:10px;margin-bottom:10px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+      + '<label style="flex:1;display:flex;align-items:center;gap:7px;cursor:pointer">'
+      + '<input type="checkbox" ' + (cuantas === lista.length ? 'checked' : '') + ' onchange="marcarTodoGrupo(\'' + clave + '\', this.checked)" style="width:19px;height:19px;cursor:pointer">'
+      + '<span style="font-size:14px;font-weight:900;color:#1a237e">' + icono + ' ' + titulo + ' (' + lista.length + ')</span>'
+      + '</label></div>';
+    lista.forEach(function(x, i){
+      t += '<label style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-top:1px solid #f0f0f0;cursor:pointer">'
+        + '<input type="checkbox" ' + (x.marcado ? 'checked' : '') + ' onchange="marcarDif(\'' + clave + '\',' + i + ',this.checked)" style="width:18px;height:18px;flex-shrink:0;margin-top:2px;cursor:pointer">'
+        + '<span style="flex:1;font-size:12.5px;line-height:1.35">' + pintarFila(x) + '</span></label>';
+    });
+    return t + '</div>';
+  }
+
+  h += bloque('nombre', 'NOMBRES', '✏️', function(x){
+    return '<span style="color:#999;text-decoration:line-through">' + escaparHtml(x.mio) + '</span><br>'
+         + '<span style="color:#2E7D32;font-weight:700">' + escaparHtml(x.delArchivo) + '</span>';
+  });
+  h += bloque('precio', 'PRECIOS DE VENTA', '💵', function(x){
+    return '<b>' + escaparHtml(String(x.nombre).slice(0,40)) + '</b><br>'
+         + '<span style="color:#999">$' + fmtNum(x.mio) + '</span> → <span style="color:#2E7D32;font-weight:800">$' + fmtNum(x.delArchivo) + '</span>';
+  });
+  h += bloque('costo', 'COSTOS', '📦', function(x){
+    return '<b>' + escaparHtml(String(x.nombre).slice(0,40)) + '</b><br>'
+         + '<span style="color:#999">$' + fmtNum(x.mio) + '</span> → <span style="color:#2E7D32;font-weight:800">$' + fmtNum(x.delArchivo) + '</span>';
+  });
+
+  h += '<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:2px solid #eee">'
+    + '<div style="text-align:center;font-size:13px;color:#666;margin-bottom:8px">Vas a aplicar <b>' + marcadas + '</b> de ' + total + '</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="aplicarCambiosProductos()" style="flex:2;padding:13px;border:none;border-radius:10px;background:#2E7D32;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer">Aplicar los marcados</button>'
+    + '<button onclick="cerrarDiferenciasProductos()" style="flex:1;padding:13px;border:2px solid #999;border-radius:10px;background:#fff;color:#666;font-weight:700;cursor:pointer">Cancelar</button>'
+    + '</div></div>';
+
+  var ov = document.getElementById('difprod-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'difprod-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99995;display:flex;align-items:center;justify-content:center;padding:14px';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:16px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto">' + h + '</div>';
+  ov.style.display = 'flex';
+}
+
+function marcarDif(clave, i, val){
+  if(_difProd && _difProd[clave] && _difProd[clave][i]){
+    _difProd[clave][i].marcado = !!val;
+    pintarDiferenciasProductos();
+  }
+}
+function marcarTodoGrupo(clave, val){
+  if(_difProd && _difProd[clave]){
+    _difProd[clave].forEach(function(x){ x.marcado = !!val; });
+    pintarDiferenciasProductos();
+  }
+}
+function cerrarDiferenciasProductos(){
+  var ov = document.getElementById('difprod-ov');
+  if(ov) ov.remove();
+  _difProd = null;
+}
+
+function aplicarCambiosProductos(){
+  var d = _difProd;
+  if(!d) return;
+  var lista = [];
+  ['nombre','precio','costo'].forEach(function(k){
+    d[k].forEach(function(x){ if(x.marcado) lista.push({ tipo:k, dato:x }); });
+  });
+  if(!lista.length){ avisoGrande('No marcaste ningún cambio.'); return; }
+
+  if(!confirm('Se van a aplicar ' + lista.length + ' cambio(s) a tus productos.\n\n'
+    + 'Solo el nombre, el precio y el costo.\n'
+    + 'NO se tocan ventas, clientes, pagos, compras, existencias ni fotos.\n\n¿Seguir?')) return;
+
+  protegerConHuella(function(){
+    loadProds();
+    var guardados = LS('np', []);
+    var porId = {};
+    guardados.forEach(function(g){ porId[String(g.id)] = g; });
+
+    // Si un producto solo existe en el catalogo de fabrica, se crea su "parche" para
+    // poder guardarle el cambio sin tocar el catalogo original.
+    function parcheDe(id){
+      var g = porId[String(id)];
+      if(g) return g;
+      var base = productos.find(function(p){ return String(p.id) === String(id); });
+      if(!base) return null;
+      g = { id: base.id };
+      porId[String(id)] = g;
+      guardados.push(g);
+      return g;
+    }
+
+    var hechos = { nombre:0, precio:0, costo:0 };
+    lista.forEach(function(item){
+      var x = item.dato;
+      var g = parcheDe(x.id);
+      if(!g) return;
+      if(item.tipo === 'nombre'){
+        g.nombre = x.delArchivo;
+        if(x.nombreCorto !== undefined) g.nombreCorto = x.nombreCorto;
+        if(x.marca !== undefined) g.marca = x.marca;
+        hechos.nombre++;
+      } else if(item.tipo === 'precio'){
+        // Queda anotado en el historial de precios, como cualquier cambio de precio
+        try { registrarCambioPrecio(x.nombre, x.mio, x.delArchivo); } catch(e){}
+        g.precio = x.delArchivo;
+        hechos.precio++;
+      } else {
+        g.costo = x.delArchivo;
+        hechos.costo++;
+      }
+    });
+
+    SS('np', guardados);
+    PRODS = [];
+    loadProds();
+    try { if(typeof renderCatalogo === 'function') renderCatalogo(document.getElementById('catbuscar') ? (document.getElementById('catbuscar').value || '') : ''); } catch(e){}
+
+    cerrarDiferenciasProductos();
+    avisoGrande('✓ Listo.\n\n'
+      + (hechos.nombre ? hechos.nombre + ' nombre(s)\n' : '')
+      + (hechos.precio ? hechos.precio + ' precio(s)\n' : '')
+      + (hechos.costo  ? hechos.costo  + ' costo(s)\n'  : '')
+      + '\nTus ventas, clientes y existencias no se tocaron.');
+  });
+}
+
 // ═══ BAJAR LAS FOTOS QUE FALTAN, POR SU CUENTA (28 jul) ═══
 //
 // EL PROBLEMA QUE REPORTO SENSEI: agregaba fotos a los productos desde la PC y en el
@@ -2534,25 +2803,45 @@ function revisarFotosDeLaNube(alTerminar){
   }
   var antesProd = cuantasTengo();
 
-  // Se lee SOLO el campo pidsConFoto del documento de productos. No se toca nada mas.
+  // ⚠️ NO se confia en el campo `pidsConFoto` del documento de productos. Esa lista la
+  // escribe el ULTIMO aparato que guardo los productos: si ese aparato ya habia perdido
+  // las fotos de vista, contesta "ninguna tiene foto" y no se baja nada — que es
+  // exactamente lo que le paso a Sensei el 28 jul. Ahora se pregunta DIRECTO por cada
+  // producto que no tenga foto en este telefono: la coleccion nbs_fotos es la unica
+  // fuente de verdad, y ahi nada se borra nunca.
+  loadProds();
+  var tengo = {};
+  var todosLosIds = [];
+  try {
+    var locales = JSON.parse(localStorage.getItem('np') || '[]');
+    locales.forEach(function(p){
+      todosLosIds.push(String(p.id));
+      if(p.foto) tengo[String(p.id)] = 1;
+    });
+  } catch(e){}
+  // Tambien los del catalogo de fabrica, por si alguno no esta en la lista guardada
+  try {
+    (productos || []).forEach(function(p){
+      if(todosLosIds.indexOf(String(p.id)) < 0) todosLosIds.push(String(p.id));
+      if(p.foto) tengo[String(p.id)] = 1;
+    });
+  } catch(e){}
+
+  // Se le suma lo que diga pidsConFoto, por si acaso trae alguno que aqui no existe
   fbDb.collection('nbs_data').doc('np').get().then(function(d){
-    var lista = (d.exists && d.data() && d.data().pidsConFoto) ? d.data().pidsConFoto : [];
-    if(!lista.length){
-      if(alTerminar) alTerminar({ bajadas: 0, faltaban: 0, sinNadaEnLaNube: true });
-      return;
-    }
-    var tengo = {};
-    try {
-      JSON.parse(localStorage.getItem('np') || '[]').forEach(function(p){ if(p.foto) tengo[String(p.id)] = 1; });
-    } catch(e){}
-    var faltan = lista.filter(function(pid){ return !tengo[String(pid)]; });
+    var delDoc = (d.exists && d.data() && d.data().pidsConFoto) ? d.data().pidsConFoto : [];
+    delDoc.forEach(function(pid){
+      if(todosLosIds.indexOf(String(pid)) < 0) todosLosIds.push(String(pid));
+    });
+
+    var faltan = todosLosIds.filter(function(pid){ return !tengo[String(pid)]; });
 
     if(!faltan.length){
       if(alTerminar) alTerminar({ bajadas: 0, faltaban: 0 });
       return;
     }
 
-    descargarFotosQueFaltan(lista);
+    descargarFotosQueFaltan(faltan);
     // descargarFotosQueFaltan trabaja en segundo plano; se revisa al rato cuantas llegaron
     setTimeout(function(){
       var ahora = cuantasTengo();
@@ -2673,7 +2962,7 @@ function descargarFotosQueFaltan(listaPids){
   var faltan = listaPids.filter(function(pid){ return !tengo[pid]; });
   if(!faltan.length) return;
   console.log('Bajando '+faltan.length+' foto(s) de la nube...');
-  var promesas = faltan.slice(0, 60).map(function(pid){   // de a poco, no todas de golpe
+  var promesas = faltan.slice(0, 150).map(function(pid){   // de a poco, no todas de golpe
     return fbDb.collection('nbs_fotos').doc(pid).get().then(function(d){
       if(d.exists && d.data() && d.data().foto) return { pid: pid, foto: d.data().foto };
       return null;
