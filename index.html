@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260728h-OFICIAL-V2.0">
+<meta name="app-version" content="20260728k-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2827,6 +2827,19 @@ function revisarFotosDeLaNube(alTerminar){
     });
   } catch(e){}
 
+  // ⏱ LIMITE DE TIEMPO. Antes, si la nube tardaba o no contestaba, el letrero de
+  // "Revisando las fotos..." se quedaba para siempre: no habia forma de rendirse.
+  // Sensei se topo con eso el 28 jul. Ahora, pase lo que pase, termina en 30 segundos.
+  var yaTermino = false;
+  function terminarUnaVez(r){
+    if(yaTermino) return;
+    yaTermino = true;
+    if(alTerminar) alTerminar(r);
+  }
+  var relojDeSeguridad = setTimeout(function(){
+    terminarUnaVez({ error: 'TARDO' });
+  }, 30000);
+
   // Se le suma lo que diga pidsConFoto, por si acaso trae alguno que aqui no existe
   fbDb.collection('nbs_data').doc('np').get().then(function(d){
     var delDoc = (d.exists && d.data() && d.data().pidsConFoto) ? d.data().pidsConFoto : [];
@@ -2837,19 +2850,35 @@ function revisarFotosDeLaNube(alTerminar){
     var faltan = todosLosIds.filter(function(pid){ return !tengo[String(pid)]; });
 
     if(!faltan.length){
-      if(alTerminar) alTerminar({ bajadas: 0, faltaban: 0 });
+      clearTimeout(relojDeSeguridad);
+      terminarUnaVez({ bajadas: 0, faltaban: 0 });
       return;
     }
 
     descargarFotosQueFaltan(faltan);
-    // descargarFotosQueFaltan trabaja en segundo plano; se revisa al rato cuantas llegaron
-    setTimeout(function(){
-      var ahora = cuantasTengo();
-      if(alTerminar) alTerminar({ bajadas: ahora - antesProd, faltaban: faltan.length });
-    }, 6000);
+    // Trabaja en segundo plano. Se revisa cada segundo si ya llegaron las 40; en cuanto
+    // llegan se termina, sin esperar de mas. Y a los 25 segundos se rinde igual.
+    // No se espera un numero fijo: se mira si SIGUEN LLEGANDO. Cuando pasan 3 segundos
+    // sin que llegue ninguna nueva, es que ya no viene mas y se termina. Asi no se
+    // esperan 25 segundos de gusto cuando en la nube solo habia 3 fotos. -28 jul-
+    var esperadas = Math.min(faltan.length, 40);
+    var vueltas = 0, ultimo = 0, quietas = 0;
+    var reloj = setInterval(function(){
+      vueltas++;
+      var bajadas = cuantasTengo() - antesProd;
+      if(bajadas > ultimo){ ultimo = bajadas; quietas = 0; } else { quietas++; }
+      var yaLlegaronTodas = bajadas >= esperadas;
+      var dejaronDeLlegar = quietas >= 3 && vueltas >= 4;
+      if(yaLlegaronTodas || dejaronDeLlegar || vueltas >= 25){
+        clearInterval(reloj);
+        clearTimeout(relojDeSeguridad);
+        terminarUnaVez({ bajadas: bajadas, faltaban: faltan.length });
+      }
+    }, 1000);
   }).catch(function(e){
     console.error('No se pudieron revisar las fotos de la nube:', e);
-    if(alTerminar) alTerminar({ error: 'FALLO', detalle: (e && e.message) || '' });
+    clearTimeout(relojDeSeguridad);
+    terminarUnaVez({ error: 'FALLO', detalle: (e && e.message) || '' });
   });
 }
 
@@ -2860,16 +2889,26 @@ function bajarFotosQueFaltan(){
     cerrarCargandoRuta();
     if(r.error === 'SIN_SESION'){ avisoGrande('📷 Primero entra con tu correo y clave.'); return; }
     if(r.error === 'SIN_SENAL'){ avisoGrande('📷 No hay señal. Conéctate a internet e inténtalo de nuevo.'); return; }
+    if(r.error === 'TARDO'){ avisoGrande('📷 La nube está tardando mucho.\n\nPuede ser la señal. Espera un momento y vuelve a tocar el botón — lo que ya bajó no se pierde.'); return; }
     if(r.error){ avisoGrande('📷 No se pudo revisar las fotos.\n\n' + (r.detalle || 'Inténtalo de nuevo en un momento.')); return; }
     if(r.sinNadaEnLaNube){ avisoGrande('📷 Todavía no hay fotos de productos en la nube.'); return; }
     if(!r.faltaban){ avisoGrande('✓ Ya tienes todas las fotos.\n\nNo falta ninguna por bajar.'); return; }
     if(r.bajadas > 0){
       avisoGrande('✓ Se bajaron ' + r.bajadas + ' foto(s).\n\n'
-        + (r.bajadas < r.faltaban ? 'Faltan ' + (r.faltaban - r.bajadas) + ' — vuelve a tocar el botón para seguir bajándolas.' : 'Ya las tienes todas.'), function(){
+        + (r.bajadas < r.faltaban ? 'Toca el botón otra vez para seguir bajando las que faltan.' : 'Ya las tienes todas.'), function(){
           try { if(typeof renderCatalogo === 'function'){ PRODS = []; loadProds(); } } catch(e){}
         });
+      return;
+    }
+    // No llego ninguna. Hay DOS razones muy distintas y hay que decir cual es -28 jul-:
+    // o esos productos NO TIENEN foto en ningun lado -lo normal-, o fallo la conexion.
+    var intento = window._ultimoIntentoFotos || {};
+    if(intento.fallos > 0){
+      avisoGrande('📷 No se pudo preguntar por ' + intento.fallos + ' foto(s).\n\nPuede ser la señal. Inténtalo otra vez en un momento — lo que ya bajó no se pierde.');
+    } else if(intento.existian === 0 && intento.pedidas > 0){
+      avisoGrande('✓ No hay más fotos que bajar.\n\nRevisé ' + intento.pedidas + ' producto(s) y ninguno tiene foto guardada en la nube — todavía no se las has puesto.\n\nNo se perdió nada.');
     } else {
-      avisoGrande('📷 Faltaban ' + r.faltaban + ' foto(s) pero no llegó ninguna.\n\nPuede ser la señal. Inténtalo otra vez en un momento.');
+      avisoGrande('📷 No llegó ninguna foto.\n\nPuede ser la señal. Inténtalo otra vez en un momento.');
     }
   });
 }
@@ -2962,14 +3001,19 @@ function descargarFotosQueFaltan(listaPids){
   var faltan = listaPids.filter(function(pid){ return !tengo[pid]; });
   if(!faltan.length) return;
   console.log('Bajando '+faltan.length+' foto(s) de la nube...');
-  var promesas = faltan.slice(0, 150).map(function(pid){   // de a poco, no todas de golpe
+  // De a 40. Con 150 eran ~4,5 MB de golpe y el telefono se ahogaba con señal normal.
+  var fallos = 0;
+  var promesas = faltan.slice(0, 40).map(function(pid){
     return fbDb.collection('nbs_fotos').doc(pid).get().then(function(d){
       if(d.exists && d.data() && d.data().foto) return { pid: pid, foto: d.data().foto };
-      return null;
-    }).catch(function(){ return null; });
+      return null;                       // el producto simplemente no tiene foto
+    }).catch(function(){ fallos++; return null; });   // esto SI es un fallo de verdad
   });
   Promise.all(promesas).then(function(res){
     var buenas = res.filter(function(x){ return x; });
+    // Se apunta cuantas de las que se pidieron EXISTIAN de verdad en la nube. Sin esto,
+    // pedir 40 fotos que simplemente no existen se veia igual que un fallo de conexion.
+    window._ultimoIntentoFotos = { pedidas: Math.min(faltan.length, 40), existian: buenas.length, fallos: fallos };
     if(!buenas.length) return;
     try{
       var prods = JSON.parse(localStorage.getItem('np') || '[]');
