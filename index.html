@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260728n-OFICIAL-V2.0">
+<meta name="app-version" content="20260728q-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2798,7 +2798,7 @@ function aplicarCambiosProductos(){
 // nada: o esta o no esta. Ahora se piden APARTE, y `descargarFotosQueFaltan` solo
 // rellena las que FALTAN -nunca sobreescribe una que ya tengas-, asi que no puede pisar
 // ningun dato.
-function revisarFotosDeLaNube(alTerminar){
+function revisarFotosDeLaNube(alTerminar, alAvanzar){
   if(typeof fbAuth === 'undefined' || !fbAuth.currentUser){
     if(alTerminar) alTerminar({ error: 'SIN_SESION' });
     return;
@@ -2808,91 +2808,113 @@ function revisarFotosDeLaNube(alTerminar){
     return;
   }
 
-  // Cuantas me faltan ANTES, para poder decir cuantas se bajaron
-  function cuantasTengo(){
-    try {
-      return JSON.parse(localStorage.getItem('np') || '[]').filter(function(p){ return p.foto; }).length;
-    } catch(e){ return 0; }
-  }
-  var antesProd = cuantasTengo();
+  // ⚠️ POR QUE ESTO RECORRE TODO Y NO SE QUEDA PEGADO:
+  // La primera version pedia `faltan.slice(0, 40)` — SIEMPRE los primeros 40 de la lista.
+  // Como los productos que NO tienen foto en la nube nunca salen de esa lista, cada toque
+  // revisaba LOS MISMOS 40 y nunca avanzaba. Sensei se topo con eso el 28 jul: el boton
+  // le decia lo mismo una y otra vez.
+  // Ahora se recorre la lista ENTERA por tandas, saltando lo ya revisado, y con un tope
+  // de tiempo para que nunca se quede colgado.
 
-  // ⚠️ NO se confia en el campo `pidsConFoto` del documento de productos. Esa lista la
-  // escribe el ULTIMO aparato que guardo los productos: si ese aparato ya habia perdido
-  // las fotos de vista, contesta "ninguna tiene foto" y no se baja nada — que es
-  // exactamente lo que le paso a Sensei el 28 jul. Ahora se pregunta DIRECTO por cada
-  // producto que no tenga foto en este telefono: la coleccion nbs_fotos es la unica
-  // fuente de verdad, y ahi nada se borra nunca.
   loadProds();
-  var tengo = {};
-  var todosLosIds = [];
+  var tengo = {}, todos = [];
   try {
-    var locales = JSON.parse(localStorage.getItem('np') || '[]');
-    locales.forEach(function(p){
-      todosLosIds.push(String(p.id));
+    JSON.parse(localStorage.getItem('np') || '[]').forEach(function(p){
+      todos.push(String(p.id));
       if(p.foto) tengo[String(p.id)] = 1;
     });
   } catch(e){}
-  // Tambien los del catalogo de fabrica, por si alguno no esta en la lista guardada
   try {
     (productos || []).forEach(function(p){
-      if(todosLosIds.indexOf(String(p.id)) < 0) todosLosIds.push(String(p.id));
+      if(todos.indexOf(String(p.id)) < 0) todos.push(String(p.id));
       if(p.foto) tengo[String(p.id)] = 1;
     });
   } catch(e){}
 
-  // ⏱ LIMITE DE TIEMPO. Antes, si la nube tardaba o no contestaba, el letrero de
-  // "Revisando las fotos..." se quedaba para siempre: no habia forma de rendirse.
-  // Sensei se topo con eso el 28 jul. Ahora, pase lo que pase, termina en 30 segundos.
+  var pendientes = todos.filter(function(pid){ return !tengo[String(pid)]; });
+  if(!pendientes.length){
+    if(alTerminar) alTerminar({ bajadas: 0, faltaban: 0 });
+    return;
+  }
+
+  var TANDA = 40;
+  var bajadas = 0, revisados = 0, fallos = 0;
   var yaTermino = false;
+  var arranque = Date.now();
+
   function terminarUnaVez(r){
     if(yaTermino) return;
     yaTermino = true;
+    clearTimeout(relojDeSeguridad);
     if(alTerminar) alTerminar(r);
   }
+
+  // ⏱ RELOJ DE SEGURIDAD, INNEGOCIABLE. El tope de 90 segundos que se mira al empezar
+  // cada tanda NO sirve si la nube se queda callada a media tanda: esa promesa nunca
+  // resuelve y el letrero se queda puesto para siempre. Este reloj corre por su cuenta
+  // y termina pase lo que pase. -28 jul, tras habersele colgado a Sensei-
   var relojDeSeguridad = setTimeout(function(){
-    terminarUnaVez({ error: 'TARDO' });
-  }, 30000);
+    terminarUnaVez({ bajadas: bajadas, faltaban: pendientes.length, revisados: revisados,
+                     fallos: fallos, incompleto: true, error: revisados === 0 ? 'TARDO' : null });
+  }, 95000);
 
-  // Se le suma lo que diga pidsConFoto, por si acaso trae alguno que aqui no existe
-  fbDb.collection('nbs_data').doc('np').get().then(function(d){
-    var delDoc = (d.exists && d.data() && d.data().pidsConFoto) ? d.data().pidsConFoto : [];
-    delDoc.forEach(function(pid){
-      if(todosLosIds.indexOf(String(pid)) < 0) todosLosIds.push(String(pid));
-    });
-
-    var faltan = todosLosIds.filter(function(pid){ return !tengo[String(pid)]; });
-
-    if(!faltan.length){
-      clearTimeout(relojDeSeguridad);
-      terminarUnaVez({ bajadas: 0, faltaban: 0 });
+  function siguienteTanda(){
+    if(yaTermino) return;
+    // Tope de tiempo: 90 segundos en total, pase lo que pase
+    if(Date.now() - arranque > 90000){
+      terminarUnaVez({ bajadas: bajadas, faltaban: pendientes.length, revisados: revisados,
+                       fallos: fallos, incompleto: true });
+      return;
+    }
+    if(revisados >= pendientes.length){
+      terminarUnaVez({ bajadas: bajadas, faltaban: pendientes.length, revisados: revisados, fallos: fallos });
       return;
     }
 
-    descargarFotosQueFaltan(faltan);
-    // Trabaja en segundo plano. Se revisa cada segundo si ya llegaron las 40; en cuanto
-    // llegan se termina, sin esperar de mas. Y a los 25 segundos se rinde igual.
-    // No se espera un numero fijo: se mira si SIGUEN LLEGANDO. Cuando pasan 3 segundos
-    // sin que llegue ninguna nueva, es que ya no viene mas y se termina. Asi no se
-    // esperan 25 segundos de gusto cuando en la nube solo habia 3 fotos. -28 jul-
-    var esperadas = Math.min(faltan.length, 40);
-    var vueltas = 0, ultimo = 0, quietas = 0;
-    var reloj = setInterval(function(){
-      vueltas++;
-      var bajadas = cuantasTengo() - antesProd;
-      if(bajadas > ultimo){ ultimo = bajadas; quietas = 0; } else { quietas++; }
-      var yaLlegaronTodas = bajadas >= esperadas;
-      var dejaronDeLlegar = quietas >= 3 && vueltas >= 4;
-      if(yaLlegaronTodas || dejaronDeLlegar || vueltas >= 25){
-        clearInterval(reloj);
-        clearTimeout(relojDeSeguridad);
-        terminarUnaVez({ bajadas: bajadas, faltaban: faltan.length });
+    var tanda = pendientes.slice(revisados, revisados + TANDA);
+    if(alAvanzar) alAvanzar(revisados, pendientes.length, bajadas);
+
+    var promesas = tanda.map(function(pid){
+      return fbDb.collection('nbs_fotos').doc(String(pid)).get().then(function(d){
+        if(d.exists && d.data() && d.data().foto) return { pid: String(pid), foto: d.data().foto };
+        return null;
+      }).catch(function(){ fallos++; return null; });
+    });
+
+    Promise.all(promesas).then(function(res){
+      revisados += tanda.length;
+      var buenas = res.filter(function(x){ return x; });
+      if(buenas.length){
+        try {
+          var prods = JSON.parse(localStorage.getItem('np') || '[]');
+          var mapa = {};
+          buenas.forEach(function(x){ mapa[x.pid] = x.foto; });
+          var cambio = false;
+          prods.forEach(function(p){
+            if(!p.foto && mapa[String(p.id)]){ p.foto = mapa[String(p.id)]; cambio = true; }
+          });
+          if(cambio){
+            localStorage.setItem('np', JSON.stringify(prods));
+            bajadas += buenas.length;
+            try {
+              var idx = leerIndiceFotos();
+              buenas.forEach(function(x){ idx[x.pid] = huellaFoto(x.foto); });
+              guardarIndiceFotos(idx);
+            } catch(e){}
+            if(typeof productos !== 'undefined') productos = prods;
+          }
+        } catch(e){
+          // Si no se pudo guardar -memoria llena- se para aqui y se avisa
+          terminarUnaVez({ bajadas: bajadas, faltaban: pendientes.length, revisados: revisados,
+                           fallos: fallos, sinEspacio: true });
+          return;
+        }
       }
-    }, 1000);
-  }).catch(function(e){
-    console.error('No se pudieron revisar las fotos de la nube:', e);
-    clearTimeout(relojDeSeguridad);
-    terminarUnaVez({ error: 'FALLO', detalle: (e && e.message) || '' });
-  });
+      setTimeout(siguienteTanda, 120);   // respiro entre tandas
+    });
+  }
+
+  siguienteTanda();
 }
 
 // El boton de "bajar las fotos que me falten", para forzarlo cuando quiera
@@ -2902,27 +2924,35 @@ function bajarFotosQueFaltan(){
     cerrarCargandoRuta();
     if(r.error === 'SIN_SESION'){ avisoGrande('📷 Primero entra con tu correo y clave.'); return; }
     if(r.error === 'SIN_SENAL'){ avisoGrande('📷 No hay señal. Conéctate a internet e inténtalo de nuevo.'); return; }
-    if(r.error === 'TARDO'){ avisoGrande('📷 La nube está tardando mucho.\n\nPuede ser la señal. Espera un momento y vuelve a tocar el botón — lo que ya bajó no se pierde.'); return; }
-    if(r.error){ avisoGrande('📷 No se pudo revisar las fotos.\n\n' + (r.detalle || 'Inténtalo de nuevo en un momento.')); return; }
-    if(r.sinNadaEnLaNube){ avisoGrande('📷 Todavía no hay fotos de productos en la nube.'); return; }
-    if(!r.faltaban){ avisoGrande('✓ Ya tienes todas las fotos.\n\nNo falta ninguna por bajar.'); return; }
+    if(r.error){ avisoGrande('📷 No se pudo revisar las fotos.\n\nInténtalo de nuevo en un momento.'); return; }
+
+    if(r.sinEspacio){
+      avisoGrande('⚠️ Se bajaron ' + r.bajadas + ' foto(s), pero el teléfono se quedó sin espacio.\n\nToca "🧹 Liberar espacio en el teléfono" y vuelve a intentarlo.');
+      return;
+    }
+    if(!r.faltaban){ avisoGrande('✓ Ya tienes todas las fotos.'); return; }
+
     if(r.bajadas > 0){
       avisoGrande('✓ Se bajaron ' + r.bajadas + ' foto(s).\n\n'
-        + (r.bajadas < r.faltaban ? 'Toca el botón otra vez para seguir bajando las que faltan.' : 'Ya las tienes todas.'), function(){
-          try { if(typeof renderCatalogo === 'function'){ PRODS = []; loadProds(); } } catch(e){}
+        + (r.incompleto ? 'Todavía faltan productos por revisar — toca el botón otra vez.' : 'Ya revisé los ' + r.revisados + ' productos que no tenían foto.'),
+        function(){
+          try { PRODS = []; loadProds(); if(typeof renderCatalogo === 'function') renderCatalogo(''); } catch(e){}
         });
       return;
     }
-    // No llego ninguna. Hay DOS razones muy distintas y hay que decir cual es -28 jul-:
-    // o esos productos NO TIENEN foto en ningun lado -lo normal-, o fallo la conexion.
-    var intento = window._ultimoIntentoFotos || {};
-    if(intento.fallos > 0){
-      avisoGrande('📷 No se pudo preguntar por ' + intento.fallos + ' foto(s).\n\nPuede ser la señal. Inténtalo otra vez en un momento — lo que ya bajó no se pierde.');
-    } else if(intento.existian === 0 && intento.pedidas > 0){
-      avisoGrande('✓ No hay más fotos que bajar.\n\nRevisé ' + intento.pedidas + ' producto(s) y ninguno tiene foto guardada en la nube — todavía no se las has puesto.\n\nNo se perdió nada.');
-    } else {
-      avisoGrande('📷 No llegó ninguna foto.\n\nPuede ser la señal. Inténtalo otra vez en un momento.');
+
+    if(r.fallos > 0){
+      avisoGrande('📷 No se pudo preguntar por ' + r.fallos + ' foto(s).\n\nPuede ser la señal. Inténtalo otra vez — lo que ya bajó no se pierde.');
+      return;
     }
+    if(r.incompleto){
+      avisoGrande('📷 Revisé ' + r.revisados + ' de ' + r.faltaban + ' producto(s) y ninguno tenía foto en la nube.\n\nToca el botón otra vez para seguir revisando los que faltan.');
+      return;
+    }
+    avisoGrande('✓ Revisé los ' + r.revisados + ' producto(s) que no tenían foto, y ninguno tiene foto guardada en la nube.\n\nEsos son los que todavía no les has puesto foto. No se perdió nada.');
+  }, function(hechos, total, bajadas){
+    mostrarCargandoRuta('📷 Revisando ' + hechos + ' de ' + total + '...'
+      + (bajadas ? '\n' + bajadas + ' foto(s) bajadas' : ''));
   });
 }
 
