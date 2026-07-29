@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260728d-OFICIAL-V2.0">
+<meta name="app-version" content="20260728e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -930,6 +930,12 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
 
 <!-- ===== COPIAS DE SEGURIDAD - para volver atras si algo se rompe ===== -->
 <div id="p-copias" class="pg">
+  <!-- Bajar las fotos que falten -28 jul-. Sensei agregaba fotos en la PC y no le
+       aparecian en el telefono; con esto puede forzarlo cuando quiera. -->
+  <div class="card" style="margin-bottom:10px">
+    <p style="font-size:13px;color:var(--nbs-muted);margin-bottom:8px;line-height:1.45">Si agregaste fotos de productos desde otro aparato y aquí no se ven, tócalo.</p>
+    <button class="btn" style="background:#E8F5E9;color:#2E7D32;border:2px solid #2E7D32;font-weight:800" onclick="bajarFotosQueFaltan()">🔄 Bajar las fotos que me falten</button>
+  </div>
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:4px">🛡️ Copias de Seguridad</h2>
   <p style="font-size:12px;color:var(--nbs-muted);margin-bottom:14px">La app respalda tus datos en dos lugares: <b>📱 en el teléfono cada 15 minutos</b> (aunque no haya cambios, para tu tranquilidad) y <b>☁️ en la nube cada 15 minutos</b> (solo cuando hay movimientos). Si algo se borra o se rompe, aquí puedes volver a como estaba.</p>
@@ -2493,6 +2499,92 @@ function sincronizarFotosClientes(cls){
 }
 
 // Baja de la nube las fotos de clientes que este teléfono no tenga
+// ═══ BAJAR LAS FOTOS QUE FALTAN, POR SU CUENTA (28 jul) ═══
+//
+// EL PROBLEMA QUE REPORTO SENSEI: agregaba fotos a los productos desde la PC y en el
+// telefono no aparecian.
+//
+// LA CAUSA: las fotos SOLO se pedian dentro de `cargarDatosDeLaNube()`, y solo si el
+// telefono aceptaba bajar la lista de productos de la nube. Pero desde el 16 de julio
+// hay una proteccion que impide que la nube pise al telefono cuando el telefono es mas
+// nuevo -esa proteccion se puso porque se perdio un dia entero de ventas-. Entonces, si
+// el habia hecho una venta o tocado un producto en el telefono despues de subir las
+// fotos en la PC, el telefono decia "yo soy mas nuevo", NO bajaba la lista... y las
+// fotos nunca se pedian.
+//
+// LA SOLUCION: las fotos no tienen por que depender de eso. Una foto no compite con
+// nada: o esta o no esta. Ahora se piden APARTE, y `descargarFotosQueFaltan` solo
+// rellena las que FALTAN -nunca sobreescribe una que ya tengas-, asi que no puede pisar
+// ningun dato.
+function revisarFotosDeLaNube(alTerminar){
+  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser){
+    if(alTerminar) alTerminar({ error: 'SIN_SESION' });
+    return;
+  }
+  if(!navigator.onLine){
+    if(alTerminar) alTerminar({ error: 'SIN_SENAL' });
+    return;
+  }
+
+  // Cuantas me faltan ANTES, para poder decir cuantas se bajaron
+  function cuantasTengo(){
+    try {
+      return JSON.parse(localStorage.getItem('np') || '[]').filter(function(p){ return p.foto; }).length;
+    } catch(e){ return 0; }
+  }
+  var antesProd = cuantasTengo();
+
+  // Se lee SOLO el campo pidsConFoto del documento de productos. No se toca nada mas.
+  fbDb.collection('nbs_data').doc('np').get().then(function(d){
+    var lista = (d.exists && d.data() && d.data().pidsConFoto) ? d.data().pidsConFoto : [];
+    if(!lista.length){
+      if(alTerminar) alTerminar({ bajadas: 0, faltaban: 0, sinNadaEnLaNube: true });
+      return;
+    }
+    var tengo = {};
+    try {
+      JSON.parse(localStorage.getItem('np') || '[]').forEach(function(p){ if(p.foto) tengo[String(p.id)] = 1; });
+    } catch(e){}
+    var faltan = lista.filter(function(pid){ return !tengo[String(pid)]; });
+
+    if(!faltan.length){
+      if(alTerminar) alTerminar({ bajadas: 0, faltaban: 0 });
+      return;
+    }
+
+    descargarFotosQueFaltan(lista);
+    // descargarFotosQueFaltan trabaja en segundo plano; se revisa al rato cuantas llegaron
+    setTimeout(function(){
+      var ahora = cuantasTengo();
+      if(alTerminar) alTerminar({ bajadas: ahora - antesProd, faltaban: faltan.length });
+    }, 6000);
+  }).catch(function(e){
+    console.error('No se pudieron revisar las fotos de la nube:', e);
+    if(alTerminar) alTerminar({ error: 'FALLO', detalle: (e && e.message) || '' });
+  });
+}
+
+// El boton de "bajar las fotos que me falten", para forzarlo cuando quiera
+function bajarFotosQueFaltan(){
+  mostrarCargandoRuta('📷 Revisando las fotos de la nube...');
+  revisarFotosDeLaNube(function(r){
+    cerrarCargandoRuta();
+    if(r.error === 'SIN_SESION'){ avisoGrande('📷 Primero entra con tu correo y clave.'); return; }
+    if(r.error === 'SIN_SENAL'){ avisoGrande('📷 No hay señal. Conéctate a internet e inténtalo de nuevo.'); return; }
+    if(r.error){ avisoGrande('📷 No se pudo revisar las fotos.\n\n' + (r.detalle || 'Inténtalo de nuevo en un momento.')); return; }
+    if(r.sinNadaEnLaNube){ avisoGrande('📷 Todavía no hay fotos de productos en la nube.'); return; }
+    if(!r.faltaban){ avisoGrande('✓ Ya tienes todas las fotos.\n\nNo falta ninguna por bajar.'); return; }
+    if(r.bajadas > 0){
+      avisoGrande('✓ Se bajaron ' + r.bajadas + ' foto(s).\n\n'
+        + (r.bajadas < r.faltaban ? 'Faltan ' + (r.faltaban - r.bajadas) + ' — vuelve a tocar el botón para seguir bajándolas.' : 'Ya las tienes todas.'), function(){
+          try { if(typeof renderCatalogo === 'function'){ PRODS = []; loadProds(); } } catch(e){}
+        });
+    } else {
+      avisoGrande('📷 Faltaban ' + r.faltaban + ' foto(s) pero no llegó ninguna.\n\nPuede ser la señal. Inténtalo otra vez en un momento.');
+    }
+  });
+}
+
 function descargarFotosClientesQueFaltan(){
   if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
   if(!navigator.onLine) return;
@@ -17620,6 +17712,11 @@ function repararListasQueFaltan(){
 
 function iniciarAppDespuesDeLogin(){
   try { repararListasQueFaltan(); } catch(e){ console.error('No se pudo reparar:', e); }
+  // Las fotos se revisan por su cuenta, sin depender de si la nube gano o no -28 jul-
+  setTimeout(function(){
+    try { revisarFotosDeLaNube(); } catch(e){ console.error('No se pudieron revisar las fotos:', e); }
+    try { descargarFotosClientesQueFaltan(); } catch(e){}
+  }, 5000);
   window._appInicializada = true;
   detectarActualizacion();            // muestra "LA APP SE ACTUALIZÓ" si la versión cambió
   // Revisar si hay versión nueva en GitHub: a los 8 seg de abrir, y luego cada 30 min
