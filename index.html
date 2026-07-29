@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260729d-OFICIAL-V2.0">
+<meta name="app-version" content="20260729e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1726,7 +1726,11 @@ function descomprimirTexto(base64){
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var CLAVES_A_RESPALDAR = ['ncl','nv','nc','ncr','np','nsup','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','np_eliminados','nvisitas_barberos','historial_precios','rutas_por_dia',
-  'nvan','nrelleno','nbs_facturas_emparejadas'];  // agregados el 28 jul: la van, el relleno y lo aprendido del lector de facturas
+  'nvan','nrelleno','nbs_facturas_emparejadas',
+  // Las listas de lo borrado tambien viajan: si no, lo que Sensei borro en un aparato
+  // resucitaria al juntarse con el otro. -29 jul-
+  '_borrados_ncl','_borrados_nv','_borrados_nc','_borrados_np','_borrados_nsup',
+  '_borrados_ngastos','_borrados_npedidos','_borrados_ndevoluciones'];  // agregados el 28 jul: la van, el relleno y lo aprendido del lector de facturas
 var HORAS_ENTRE_COPIAS = 0.25; // cada 15 minutos (pedido por Sensei, 19 jul 2026)
 var DIAS_QUE_SE_GUARDAN = 15;
 var CLAVE_ULTIMA_COPIA = 'nbs_ultima_copia_auto';
@@ -3117,8 +3121,190 @@ function horaLocalDe(k){
   return parseInt(localStorage.getItem('_hora_'+k) || '0', 10);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SINCRONIZACION QUE JUNTA EN VEZ DE PISAR  (29 jul 2026)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// EL PROBLEMA QUE RESUELVE: hasta hoy la app comparaba la LISTA ENTERA. Si el
+// telefono era mas nuevo, se quedaba con todo lo del telefono; si la nube era
+// mas nueva, con todo lo de la nube. Resultado: Sensei corregia precios en la
+// PC, vendia en el telefono, y al juntarse uno de los dos lados se perdia
+// completo. El 28 de julio perdio asi 31 correcciones de precios y nombres,
+// 23 fotos y el historial de precios.
+//
+// LA SOLUCION: cada REGISTRO lleva su propia hora de modificacion (`mod`), y al
+// juntar se compara UNO POR UNO. La PC cambio el producto A y el telefono
+// vendio el B -> los dos sobreviven.
+//
+// COMO SE PONE LA HORA: sola, dentro de SS(), que es el unico sitio por donde
+// pasa todo lo que se guarda. No hay que tocar los cien lugares donde la app
+// crea o edita algo.
+//
+// LO QUE BORRAS SE QUEDA BORRADO: si se borra un registro, se anota su id y la
+// hora en una lista de borrados. Al juntar, un registro no puede resucitar
+// porque el otro aparato todavia lo tenga.
+
+// Las claves que son LISTAS de registros con id -esas se funden uno por uno-
+var CLAVES_CON_REGISTROS = ['ncl','nv','nc','ncr','np','nsup','ngastos',
+                            'ntarjetas','notrasdeudas','npedidos','ndevoluciones'];
+
+// Cuadernos que SOLO CRECEN: se unen sin repetir, nunca se pisan
+var CLAVES_CUADERNO = ['historial_precios','np_eliminados'];
+
+// Mapas: se juntan clave por clave
+var CLAVES_MAPA = ['nbs_facturas_emparejadas','nvisitas_barberos','rutas_por_dia'];
+
+function esListaDeRegistros(k){ return CLAVES_CON_REGISTROS.indexOf(k) >= 0; }
+function claveDeBorrados(k){ return '_borrados_' + k; }
+
+// El JSON del registro SIN su sello, para poder ver si de verdad cambio algo.
+// Si se comparara con el sello puesto, todo pareceria cambiado siempre.
+function sinSello(reg){
+  if(!reg || typeof reg !== 'object') return JSON.stringify(reg);
+  var copia = {};
+  for(var p in reg){ if(p !== 'mod' && Object.prototype.hasOwnProperty.call(reg, p)) copia[p] = reg[p]; }
+  return JSON.stringify(copia);
+}
+
+function leerBorrados(k){
+  try { var b = JSON.parse(localStorage.getItem(claveDeBorrados(k)) || '[]'); return Array.isArray(b) ? b : []; }
+  catch(e){ return []; }
+}
+
+// Le pone la hora a los registros que CAMBIARON, y anota los que se borraron.
+// Corre dentro de SS(), antes de guardar. Medido con los datos reales de Sensei
+// -505 productos, 270 ventas- en un telefono 4 veces mas lento: 24 y 29 ms.
+function sellarCambios(k, lista){
+  if(!esListaDeRegistros(k) || !Array.isArray(lista)) return lista;
+  var ahora = Date.now();
+  var antes = [];
+  try { antes = JSON.parse(localStorage.getItem(k) || '[]'); } catch(e){ antes = []; }
+  if(!Array.isArray(antes)) antes = [];
+
+  var previos = {};
+  antes.forEach(function(x){ if(x && x.id !== undefined) previos[String(x.id)] = x; });
+
+  var vistos = {};
+  lista.forEach(function(reg){
+    if(!reg || typeof reg !== 'object' || reg.id === undefined) return;
+    var id = String(reg.id);
+    vistos[id] = true;
+    var viejo = previos[id];
+    if(!viejo){
+      reg.mod = ahora;                                   // registro nuevo
+    } else if(sinSello(viejo) !== sinSello(reg)){
+      reg.mod = ahora;                                   // cambio de verdad
+    } else if(reg.mod === undefined && viejo.mod !== undefined){
+      reg.mod = viejo.mod;                               // no cambio: conserva su hora
+    }
+  });
+
+  // Los que estaban y ya no estan: quedan anotados como borrados
+  var borrados = leerBorrados(k);
+  var yaAnotados = {};
+  borrados.forEach(function(b){ yaAnotados[String(b.id)] = true; });
+  var huboBorrados = false;
+  antes.forEach(function(x){
+    if(!x || x.id === undefined) return;
+    var id = String(x.id);
+    if(!vistos[id] && !yaAnotados[id]){
+      borrados.push({ id: id, mod: ahora });
+      huboBorrados = true;
+    }
+  });
+  if(huboBorrados){
+    if(borrados.length > 900) borrados = borrados.slice(-900);   // no crecer para siempre
+    try { localStorage.setItem(claveDeBorrados(k), JSON.stringify(borrados)); } catch(e){}
+  }
+  return lista;
+}
+
+function horaDe(reg){
+  var m = reg && reg.mod;
+  return (typeof m === 'number' && isFinite(m)) ? m : 0;
+}
+
+// ═══ JUNTAR DOS LISTAS, REGISTRO POR REGISTRO ═══
+// Gana el que se modifico despues. Si empatan -por ejemplo los dos sin sello,
+// que es como estan todos los registros viejos-, gana el del TELEFONO: es donde
+// Sensei trabaja y lo mas reciente casi siempre esta ahi.
+function fundirListas(k, deLaNube, delTelefono){
+  if(!Array.isArray(deLaNube)) return delTelefono;
+  if(!Array.isArray(delTelefono)) return deLaNube;
+
+  var resultado = {}, orden = [];
+  function meter(reg, esDelTelefono){
+    if(!reg || typeof reg !== 'object' || reg.id === undefined) return;
+    var id = String(reg.id);
+    if(!(id in resultado)){ resultado[id] = reg; orden.push(id); return; }
+    var actual = resultado[id];
+    var hA = horaDe(actual), hN = horaDe(reg);
+    if(hN > hA) resultado[id] = reg;
+    else if(hN === hA && esDelTelefono) resultado[id] = reg;   // empate: manda el telefono
+  }
+  deLaNube.forEach(function(r){ meter(r, false); });
+  delTelefono.forEach(function(r){ meter(r, true); });
+
+  // Aplicar lo borrado: si un registro esta anotado como borrado DESPUES de su
+  // ultima modificacion, se va. Asi lo que borro no puede resucitar.
+  var borrados = leerBorrados(k);
+  borrados.forEach(function(b){
+    var id = String(b.id);
+    var reg = resultado[id];
+    if(reg && horaDe(reg) <= (b.mod || 0)) delete resultado[id];
+  });
+
+  var salida = [];
+  orden.forEach(function(id){ if(resultado[id]) salida.push(resultado[id]); });
+  return salida;
+}
+
+// Cuadernos que solo crecen: se unen sin repetir
+function fundirCuaderno(deLaNube, delTelefono){
+  if(!Array.isArray(deLaNube)) return delTelefono;
+  if(!Array.isArray(delTelefono)) return deLaNube;
+  var vistos = {}, salida = [];
+  function meter(x){
+    var llave = (x && typeof x === 'object') ? JSON.stringify(x) : String(x);
+    if(vistos[llave]) return;
+    vistos[llave] = true;
+    salida.push(x);
+  }
+  deLaNube.forEach(meter);
+  delTelefono.forEach(meter);
+  return salida;
+}
+
+// Mapas: se juntan clave por clave; ante duda manda el telefono
+function fundirMapa(deLaNube, delTelefono){
+  if(!deLaNube || typeof deLaNube !== 'object') return delTelefono;
+  if(!delTelefono || typeof delTelefono !== 'object') return deLaNube;
+  var salida = {};
+  for(var a in deLaNube){ if(Object.prototype.hasOwnProperty.call(deLaNube, a)) salida[a] = deLaNube[a]; }
+  for(var b in delTelefono){ if(Object.prototype.hasOwnProperty.call(delTelefono, b)) salida[b] = delTelefono[b]; }
+  return salida;
+}
+
+// El que usa la bajada de la nube. Devuelve el TEXTO ya fundido, o null si esa
+// clave no se sabe fundir -y entonces se hace lo de siempre-.
+function fundirConLoDelTelefono(clave, textoDeLaNube){
+  var crudoLocal = localStorage.getItem(clave);
+  if(crudoLocal === null) return null;                 // aqui no hay nada: que baje tal cual
+  var nube, local;
+  try { nube = JSON.parse(textoDeLaNube); } catch(e){ return null; }
+  try { local = JSON.parse(crudoLocal); } catch(e){ return null; }
+
+  if(esListaDeRegistros(clave))       return JSON.stringify(fundirListas(clave, nube, local));
+  if(CLAVES_CUADERNO.indexOf(clave) >= 0) return JSON.stringify(fundirCuaderno(nube, local));
+  if(CLAVES_MAPA.indexOf(clave) >= 0)     return JSON.stringify(fundirMapa(nube, local));
+  return null;
+}
+
 function SS(k,v){
   try{
+    // Ponerle la hora a los registros que cambiaron, para poder juntar sin pisar
+    try { v = sellarCambios(k, v); } catch(eSello){ console.error('No se pudo sellar', k, eSello); }
     localStorage.setItem(k,JSON.stringify(v));
     marcarHoraLocal(k);
     revisarSiTocaCopiaLocal(k, v); // cada 5 facturas guarda una copia DENTRO del telefono
@@ -18802,7 +18988,7 @@ function cargarDatosDeLaNube(callback){
   }, 15000);
   fbDb.collection('nbs_data').get().then(function(snapshot){
     clearTimeout(temporizador);
-    var bajados = 0, protegidos = 0;
+    var bajados = 0, protegidos = 0, juntados = 0;
     snapshot.forEach(function(doc){
       var data = doc.data();
       if(!data || typeof data.valor !== 'string') return;
@@ -18840,15 +19026,30 @@ function cargarDatosDeLaNube(callback){
           // Bajar las fotos de clientes que falten (van aparte, en su propia colección)
           setTimeout(function(){ descargarFotosClientesQueFaltan(); }, 4000);
         }
-        localStorage.setItem(doc.id, valorFinal);
+        // ═══ AQUI ESTABA LA PERDIDA (arreglado el 29 jul) ═══
+        // Antes esta linea reemplazaba la LISTA ENTERA con la de la nube. Ahora se
+        // JUNTAN registro por registro: gana el que se modifico despues, y lo que
+        // se borro no resucita. Si por lo que sea no se puede juntar, se hace lo de
+        // siempre -reemplazar-, que es como funcionaba hasta hoy.
+        var fundido = null;
+        try { fundido = fundirConLoDelTelefono(doc.id, valorFinal); }
+        catch(eFundir){ console.error('No se pudo juntar "'+doc.id+'":', eFundir); }
+        localStorage.setItem(doc.id, fundido !== null ? fundido : valorFinal);
+        if(fundido !== null) juntados++;
+
         // Se anota la hora de la nube como la hora de este dato, para no confundir despues
         localStorage.setItem('_hora_'+doc.id, String(horaNube));
         bajados++;
       }catch(e){}
     });
+    if(juntados > 0) console.log(juntados+' dato(s) se JUNTARON registro por registro con lo de este telefono.');
     if(protegidos > 0){
       console.log(protegidos+' dato(s) de este teléfono se protegieron de ser sobrescritos por la nube.');
-      setTimeout(subirPendientes, 1500); // subir lo que la nube no tenia
+    }
+    // Siempre se sube lo que quedo despues de juntar, para que la nube tenga la mezcla
+    if(juntados > 0 || protegidos > 0){
+      CLAVES_A_RESPALDAR.forEach(function(k){ if(localStorage.getItem(k) !== null) marcarPendienteDeSubir(k); });
+      setTimeout(subirPendientes, 1500);
     }
     llamarUnaSolaVez();
   }).catch(function(e){
