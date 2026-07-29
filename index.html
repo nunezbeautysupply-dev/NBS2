@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260729c-OFICIAL-V2.0">
+<meta name="app-version" content="20260729d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -11941,13 +11941,29 @@ function descartarPedidoEnProceso(){
   if(!confirm(msj)) return;
   olvidarPedidoEnProceso();
   pedidosMultiTemp = [];
+
+  // Borrar el aviso YA, sin esperar a nada mas. Sensei reporto el 29 jul que al tocar
+  // Descartar la pantalla se quedaba igual y el aviso seguia ahi, aunque el pedido SI se
+  // habia borrado -al refrescar a mano ya no estaba-. En el taller no se reproduce, asi
+  // que se hace a prueba de eso: se quita el aviso del DOM de una vez, y el redibujado
+  // completo se manda con setTimeout(0) para que corra DESPUES de que el telefono termine
+  // de cerrar su letrero de confirmacion.
+  var avisoW = document.getElementById('ped-retomar-wrap');
+  if(avisoW) avisoW.innerHTML = '';
   // A PRUEBA DE BALAS (24 jul, pedido por Sensei: "debería volver al listado de todas
   // las barberías... el botón funciona pero no saca de esa pantalla"). Antes solo se
   // refrescaba el avisito, y si Sensei estaba DENTRO del formulario (ped-multi-wrap,
   // ped-barbero-wrap, etc.) se quedaba ahi mismo viendo datos ya borrados. Ahora
   // SIEMPRE se navega de vuelta a la lista completa de Pedidos Rapidos, sin importar
   // desde donde se haya tocado "Descartar".
-  ir('p-ped');
+  setTimeout(function(){
+    try {
+      ir('p-ped');
+      var av = document.getElementById('ped-retomar-wrap');
+      if(av) av.innerHTML = '';        // por si el redibujado lo repuso
+      window.scrollTo(0, 0);
+    } catch(e){ console.error('No se pudo volver a Pedidos Rapidos:', e); }
+  }, 0);
 }
 
 // El aviso arriba de la lista, para retomar lo que dejaste a medias
