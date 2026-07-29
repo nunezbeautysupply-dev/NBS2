@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260729a-OFICIAL-V2.0">
+<meta name="app-version" content="20260729c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1091,6 +1091,9 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       <div id="res-vendido-n" style="font-size:11px;color:#d5e7f8;font-weight:600">0 ventas</div>
     </div>
   </div>
+
+  <!-- La ganancia que de verdad entro, menos los gastos -29 jul, pedido de Sensei- -->
+  <div id="res-ganancia" style="margin-bottom:10px"></div>
 
   <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px 16px">
     <div style="font-size:13px;color:#888;font-weight:800;letter-spacing:.6px;margin-bottom:10px">DESGLOSE</div>
@@ -7083,6 +7086,36 @@ function revisarIntegridad(){
   // Salieron de auditar los datos REALES de Sensei. Antes la revision solo miraba las
   // ventas y los clientes: las compras, las devoluciones, el inventario y la ganancia
   // no se revisaban en absoluto.
+
+  // ── FECHAS IMPOSIBLES (29 jul) ──
+  // Se encontraron 4 pagos de Sensei escritos como '24/6/2026' en vez de '6/24/2026'.
+  // JavaScript lee ese 24 como el MES y rueda la fecha a diciembre de 2027. O sea que
+  // ese dinero queda archivado 18 meses en el futuro y no sale en NINGUN reporte que el
+  // mire. No es un error de la app: es un dato mal escrito, pero nadie lo avisaba.
+  var fechasMalas = [];
+  V.forEach(function(v){
+    function revisarFecha(f, dondeDice, monto){
+      if(!f) return;
+      var pt = String(f).split('/');
+      if(pt.length !== 3) return;
+      var primero = parseInt(pt[0], 10);
+      if(primero > 12){
+        fechasMalas.push({ id: v.id, cn: v.cn, fecha: String(f), donde: dondeDice, monto: monto || 0 });
+      }
+    }
+    revisarFecha(v.fecha, 'la factura', v.total);
+    (v.pagosFactura || []).forEach(function(p){ revisarFecha(p.fecha, 'un pago', p.monto); });
+  });
+  if(fechasMalas.length){
+    var montoMalo = fechasMalas.reduce(function(a,x){ return a + (parseFloat(x.monto)||0); }, 0);
+    problemas.push(fechasMalas.length + ' fecha(s) escritas al reves -dia primero en vez del mes-, por $'
+      + fmtNum(montoMalo) + '. La app las lee como si fueran de anos futuros, asi que ese dinero NO sale en tus reportes. '
+      + fechasMalas.slice(0,4).map(function(x){
+          return (x.cn || 'sin nombre') + ': ' + x.fecha + ' en ' + x.donde;
+        }).join(' · ')
+      + (fechasMalas.length > 4 ? ' y ' + (fechasMalas.length-4) + ' mas' : '')
+      + '. Corrigelas con el lapiz ✏️ del pago.');
+  } else oks.push('Todas las fechas estan bien escritas');
 
   // ── Las COMPRAS ──
   var COMP = LS('nc', []);
@@ -19667,6 +19700,20 @@ function calcularResumen(){
   var vendido = 0, nVentas = 0, contado = 0, credito = 0;
   var cobrado = 0, nCobros = 0, abonos = 0;
 
+  // ═══ GANANCIA YA COBRADA (29 jul, pedido de Sensei) ═══
+  // "las ventas al contado dame de inmediato cuanto me gane, y las de credito que
+  // reflejen la ganancia al momento de que sean pagadas".
+  //
+  // LA REGLA:
+  //   · CONTADO  -> la ganancia entera cuenta el dia de la venta
+  //   · CREDITO  -> cada abono trae SU PARTE de la ganancia, proporcional:
+  //                 si la factura de $500 deja $150 y te pagan $250 (la mitad),
+  //                 cuentas $75.
+  //
+  // OJO: los "Balance inicial traido de sistema anterior" NO son ventas suyas — son
+  // deudas que paso a mano al cambiarse de app. Su ganancia es cero y asi debe quedar.
+  var ganCobrada = 0, ganEnLaCalle = 0;
+
   ventas.forEach(function(v){
     if(v.cancelada) return;
     // ── VENDIDO: facturas emitidas en el rango ──
@@ -19686,7 +19733,40 @@ function calcularResumen(){
         }
       });
     }
+
+    // ── GANANCIA COBRADA ──
+    if(typeof esBalanceInicial === 'function' && esBalanceInicial(v)) return;
+    var totalV = parseFloat(v.total) || 0;
+    var ganV = parseFloat(v.ganancia) || 0;
+    if(totalV <= 0) return;
+
+    if(v.tipo === 'contado'){
+      if(dentro(v.fecha)) ganCobrada += ganV;
+    } else {
+      var pagadoTodo = 0;
+      (v.pagosFactura || []).forEach(function(p){
+        var m = parseFloat(p.monto) || 0;
+        if(m <= 0 || p.esDevolucion) return;
+        pagadoTodo += m;
+        if(dentro(p.fecha || v.fecha)) ganCobrada += ganV * (m / totalV);
+      });
+      // Lo que todavia no te han pagado de esa factura, en ganancia
+      var faltaPagar = totalV - pagadoTodo;
+      if(faltaPagar > 0.005) ganEnLaCalle += ganV * (faltaPagar / totalV);
+    }
   });
+
+  // ── GASTOS del rango ──
+  var gastosRango = 0, nGastos = 0;
+  try {
+    (LS('ngastos', []) || []).forEach(function(g){
+      if(!dentro(g.fecha)) return;
+      gastosRango += parseFloat(g.monto) || 0;
+      nGastos++;
+    });
+  } catch(e){}
+
+  var teQuedo = ganCobrada - gastosRango;
 
   document.getElementById('res-cobrado').textContent = '$'+fmtNum(cobrado);
   document.getElementById('res-cobrado-n').textContent = nCobros + (nCobros===1?' cobro':' cobros');
@@ -19705,6 +19785,35 @@ function calcularResumen(){
     + '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 2px">'
     + '<span style="font-size:15.5px;color:#1a237e;font-weight:800">Falta por cobrar de estas ventas</span>'
     + '<span style="font-size:17px;font-weight:900;color:#C62828">$'+fmtNum(Math.max(0, credito))+'</span></div>';
+
+  // ── El bloque de la ganancia real ──
+  var elGan = document.getElementById('res-ganancia');
+  if(elGan){
+    elGan.innerHTML =
+        '<div style="background:#E8F5E9;border:2px solid #2E7D32;border-radius:14px;padding:14px;margin-bottom:10px">'
+      +   '<div style="font-size:11.5px;font-weight:800;color:#2E7D32;letter-spacing:.5px;margin-bottom:2px">\ud83d\udcb5 GANANCIA YA COBRADA</div>'
+      +   '<div style="font-size:30px;font-weight:900;color:#1B5E20;line-height:1.1">$' + fmtNum(ganCobrada) + '</div>'
+      +   '<div style="font-size:12px;color:#33691E;margin-top:2px">de lo que de verdad entr\u00f3</div>'
+
+      +   '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0 7px;margin-top:9px;border-top:1px dashed #A5D6A7">'
+      +     '<span style="font-size:14.5px;color:#444;font-weight:600">\ud83e\uddfe Gastos' + (nGastos ? ' (' + nGastos + ')' : '') + '</span>'
+      +     '<span style="font-size:16.5px;font-weight:800;color:#C62828">\u2212$' + fmtNum(gastosRango) + '</span>'
+      +   '</div>'
+
+      +   '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:10px;background:' + (teQuedo >= 0 ? '#C8E6C9' : '#FFCDD2') + '">'
+      +     '<span style="font-size:15px;font-weight:900;color:' + (teQuedo >= 0 ? '#1B5E20' : '#B71C1C') + '">' + (teQuedo >= 0 ? '\u2705 TE QUED\u00d3' : '\u26a0\ufe0f QUEDASTE EN ROJO') + '</span>'
+      +     '<span style="font-size:20px;font-weight:900;color:' + (teQuedo >= 0 ? '#1B5E20' : '#B71C1C') + '">$' + fmtNum(Math.abs(teQuedo)) + '</span>'
+      +   '</div>'
+      + '</div>'
+
+      + (ganEnLaCalle > 0.005
+          ? '<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:12px;padding:11px">'
+          +   '<div style="font-size:11.5px;font-weight:800;color:#8D6E63;letter-spacing:.5px">\u23f3 GANANCIA QUE EST\u00c1 EN LA CALLE</div>'
+          +   '<div style="font-size:21px;font-weight:900;color:#E65100;line-height:1.2">$' + fmtNum(ganEnLaCalle) + '</div>'
+          +   '<div style="font-size:12px;color:#8D6E63;margin-top:2px">te la ganaste, pero todav\u00eda no te la han pagado</div>'
+          + '</div>'
+          : '');
+  }
 
   function bonito(iso){ var p = iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
   document.getElementById('res-rango').textContent =
