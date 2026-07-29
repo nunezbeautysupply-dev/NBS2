@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260728q-OFICIAL-V2.0">
+<meta name="app-version" content="20260728r-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2599,10 +2599,16 @@ function compararProductosDelRespaldo(delRespaldo){
   var mios = {};
   productos.forEach(function(p){ mios[String(p.id)] = p; });
 
-  var difs = { nombre: [], precio: [], costo: [] };
+  // Las FOTOS tambien viajan en el respaldo, dentro de cada producto. Traerlas por aqui
+  // es directo y de una vez — mucho mejor que ir pidiendolas a la nube una por una.
+  // -28 jul, despues de que ese camino largo le costara horas a Sensei-
+  var difs = { nombre: [], precio: [], costo: [], foto: [] };
   delRespaldo.forEach(function(r){
     var m = mios[String(r.id)];
     if(!m) return;                                  // producto que aqui no existe: no se toca
+    if(r.foto && !m.foto){
+      difs.foto.push({ id: r.id, nombre: String(m.nombre || r.nombre || ''), delArchivo: r.foto });
+    }
     var nomR = String(r.nombre || '').trim();
     var nomM = String(m.nombre || '').trim();
     if(nomR && nomR !== nomM){
@@ -2617,13 +2623,13 @@ function compararProductosDelRespaldo(delRespaldo){
     }
   });
 
-  var total = difs.nombre.length + difs.precio.length + difs.costo.length;
+  var total = difs.nombre.length + difs.precio.length + difs.costo.length + difs.foto.length;
   if(!total){
     avisoGrande('✓ No hay ninguna diferencia.\n\nLos productos de ese respaldo son iguales a los de este teléfono.');
     return;
   }
   // Todas marcadas al principio; el decide cuales quitar
-  ['nombre','precio','costo'].forEach(function(k){
+  ['nombre','precio','costo','foto'].forEach(function(k){
     difs[k].forEach(function(x){ x.marcado = true; });
   });
   _difProd = difs;
@@ -2633,9 +2639,9 @@ function compararProductosDelRespaldo(delRespaldo){
 function pintarDiferenciasProductos(){
   var d = _difProd;
   if(!d) return;
-  var marcadas = ['nombre','precio','costo'].reduce(function(a,k){
+  var marcadas = ['nombre','precio','costo','foto'].reduce(function(a,k){
     return a + d[k].filter(function(x){ return x.marcado; }).length; }, 0);
-  var total = d.nombre.length + d.precio.length + d.costo.length;
+  var total = d.nombre.length + d.precio.length + d.costo.length + d.foto.length;
 
   var h = '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">'
     + '<div style="flex:1"><div style="font-size:17px;font-weight:900;color:#1a237e">📥 Cambios de productos</div>'
@@ -2643,8 +2649,8 @@ function pintarDiferenciasProductos(){
     + '<button onclick="cerrarDiferenciasProductos()" style="flex-shrink:0;width:34px;height:34px;border:none;border-radius:9px;background:#f0f0f0;color:#666;font-size:20px;font-weight:800;cursor:pointer">✕</button>'
     + '</div>'
     + '<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:9px;padding:9px;margin-bottom:12px;font-size:12px;color:#2E7D32;line-height:1.4">'
-    + '<b>Solo se cambia el nombre, el precio y el costo.</b><br>'
-    + 'NO se tocan tus ventas, clientes, pagos, compras, existencias ni fotos.'
+    + '<b>Solo se cambia el nombre, el precio, el costo y la foto.</b><br>'
+    + 'NO se tocan tus ventas, clientes, pagos, compras ni existencias. Y una foto que ya tengas NO se reemplaza.'
     + '</div>';
 
   function bloque(clave, titulo, icono, pintarFila){
@@ -2676,6 +2682,11 @@ function pintarDiferenciasProductos(){
   h += bloque('costo', 'COSTOS', '📦', function(x){
     return '<b>' + escaparHtml(String(x.nombre).slice(0,40)) + '</b><br>'
          + '<span style="color:#999">$' + fmtNum(x.mio) + '</span> → <span style="color:#2E7D32;font-weight:800">$' + fmtNum(x.delArchivo) + '</span>';
+  });
+  h += bloque('foto', 'FOTOS QUE NO TIENES AQUÍ', '📷', function(x){
+    return '<div style="display:flex;align-items:center;gap:8px">'
+         + '<img src="' + x.delArchivo + '" style="width:44px;height:44px;object-fit:cover;border-radius:7px;border:1px solid #ddd;flex-shrink:0">'
+         + '<b style="flex:1">' + escaparHtml(String(x.nombre).slice(0,38)) + '</b></div>';
   });
 
   h += '<div style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:2px solid #eee">'
@@ -2718,7 +2729,7 @@ function aplicarCambiosProductos(){
   var d = _difProd;
   if(!d) return;
   var lista = [];
-  ['nombre','precio','costo'].forEach(function(k){
+  ['nombre','precio','costo','foto'].forEach(function(k){
     d[k].forEach(function(x){ if(x.marcado) lista.push({ tipo:k, dato:x }); });
   });
   if(!lista.length){ avisoGrande('No marcaste ningún cambio.'); return; }
@@ -2746,7 +2757,7 @@ function aplicarCambiosProductos(){
       return g;
     }
 
-    var hechos = { nombre:0, precio:0, costo:0 };
+    var hechos = { nombre:0, precio:0, costo:0, foto:0 };
     lista.forEach(function(item){
       var x = item.dato;
       var g = parcheDe(x.id);
@@ -2761,13 +2772,30 @@ function aplicarCambiosProductos(){
         try { registrarCambioPrecio(x.nombre, x.mio, x.delArchivo); } catch(e){}
         g.precio = x.delArchivo;
         hechos.precio++;
+      } else if(item.tipo === 'foto'){
+        g.foto = x.delArchivo;
+        hechos.foto++;
       } else {
         g.costo = x.delArchivo;
         hechos.costo++;
       }
     });
 
-    SS('np', guardados);
+    // Si trae fotos puede pesar; si no cabe, avisar claro en vez de fallar en silencio
+    var seGuardo = true;
+    try {
+      localStorage.setItem('np', JSON.stringify(guardados));
+    } catch(e){
+      seGuardo = false;
+    }
+    if(!seGuardo){
+      try { liberarEspacioSiHaceFalta(); } catch(e){}
+      try { localStorage.setItem('np', JSON.stringify(guardados)); seGuardo = true; } catch(e){}
+    }
+    if(!seGuardo){
+      avisoGrande('⚠️ No cupo en el teléfono.\n\nToca "🧹 Liberar espacio en el teléfono" y vuelve a intentarlo.\n\nNo se cambió nada.');
+      return;
+    }
     PRODS = [];
     loadProds();
     try { if(typeof renderCatalogo === 'function') renderCatalogo(document.getElementById('catbuscar') ? (document.getElementById('catbuscar').value || '') : ''); } catch(e){}
@@ -2777,6 +2805,7 @@ function aplicarCambiosProductos(){
       + (hechos.nombre ? hechos.nombre + ' nombre(s)\n' : '')
       + (hechos.precio ? hechos.precio + ' precio(s)\n' : '')
       + (hechos.costo  ? hechos.costo  + ' costo(s)\n'  : '')
+      + (hechos.foto   ? hechos.foto   + ' foto(s)\n'   : '')
       + '\nTus ventas, clientes y existencias no se tocaron.');
   });
 }
