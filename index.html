@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260728k-OFICIAL-V2.0">
+<meta name="app-version" content="20260728n-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -940,6 +940,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
   <div class="card" style="margin-bottom:10px">
     <p style="font-size:13px;color:var(--nbs-muted);margin-bottom:8px;line-height:1.45">Si corregiste precios, costos o nombres en otro aparato, baja un respaldo allá y tráelos aquí. Solo cambia esos tres datos.</p>
     <button class="btn" style="background:#E3F2FD;color:#1565C0;border:2px solid #1565C0;font-weight:800" onclick="abrirTraerCambiosProductos()">📥 Traer cambios de productos de un respaldo</button>
+    <button class="btn" style="background:#FFF3E0;color:#E65100;border:2px solid #E65100;font-weight:800;margin-top:8px" onclick="liberarEspacioAhora()">🧹 Liberar espacio en el teléfono</button>
     <input type="file" id="traer-prod-input" accept=".json,application/json" style="display:none" onchange="leerRespaldoParaComparar(this)">
   </div>
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
@@ -2230,6 +2231,18 @@ function hacerCopiaLocal(){
   CLAVES_COPIA_LOCAL.forEach(function(k){
     var crudo = localStorage.getItem(k);
     if(crudo === null) return;
+    // ⚠️ LOS PRODUCTOS VAN SIN FOTOS. El 28 de julio se agrego 'np' a las copias del
+    // telefono sin caer en que los productos llevan las fotos ADENTRO: 10 copias con
+    // fotos llenaron la memoria y la app dejo de poder guardar. Las fotos viven en la
+    // nube -coleccion nbs_fotos- y en el 'np' de ahora, asi que en las copias sobran.
+    if(k === 'np'){
+      try {
+        var lista = JSON.parse(crudo);
+        if(Array.isArray(lista) && typeof quitarFotos === 'function'){
+          crudo = JSON.stringify(quitarFotos(lista));
+        }
+      } catch(e){}
+    }
     promesas.push(comprimirTexto(crudo).then(function(z){
       partes[k] = z ? { zip: z } : { valor: crudo };
     }));
@@ -18009,6 +18022,79 @@ function mostrarLetreroActualizacion(){
 //
 // ES A PRUEBA DE TONTOS: solo AGREGA la lista que falta. No cambia ni un numero, ni un
 // precio, ni una fecha. Y si no habia nada que reparar, no guarda nada.
+// ═══ LIBERAR ESPACIO (28 jul) ═══
+// Las copias del telefono que se hicieron el 28 de julio llevan las fotos adentro y
+// llenaron la memoria, dejando a la app sin poder guardar. Esto las tira y deja solo
+// las 2 mas recientes, ya sin fotos. Corre solo si de verdad hace falta.
+function tamanoDeLocalStorage(){
+  var n = 0;
+  try {
+    for(var i = 0; i < localStorage.length; i++){
+      var k = localStorage.key(i);
+      var v = localStorage.getItem(k);
+      n += (k.length + (v ? v.length : 0)) * 2;   // 2 bytes por caracter
+    }
+  } catch(e){}
+  return n;
+}
+
+function liberarEspacioSiHaceFalta(){
+  var TOPE = 4.2 * 1048576;               // 4,2 MB — antes de que el telefono diga basta
+  var antes = tamanoDeLocalStorage();
+  if(antes < TOPE) return 0;
+
+  console.warn('Memoria casi llena (' + (antes/1048576).toFixed(2) + ' MB). Liberando...');
+
+  // 1) Dejar solo las 2 copias mas recientes
+  try {
+    var copias = JSON.parse(localStorage.getItem(CLAVE_COPIAS_LOCALES) || '[]');
+    if(Array.isArray(copias) && copias.length > 2){
+      localStorage.setItem(CLAVE_COPIAS_LOCALES, JSON.stringify(copias.slice(0, 2)));
+    }
+  } catch(e){}
+
+  // 2) Si aun asi no alcanza, quitarles las fotos a las copias que quedan
+  if(tamanoDeLocalStorage() >= TOPE){
+    try {
+      var c2 = JSON.parse(localStorage.getItem(CLAVE_COPIAS_LOCALES) || '[]');
+      c2.forEach(function(cp){ if(cp && cp.partes) delete cp.partes.np; });
+      localStorage.setItem(CLAVE_COPIAS_LOCALES, JSON.stringify(c2));
+    } catch(e){}
+  }
+
+  // 3) Y si todavia no, borrar las copias del todo -tus DATOS no se tocan-
+  if(tamanoDeLocalStorage() >= TOPE){
+    try { localStorage.removeItem(CLAVE_COPIAS_LOCALES); } catch(e){}
+    try { localStorage.removeItem('nbs_huella_ultima_copia_local'); } catch(e){}
+  }
+
+  var despues = tamanoDeLocalStorage();
+  var liberado = antes - despues;
+  console.warn('Se liberaron ' + (liberado/1048576).toFixed(2) + ' MB. Ahora: ' + (despues/1048576).toFixed(2) + ' MB');
+  return liberado;
+}
+
+// El boton, para que Sensei pueda forzarlo cuando quiera
+function liberarEspacioAhora(){
+  var antes = tamanoDeLocalStorage();
+  var copias = 0;
+  try { copias = (JSON.parse(localStorage.getItem(CLAVE_COPIAS_LOCALES) || '[]') || []).length; } catch(e){}
+
+  if(!confirm('Vas a borrar las copias viejas que guarda el teléfono (' + copias + ').\n\n'
+    + 'Tus VENTAS, CLIENTES, PRODUCTOS y FOTOS no se tocan — solo las copias de respaldo.\n\n'
+    + 'Tu respaldo de la nube y los que has bajado siguen igual.\n\n¿Seguir?')) return;
+
+  try {
+    localStorage.removeItem(CLAVE_COPIAS_LOCALES);
+    localStorage.removeItem('nbs_huella_ultima_copia_local');
+  } catch(e){}
+
+  var despues = tamanoDeLocalStorage();
+  avisoGrande('✓ Se liberaron ' + ((antes - despues)/1048576).toFixed(2) + ' MB.\n\n'
+    + 'Ahora estás usando ' + (despues/1048576).toFixed(2) + ' MB.\n\n'
+    + 'Tus datos no se tocaron. El teléfono va a hacer copias nuevas solo, y ya sin fotos.');
+}
+
 function repararListasQueFaltan(){
   var arreglos = 0;
 
@@ -18045,6 +18131,7 @@ function repararListasQueFaltan(){
 
 function iniciarAppDespuesDeLogin(){
   try { repararListasQueFaltan(); } catch(e){ console.error('No se pudo reparar:', e); }
+  try { liberarEspacioSiHaceFalta(); } catch(e){ console.error('No se pudo liberar espacio:', e); }
   // Las fotos se revisan por su cuenta, sin depender de si la nube gano o no -28 jul-
   setTimeout(function(){
     try { revisarFotosDeLaNube(); } catch(e){ console.error('No se pudieron revisar las fotos:', e); }
@@ -18726,7 +18813,7 @@ function corregirFechasGastosViejos(){
   var huboCambios = false;
   gastosLS.forEach(function(g){
     if(g.fecha && g.fecha.indexOf('-') >= 0){
-      var partes = g.fecha.split('-');
+      var partes = (g.fecha || '').split('-');
       if(partes.length === 3 && partes[0].length === 4){ // AAAA-MM-DD
         g.fecha = partes[1]+'/'+partes[2]+'/'+partes[0];
         huboCambios = true;
@@ -20071,7 +20158,7 @@ function renderDashboard(){
   var mesActual = hoy.split('/')[0]+'/'+hoy.split('/')[2]; // MM/YYYY
   var ventasMes = ventas.filter(function(v){
     if(v.cancelada||v.esBalanceInicial) return false;
-    var p = v.fecha.split('/');
+    var p = (v.fecha || '').split('/');
     return p[0]+'/'+p[2] === mesActual;
   });
   var totalMes = ventasMes.reduce(function(s,v){ return s+v.total; },0);
@@ -20083,7 +20170,7 @@ function renderDashboard(){
   var mesAnteriorKey = String(fechaMesAnterior.getMonth()+1).padStart(2,'0')+'/'+fechaMesAnterior.getFullYear();
   var ventasMesAnterior = ventas.filter(function(v){
     if(v.cancelada||v.esBalanceInicial) return false;
-    var p = v.fecha.split('/');
+    var p = (v.fecha || '').split('/');
     return p[0]+'/'+p[2] === mesAnteriorKey;
   });
   var totalMesAnterior = ventasMesAnterior.reduce(function(s,v){ return s+v.total; },0);
