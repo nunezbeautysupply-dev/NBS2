@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260728r-OFICIAL-V2.0">
+<meta name="app-version" content="20260729a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -6911,7 +6911,7 @@ function renderCatalogo(q){
     var card = document.createElement('div');
     card.className = 'card';
     card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:8px;cursor:pointer';
-    card.innerHTML = '<div style="width:48px;height:48px;border-radius:10px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden">'+(p.foto?'<img src="'+p.foto+'" style="width:100%;height:100%;object-fit:cover">':'📦')+'</div>'
+    card.innerHTML = '<div style="width:88px;height:88px;border-radius:12px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:38px;flex-shrink:0;overflow:hidden">'+(p.foto?'<img src="'+p.foto+'" style="width:100%;height:100%;object-fit:cover">':'📦')+'</div>'
       +'<div style="flex:1;min-width:0">'
       +'<div style="font-size:14px;font-weight:700;line-height:1.3">'+escaparHtml(p.nombre)+'</div>'
       +'<div style="font-size:11px;color:#999;margin-top:2px">'+escaparHtml(p.cat||'Sin categoria')+(p.sku?' · SKU: '+escaparHtml(p.sku):'')+'</div>'
@@ -15194,12 +15194,20 @@ function renderCxC(q){
   var totalLeDebes = pendientes.filter(function(c){return c.saldo<0;}).reduce(function(s,c){ return s+Math.abs(c.saldo); }, 0);
   var resumen = document.createElement('div');
   resumen.style.cssText = 'display:flex;gap:8px;margin-bottom:12px';
+  // Cuantos clientes son, no solo el total -pedido de Sensei el 28 jul: "en clientes que
+  // me deben no me dicen cuantos son, deberia decirmelo ya que es tambien un dato
+  // importante"-
+  var cuantosTeDeben = pendientes.filter(function(c){ return c.saldo > 0; }).length;
+  var cuantosLeDebes = pendientes.filter(function(c){ return c.saldo < 0; }).length;
+
   resumen.innerHTML = '<div style="flex:1;background:var(--nbs-red-bg);border-radius:12px;padding:14px">'
     +'<div style="font-size:11px;color:var(--nbs-red-text);font-weight:500">Total por cobrar</div>'
-    +'<div style="font-size:20px;font-weight:700;color:var(--nbs-red-dark)">$'+fmtNum(totalTeDeben)+'</div></div>'
+    +'<div style="font-size:20px;font-weight:700;color:var(--nbs-red-dark)">$'+fmtNum(totalTeDeben)+'</div>'
+    +'<div style="font-size:12.5px;font-weight:700;color:var(--nbs-red-dark);opacity:.85">'+cuantosTeDeben+(cuantosTeDeben===1?' cliente':' clientes')+'</div></div>'
     +(totalLeDebes>0.005 ? '<div style="flex:1;background:#FFF3E0;border-radius:12px;padding:14px">'
     +'<div style="font-size:11px;color:#E65100;font-weight:500">Crédito a favor de clientes</div>'
-    +'<div style="font-size:20px;font-weight:700;color:#E65100">$'+fmtNum(totalLeDebes)+'</div></div>' : '');
+    +'<div style="font-size:20px;font-weight:700;color:#E65100">$'+fmtNum(totalLeDebes)+'</div>'
+    +'<div style="font-size:12.5px;font-weight:700;color:#E65100;opacity:.85">'+cuantosLeDebes+(cuantosLeDebes===1?' cliente':' clientes')+'</div></div>' : '');
   el.appendChild(resumen);
 
   var btnsAdmin = document.createElement('div');
