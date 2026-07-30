@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260729h-OFICIAL-V2.0">
+<meta name="app-version" content="20260729j-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -619,7 +619,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
 
     <div style="font-size:10px;color:var(--nbs-muted-2);font-weight:700;letter-spacing:1px;padding:12px 8px 4px">INVENTARIO</div>
     <button onclick="irMenuProtegido('p-cat')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📦</span></span>Catálogo</button>
-    <button onclick="irMenuProtegido('p-van')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🚐</span></span>Control de la Van</button>
+    <button onclick="irMenuProtegido('p-van')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🚐</span></span>VAN</button>
     <button onclick="irMenuProtegido('p-inventario')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💰</span></span>Inventario</button>
     <button onclick="irMenuProtegido('p-relleno')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🚐</span></span>Lista de Relleno</button>
     <button onclick="irMenuProtegido('p-copias')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🛡️</span></span>Copias de Seguridad</button>
@@ -1033,7 +1033,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
   <div id="van-resumen" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px"></div>
 
   <div style="display:flex;gap:6px;margin-bottom:12px">
-    <button onclick="abrirCargarVan()" style="flex:1;padding:11px;background:#2E7D32;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">➕ Cargar la van</button>
+    <button onclick="rellenarVanConLoVendido()" style="flex:1;padding:11px;background:#2E7D32;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔄 Cargar la van</button><button onclick="abrirCargarVan()" style="flex:1;padding:11px;background:#1a237e;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">📥 Inventario inicial</button>
     <button onclick="compartirRecargaVan()" style="flex:1;padding:11px;background:#6A1B9A;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">📤 Lista de recarga</button>
   </div>
 
@@ -8607,18 +8607,26 @@ function calcularEstadoVan(){
   var vendidos = v.fechaCarga ? vendidosEnRango(v.fechaCarga, fechaHoyISO()) : {};
   var filas = [];
   var totalEnVan = 0, productosBajos = 0;
+  var inicialDe = v.inicial || {};
   Object.keys(v.cargado).forEach(function(pidStr){
     var cargado = v.cargado[pidStr] || 0;
     if(cargado <= 0) return;
     var prod = productos.find(function(p){ return String(p.id) === pidStr; });
     var nombre = prod ? prod.nombre : ('Producto #' + pidStr);
-    var vendido = vendidos[pidStr] || 0;
-    var quedan = Math.max(0, cargado - vendido);
+    var vendidoTotal = vendidos[pidStr] || 0;
+    var quedan = Math.max(0, cargado - vendidoTotal);
+    // El inventario inicial: si la van es de antes de este cambio, se toma lo cargado
+    var inicial = (inicialDe[pidStr] !== undefined) ? inicialDe[pidStr] : cargado;
+    // Lo que ya repuso al cargar la van; el "vendi" que se ENSEÑA es lo vendido DESDE
+    // esa ultima carga. Sin esto los tres numeros de la pantalla no cuadraban:
+    // salia "Inicial 25 - Vendi 3 - Me quedan 25", y 25-3 no es 25. Sensei lo cazo.
+    var repuesto = Math.max(0, cargado - inicial);
+    var vendido = Math.max(0, vendidoTotal - repuesto);
     // "bajo" = queda 25% o menos de lo que cargaste (o cero). Es una senal, no una regla fija.
     var bajo = quedan === 0 || (cargado > 0 && (quedan / cargado) <= 0.25);
     totalEnVan += quedan;
     if(bajo) productosBajos++;
-    filas.push({ pid: pidStr, nombre: nombre, cargado: cargado, vendido: vendido, quedan: quedan, bajo: bajo });
+    filas.push({ pid: pidStr, nombre: nombre, cargado: cargado, inicial: inicial, vendido: vendido, quedan: quedan, bajo: bajo });
   });
   // Ordenar: primero los bajos, y dentro de esos, los que mas se vendieron
   filas.sort(function(a,b){
@@ -8677,8 +8685,8 @@ function renderVan(q){
       +'<button onclick="quitarProductoDeVan(\''+f.pid+'\')" title="Quitar de la van" style="flex-shrink:0;width:30px;height:30px;border:none;border-radius:7px;background:var(--nbs-red-bg);color:var(--nbs-red-dark);font-size:15px;font-weight:800;cursor:pointer">\u2715</button>'
       +'</div>'
       +'<div style="display:flex;gap:6px">'
-      +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--nbs-muted)">Cargué</div>'
-      +'<input type="number" min="0" inputmode="numeric" value="'+f.cargado+'" data-cargado="'+f.cargado+'"'
+      +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--nbs-muted)">Inicial</div>'
+      +'<input type="number" min="0" inputmode="numeric" value="'+f.inicial+'" data-cargado="'+f.inicial+'"'
       +' onfocus="this.select()" onchange="corregirCargaVan(\''+f.pid+'\', this.value, this)"'
       +' style="width:100%;max-width:66px;padding:5px 4px;text-align:center;font-size:16px;font-weight:800;color:var(--nbs-ink);border:1.5px solid var(--nbs-gold);border-radius:7px;background:#FFFDF5"></div>'
       +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--nbs-muted)">Vendí</div><div style="font-size:16px;font-weight:800;color:#1565C0">'+f.vendido+'</div></div>'
@@ -8691,6 +8699,153 @@ function renderVan(q){
 
 // Abre un panel para registrar cuanto se carga de cada producto en la van.
 // Se puede REEMPLAZAR (empezar de cero) o SUMAR (agregar a lo que ya habia).
+
+// ═══════════════════════════════════════════════════════════════════
+//  CARGAR LA VAN CON LO VENDIDO  (29 jul)
+// ═══════════════════════════════════════════════════════════════════
+//
+// LA IDEA DE SENSEI, en sus palabras: "yo hago un inventario inicial en la van, luego
+// que la van me de una lista de lo que vendi de acuerdo a las ventas, y con esa lista yo
+// relleno la van y se vuelve a poner como cuando empezo".
+//
+// LA DIFERENCIA ENTRE LOS DOS BOTONES, tambien en sus palabras:
+//   INVENTARIO INICIAL -> una vez. Define cuanto es "la van llena".
+//   CARGAR LA VAN      -> cada vez. Mira lo vendido, lo pone, y la van vuelve
+//                         a su inventario inicial.
+//
+// POR QUE ES TAN SIMPLE: la app ya guarda `cargado` (el inventario inicial) y cuenta lo
+// vendido DESDE `fechaCarga`. Asi que cargar la van = mover fechaCarga a hoy: lo vendido
+// vuelve a 0 y "me quedan" vuelve a ser igual al inventario inicial. Sin escribir nada.
+//
+// NO TOCA el inventario del almacen, ni las ventas, ni el dinero.
+
+function rellenarVanConLoVendido(){
+  loadProds();
+  _van = cargarDatosVan();
+  if(!_van || !_van.cargado || !Object.keys(_van.cargado).length){
+    avisoGrande('Tu van esta vacia.\n\nPrimero toca "Inventario inicial" para decir que lleva la van cuando esta llena.');
+    return;
+  }
+  window._relVanDesde = _van.fechaCarga || fechaHoyISO();
+  window._relVanHasta = fechaHoyISO();
+  pintarRellenarVan();
+}
+
+function rangoRapidoVan(dias){
+  if(dias === 0){
+    window._relVanDesde = (_van && _van.fechaCarga) ? _van.fechaCarga : fechaHoyISO();
+  } else {
+    var d = new Date(Date.now() - dias * 86400000);
+    window._relVanDesde = d.toISOString().slice(0,10);
+  }
+  window._relVanHasta = fechaHoyISO();
+  pintarRellenarVan();
+}
+
+function cambiarFechaRelVan(cual, valor){
+  if(cual === 'desde') window._relVanDesde = valor; else window._relVanHasta = valor;
+  pintarRellenarVan();
+}
+
+function pintarRellenarVan(){
+  loadProds();
+  _van = cargarDatosVan();
+  var vendidos = vendidosEnRango(window._relVanDesde, window._relVanHasta) || {};
+
+  var filas = [], totalUnidades = 0;
+  Object.keys(_van.cargado).forEach(function(pid){
+    var n = vendidos[pid] || 0;
+    if(n <= 0) return;
+    var prod = productos.find(function(p){ return String(p.id) === String(pid); });
+    filas.push({ pid: pid, nombre: prod ? prod.nombre : ('Producto #' + pid),
+                 vendido: n, inicial: _van.cargado[pid] || 0 });
+    totalUnidades += n;
+  });
+  filas.sort(function(a,b){ return b.vendido - a.vendido; });
+
+  var h = '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px">'
+        +   '<div style="flex:1"><div style="font-size:18px;font-weight:900;color:#1a237e">CARGAR LA VAN</div>'
+        +   '<div style="font-size:12px;color:#666">Pon esto en la camioneta y la van vuelve a su inventario inicial</div></div>'
+        +   '<button onclick="cerrarRellenarVan()" style="flex-shrink:0;width:34px;height:34px;border:none;border-radius:9px;background:#f0f0f0;color:#666;font-size:20px;font-weight:800;cursor:pointer">X</button>'
+        + '</div>'
+        + '<div style="background:#F4F6FB;border:1px solid #d9dcec;border-radius:11px;padding:11px;margin-bottom:10px">'
+        +   '<div style="font-size:10.5px;color:#666;font-weight:800;letter-spacing:.4px;margin-bottom:6px">VER LO VENDIDO ENTRE ESTAS FECHAS</div>'
+        +   '<div style="display:flex;gap:7px;align-items:center">'
+        +     '<input class="inp" type="date" value="' + window._relVanDesde + '" onchange="cambiarFechaRelVan(&quot;desde&quot;, this.value)" style="flex:1;margin-bottom:0">'
+        +     '<span style="font-size:12px;color:#aaa">a</span>'
+        +     '<input class="inp" type="date" value="' + window._relVanHasta + '" onchange="cambiarFechaRelVan(&quot;hasta&quot;, this.value)" style="flex:1;margin-bottom:0">'
+        +   '</div>'
+        +   '<div style="display:flex;gap:5px;margin-top:8px">'
+        +     '<button onclick="rangoRapidoVan(0)" style="flex:1.4;padding:7px;background:white;border:1px solid #ccc;border-radius:7px;font-size:11px;font-weight:700;color:#1a237e;cursor:pointer">Desde que cargue</button>'
+        +     '<button onclick="rangoRapidoVan(7)" style="flex:1;padding:7px;background:white;border:1px solid #ccc;border-radius:7px;font-size:11.5px;font-weight:700;color:#1a237e;cursor:pointer">7 dias</button>'
+        +     '<button onclick="rangoRapidoVan(15)" style="flex:1;padding:7px;background:white;border:1px solid #ccc;border-radius:7px;font-size:11.5px;font-weight:700;color:#1a237e;cursor:pointer">15</button>'
+        +     '<button onclick="rangoRapidoVan(30)" style="flex:1;padding:7px;background:white;border:1px solid #ccc;border-radius:7px;font-size:11.5px;font-weight:700;color:#1a237e;cursor:pointer">30</button>'
+        +   '</div>'
+        + '</div>';
+
+  if(!filas.length){
+    h += '<div style="text-align:center;color:#999;font-size:13px;padding:22px;line-height:1.5">No vendiste nada de la van en esas fechas.<br>No hay nada que cargar.</div>'
+       + '<button onclick="cerrarRellenarVan()" style="width:100%;padding:13px;background:#ECEFF1;color:#546E7A;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">Cerrar</button>';
+  } else {
+    h += '<div style="font-size:11.5px;color:#2E7D32;font-weight:800;letter-spacing:.4px;margin-bottom:7px">ESTO ES LO QUE TIENES QUE PONER &middot; ' + totalUnidades + ' unidad(es)</div>';
+    filas.forEach(function(f){
+      h += '<div style="display:flex;align-items:center;gap:10px;background:white;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-bottom:6px">'
+        +    '<div style="flex-shrink:0;min-width:46px;text-align:center;background:#E8F5E9;border-radius:8px;padding:7px 4px">'
+        +      '<div style="font-size:19px;font-weight:900;color:#1B5E20;line-height:1">' + f.vendido + '</div></div>'
+        +    '<div style="flex:1;min-width:0">'
+        +      '<div style="font-size:13px;font-weight:700;color:var(--nbs-ink);line-height:1.3">' + escaparHtml(f.nombre) + '</div>'
+        +      '<div style="font-size:11px;color:#888">vuelve a ' + f.inicial + ' en la van</div>'
+        +    '</div></div>';
+    });
+    h += '<button onclick="aplicarRellenoVan()" style="width:100%;padding:15px;background:#2E7D32;color:white;border:none;border-radius:11px;font-size:15px;font-weight:800;cursor:pointer;margin-top:8px">Ya lo puse - cargar la van</button>'
+       + '<button onclick="cerrarRellenarVan()" style="width:100%;padding:11px;background:none;border:1px solid #999;color:#666;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px">Cancelar</button>'
+       + '<div style="font-size:11.5px;color:var(--nbs-muted);text-align:center;margin-top:8px;line-height:1.45">Esto NO toca tu inventario del almacen ni tus ventas.<br>Solo pone el contador de la van en cero.</div>';
+  }
+
+  var ov = document.getElementById('relvan-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'relvan-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99994;display:flex;align-items:center;justify-content:center;padding:14px';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:15px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto">' + h + '</div>';
+  ov.style.display = 'flex';
+}
+
+function cerrarRellenarVan(){
+  var ov = document.getElementById('relvan-ov');
+  if(ov) ov.remove();
+}
+
+function aplicarRellenoVan(){
+  loadProds();
+  _van = cargarDatosVan();
+  if(!_van || !_van.cargado){ cerrarRellenarVan(); return; }
+
+  // POR QUE NO SE MUEVE LA FECHA: la app cuenta lo vendido POR DIA, asi que si Sensei
+  // carga y vende el MISMO dia, mover fechaCarga no borraria las ventas de hoy y "me
+  // quedan" no volveria al inventario inicial. En vez de eso se SUMA lo vendido a lo
+  // cargado: quedan = cargado - vendido vuelve EXACTO al inicial, sin importar la fecha.
+  var vendidos = vendidosEnRango(window._relVanDesde, window._relVanHasta) || {};
+  if(!_van.inicial) _van.inicial = {};
+  var cuantos = 0, unidades = 0;
+  Object.keys(_van.cargado).forEach(function(pid){
+    var n = vendidos[pid] || 0;
+    if(n <= 0) return;
+    _van.cargado[pid] = (_van.cargado[pid] || 0) + n;
+    if(_van.inicial[pid] === undefined) _van.inicial[pid] = _van.cargado[pid] - n;
+    cuantos++; unidades += n;
+  });
+
+  if(!cuantos){ cerrarRellenarVan(); avisoGrande('No habia nada que cargar.'); return; }
+
+  guardarDatosVan(_van);
+  cerrarRellenarVan();
+  abrirVan();
+  avisoGrande('Van cargada.\n\nPusiste ' + unidades + ' unidad(es) en ' + cuantos + ' producto(s).\nLa van volvio a tu inventario inicial.');
+}
+
 // ═══ CORREGIR LO CARGADO EN LA VAN (29 jul) ═══
 // Sensei: "necesito que las cantidades sean editables porque puede ser que esté contando
 // lo que tengo por primera vez y haya productos en varios sitios, y cuando cuente no
@@ -8710,7 +8865,8 @@ function corregirCargaVan(pid, valor, campo){
   _van = cargarDatosVan();
   if(!_van || !_van.cargado){ avisoGrande('Tu van está vacía.'); return; }
 
-  var antes = _van.cargado[pid] || 0;
+  if(!_van.inicial) _van.inicial = {};
+  var antes = (_van.inicial[pid] !== undefined) ? _van.inicial[pid] : (_van.cargado[pid] || 0);
   if(antes === n) return;                      // no cambio nada
 
   loadProds();
@@ -8723,8 +8879,12 @@ function corregirCargaVan(pid, valor, campo){
       return;
     }
     delete _van.cargado[pid];
+    delete _van.inicial[pid];
   } else {
-    _van.cargado[pid] = n;
+    // Se mueve el inicial, y lo cargado se corre lo mismo para no descuadrar lo vendido
+    var dif = n - antes;
+    _van.inicial[pid] = n;
+    _van.cargado[pid] = Math.max(0, (_van.cargado[pid] || 0) + dif);
   }
   guardarDatosVan(_van);
   apuntarCorreccionVan(nombre, antes, n);
@@ -8738,9 +8898,10 @@ function quitarProductoDeVan(pid){
   loadProds();
   var prod = productos.find(function(p){ return String(p.id) === String(pid); });
   var nombre = prod ? prod.nombre : ('Producto #' + pid);
-  var antes = _van.cargado[pid] || 0;
+  var antes = (_van.inicial && _van.inicial[pid] !== undefined) ? _van.inicial[pid] : (_van.cargado[pid] || 0);
   if(!confirm('¿Quitar ' + nombre + ' de la van?\n\nTenías ' + antes + ' cargada(s). Esto NO toca tu inventario ni tus ventas.')) return;
   delete _van.cargado[pid];
+  if(_van.inicial) delete _van.inicial[pid];
   guardarDatosVan(_van);
   apuntarCorreccionVan(nombre, antes, 0);
   abrirVan();
@@ -9072,13 +9233,17 @@ function guardarCargaVan(modo){
     if(!confirm('¿Empezar la van de cero? Esto borra el conteo anterior y arranca de nuevo con lo que acabas de poner.')) return;
     _van.cargado = {};
   }
+  if(!_van.inicial) _van.inicial = {};
+  if(modo === 'reemplazar') _van.inicial = {};
   pids.forEach(function(pid){
     var n = window._cargaVanTemp[pid] || 0;
     if(n <= 0) return;
     if(modo === 'sumar'){
       _van.cargado[pid] = (_van.cargado[pid] || 0) + n;
+      _van.inicial[pid] = (_van.inicial[pid] || 0) + n;
     } else {
       _van.cargado[pid] = n;
+      _van.inicial[pid] = n;
     }
   });
   // La fecha de carga se pone a HOY: desde hoy se cuentan las ventas como salidas de la van.
