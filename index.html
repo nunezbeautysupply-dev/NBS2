@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260730c-OFICIAL-V2.0">
+<meta name="app-version" content="20260730d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -911,7 +911,8 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       <div id="copias-estado" style="font-size:11px;font-weight:700"></div>
     </div>
     <button class="btn" style="background:#2E7D32;color:white;margin:0" onclick="copiarAhoraManual()">🛡️ Hacer una copia ahora</button>
-    <button class="btn" style="background:#546E7A;color:white;margin:8px 0 0" onclick="diagnosticarNube()">🔍 Probar la conexión con la nube</button>
+    <button class="btn" style="background:#546E7A;color:white;margin:8px 0 0" onclick="probarLaNubePiezaPorPieza()" style="width:100%;padding:11px;margin-bottom:8px;background:#FFF3E0;color:#E65100;border:2px solid #E65100;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">🔬 Probar la nube pieza por pieza</button>
+    <button onclick="diagnosticarNube()">🔍 Probar la conexión con la nube</button>
     <div id="diag-resultado" style="display:none;margin-top:10px;font-size:12px;line-height:1.7;background:#FAFAFA;border-radius:9px;padding:11px;white-space:pre-line;font-family:monospace"></div>
   </div>
 
@@ -1770,6 +1771,7 @@ function hacerCopiaAutomatica(forzada){
 
   var promesas = [];
   var guardadas = 0;
+  var claves_ok = [], claves_malas = [];
 
   CLAVES_A_RESPALDAR.forEach(function(k){
     var crudo = localStorage.getItem(k);
@@ -1786,7 +1788,12 @@ function hacerCopiaAutomatica(forzada){
         if(comprimido){ doc.zip = comprimido; }
         else { doc.valor = crudo; } // el navegador no supo comprimir: se guarda tal cual
         return fbDb.collection('nbs_copias').doc(idCopia + '__' + k).set(doc)
-          .then(function(){ guardadas++; });
+          .then(function(){ guardadas++; claves_ok.push(k); });
+      }).catch(function(e){
+        // Esta pieza no se pudo subir. Se anota y se SIGUE con las demas: mas vale una
+        // copia con 27 de 28 piezas que ninguna copia.
+        claves_malas.push({ clave: k, porque: (e && e.code) ? e.code : String(e).slice(0,80) });
+        console.error('No se pudo subir a la nube la pieza "' + k + '":', e);
       })
     );
   });
@@ -1798,7 +1805,8 @@ function hacerCopiaAutomatica(forzada){
       hora: Date.now(),
       fecha: fechaHoy(),
       horaTexto: new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', hour12:true}),
-      claves: CLAVES_A_RESPALDAR.filter(function(k){ return localStorage.getItem(k) !== null; }),
+      claves: claves_ok.slice(),   // SOLO las que de verdad subieron, no las que se intentaron
+      falladas: claves_malas.slice(),
       conteo: conteo,
       cambios: window._cambiosParaAvisar || 0,
       automatica: !forzada
@@ -1809,6 +1817,26 @@ function hacerCopiaAutomatica(forzada){
     // comprobar que esta completo. Sin esto, la app podia decir "copia guardada" cuando en
     // realidad no habia nada. Paso el 17 de julio de 2026: las reglas de Firebase bloqueaban
     // la coleccion nbs_copias y la app igual decia que todo estaba bien.
+    // Si alguna pieza no subio, hay que DECIRLO. Callarlo fue lo que dejo a Sensei sin
+    // copias en la nube sin que se enterara. -30 jul-
+    if(claves_malas.length){
+      var lista = claves_malas.map(function(x){ return x.clave + ' (' + x.porque + ')'; }).join('\n   ');
+      console.error('PIEZAS QUE NO SUBIERON A LA NUBE:\n   ' + lista);
+      try {
+        localStorage.setItem('nbs_copia_nube_fallos', JSON.stringify({
+          hora: Date.now(), fecha: fechaHoy(), fallas: claves_malas
+        }));
+      } catch(e){}
+      if(forzada){
+        setTimeout(function(){
+          avisoGrande('\u26a0\ufe0f La copia se guard\u00f3, pero ' + claves_malas.length +
+            ' parte(s) no subieron:\n\n   ' + lista +
+            '\n\nTus datos est\u00e1n en el tel\u00e9fono y en tu backup. Av\u00edsame para revisarlo.');
+        }, 900);
+      }
+    } else {
+      try { localStorage.removeItem('nbs_copia_nube_fallos'); } catch(e){}
+    }
     return verificarCopiaDeVerdad(idCopia);
   }).then(function(v){
     if(!v.completa){
@@ -19836,6 +19864,45 @@ function cargarDatosDeLaNube(callback){
 
 // Reintenta subir a la nube todo lo que quedo pendiente -por ejemplo, lo que registraste
 // sin señal en la ruta-. Se llama sola al volver el internet y cada 2 minutos.
+
+// ═══ PROBAR LA NUBE, PIEZA POR PIEZA (30 jul) ═══
+// Sensei descubrio que llevaba dias sin copias en la nube y la app no le decia nada.
+// Esto prueba a escribir CADA clave por separado y le dice exactamente cual falla y
+// por que, para no andar adivinando con las reglas de Firebase.
+function probarLaNubePiezaPorPieza(){
+  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser){
+    avisoGrande('Primero entra con tu correo y clave.'); return;
+  }
+  if(!navigator.onLine){ avisoGrande('No hay internet. Conéctate y prueba otra vez.'); return; }
+
+  mostrarCargandoRuta('☁️ Probando la nube pieza por pieza...');
+  var prueba = 'prueba_' + Date.now();
+  var ok = [], mal = [];
+  var pendientes = CLAVES_A_RESPALDAR.filter(function(k){ return localStorage.getItem(k) !== null; });
+
+  var promesas = pendientes.map(function(k){
+    return fbDb.collection('nbs_copias').doc(prueba + '__' + k)
+      .set({ clave: k, hora: Date.now(), valor: 'prueba' })
+      .then(function(){
+        ok.push(k);
+        return fbDb.collection('nbs_copias').doc(prueba + '__' + k).delete().catch(function(){});
+      })
+      .catch(function(e){ mal.push({ k: k, e: (e && e.code) ? e.code : String(e).slice(0,60) }); });
+  });
+
+  Promise.all(promesas).then(function(){
+    cerrarCargandoRuta();
+    if(!mal.length){
+      avisoGrande('✅ La nube acepta las ' + ok.length + ' piezas.\n\n' +
+        'Si aun asi no ves copias, el problema es otro — avísame.');
+      return;
+    }
+    var det = mal.map(function(x){ return '   • ' + x.k + '\n     ' + x.e; }).join('\n');
+    avisoGrande('🔴 LA NUBE RECHAZA ' + mal.length + ' de ' + pendientes.length + ' pieza(s):\n\n' +
+      det + '\n\nEsto casi siempre son las REGLAS de Firebase.\nMándame esta pantalla y te digo qué cambiar.');
+  });
+}
+
 function subirPendientes(){
   if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
   if(!navigator.onLine) return;
