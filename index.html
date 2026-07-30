@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260730a-OFICIAL-V2.0">
+<meta name="app-version" content="20260730b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1682,6 +1682,9 @@ function descomprimirTexto(base64){
 
 var CLAVES_A_RESPALDAR = ['ncl','nv','nc','ncr','np','nsup','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','np_eliminados','nvisitas_barberos','historial_precios','rutas_por_dia',
   'nvan','nrelleno','nbs_facturas_emparejadas','nbs_correcciones_van',
+  // La LISTA de impresoras sí viaja a la nube. La que está ACTIVA no: eso es de cada
+  // aparato -el teléfono puede usar la portátil y la PC la de escritorio-. -30 jul-
+  'impresoras_lista',
   // Las listas de lo borrado tambien viajan: si no, lo que Sensei borro en un aparato
   // resucitaria al juntarse con el otro. -29 jul-
   '_borrados_ncl','_borrados_nv','_borrados_nc','_borrados_np','_borrados_nsup',
@@ -3102,7 +3105,8 @@ function horaLocalDe(k){
 
 // Las claves que son LISTAS de registros con id -esas se funden uno por uno-
 var CLAVES_CON_REGISTROS = ['ncl','nv','nc','ncr','np','nsup','ngastos',
-                            'ntarjetas','notrasdeudas','npedidos','ndevoluciones'];
+                            'ntarjetas','notrasdeudas','npedidos','ndevoluciones',
+                            'impresoras_lista'];
 
 // Cuadernos que SOLO CRECEN: se unen sin repetir, nunca se pisan
 var CLAVES_CUADERNO = ['historial_precios','np_eliminados','nbs_correcciones_van'];
@@ -18642,7 +18646,11 @@ async function exportD(){
     // habria que empezar de cero con cada suplidor -agregado 28 jul-.
     facturasEmparejadas: LS(CLAVE_EMPAREJADOS, {}),
     // El rastro de las correcciones del conteo de la van -29 jul-
-    correccionesVan: LS('nbs_correcciones_van', [])};
+    correccionesVan: LS('nbs_correcciones_van', []),
+    // La impresora: la lista y cuál estaba activa. Asi no hay que configurarla otra vez
+    // si cambia de telefono. -30 jul, hallazgo de la auditoria-
+    impresoras: LS('impresoras_lista', []),
+    impresoraActiva: LS('printer_config', null)};
   var json = JSON.stringify(d);
 
   // Cifrar antes de guardar, con la misma clave del PIN de administrador.
@@ -18813,6 +18821,8 @@ function importD(inp){
       if(d.listaRelleno){ SS('nrelleno', d.listaRelleno); }
       if(d.facturasEmparejadas){ SS(CLAVE_EMPAREJADOS, d.facturasEmparejadas); }
       if(d.correccionesVan){ SS('nbs_correcciones_van', d.correccionesVan); }
+      if(d.impresoras){ SS('impresoras_lista', d.impresoras); }
+      if(d.impresoraActiva){ SS('printer_config', d.impresoraActiva); }
       if(d.visitasRuta){
         for(var kV in d.visitasRuta){
           if(d.visitasRuta.hasOwnProperty(kV)) SS(kV, d.visitasRuta[kV]);
