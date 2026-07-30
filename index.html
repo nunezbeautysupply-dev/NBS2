@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260729e-OFICIAL-V2.0">
+<meta name="app-version" content="20260729g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1726,7 +1726,7 @@ function descomprimirTexto(base64){
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var CLAVES_A_RESPALDAR = ['ncl','nv','nc','ncr','np','nsup','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','np_eliminados','nvisitas_barberos','historial_precios','rutas_por_dia',
-  'nvan','nrelleno','nbs_facturas_emparejadas',
+  'nvan','nrelleno','nbs_facturas_emparejadas','nbs_correcciones_van',
   // Las listas de lo borrado tambien viajan: si no, lo que Sensei borro en un aparato
   // resucitaria al juntarse con el otro. -29 jul-
   '_borrados_ncl','_borrados_nv','_borrados_nc','_borrados_np','_borrados_nsup',
@@ -3150,7 +3150,7 @@ var CLAVES_CON_REGISTROS = ['ncl','nv','nc','ncr','np','nsup','ngastos',
                             'ntarjetas','notrasdeudas','npedidos','ndevoluciones'];
 
 // Cuadernos que SOLO CRECEN: se unen sin repetir, nunca se pisan
-var CLAVES_CUADERNO = ['historial_precios','np_eliminados'];
+var CLAVES_CUADERNO = ['historial_precios','np_eliminados','nbs_correcciones_van'];
 
 // Mapas: se juntan clave por clave
 var CLAVES_MAPA = ['nbs_facturas_emparejadas','nvisitas_barberos','rutas_por_dia'];
@@ -8672,9 +8672,15 @@ function renderVan(q){
       etiqueta = '<span style="color:#2E7D32;font-weight:700">✓ Tienes suficiente</span>';
     }
     return '<div class="card" style="margin-bottom:8px;padding:11px;border-left:4px solid '+colorBorde+'">'
-      +'<div style="font-size:14px;font-weight:700;color:var(--nbs-ink);margin-bottom:8px">'+escaparHtml(f.nombre)+'</div>'
+      +'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">'
+      +'<div style="flex:1;font-size:14px;font-weight:700;color:var(--nbs-ink)">'+escaparHtml(f.nombre)+'</div>'
+      +'<button onclick="quitarProductoDeVan(\''+f.pid+'\')" title="Quitar de la van" style="flex-shrink:0;width:30px;height:30px;border:none;border-radius:7px;background:var(--nbs-red-bg);color:var(--nbs-red-dark);font-size:15px;font-weight:800;cursor:pointer">\u2715</button>'
+      +'</div>'
       +'<div style="display:flex;gap:6px">'
-      +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--nbs-muted)">Cargué</div><div style="font-size:16px;font-weight:800;color:var(--nbs-ink)">'+f.cargado+'</div></div>'
+      +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--nbs-muted)">Cargué</div>'
+      +'<input type="number" min="0" inputmode="numeric" value="'+f.cargado+'" data-cargado="'+f.cargado+'"'
+      +' onfocus="this.select()" onchange="corregirCargaVan(\''+f.pid+'\', this.value, this)"'
+      +' style="width:100%;max-width:66px;padding:5px 4px;text-align:center;font-size:16px;font-weight:800;color:var(--nbs-ink);border:1.5px solid var(--nbs-gold);border-radius:7px;background:#FFFDF5"></div>'
       +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--nbs-muted)">Vendí</div><div style="font-size:16px;font-weight:800;color:#1565C0">'+f.vendido+'</div></div>'
       +'<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--nbs-muted)">Me quedan</div><div style="font-size:16px;font-weight:800;color:'+(f.bajo?'var(--nbs-red-dark)':'#2E7D32')+'">'+f.quedan+'</div></div>'
       +'</div>'
@@ -8685,6 +8691,75 @@ function renderVan(q){
 
 // Abre un panel para registrar cuanto se carga de cada producto en la van.
 // Se puede REEMPLAZAR (empezar de cero) o SUMAR (agregar a lo que ya habia).
+// ═══ CORREGIR LO CARGADO EN LA VAN (29 jul) ═══
+// Sensei: "necesito que las cantidades sean editables porque puede ser que esté contando
+// lo que tengo por primera vez y haya productos en varios sitios, y cuando cuente no
+// cuente bien y haya que arreglar la cantidad".
+//
+// Antes, despues de guardar la carga, el "Cargue" quedaba fijo: solo se podia SUMAR mas o
+// empezar la van de cero. Si conto 25 y en realidad eran 20, no habia como bajarlo.
+//
+// Esto NO toca el inventario ni las ventas: solo el conteo de lo que metio en la van.
+function corregirCargaVan(pid, valor, campo){
+  var n = parseInt(valor, 10);
+  if(!isFinite(n) || n < 0){
+    avisoGrande('Escribe un número de 0 o más.');
+    if(campo) campo.value = campo.getAttribute('data-cargado') || '0';
+    return;
+  }
+  _van = cargarDatosVan();
+  if(!_van || !_van.cargado){ avisoGrande('Tu van está vacía.'); return; }
+
+  var antes = _van.cargado[pid] || 0;
+  if(antes === n) return;                      // no cambio nada
+
+  loadProds();
+  var prod = productos.find(function(p){ return String(p.id) === String(pid); });
+  var nombre = prod ? prod.nombre : ('Producto #' + pid);
+
+  if(n === 0){
+    if(!confirm('Poner ' + nombre + ' en 0 lo quita de la van.\n\n¿Seguir?')){
+      if(campo) campo.value = String(antes);
+      return;
+    }
+    delete _van.cargado[pid];
+  } else {
+    _van.cargado[pid] = n;
+  }
+  guardarDatosVan(_van);
+  apuntarCorreccionVan(nombre, antes, n);
+  abrirVan();                                  // redibuja: "Me quedan" se recalcula solo
+  avisoGrande('\u2713 ' + nombre + '\n\nCargué: ' + antes + ' \u2192 ' + n);
+}
+
+function quitarProductoDeVan(pid){
+  _van = cargarDatosVan();
+  if(!_van || !_van.cargado || _van.cargado[pid] === undefined) return;
+  loadProds();
+  var prod = productos.find(function(p){ return String(p.id) === String(pid); });
+  var nombre = prod ? prod.nombre : ('Producto #' + pid);
+  var antes = _van.cargado[pid] || 0;
+  if(!confirm('¿Quitar ' + nombre + ' de la van?\n\nTenías ' + antes + ' cargada(s). Esto NO toca tu inventario ni tus ventas.')) return;
+  delete _van.cargado[pid];
+  guardarDatosVan(_van);
+  apuntarCorreccionVan(nombre, antes, 0);
+  abrirVan();
+  avisoGrande('\u2713 ' + nombre + ' se quitó de la van.');
+}
+
+// Cada correccion queda anotada, igual que los cambios de precio. Asi hay rastro de lo que
+// se toco durante el conteo. Se guardan las ultimas 300.
+function apuntarCorreccionVan(nombre, antes, despues){
+  try {
+    var log = LS('nbs_correcciones_van', []);
+    if(!Array.isArray(log)) log = [];
+    log.push({ nombre: nombre, antes: antes, despues: despues,
+               fecha: fechaHoy(), hora: new Date().toLocaleTimeString('es-DO', {hour:'numeric', minute:'2-digit'}) });
+    if(log.length > 300) log = log.slice(-300);
+    SS('nbs_correcciones_van', log);
+  } catch(e){ console.error('No se pudo apuntar la corrección de la van:', e); }
+}
+
 function abrirCargarVan(){
   loadProds();
   _van = cargarDatosVan();
@@ -17911,7 +17986,9 @@ async function exportD(){
     // Lo que APRENDIO el lector de facturas: que producto suyo es cada linea de cada
     // suplidor. Es trabajo de Sensei, uno por uno; sin esto, al perder el telefono
     // habria que empezar de cero con cada suplidor -agregado 28 jul-.
-    facturasEmparejadas: LS(CLAVE_EMPAREJADOS, {})};
+    facturasEmparejadas: LS(CLAVE_EMPAREJADOS, {}),
+    // El rastro de las correcciones del conteo de la van -29 jul-
+    correccionesVan: LS('nbs_correcciones_van', [])};
   var json = JSON.stringify(d);
 
   // Cifrar antes de guardar, con la misma clave del PIN de administrador.
@@ -18081,6 +18158,7 @@ function importD(inp){
       if(d.van){ SS('nvan', d.van); }
       if(d.listaRelleno){ SS('nrelleno', d.listaRelleno); }
       if(d.facturasEmparejadas){ SS(CLAVE_EMPAREJADOS, d.facturasEmparejadas); }
+      if(d.correccionesVan){ SS('nbs_correcciones_van', d.correccionesVan); }
       if(d.visitasRuta){
         for(var kV in d.visitasRuta){
           if(d.visitasRuta.hasOwnProperty(kV)) SS(kV, d.visitasRuta[kV]);
