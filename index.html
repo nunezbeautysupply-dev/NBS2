@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260730b-OFICIAL-V2.0">
+<meta name="app-version" content="20260730c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1972,6 +1972,13 @@ var NOMBRES_BONITOS = { ncl:'clientes', nv:'ventas', nc:'compras', np:'productos
 //             balance ni calculo que Sensei vea-. Se deja de vigilar (25 jul,
 //             encontrado porque el aviso lo asustaba sin razon con estas dos).
 var CLAVES_SIN_VIGILAR = { npedidos:true, ncr:true };
+// Las libretas `_borrados_*` NO son datos de Sensei: son apuntes internos de que EL
+// borro algo. Que suban o bajen es normal y no significa perdida de mercancia. El
+// detector las estaba vigilando y le sacaba un aviso de "se borraron datos" que lo
+// asustaba sin razon. -30 jul-
+function esLibretaInterna(clave){
+  return String(clave).indexOf('_borrados_') === 0 || String(clave).indexOf('_hora_') === 0;
+}
 
 // ═══ SONIDOS DE AVISO — hechos desde cero con el propio telefono, sin archivos de
 // audio (25 jul, pedido por Sensei). No se puede copiar el sonido de Windows ni el de
@@ -2052,6 +2059,7 @@ function revisarSiFaltaAlgo(){
   var perdidas = [];
   Object.keys(antes).forEach(function(k){
     if(CLAVES_SIN_VIGILAR[k]) return;
+    if(esLibretaInterna(k)) return;   // apuntes internos, no son datos de Sensei
     var a = antes[k] || 0;
     var b = ahora[k] || 0;
     // Solo avisa si la caida es de verdad -mas de 2, o mas del 10%-, para no molestar
@@ -3219,6 +3227,27 @@ function fundirListas(k, deLaNube, delTelefono){
   return salida;
 }
 
+// Une dos libretas de borrados sin repetir. Si el mismo id esta en las dos, se queda
+// con la hora MAS VIEJA: fue el momento en que de verdad se borro.
+function fundirBorrados(deLaNube, delTelefono){
+  if(!Array.isArray(deLaNube)) return delTelefono;
+  if(!Array.isArray(delTelefono)) return deLaNube;
+  var porId = {}, orden = [];
+  function meter(x){
+    if(!x || x.id === undefined) return;
+    var id = String(x.id);
+    if(!(id in porId)){ porId[id] = x; orden.push(id); return; }
+    var m1 = porId[id].mod || 0, m2 = x.mod || 0;
+    if(m2 && (!m1 || m2 < m1)) porId[id] = x;
+  }
+  deLaNube.forEach(meter);
+  delTelefono.forEach(meter);
+  var salida = [];
+  orden.forEach(function(id){ salida.push(porId[id]); });
+  if(salida.length > 900) salida = salida.slice(-900);
+  return salida;
+}
+
 // Cuadernos que solo crecen: se unen sin repetir
 function fundirCuaderno(deLaNube, delTelefono){
   if(!Array.isArray(deLaNube)) return delTelefono;
@@ -3255,6 +3284,10 @@ function fundirConLoDelTelefono(clave, textoDeLaNube){
   try { local = JSON.parse(crudoLocal); } catch(e){ return null; }
 
   if(esListaDeRegistros(clave))       return JSON.stringify(fundirListas(clave, nube, local));
+  // Las libretas de borrados SOLO CRECEN: se unen sin repetir, jamas se pisan.
+  // Si se reemplazaran, lo que Sensei borro en un aparato resucitaria al juntarse
+  // con el otro. -30 jul, tras pasarle de verdad-
+  if(clave.indexOf('_borrados_') === 0) return JSON.stringify(fundirBorrados(nube, local));
   if(CLAVES_CUADERNO.indexOf(clave) >= 0) return JSON.stringify(fundirCuaderno(nube, local));
   if(CLAVES_MAPA.indexOf(clave) >= 0)     return JSON.stringify(fundirMapa(nube, local));
   return null;
