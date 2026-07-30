@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260729g-OFICIAL-V2.0">
+<meta name="app-version" content="20260729h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -8769,44 +8769,139 @@ function abrirCargarVan(){
     overlay.id = 'van-cargar-overlay';
     document.body.appendChild(overlay);
   }
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:white;z-index:99999;overflow-y:auto;padding:16px';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:white;z-index:99999;overflow-y:auto;padding:14px';
   overlay.scrollTop = 0;
 
+  // ═══ REDISEÑADA IGUAL QUE UN PEDIDO (29 jul) ═══
+  // Sensei: "el cargar la van esta mal diseñado, deberia funcionar como si estuviera
+  // haciendo un pedido... las mismas opciones que cuando estoy haciendo un pedido".
+  // Antes: el buscador metia el producto con cantidad 1 y habia que corregirlo en una
+  // cajita de 60px. Ahora es igual que el pedido: buscador con microfono y boton de
+  // producto nuevo, escoges el producto, pones la cantidad con - y +, y lo agregas.
+  // ⚠️ NO LLEVA PRECIO: esto no toca dinero ni inventario, solo el conteo de la van.
   overlay.innerHTML =
     '<div style="max-width:480px;margin:0 auto">'
-    +'<div style="display:flex;gap:8px;margin-bottom:14px">'
-    +'<button onclick="cerrarCargarVan()" style="flex:1;background:#E8EAF6;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:700;color:#1a237e;cursor:pointer">← Cancelar</button>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px">'
+    +'<button onclick="cerrarCargarVan()" style="flex:1;background:#E8EAF6;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:700;color:#1a237e;cursor:pointer">\u2190 Volver</button>'
     +'</div>'
-    +'<h2 style="font-size:19px;font-weight:700;color:#1a237e;margin-bottom:4px">➕ Cargar la van</h2>'
-    +'<p style="font-size:12px;color:var(--nbs-muted);margin-bottom:14px">Busca cada producto que metes en la van y escribe cuánto cargas. Al guardar, arranca el conteo desde hoy.</p>'
-    +'<div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px">'
-    +'<span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span>'
-    +'<input id="van-carga-buscar" class="busca-fuerte" type="text" placeholder="Buscar producto para cargar..." oninput="filtrarCargaVan(this.value)">'
+    +'<h2 style="font-size:19px;font-weight:700;color:#1a237e;margin-bottom:2px">\ud83d\ude90 Cargar la van</h2>'
+    +'<p style="font-size:12px;color:var(--nbs-muted);margin-bottom:12px">Busca cada producto, pon cu\u00e1ntos metes y agr\u00e9galo. Esto NO toca tu inventario ni tu dinero.</p>'
+
+    // Buscador + microfono + producto nuevo, igual que el pedido
+    +'<div style="display:flex;gap:6px;align-items:stretch;margin-bottom:8px">'
+    +'<div class="busca-caja" style="flex:1;border:2px solid var(--nbs-gold);margin:0">'
+    +'<span style="font-size:16px;flex-shrink:0;opacity:0.75">\ud83d\udd0d</span>'
+    +'<input id="van-carga-buscar" class="busca-fuerte" type="search" inputmode="search" autocomplete="off" placeholder="Buscar producto..." oninput="filtrarCargaVan(this.value)">'
     +'</div>'
-    +'<div id="van-carga-plist" style="background:white;border:1px solid #ddd;border-radius:8px;max-height:240px;overflow-y:auto;display:none;margin-bottom:10px"></div>'
+    +'<button id="van-carga-mic" onclick="dictarBusquedaSimple(\'van-carga-buscar\', \'van-carga-mic\')" title="Dictar por voz" style="flex-shrink:0;width:44px;background:#5E35B1;color:white;border:none;border-radius:9px;font-size:19px;cursor:pointer">\ud83c\udfa4</button>'
+    +'<button onclick="abrirNuevoProdVan(document.getElementById(\'van-carga-buscar\').value||\'\')" title="Crear producto nuevo" style="flex-shrink:0;width:44px;background:#00838F;color:white;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer">+</button>'
+    +'</div>'
+    +'<div id="van-carga-plist" style="background:white;border:1px solid #ddd;border-radius:8px;max-height:230px;overflow-y:auto;display:none;margin-bottom:10px"></div>'
+
+    // El producto escogido, con su cantidad -- y +
+    +'<div id="van-sel-wrap" style="display:none;background:#FFFDF5;border:2px solid var(--nbs-gold);border-radius:12px;padding:12px;margin-bottom:12px"></div>'
+
+    // Formulario de producto nuevo
     +'<div id="van-np-wrap" style="display:none;background:#E0F7FA;border-radius:10px;padding:12px;margin-bottom:10px">'
-    +'<div style="font-size:12px;font-weight:700;color:#00838F;margin-bottom:8px">📦 NUEVO PRODUCTO</div>'
+    +'<div style="font-size:12px;font-weight:700;color:#00838F;margin-bottom:8px">\u2795 NUEVO PRODUCTO</div>'
     +'<label class="lbl">Marca *</label><input class="inp" id="vannp-marca" type="text" placeholder="Ej: DORCO, IMMORTAL" autocomplete="off">'
     +'<label class="lbl">Nombre del producto *</label><input class="inp" id="vannp-nombre" type="text" placeholder="Ej: Colonia Venom" autocomplete="off">'
-    +'<label class="lbl">Categoría</label><input class="inp" id="vannp-cat" type="text" placeholder="Ej: Colonias, Navajas..." autocomplete="off">'
+    +'<label class="lbl">Categor\u00eda</label><input class="inp" id="vannp-cat" type="text" placeholder="Ej: Colonias, Navajas..." autocomplete="off">'
     +'<div class="r2">'
-    +'<div><label class="lbl">Costo ($)</label><input class="inp" id="vannp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select()"></div>'
-    +'<div><label class="lbl">Precio ($)</label><input class="inp" id="vannp-precio" type="text" inputmode="decimal" value="0.00" onfocus="this.select()"></div>'
+    +'<div><label class="lbl">Costo ($)</label><input class="inp" id="vannp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)"></div>'
+    +'<div><label class="lbl">Precio ($)</label><input class="inp" id="vannp-precio" type="text" inputmode="decimal" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)"></div>'
     +'</div>'
-    +'<label class="lbl">Cuántos cargas en la van</label><input class="inp" id="vannp-stock" type="number" value="1" min="0">'
+    +'<label class="lbl">Cu\u00e1ntos cargas en la van</label><input class="inp" id="vannp-stock" type="number" value="1" min="0">'
     +'<div style="display:flex;gap:8px">'
-    +'<button class="btn" style="flex:1;background:#00838F;color:white;margin:0" onclick="guardarNuevoProdVan()">✓ Crear y agregar</button>'
+    +'<button class="btn" style="flex:1;background:#00838F;color:white;margin:0" onclick="guardarNuevoProdVan()">\u2713 Crear y agregar</button>'
     +'<button class="btn" style="flex:1;background:#546E7A;color:white;margin:0" onclick="cerrarNuevoProdVan()">Cancelar</button>'
     +'</div>'
     +'</div>'
+
+    // Lo que va llevando
+    +'<div id="van-carga-conteo" style="font-size:12px;font-weight:800;color:#2E7D32;letter-spacing:.4px;margin-bottom:6px"></div>'
     +'<div id="van-carga-lista" style="margin-bottom:14px"></div>'
-    +'<div style="display:flex;gap:8px;margin-bottom:8px">'
-    +'<button onclick="guardarCargaVan(\'sumar\')" style="flex:1;padding:13px;background:#2E7D32;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Sumar a la van</button>'
-    +'</div>'
-    +'<button onclick="guardarCargaVan(\'reemplazar\')" style="width:100%;padding:11px;background:none;border:1px solid #546E7A;color:#546E7A;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Empezar de cero (reemplazar todo)</button>'
+
+    +'<div id="van-carga-botones"></div>'
     +'</div>';
 
-  window._cargaVanTemp = {}; // pid -> cantidad que se va a cargar en esta sesion
+  window._cargaVanTemp = {};   // pid -> cantidad que se va a cargar
+  window._vanSel = null;       // el producto escogido, esperando su cantidad
+  window._vanSelCant = 1;
+  renderCargaVanLista();
+  setTimeout(function(){ var c = document.getElementById('van-carga-buscar'); if(c) c.focus(); }, 120);
+}
+
+// Al tocar un producto de los resultados: NO se agrega de una vez. Se muestra arriba con
+// su cantidad, igual que en el pedido, para que Sensei ponga cuantos metio de verdad.
+function seleccionarProdVan(pid){
+  loadProds();
+  var p = productos.find(function(x){ return String(x.id) === String(pid); });
+  if(!p) return;
+  window._vanSel = p;
+  window._vanSelCant = window._cargaVanTemp[String(pid)] || 1;
+  var buscar = document.getElementById('van-carga-buscar');
+  if(buscar) buscar.value = '';
+  var plist = document.getElementById('van-carga-plist');
+  if(plist){ plist.innerHTML = ''; plist.style.display = 'none'; }
+  pintarSelVan();
+}
+
+function pintarSelVan(){
+  var w = document.getElementById('van-sel-wrap');
+  if(!w) return;
+  var p = window._vanSel;
+  if(!p){ w.style.display = 'none'; w.innerHTML = ''; return; }
+  var yaTiene = window._cargaVanTemp[String(p.id)];
+  w.style.display = 'block';
+  w.innerHTML =
+     '<div style="font-size:14.5px;font-weight:800;color:var(--nbs-ink);line-height:1.3;margin-bottom:8px">' + escaparHtml(p.nombre) + '</div>'
+   + (yaTiene !== undefined ? '<div style="font-size:11.5px;color:#8D6E63;margin-bottom:8px">Ya llevas ' + yaTiene + ' de este \u2014 esto lo cambia</div>' : '')
+   + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+   +   '<button onclick="cambiarCantSelVan(-1)" style="width:44px;height:44px;background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:10px;font-size:22px;font-weight:800;cursor:pointer">\u2212</button>'
+   +   '<input id="van-sel-cant" type="number" min="1" inputmode="numeric" value="' + window._vanSelCant + '" onfocus="this.select()" oninput="window._vanSelCant = parseInt(this.value) || 1" style="flex:1;height:44px;text-align:center;font-size:20px;font-weight:800;color:var(--nbs-ink);border:1.5px solid #ccc;border-radius:10px">'
+   +   '<button onclick="cambiarCantSelVan(1)" style="width:44px;height:44px;background:var(--nbs-green-bg);color:var(--nbs-green-text);border:none;border-radius:10px;font-size:22px;font-weight:800;cursor:pointer">+</button>'
+   + '</div>'
+   + '<div style="display:flex;gap:8px">'
+   +   '<button onclick="agregarSelVan()" style="flex:2;padding:13px;background:#2E7D32;color:white;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer">\u2713 Agregar a la van</button>'
+   +   '<button onclick="cancelarSelVan()" style="flex:1;padding:13px;background:#ECEFF1;color:#546E7A;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">Cancelar</button>'
+   + '</div>';
+  setTimeout(function(){ var c = document.getElementById('van-sel-cant'); if(c){ try{ c.focus(); c.select(); }catch(e){} } }, 80);
+}
+
+function cambiarCantSelVan(d){
+  var n = (parseInt(window._vanSelCant, 10) || 1) + d;
+  if(n < 1) n = 1;
+  window._vanSelCant = n;
+  var c = document.getElementById('van-sel-cant');
+  if(c) c.value = String(n);
+}
+
+function agregarSelVan(){
+  var p = window._vanSel;
+  if(!p) return;
+  var n = parseInt(window._vanSelCant, 10) || 1;
+  if(n < 1) n = 1;
+  window._cargaVanTemp[String(p.id)] = n;
+  window._vanSel = null;
+  pintarSelVan();
+  renderCargaVanLista();
+  var buscar = document.getElementById('van-carga-buscar');
+  if(buscar) buscar.focus();
+}
+
+function cancelarSelVan(){
+  window._vanSel = null;
+  pintarSelVan();
+  var buscar = document.getElementById('van-carga-buscar');
+  if(buscar) buscar.focus();
+}
+
+function cambiarCantItemVan(pid, d){
+  var actual = window._cargaVanTemp[String(pid)] || 0;
+  var n = actual + d;
+  if(n < 1){ quitarDeCargaVan(pid); return; }
+  window._cargaVanTemp[String(pid)] = n;
   renderCargaVanLista();
 }
 
@@ -8829,7 +8924,7 @@ function filtrarCargaVan(q){
     d.innerHTML = '<span style="flex:1;min-width:0;font-weight:600;color:var(--nbs-ink)">'+escaparHtml(p.nombre)+'</span>'
       +(ya ? '<span style="font-size:11px;color:var(--nbs-green-text);font-weight:700">✓ agregado</span>'
            : '<span style="font-size:18px;color:var(--nbs-gold)">+</span>');
-    d.onclick = (function(prod){ return function(){ agregarACargaVan(prod); }; })(p);
+    d.onclick = (function(prod){ return function(){ seleccionarProdVan(prod.id); }; })(p);
     el.appendChild(d);
   });
   // Siempre ofrecer crear un producto nuevo con lo que escribió (útil al armar inventario desde cero)
@@ -8922,22 +9017,50 @@ function quitarDeCargaVan(pid){
 
 function renderCargaVanLista(){
   var el = document.getElementById('van-carga-lista');
+  var elConteo = document.getElementById('van-carga-conteo');
+  var elBotones = document.getElementById('van-carga-botones');
   if(!el) return;
+  loadProds();
   var pids = Object.keys(window._cargaVanTemp);
+
+  // Cuantos productos y cuantas unidades lleva, como el pedido
+  var unidades = pids.reduce(function(a, pid){ return a + (window._cargaVanTemp[pid] || 0); }, 0);
+  if(elConteo){
+    elConteo.textContent = pids.length
+      ? 'LLEVAS ' + pids.length + ' producto(s) \u00b7 ' + unidades + ' unidad(es)'
+      : '';
+  }
+
   if(!pids.length){
-    el.innerHTML = '<div style="text-align:center;color:#bbb;font-size:13px;padding:16px">Busca productos arriba para agregarlos a la carga.</div>';
+    el.innerHTML = '<div style="text-align:center;color:#bbb;font-size:13px;padding:18px">Busca un producto arriba para empezar.</div>';
+    if(elBotones) elBotones.innerHTML = '';
     return;
   }
+
   el.innerHTML = pids.map(function(pid){
     var prod = productos.find(function(p){ return String(p.id) === pid; });
-    var nombre = prod ? prod.nombre : ('Producto #'+pid);
+    var nombre = prod ? prod.nombre : ('Producto #' + pid);
     var cant = window._cargaVanTemp[pid];
-    return '<div class="card" style="margin-bottom:8px;padding:10px;display:flex;align-items:center;gap:9px">'
-      +'<input type="number" min="0" value="'+cant+'" oninput="fijarCargaVan(\''+pid+'\', this.value)" style="width:60px;padding:8px;border:1px solid #ddd;border-radius:7px;font-size:15px;text-align:center;font-weight:700">'
-      +'<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--nbs-ink)">'+escaparHtml(nombre)+'</div>'
-      +'<button onclick="quitarDeCargaVan(\''+pid+'\')" style="background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:7px;width:32px;height:32px;font-size:16px;cursor:pointer;flex-shrink:0">×</button>'
-      +'</div>';
+    return '<div class="card" style="margin-bottom:8px;padding:11px">'
+      + '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">'
+      +   '<div style="flex:1;font-size:13.5px;font-weight:700;color:var(--nbs-ink);line-height:1.3">' + escaparHtml(nombre) + '</div>'
+      +   '<button onclick="quitarDeCargaVan(\'' + pid + '\')" title="Quitar" style="flex-shrink:0;width:30px;height:30px;background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:7px;font-size:14px;cursor:pointer">\ud83d\uddd1\ufe0f</button>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:7px">'
+      +   '<button onclick="cambiarCantItemVan(\'' + pid + '\',-1)" style="width:38px;height:38px;background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:9px;font-size:20px;font-weight:800;cursor:pointer">\u2212</button>'
+      +   '<input type="number" min="1" inputmode="numeric" value="' + cant + '" onfocus="this.select()" oninput="fijarCargaVan(\'' + pid + '\', this.value)" style="flex:1;height:38px;text-align:center;font-size:17px;font-weight:800;color:var(--nbs-ink);border:1.5px solid #ccc;border-radius:9px">'
+      +   '<button onclick="cambiarCantItemVan(\'' + pid + '\',1)" style="width:38px;height:38px;background:var(--nbs-green-bg);color:var(--nbs-green-text);border:none;border-radius:9px;font-size:20px;font-weight:800;cursor:pointer">+</button>'
+      + '</div>'
+      + '</div>';
   }).join('');
+
+  // Los dos botones de guardar solo salen cuando ya hay algo que guardar
+  if(elBotones){
+    elBotones.innerHTML =
+       '<button onclick="guardarCargaVan(\'sumar\')" style="width:100%;padding:14px;background:#2E7D32;color:white;border:none;border-radius:10px;font-size:14.5px;font-weight:800;cursor:pointer;margin-bottom:8px">\u2713 Sumar a la van</button>'
+     + '<button onclick="guardarCargaVan(\'reemplazar\')" style="width:100%;padding:12px;background:none;border:2px solid #546E7A;color:#546E7A;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">\ud83d\udd04 Empezar de cero (reemplazar todo)</button>'
+     + '<div style="font-size:11.5px;color:var(--nbs-muted);text-align:center;margin-top:7px;line-height:1.4">"Sumar" agrega a lo que ya hab\u00eda.<br>"Empezar de cero" borra el conteo anterior \u2014 es el que sirve para el inventario.</div>';
+  }
 }
 
 function guardarCargaVan(modo){
