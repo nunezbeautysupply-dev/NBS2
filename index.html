@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260730k-OFICIAL-V2.0">
+<meta name="app-version" content="20260730m-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19845,6 +19845,7 @@ function cargarDatosDeLaNube(callback){
   fbDb.collection('nbs_data').get().then(function(snapshot){
     clearTimeout(temporizador);
     var bajados = 0, protegidos = 0, juntados = 0;
+    var clavesQueCambiaron = [], protegidosLista = [];
     // Primero se REGISTRAN todas las libretas de borrados de esta tanda, y ademas se
     // ordenan para que se apliquen antes. Dos redes: si una fallara, la otra sostiene.
     // Sin esto, un registro que Sensei borro en un aparato resucitaba en el otro. -30 jul-
@@ -19880,6 +19881,7 @@ function cargarDatosDeLaNube(callback){
 
       if(hayAlgoLocal && horaTelefono > horaNube){
         protegidos++;
+        protegidosLista.push(doc.id);
         console.log('PROTEGIDO: "'+doc.id+'" en este teléfono es más nuevo que en la nube. No se toca.');
         // Y como lo del telefono es mas nuevo, hay que subirlo -la nube esta atrasada-
         marcarPendienteDeSubir(doc.id);
@@ -19906,11 +19908,16 @@ function cargarDatosDeLaNube(callback){
         // JUNTAN registro por registro: gana el que se modifico despues, y lo que
         // se borro no resucita. Si por lo que sea no se puede juntar, se hace lo de
         // siempre -reemplazar-, que es como funcionaba hasta hoy.
+        var loQueHabia = localStorage.getItem(doc.id);
         var fundido = null;
         try { fundido = fundirConLoDelTelefono(doc.id, valorFinal); }
         catch(eFundir){ console.error('No se pudo juntar "'+doc.id+'":', eFundir); }
-        localStorage.setItem(doc.id, fundido !== null ? fundido : valorFinal);
+        var loQueQueda = (fundido !== null) ? fundido : valorFinal;
+        localStorage.setItem(doc.id, loQueQueda);
         if(fundido !== null) juntados++;
+        // Solo si el resultado es DISTINTO de lo que este telefono ya tenia, hay algo
+        // nuevo que subir. Si quedo igual, la nube ya lo tiene y no hay que molestar.
+        if(loQueQueda !== loQueHabia) clavesQueCambiaron.push(doc.id);
 
         // Se anota la hora de la nube como la hora de este dato, para no confundir despues
         localStorage.setItem('_hora_'+doc.id, String(horaNube));
@@ -19922,9 +19929,16 @@ function cargarDatosDeLaNube(callback){
     if(protegidos > 0){
       console.log(protegidos+' dato(s) de este teléfono se protegieron de ser sobrescritos por la nube.');
     }
-    // Siempre se sube lo que quedo despues de juntar, para que la nube tenga la mezcla
-    if(juntados > 0 || protegidos > 0){
-      CLAVES_A_RESPALDAR.forEach(function(k){ if(localStorage.getItem(k) !== null) marcarPendienteDeSubir(k); });
+    // Solo se marcan para subir las claves que DE VERDAD cambiaron al juntarse — no
+    // todas. Marcarlas todas hacia que cada arranque enseñara "16 cambios sin guardar"
+    // aunque no hubiera pasado nada, y eso asustaba a Sensei sin razon. -30 jul-
+    if(clavesQueCambiaron.length){
+      clavesQueCambiaron.forEach(function(k){ marcarPendienteDeSubir(k); });
+      console.log('Se van a subir ' + clavesQueCambiaron.length + ' clave(s) que cambiaron al juntarse.');
+      setTimeout(subirPendientes, 1500);
+    } else if(protegidos > 0){
+      // Nada cambio al juntar, pero este telefono tiene datos que la nube no: se suben
+      protegidosLista.forEach(function(k){ marcarPendienteDeSubir(k); });
       setTimeout(subirPendientes, 1500);
     }
     llamarUnaSolaVez();
