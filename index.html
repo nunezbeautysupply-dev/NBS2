@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260730n-OFICIAL-V2.0">
+<meta name="app-version" content="20260731a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -402,7 +402,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
   #res-cobrado, #res-vendido{ font-size:19px }
   @media (max-width:400px){ #res-cobrado, #res-vendido{ font-size:17px } }
   @media (max-width:345px){ #res-cobrado, #res-vendido{ font-size:15px } }
-  @media (max-width:365px){ #mini-res-txt{ font-size:10.5px } }
+  @media (max-width:365px){ #mini-res-txt{ font-size:13px } }
   #mini-resumen{ box-sizing:border-box }
 </style>
 
@@ -529,9 +529,9 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
      Va dentro de un contenedor con padding para que nunca se salga de la pantalla. -->
 <div style="padding:0 12px 8px;box-sizing:border-box;width:100%">
   <button onclick="ir('p-resumen')" id="mini-resumen" style="display:flex;align-items:center;gap:6px;width:100%;box-sizing:border-box;background:linear-gradient(90deg,#2E7D32,#388E3C);border:none;border-radius:9px;padding:8px 10px;margin:0;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(46,125,50,.22)">
-    <span style="font-size:13px;flex:0 0 auto">💰</span>
-    <span id="mini-res-txt" style="flex:1;text-align:left;font-size:12px;color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15;min-width:0">Cobr&eacute; <b style="font-size:15px">$0.00</b> &nbsp;&middot;&nbsp; Vend&iacute; <b style="font-size:15px">$0.00</b></span>
-    <span style="font-size:13px;color:#c8f0cd;flex:0 0 auto">›</span>
+    <span style="font-size:16px;flex:0 0 auto">💰</span>
+    <span id="mini-res-txt" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:15px;color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;line-height:1.15;min-width:0"><span>Cobr&eacute; $0.00</span><span style="color:#8FD19A;letter-spacing:2px">&middot;&middot;&middot;</span><span>Vend&iacute; $0.00</span></span>
+    <span style="font-size:16px;color:#c8f0cd;flex:0 0 auto">›</span>
   </button>
 </div>
 
@@ -20937,8 +20937,10 @@ function pintarMiniResumen(){
         });
       }
     });
-    el.innerHTML = 'Cobr&eacute; <b style="font-size:15px">$'+fmtNum(cobrado)+'</b> &nbsp;&middot;&nbsp; Vend&iacute; <b style="font-size:15px">$'+fmtNum(vendido)+'</b>';
-  }catch(e){ el.textContent = 'Toca para ver lo de hoy'; }
+    el.innerHTML = '<span>Cobr&eacute; $'+fmtNum(cobrado)+'</span>'
+      + '<span style="color:#8FD19A;letter-spacing:2px">&middot;&middot;&middot;</span>'
+      + '<span>Vend&iacute; $'+fmtNum(vendido)+'</span>';
+  }catch(e){ el.innerHTML = '<span>Toca para ver lo de hoy</span>'; }
 }
 
 // Detalle por cliente: quien pago, cuanto cogio y como quedo el balance
