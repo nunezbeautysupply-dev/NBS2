@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260730j-OFICIAL-V2.0">
+<meta name="app-version" content="20260730k-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -911,7 +911,8 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       <div id="copias-estado" style="font-size:11px;font-weight:700"></div>
     </div>
     <button class="btn" style="background:#2E7D32;color:white;margin:0" onclick="copiarAhoraManual()">🛡️ Hacer una copia ahora</button>
-    <button class="btn" style="background:#546E7A;color:white;margin:8px 0 0" onclick="probarLaNubePiezaPorPieza()" style="width:100%;padding:11px;margin-bottom:8px;background:#FFF3E0;color:#E65100;border:2px solid #E65100;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">🔬 Probar la nube pieza por pieza</button>
+    <button class="btn" style="background:#546E7A;color:white;margin:8px 0 0" onclick="reintentarYDecirmeElError()" style="width:100%;padding:13px;margin-bottom:8px;background:#C62828;color:white;border:none;border-radius:9px;font-size:14px;font-weight:800;cursor:pointer">🚨 Reintentar y decirme el error</button>
+    <button onclick="probarLaNubePiezaPorPieza()" style="width:100%;padding:11px;margin-bottom:8px;background:#FFF3E0;color:#E65100;border:2px solid #E65100;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">🔬 Probar la nube pieza por pieza</button>
     <button onclick="diagnosticarNube()">🔍 Probar la conexión con la nube</button>
     <div id="diag-resultado" style="display:none;margin-top:10px;font-size:12px;line-height:1.7;background:#FAFAFA;border-radius:9px;padding:11px;white-space:pre-line;font-family:monospace"></div>
   </div>
@@ -19941,6 +19942,56 @@ function cargarDatosDeLaNube(callback){
 // Sensei descubrio que llevaba dias sin copias en la nube y la app no le decia nada.
 // Esto prueba a escribir CADA clave por separado y le dice exactamente cual falla y
 // por que, para no andar adivinando con las reglas de Firebase.
+// ═══ REINTENTAR Y DECIR EL ERROR DE VERDAD (30 jul) ═══
+// Se llevaban horas adivinando por que 16 cambios no subian: la prueba con documentos
+// falsos decia que todo estaba bien, porque escribia datos de mentira en documentos de
+// mentira. Esto reintenta la subida DE VERDAD y enseña el error exacto de cada pieza.
+function reintentarYDecirmeElError(){
+  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser){
+    avisoGrande('Primero entra con tu correo y clave.'); return;
+  }
+  if(!navigator.onLine){ avisoGrande('No hay internet. Conectate y prueba otra vez.'); return; }
+
+  try { localStorage.removeItem('nbs_fallos_subida'); } catch(e){}
+  var antes = hayPendientesDeSubir();
+  mostrarCargandoRuta('\u2601\ufe0f Reintentando de verdad...');
+
+  subirPendientes();
+
+  setTimeout(function(){
+    cerrarCargandoRuta();
+    var despues = hayPendientesDeSubir();
+    var fallos = {};
+    try { fallos = JSON.parse(localStorage.getItem('nbs_fallos_subida') || '{}'); } catch(e){}
+    var nombres = Object.keys(fallos);
+
+    var t = [];
+    t.push('\u2601\ufe0f REINTENTO DE VERDAD\n');
+    t.push('Pendientes antes:   ' + antes);
+    t.push('Pendientes ahora:   ' + despues);
+    t.push('');
+
+    if(!nombres.length && despues === 0){
+      t.push('\u2705 SUBIO TODO. Ya no queda nada pendiente.');
+    } else if(!nombres.length && despues > 0){
+      t.push('\u26a0\ufe0f Quedan ' + despues + ' pendientes pero NINGUNO dio error.');
+      t.push('Puede que todavia esten subiendo. Espera 10 segundos y toca otra vez.');
+    } else {
+      t.push('\ud83d\udd34 ESTAS NO PUDIERON SUBIR:\n');
+      nombres.slice(0, 6).forEach(function(k){
+        var f = fallos[k];
+        t.push('\u2022 ' + k + '   (' + Math.round(f.bytes/1024) + ' KB)');
+        t.push('   ' + f.codigo);
+        t.push('   ' + f.mensaje);
+        t.push('');
+      });
+      if(nombres.length > 6) t.push('...y ' + (nombres.length - 6) + ' mas.');
+      t.push('MANDAME ESTA PANTALLA.');
+    }
+    avisoGrande(t.join('\n'));
+  }, 6000);
+}
+
 function probarLaNubePiezaPorPieza(){
   if(typeof fbAuth === 'undefined' || !fbAuth.currentUser){
     avisoGrande('Primero entra con tu correo y clave.'); return;
@@ -20038,8 +20089,24 @@ function subirPendientes(){
     }
     fbDb.collection('nbs_data').doc(k.replace(/\//g,'_')).set(docPend).then(function(){
       quitarPendienteDeSubir(k);
+      try {
+        var okf = JSON.parse(localStorage.getItem('nbs_fallos_subida') || '{}');
+        if(okf[k]){ delete okf[k]; localStorage.setItem('nbs_fallos_subida', JSON.stringify(okf)); }
+      } catch(e2){}
       console.log('Se subió a la nube lo que estaba pendiente: '+k);
-    }).catch(function(e){ console.error('Sigue sin poder subir "'+k+'":', e); });
+    }).catch(function(e){
+      console.error('Sigue sin poder subir "'+k+'":', e);
+      try {
+        var fallos = JSON.parse(localStorage.getItem('nbs_fallos_subida') || '{}');
+        fallos[k] = {
+          codigo: (e && e.code) ? e.code : '(sin codigo)',
+          mensaje: (e && e.message) ? String(e.message).slice(0, 180) : String(e).slice(0, 180),
+          bytes: JSON.stringify(docPend).length,
+          hora: Date.now()
+        };
+        localStorage.setItem('nbs_fallos_subida', JSON.stringify(fallos));
+      } catch(e2){}
+    });
   });
 }
 
