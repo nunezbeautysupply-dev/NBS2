@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260730d-OFICIAL-V2.0">
+<meta name="app-version" content="20260730i-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3163,8 +3163,22 @@ function sinSello(reg){
 }
 
 function leerBorrados(k){
-  try { var b = JSON.parse(localStorage.getItem(claveDeBorrados(k)) || '[]'); return Array.isArray(b) ? b : []; }
-  catch(e){ return []; }
+  var lista = [];
+  try {
+    var b = JSON.parse(localStorage.getItem(claveDeBorrados(k)) || '[]');
+    if(Array.isArray(b)) lista = b.slice();
+  } catch(e){}
+  // Y tambien lo que trae la nube en esta misma bajada, aunque aun no este guardado.
+  // Sin esto, un borrado hecho en el otro aparato podia resucitar. -30 jul-
+  var deLaBajada = _borradosDeEstaBajada[claveDeBorrados(k)];
+  if(Array.isArray(deLaBajada)){
+    var vistos = {};
+    lista.forEach(function(x){ if(x && x.id !== undefined) vistos[String(x.id)] = true; });
+    deLaBajada.forEach(function(x){
+      if(x && x.id !== undefined && !vistos[String(x.id)]) lista.push(x);
+    });
+  }
+  return lista;
 }
 
 // Le pone la hora a los registros que CAMBIARON, y anota los que se borraron.
@@ -3304,6 +3318,30 @@ function fundirMapa(deLaNube, delTelefono){
 
 // El que usa la bajada de la nube. Devuelve el TEXTO ya fundido, o null si esa
 // clave no se sabe fundir -y entonces se hace lo de siempre-.
+// Lo que la nube trae en ESTA misma bajada, para que fundirListas pueda mirar la
+// libreta de borrados aunque todavia no se haya guardado en el telefono. Es la segunda
+// red por si el orden fallara. -30 jul-
+var _borradosDeEstaBajada = {};
+
+// Se llama ANTES de fundir nada, con TODO lo que trae la nube en esta tanda. Registra
+// las libretas de borrados de una vez, para que al fundir cualquier lista ya se sepa
+// que estaba borrado — sin importar en que orden lleguen los documentos.
+// Es la cura de raiz del fallo del 30 jul: un cliente borrado en la PC resucitaba en
+// el telefono solo porque `ncl` llegaba antes que `_borrados_ncl`.
+function prepararBorradosDeLaTanda(tanda){
+  _borradosDeEstaBajada = {};
+  if(!tanda) return 0;
+  var cuantas = 0;
+  Object.keys(tanda).forEach(function(clave){
+    if(String(clave).indexOf('_borrados_') !== 0) return;
+    try {
+      var lista = JSON.parse(tanda[clave]);
+      if(Array.isArray(lista)){ _borradosDeEstaBajada[clave] = lista; cuantas++; }
+    } catch(e){}
+  });
+  return cuantas;
+}
+
 function fundirConLoDelTelefono(clave, textoDeLaNube){
   var crudoLocal = localStorage.getItem(clave);
   if(crudoLocal === null) return null;                 // aqui no hay nada: que baje tal cual
@@ -3355,8 +3393,22 @@ function SS(k,v){
   // Ademas de guardar local -como siempre-, se manda una copia a la nube en segundo plano.
   // Si no hay internet o falla, la app sigue funcionando igual con lo que ya guardo local;
   // esto nunca bloquea ni retrasa el uso normal de la app.
+  // Se apunta SIEMPRE que sea un dato del negocio, aunque la sesion todavia no haya
+  // cargado. Antes solo se apuntaba con la sesion lista, y las ventas hechas en los
+  // primeros segundos de abrir la app se quedaban sin subir para siempre. -30 jul-
+  try {
+    if(typeof CLAVES_A_RESPALDAR !== 'undefined' && CLAVES_A_RESPALDAR.indexOf(k) >= 0){
+      marcarPendienteDeSubir(k);
+    }
+  } catch(eMarca){}
+
   if(typeof fbAuth !== 'undefined' && fbAuth.currentUser){
-    marcarPendienteDeSubir(k);
+    // SOLO los datos del negocio. Antes se apuntaba CUALQUIER clave, incluidas las
+    // internas (relojes, contadores, la meta semanal). Esas la nube las rechaza y se
+    // quedaban atascadas para siempre en "cambios sin guardar". -30 jul-
+    if(typeof CLAVES_A_RESPALDAR === 'undefined' || CLAVES_A_RESPALDAR.indexOf(k) >= 0){
+      marcarPendienteDeSubir(k);
+    }
     // Los productos van a la nube SIN las fotos -esas se guardan cada una por su lado-.
     // Sin esto, los productos ocupaban el 97.1% del limite de Firebase y con una foto mas
     // dejaban de subir. Ver "LAS FOTOS DE LOS PRODUCTOS VAN APARTE" mas arriba.
@@ -19792,7 +19844,26 @@ function cargarDatosDeLaNube(callback){
   fbDb.collection('nbs_data').get().then(function(snapshot){
     clearTimeout(temporizador);
     var bajados = 0, protegidos = 0, juntados = 0;
+    // Primero se REGISTRAN todas las libretas de borrados de esta tanda, y ademas se
+    // ordenan para que se apliquen antes. Dos redes: si una fallara, la otra sostiene.
+    // Sin esto, un registro que Sensei borro en un aparato resucitaba en el otro. -30 jul-
+    var docsOrdenados = [];
+    var tandaBorrados = {};
     snapshot.forEach(function(doc){
+      docsOrdenados.push(doc);
+      if(String(doc.id).indexOf('_borrados_') === 0){
+        var d = doc.data();
+        if(d && typeof d.valor === 'string') tandaBorrados[doc.id] = d.valor;
+      }
+    });
+    try { prepararBorradosDeLaTanda(tandaBorrados); } catch(e){ console.error(e); }
+    docsOrdenados.sort(function(a, b){
+      var ea = String(a.id).indexOf('_borrados_') === 0 ? 0 : 1;
+      var eb = String(b.id).indexOf('_borrados_') === 0 ? 0 : 1;
+      return ea - eb;
+    });
+
+    docsOrdenados.forEach(function(doc){
       var data = doc.data();
       if(!data || typeof data.valor !== 'string') return;
 
@@ -19845,6 +19916,7 @@ function cargarDatosDeLaNube(callback){
         bajados++;
       }catch(e){}
     });
+    _borradosDeEstaBajada = {};   // se limpia: era de ESTA tanda, no de la siguiente
     if(juntados > 0) console.log(juntados+' dato(s) se JUNTARON registro por registro con lo de este telefono.');
     if(protegidos > 0){
       console.log(protegidos+' dato(s) de este teléfono se protegieron de ser sobrescritos por la nube.');
@@ -19903,8 +19975,30 @@ function probarLaNubePiezaPorPieza(){
   });
 }
 
+function limpiarPendientesQueNoSonDatos(){
+  // Saca de la cola las claves internas que se colaron antes de este arreglo y que la
+  // nube nunca va a aceptar. Sin esto, el aviso de "N cambios sin guardar" no baja
+  // nunca aunque todo lo importante ya haya subido. -30 jul-
+  try {
+    var p = JSON.parse(localStorage.getItem(CLAVE_PENDIENTES) || '{}');
+    var quitadas = 0;
+    Object.keys(p).forEach(function(k){
+      if(CLAVES_A_RESPALDAR.indexOf(k) < 0){ delete p[k]; quitadas++; }
+    });
+    if(quitadas){
+      localStorage.setItem(CLAVE_PENDIENTES, JSON.stringify(p));
+      console.log('Se sacaron ' + quitadas + ' clave(s) internas de la cola de subida.');
+    }
+    return quitadas;
+  } catch(e){ return 0; }
+}
+
 function subirPendientes(){
   if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  try { limpiarPendientesQueNoSonDatos(); } catch(e){}
+  // Nota: los pendientes se apuntan SIEMPRE al guardar -aunque la sesion no estuviera
+  // lista-, y esta funcion es la que comprueba la sesion antes de intentar subir. Asi
+  // nada se queda sin subir por haberse guardado antes de que cargara la sesion.
   if(!navigator.onLine) return;
   var p;
   try{ p = JSON.parse(localStorage.getItem(CLAVE_PENDIENTES) || '{}'); }catch(e){ return; }
