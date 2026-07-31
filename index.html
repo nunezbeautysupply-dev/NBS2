@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260730i-OFICIAL-V2.0">
+<meta name="app-version" content="20260730j-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19947,51 +19947,71 @@ function probarLaNubePiezaPorPieza(){
   }
   if(!navigator.onLine){ avisoGrande('No hay internet. Conéctate y prueba otra vez.'); return; }
 
-  mostrarCargandoRuta('☁️ Probando la nube pieza por pieza...');
-  var prueba = 'prueba_' + Date.now();
-  var ok = [], mal = [];
-  var pendientes = CLAVES_A_RESPALDAR.filter(function(k){ return localStorage.getItem(k) !== null; });
+  // ⚠️ SE PRUEBAN LAS DOS PUERTAS. La primera version solo probaba `nbs_copias` y decia
+  // que todo estaba bien, cuando lo que le fallaba a Sensei eran los cambios pendientes,
+  // que van a `nbs_data`. Probar la puerta equivocada es peor que no probar. -30 jul-
+  mostrarCargandoRuta('☁️ Probando las dos puertas de la nube...');
+  var marca = 'prueba_' + Date.now();
+  var res = { nbs_copias: { ok: [], mal: [] }, nbs_data: { ok: [], mal: [] } };
+  var claves = CLAVES_A_RESPALDAR.filter(function(k){ return localStorage.getItem(k) !== null; });
 
-  var promesas = pendientes.map(function(k){
-    return fbDb.collection('nbs_copias').doc(prueba + '__' + k)
+  function probarEn(coleccion, k){
+    var id = (coleccion === 'nbs_copias') ? (marca + '__' + k) : (marca + '_' + k);
+    return fbDb.collection(coleccion).doc(id)
       .set({ clave: k, hora: Date.now(), valor: 'prueba' })
       .then(function(){
-        ok.push(k);
-        return fbDb.collection('nbs_copias').doc(prueba + '__' + k).delete().catch(function(){});
+        res[coleccion].ok.push(k);
+        return fbDb.collection(coleccion).doc(id).delete().catch(function(){});
       })
-      .catch(function(e){ mal.push({ k: k, e: (e && e.code) ? e.code : String(e).slice(0,60) }); });
+      .catch(function(e){
+        res[coleccion].mal.push({ k: k, e: (e && e.code) ? e.code : String(e).slice(0,60) });
+      });
+  }
+
+  var todas = [];
+  claves.forEach(function(k){
+    todas.push(probarEn('nbs_copias', k));
+    todas.push(probarEn('nbs_data', k));
   });
 
-  Promise.all(promesas).then(function(){
+  Promise.all(todas).then(function(){
     cerrarCargandoRuta();
-    if(!mal.length){
-      avisoGrande('✅ La nube acepta las ' + ok.length + ' piezas.\n\n' +
-        'Si aun asi no ves copias, el problema es otro — avísame.');
-      return;
+    var c = res.nbs_copias, d = res.nbs_data;
+    var lineas = [];
+    lineas.push('\u2601\ufe0f LAS DOS PUERTAS DE LA NUBE\n');
+    lineas.push('\ud83d\udcbe COPIAS (nbs_copias)');
+    lineas.push(c.mal.length ? '   \ud83d\udd34 rechaza ' + c.mal.length + ' de ' + claves.length
+                             : '   \u2705 acepta las ' + c.ok.length);
+    lineas.push('');
+    lineas.push('\ud83d\udd04 CAMBIOS DEL DIA (nbs_data)');
+    lineas.push(d.mal.length ? '   \ud83d\udd34 rechaza ' + d.mal.length + ' de ' + claves.length
+                             : '   \u2705 acepta las ' + d.ok.length);
+
+    var malas = [];
+    if(d.mal.length) malas = d.mal;
+    else if(c.mal.length) malas = c.mal;
+
+    if(malas.length){
+      lineas.push('');
+      lineas.push('LAS QUE RECHAZA:');
+      malas.slice(0, 8).forEach(function(x){ lineas.push('   \u2022 ' + x.k + '  \u2014  ' + x.e); });
+      if(malas.length > 8) lineas.push('   y ' + (malas.length - 8) + ' mas');
+      lineas.push('');
+      lineas.push('Casi siempre son las REGLAS de Firebase.');
+      lineas.push('Mandame esta pantalla.');
+    } else {
+      lineas.push('');
+      lineas.push('Las dos puertas aceptan todo.');
+      lineas.push('Si el aviso naranja sigue, es otra cosa \u2014 avisame.');
     }
-    var det = mal.map(function(x){ return '   • ' + x.k + '\n     ' + x.e; }).join('\n');
-    avisoGrande('🔴 LA NUBE RECHAZA ' + mal.length + ' de ' + pendientes.length + ' pieza(s):\n\n' +
-      det + '\n\nEsto casi siempre son las REGLAS de Firebase.\nMándame esta pantalla y te digo qué cambiar.');
+
+    try {
+      localStorage.setItem('nbs_prueba_nube', JSON.stringify({ hora: Date.now(), res: res }));
+    } catch(e){}
+    avisoGrande(lineas.join('\n'));
   });
 }
 
-function limpiarPendientesQueNoSonDatos(){
-  // Saca de la cola las claves internas que se colaron antes de este arreglo y que la
-  // nube nunca va a aceptar. Sin esto, el aviso de "N cambios sin guardar" no baja
-  // nunca aunque todo lo importante ya haya subido. -30 jul-
-  try {
-    var p = JSON.parse(localStorage.getItem(CLAVE_PENDIENTES) || '{}');
-    var quitadas = 0;
-    Object.keys(p).forEach(function(k){
-      if(CLAVES_A_RESPALDAR.indexOf(k) < 0){ delete p[k]; quitadas++; }
-    });
-    if(quitadas){
-      localStorage.setItem(CLAVE_PENDIENTES, JSON.stringify(p));
-      console.log('Se sacaron ' + quitadas + ' clave(s) internas de la cola de subida.');
-    }
-    return quitadas;
-  } catch(e){ return 0; }
-}
 
 function subirPendientes(){
   if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
