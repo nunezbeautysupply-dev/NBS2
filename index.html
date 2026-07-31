@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260730m-OFICIAL-V2.0">
+<meta name="app-version" content="20260730n-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19865,9 +19865,45 @@ function cargarDatosDeLaNube(callback){
       return ea - eb;
     });
 
+    // Se prepara la lista: cada documento con su TEXTO ya listo. Los que vengan
+    // comprimidos (campo `zip`) se descomprimen primero; los de siempre (campo `valor`)
+    // pasan tal cual, sin tocar nada de su camino. -30 jul-
+    var listos = [];
+    var esperas = [];
     docsOrdenados.forEach(function(doc){
       var data = doc.data();
-      if(!data || typeof data.valor !== 'string') return;
+      if(!data) return;
+      if(typeof data.valor === 'string'){
+        listos.push({ doc: doc, data: data, texto: data.valor });
+      } else if(typeof data.zip === 'string'){
+        esperas.push(
+          descomprimirTexto(data.zip).then(function(txt){
+            if(typeof txt === 'string') listos.push({ doc: doc, data: data, texto: txt });
+            else console.error('No se pudo descomprimir "' + doc.id + '"');
+          }).catch(function(e){
+            console.error('No se pudo descomprimir "' + doc.id + '":', e);
+          })
+        );
+      }
+    });
+
+    return Promise.all(esperas).then(function(){
+    // Las libretas de borrados, primero — y con el texto ya descomprimido
+    listos.sort(function(a, b){
+      var ea = String(a.doc.id).indexOf('_borrados_') === 0 ? 0 : 1;
+      var eb = String(b.doc.id).indexOf('_borrados_') === 0 ? 0 : 1;
+      return ea - eb;
+    });
+    var tandaB = {};
+    listos.forEach(function(x){
+      if(String(x.doc.id).indexOf('_borrados_') === 0) tandaB[x.doc.id] = x.texto;
+    });
+    try { prepararBorradosDeLaTanda(tandaB); } catch(e){ console.error(e); }
+
+    listos.forEach(function(item){
+      var doc = item.doc;
+      var data = item.data;
+      var _valorDelDoc = item.texto;
 
       // ===== LA PROTECCION QUE FALTABA =====
       // ANTES esta linea sobreescribia el telefono con la nube SIEMPRE, sin mirar cual era
@@ -19889,12 +19925,12 @@ function cargarDatosDeLaNube(callback){
       }
 
       try{
-        var valorFinal = data.valor;
+        var valorFinal = _valorDelDoc;
         // Los productos bajan SIN fotos. Se les vuelven a pegar las que este telefono ya
         // tiene, y en segundo plano se bajan las que falten.
         if(doc.id === 'np'){
           try{
-            var prods = pegarFotosQueYaTengo(JSON.parse(data.valor));
+            var prods = pegarFotosQueYaTengo(JSON.parse(_valorDelDoc));
             valorFinal = JSON.stringify(prods);
             if(data.pidsConFoto) setTimeout(function(){ descargarFotosQueFaltan(data.pidsConFoto); }, 3000);
           }catch(e){ console.error('No se pudieron pegar las fotos:', e); }
@@ -19942,6 +19978,7 @@ function cargarDatosDeLaNube(callback){
       setTimeout(subirPendientes, 1500);
     }
     llamarUnaSolaVez();
+    });   // cierra el Promise.all de las descompresiones
   }).catch(function(e){
     clearTimeout(temporizador);
     console.error('No se pudieron cargar los datos de la nube, se sigue con lo que haya guardado en este dispositivo:', e);
@@ -20101,7 +20138,32 @@ function subirPendientes(){
         setTimeout(function(){ sincronizarFotos(pp); }, 500);
       }catch(e){}
     }
-    fbDb.collection('nbs_data').doc(k.replace(/\//g,'_')).set(docPend).then(function(){
+
+    // ═══ SE COMPRIME LO GRANDE (30 jul) ═══
+    // Firestore no acepta documentos de mas de 1 MB. Las ventas de Sensei ya iban por
+    // 449 KB sin comprimir, y cada venta con FIRMA del cliente suma ~23 KB. Las copias
+    // ya se comprimian (183 KB) pero los cambios del dia no.
+    // Solo se comprime lo que pasa de 100 KB: lo chico sigue yendo igual que siempre,
+    // asi el cambio toca lo menos posible. Si el navegador no sabe comprimir, o si
+    // comprimido no queda mas chico, se manda tal cual — nunca se pierde nada.
+    var subirDoc = function(d){
+      return fbDb.collection('nbs_data').doc(k.replace(/\//g,'_')).set(d);
+    };
+    var listo;
+    if(docPend.valor.length > 100000 && typeof comprimirTexto === 'function'){
+      listo = comprimirTexto(docPend.valor).then(function(z){
+        if(z && z.length < docPend.valor.length){
+          var dz = { zip: z, actualizado: docPend.actualizado };
+          if(docPend.pidsConFoto) dz.pidsConFoto = docPend.pidsConFoto;
+          return subirDoc(dz);
+        }
+        return subirDoc(docPend);
+      }).catch(function(){ return subirDoc(docPend); });
+    } else {
+      listo = subirDoc(docPend);
+    }
+
+    listo.then(function(){
       quitarPendienteDeSubir(k);
       try {
         var okf = JSON.parse(localStorage.getItem('nbs_fallos_subida') || '{}');
