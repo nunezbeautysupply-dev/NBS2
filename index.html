@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260731c-OFICIAL-V2.0">
+<meta name="app-version" content="20260801a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16726,6 +16726,11 @@ function abrirAbono(cid){
   var facturasCredito = ventas.filter(function(v){
     return String(v.cid)===String(cid) && v.tipo==='credito';
   });
+  // Las canceladas van AL FINAL de la lista, para que no se confundan con las que
+  // de verdad debe. Se siguen viendo -para poder consultarlas- pero marcadas. -1 ago-
+  facturasCredito.sort(function(a, b){
+    return (a.cancelada ? 1 : 0) - (b.cancelada ? 1 : 0);
+  });
 
 
 
@@ -16772,7 +16777,8 @@ function abrirAbono(cid){
         +'<div><div style="font-size:13px;font-weight:700">Factura '+(v.numFactura?'#'+v.numFactura+' · ':'')+v.fecha+' - '+v.hora+'</div>'
         +'<div style="font-size:11px;color:#aaa">Total factura: $'+fmtNum(v.total)+'</div></div>'
         +'<div style="text-align:right"><div style="font-size:16px;font-weight:700;color:'+(esSaldoPendiente(saldoFactura)?'#C62828':'#2E7D32')+'">$'+fmtNum(saldoFactura)+'</div>'
-        +'<div style="font-size:11px;color:#aaa">'+(esSaldoPendiente(saldoFactura)?'pendiente':'pagado')+'</div></div></div>'
+        +'<div style="font-size:11px;color:'+(v.cancelada?'#C62828':'#aaa')+';font-weight:'+(v.cancelada?'800':'400')+'">'
+        +(v.cancelada ? '\ud83d\udeab CANCELADA' : (esSaldoPendiente(saldoFactura)?'pendiente':'pagado'))+'</div></div></div>'
         +'<button type="button" onclick="verFacturaProfesional(\''+v.id+'\')" style="width:100%;padding:8px;background:#E8EAF6;color:#1a237e;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:8px">👁️ Ver factura completa / Editar productos y pagos</button>';
 
       // Items of the invoice
