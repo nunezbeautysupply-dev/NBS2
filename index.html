@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260731b-OFICIAL-V2.0">
+<meta name="app-version" content="20260731c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16938,7 +16938,7 @@ function renderFilasEditPago(){
   var opciones = { efectivo:'💵 Efectivo', cashapp:'📱 CashApp', zelle:'💸 Zelle' };
   cont.innerHTML = filas.map(function(m, i){
     return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'
-      +'<select onchange="fijarMetodoEditPago('+i+',this.value)" style="flex:1.2;padding:9px 6px;border:1px solid #ddd;border-radius:7px;font-size:13px">'
+      +'<select onchange="fijarMetodoEditPago('+i+',this.value)" style="flex:1.2;min-width:0;padding:9px 6px;border:1px solid #ddd;border-radius:7px;font-size:13px">'
       + Object.keys(opciones).map(function(k){ return '<option value="'+k+'"'+(m.tipo===k?' selected':'')+'>'+opciones[k]+'</option>'; }).join('')
       +'</select>'
       +'<input type="text" inputmode="decimal" value="'+(m.monto||0).toFixed(2)+'" onfocus="this.select()" oninput="fijarMontoEditPago('+i+',this.value)" style="flex:1;width:70px;padding:9px;border:1px solid #ddd;border-radius:7px;font-size:14px;font-weight:700;text-align:right;box-sizing:border-box">'
@@ -17063,7 +17063,9 @@ function obtenerOpcionesMetodoPago(vid){
     var clientesLocal = LS('ncl', []);
     var cl = clientesLocal.find(function(c){ return String(c.id) === String(cidCredito); });
     if(cl && (cl.creditoAFavor||0) > 0.005){
-      opciones.credito_cliente = '🎁 Usar crédito del cliente ($'+fmtNum(cl.creditoAFavor)+' disponible)';
+      // Texto CORTO a proposito: el largo estiraba la fila y sacaba el monto de la
+        // pantalla del telefono. -31 jul, lo encontro Sensei-
+        opciones.credito_cliente = '🎁 Crédito ($'+fmtNum(cl.creditoAFavor)+')';
     }
   }
   return opciones;
@@ -17076,7 +17078,7 @@ function renderMetodosPago(vid){
   var opciones = obtenerOpcionesMetodoPago(vid);
   cont.innerHTML = filas.map(function(m, i){
     return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'
-      +'<select onchange="actualizarMetodoPago(\''+vid+'\','+i+',\'tipo\',this.value)" style="flex:1.2;padding:8px 6px;border:1px solid #ddd;border-radius:6px;font-size:12px">'
+      +'<select onchange="actualizarMetodoPago(\''+vid+'\','+i+',\'tipo\',this.value)" style="flex:1.2;min-width:0;padding:8px 6px;border:1px solid #ddd;border-radius:6px;font-size:12px">'
       +Object.keys(opciones).map(function(k){ return '<option value="'+k+'"'+(m.tipo===k?' selected':'')+'>'+opciones[k]+'</option>'; }).join('')
       +'</select>'
       +'<input type="text" inputmode="numeric" value="'+m.monto.toFixed(2)+'" onfocus="this.select()" oninput="formatoMoneda(this);actualizarMetodoPago(\''+vid+'\','+i+',\'monto\',parseFloat(this.value)||0)" style="width:80px;padding:8px 6px;border:1px solid #ddd;border-radius:6px;font-size:12px;text-align:center">'
@@ -17171,6 +17173,47 @@ function pagarTodoEfectivo(vid, saldo){
   confirmarPagoMultiple(vid, saldo);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  DESCONTAR EL CRÉDITO A FAVOR QUE SE HAYA USADO EN UN PAGO (31 jul)
+//
+//  🔴 EL FALLO QUE ENCONTRÓ SENSEI EN LA RUTA: se abrió la opción
+//  "Usar crédito del cliente" al cobrar una factura, pero el crédito
+//  NUNCA se le descontaba. El mismo crédito se podía usar infinitas
+//  veces, y la app contaba como cobrado un dinero que seguía existiendo.
+//
+//  ⚠️ OJO: `confirmarPagoMultiple` tiene DOS caminos y el normal hace
+//  `return` temprano. Por eso esto vive en su propia función y se llama
+//  desde LOS DOS — si solo se pusiera en uno, el fallo seguiría vivo
+//  justo en el caso más común.
+// ═══════════════════════════════════════════════════════════════════
+function descontarCreditoUsado(cid, filas){
+  var usado = 0;
+  (filas || []).forEach(function(f){
+    if(f && f.tipo === 'credito_cliente') usado += (parseFloat(f.monto) || 0);
+  });
+  if(usado <= 0.005) return 0;
+
+  var cls = LS('ncl', []);
+  var i = cls.findIndex(function(c){ return String(c.id) === String(cid); });
+  if(i < 0) return 0;
+
+  var tenia = parseFloat(cls[i].creditoAFavor) || 0;
+  var seUsa = Math.min(tenia, usado);
+  cls[i].creditoAFavor = Math.round((tenia - seUsa) * 100) / 100;
+  SS('ncl', cls);
+  clientes = LS('ncl', []);
+
+  if(usado > tenia + 0.005){
+    setTimeout(function(){
+      avisoGrande('\u26a0\ufe0f Se marcaron $' + fmtNum(usado) + ' de cr\u00e9dito, pero el cliente'
+        + ' solo ten\u00eda $' + fmtNum(tenia) + '.\n\nRevisa ese pago.');
+    }, 800);
+  }
+  return seUsa;
+}
+
+
 function confirmarPagoMultiple(vid, saldo){
   var filas = (window._pagoMetodos[vid] || []).filter(function(m){ return m.monto > 0; });
   var total = filas.reduce(function(s,m){ return s+m.monto; }, 0);
@@ -17185,6 +17228,9 @@ function confirmarPagoMultiple(vid, saldo){
     if(!venta.pagosFactura) venta.pagosFactura = [];
     venta.pagosFactura.push({ pid: nuevoPagoId(), monto: total, fecha: fechaHoy(), metodos: filas });
     SS('nv', ventas);
+    // Descontarle el credito que haya usado. Este es el camino NORMAL, el mas comun
+    // — y era justo el que se quedaba sin descontar. -31 jul-
+    descontarCreditoUsado(venta.cid, filas);
     var detalle = filas.map(function(m){ return METODOS_PAGO_LABELS[m.tipo]+': $'+fmtNum(m.monto); }).join('\n');
     alert('✅ Pago de $'+fmtNum(total)+' aplicado correctamente.\n\n'+detalle);
     // Refrescar la pantalla DESPUES de cerrar el alert, con una pausa para que el telefono
@@ -17228,6 +17274,8 @@ function confirmarPagoMultiple(vid, saldo){
     aplicados++;
   });
   SS('nv', ventas);
+  // Y aqui tambien, cuando el pago se reparte entre varias facturas
+  descontarCreditoUsado(venta.cid, filas);
 
   // El dinero que sobro -el cliente ya no debia nada mas- se guarda como
   // CREDITO A FAVOR del cliente, con el mismo sistema que ya usan las
