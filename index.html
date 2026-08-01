@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260731a-OFICIAL-V2.0">
+<meta name="app-version" content="20260731b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16142,28 +16142,238 @@ function imprimirReporteVentas(){
 
 var cxcClienteId = null;
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  CUÁNTO ME DEBÍAN, DÍA POR DÍA  (31 jul)
+//
+//  Sensei: "en cuentas por cobrar, al día de ayer me debían X, al día
+//  anterior otra cantidad y hoy otra, de acuerdo al movimiento que
+//  haya habido cada día".
+//
+//  ⚠️ ESTO SOLO LEE. No guarda, no cambia y no borra NADA. Se calcula
+//  todo de las ventas y los pagos que ya existen:
+//     lo que te debían ese día  =  lo que fiaste hasta ese día
+//                                  menos lo que cobraste hasta ese día
+// ═══════════════════════════════════════════════════════════════════
+var _histCxCDias = parseInt(localStorage.getItem('nbs_hist_cxc_dias') || '30', 10);
+
+function _histFecha(f){
+  // Entiende MM/DD/AAAA y también las escritas al revés (DD/MM/AAAA)
+  if(!f) return null;
+  var p = String(f).split('/');
+  if(p.length !== 3) return null;
+  var m = parseInt(p[0],10), d = parseInt(p[1],10), a = parseInt(p[2],10);
+  if(!isFinite(m) || !isFinite(d) || !isFinite(a)) return null;
+  if(m > 12){ var t = m; m = d; d = t; }
+  var x = new Date(a, m-1, d);
+  return isNaN(x.getTime()) ? null : x;
+}
+function _histClave(x){
+  return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0');
+}
+function _histBonito(clave){
+  var p = clave.split('-');
+  var x = new Date(+p[0], +p[1]-1, +p[2]);
+  var dias = ['dom','lun','mar','mié','jue','vie','sáb'];
+  var mes  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return dias[x.getDay()] + ' ' + x.getDate() + ' ' + mes[x.getMonth()];
+}
+
+// Arma el día por día. Devuelve una lista del más nuevo al más viejo.
+function calcularHistorialCxC(){
+  var V = LS('nv', []);
+  var porDia = {};   // clave -> { fio, cobro, quienesFiaron[], quienesPagaron[] }
+  function anota(clave, campo, monto, quien, facturaId){
+    if(!porDia[clave]) porDia[clave] = { fio:0, cobro:0, fiados:[], pagos:[] };
+    porDia[clave][campo] += monto;
+    if(campo === 'fio') porDia[clave].fiados.push({ quien: quien, monto: monto, id: facturaId });
+    else                porDia[clave].pagos.push({ quien: quien, monto: monto, id: facturaId });
+  }
+
+  V.forEach(function(v){
+    if(v.cancelada) return;
+    if(v.tipo !== 'credito') return;          // el contado no deja deuda
+    var fv = _histFecha(v.fecha);
+    var total = parseFloat(v.total) || 0;
+    if(fv && total > 0) anota(_histClave(fv), 'fio', total, v.cn || 'sin nombre', v.id);
+    (v.pagosFactura || []).forEach(function(p){
+      if(p.esDevolucion) return;
+      var m = parseFloat(p.monto) || 0;
+      if(m <= 0) return;
+      var fp = _histFecha(p.fecha) || fv;
+      if(fp) anota(_histClave(fp), 'cobro', m, v.cn || 'sin nombre', v.id);
+    });
+  });
+
+  var claves = Object.keys(porDia).sort();     // del más viejo al más nuevo
+  var saldo = 0, lista = [];
+  claves.forEach(function(k){
+    var d = porDia[k];
+    saldo += (d.fio - d.cobro);
+    lista.push({ clave:k, fio:d.fio, cobro:d.cobro, saldo:Math.round(saldo*100)/100,
+                 fiados:d.fiados, pagos:d.pagos });
+  });
+  // el más nuevo primero
+  return lista.reverse();
+}
+
+function cambiarDiasHistorialCxC(n){
+  _histCxCDias = n;
+  try { localStorage.setItem('nbs_hist_cxc_dias', String(n)); } catch(e){}
+  renderHistorialCxC();
+}
+
+function renderHistorialCxC(){
+  var el = document.getElementById('cxc-historial-lista');
+  if(!el) return;
+  var todo = calcularHistorialCxC();
+  var lista = (_histCxCDias > 0) ? todo.slice(0, _histCxCDias) : todo;
+
+  var botones = [[7,'7 días'],[15,'15'],[30,'30'],[0,'Todo']];
+  var h = '<div style="display:flex;gap:5px;margin-bottom:10px">'
+        + botones.map(function(b){
+            var act = (_histCxCDias === b[0]);
+            return '<button onclick="cambiarDiasHistorialCxC(' + b[0] + ')" style="flex:1;padding:8px;'
+              + 'background:' + (act ? 'var(--nbs-gold)' : '#F0F0F2') + ';color:' + (act ? 'white' : 'var(--nbs-ink)')
+              + ';border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">' + b[1] + '</button>';
+          }).join('')
+        + '</div>';
+
+  if(!lista.length){
+    el.innerHTML = h + '<div style="text-align:center;color:var(--nbs-muted);font-size:13px;padding:24px">'
+      + 'Todav\u00eda no hay movimiento de cr\u00e9dito que mostrar.</div>';
+    return;
+  }
+
+  // El resumen del período
+  var hoy = lista[0], viejo = lista[lista.length-1];
+  var dif = Math.round((hoy.saldo - viejo.saldo) * 100) / 100;
+  h += '<div style="background:' + (dif <= 0 ? '#E8F5E9' : '#FFF3E0') + ';border:1.5px solid '
+     + (dif <= 0 ? '#2E7D32' : '#E65100') + ';border-radius:11px;padding:11px;margin-bottom:12px">'
+     + '<div style="font-size:11px;font-weight:800;color:' + (dif <= 0 ? '#1B5E20' : '#E65100')
+     + ';letter-spacing:.4px">EN ESTOS ' + lista.length + ' D\u00cdA(S) CON MOVIMIENTO</div>'
+     + '<div style="font-size:19px;font-weight:900;color:' + (dif <= 0 ? '#1B5E20' : '#E65100') + ';line-height:1.2">'
+     + (dif <= 0 ? '\u2193 Bajaste $' : '\u2191 Subi\u00f3 $') + fmtNum(Math.abs(dif)) + '</div>'
+     + '<div style="font-size:12px;color:#666;margin-top:2px">de $' + fmtNum(viejo.saldo)
+     + ' a $' + fmtNum(hoy.saldo) + '</div></div>';
+
+  h += lista.map(function(d, i){
+    var ant = lista[i+1];
+    var cam = ant ? Math.round((d.saldo - ant.saldo) * 100) / 100 : null;
+    var col = (cam === null) ? '#999' : (cam > 0 ? '#E65100' : (cam < 0 ? '#2E7D32' : '#999'));
+    var fle = (cam === null) ? '' : (cam > 0 ? '\u2191 $' + fmtNum(cam) : (cam < 0 ? '\u2193 $' + fmtNum(-cam) : '='));
+    return '<div class="card" style="margin-bottom:7px;padding:11px;cursor:pointer" onclick="verDiaCxC(\'' + d.clave + '\')">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center">'
+      +   '<div style="font-size:13.5px;font-weight:800;color:var(--nbs-ink)">' + _histBonito(d.clave) + '</div>'
+      +   '<div style="font-size:16px;font-weight:900;color:var(--nbs-ink)">$' + fmtNum(d.saldo) + '</div>'
+      + '</div>'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">'
+      +   '<div style="font-size:11.5px;color:var(--nbs-muted)">fi\u00e9 $' + fmtNum(d.fio)
+      +      ' \u00b7 cobr\u00e9 $' + fmtNum(d.cobro) + '</div>'
+      +   '<div style="font-size:12.5px;font-weight:800;color:' + col + '">' + fle + '</div>'
+      + '</div></div>';
+  }).join('');
+
+  h += '<div style="font-size:11.5px;color:var(--nbs-muted);text-align:center;margin-top:10px;line-height:1.5">'
+     + 'Toca un d\u00eda para ver a qui\u00e9n le fiaste y qui\u00e9n te pag\u00f3.<br>'
+     + 'Solo se cuentan las ventas a cr\u00e9dito \u2014 el contado se paga el mismo d\u00eda.</div>';
+
+  el.innerHTML = h;
+}
+
+// Al tocar un día: quiénes fiaron y quiénes pagaron
+function verDiaCxC(clave){
+  var d = calcularHistorialCxC().find(function(x){ return x.clave === clave; });
+  if(!d) return;
+
+  var h = '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px">'
+        + '<div style="flex:1"><div style="font-size:18px;font-weight:900;color:#1a237e">' + _histBonito(clave) + '</div>'
+        + '<div style="font-size:12px;color:#666">te deb\u00edan <b>$' + fmtNum(d.saldo) + '</b> al cerrar el d\u00eda</div></div>'
+        + '<button onclick="cerrarDiaCxC()" style="flex-shrink:0;width:34px;height:34px;border:none;border-radius:9px;background:#f0f0f0;color:#666;font-size:20px;font-weight:800;cursor:pointer">\u2715</button>'
+        + '</div>';
+
+  h += '<div style="display:flex;gap:8px;margin-bottom:12px">'
+     + '<div style="flex:1;background:#FFF3E0;border-radius:10px;padding:10px;text-align:center">'
+     +   '<div style="font-size:10.5px;font-weight:800;color:#E65100;letter-spacing:.4px">FIASTE</div>'
+     +   '<div style="font-size:18px;font-weight:900;color:#E65100">$' + fmtNum(d.fio) + '</div></div>'
+     + '<div style="flex:1;background:#E8F5E9;border-radius:10px;padding:10px;text-align:center">'
+     +   '<div style="font-size:10.5px;font-weight:800;color:#1B5E20;letter-spacing:.4px">COBRASTE</div>'
+     +   '<div style="font-size:18px;font-weight:900;color:#1B5E20">$' + fmtNum(d.cobro) + '</div></div>'
+     + '</div>';
+
+  function bloque(titulo, color, items){
+    if(!items.length) return '';
+    var t = '<div style="font-size:11px;font-weight:800;color:' + color + ';letter-spacing:.4px;margin:12px 0 6px">'
+          + titulo + ' (' + items.length + ')</div>';
+    t += items.map(function(x){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;background:white;'
+        + 'border:1px solid #e5e7eb;border-radius:9px;padding:9px 11px;margin-bottom:5px">'
+        + '<span style="font-size:13px;font-weight:700;color:var(--nbs-ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+        + escaparHtml(String(x.quien).slice(0,30)) + '</span>'
+        + '<span style="font-size:14px;font-weight:900;color:' + color + '">$' + fmtNum(x.monto) + '</span>'
+        + '</div>';
+    }).join('');
+    return t;
+  }
+  h += bloque('\ud83e\uddfe LES FIASTE', '#E65100', d.fiados);
+  h += bloque('\ud83d\udcb5 TE PAGARON', '#1B5E20', d.pagos);
+
+  h += '<button onclick="cerrarDiaCxC()" style="width:100%;padding:12px;background:#ECEFF1;color:#546E7A;'
+     + 'border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px">Cerrar</button>';
+
+  var ov = document.getElementById('diacxc-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'diacxc-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99993;display:flex;align-items:center;justify-content:center;padding:14px';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:15px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto">' + h + '</div>';
+  ov.style.display = 'flex';
+}
+
+function cerrarDiaCxC(){
+  var ov = document.getElementById('diacxc-ov');
+  if(ov) ov.remove();
+}
+
+
 function cambiarPestanaCxC(tab){
   window._cxcTabActiva = tab;
   var btnPend = document.getElementById('cxc-tab-pendientes');
   var btnSald = document.getElementById('cxc-tab-saldadas');
+  var btnHist = document.getElementById('cxc-tab-historial');
   var listaPend = document.getElementById('cxc-lista');
   var listaSald = document.getElementById('cxc-saldadas-lista');
+  var listaHist = document.getElementById('cxc-historial-lista');
   var buscar = document.getElementById('cxc-buscar');
+
+  function apagar(b){ if(b){ b.style.background = '#F0F0F2'; b.style.color = 'var(--nbs-ink)'; } }
+  function prender(b){ if(b){ b.style.background = 'var(--nbs-gold)'; b.style.color = 'white'; } }
+  apagar(btnPend); apagar(btnSald); apagar(btnHist);
+  if(listaPend) listaPend.style.display = 'none';
+  if(listaSald) listaSald.style.display = 'none';
+  if(listaHist) listaHist.style.display = 'none';
+
   if(tab === 'saldadas'){
-    btnSald.style.background = 'var(--nbs-gold)'; btnSald.style.color = 'white';
-    btnPend.style.background = '#F0F0F2'; btnPend.style.color = 'var(--nbs-ink)';
-    listaPend.style.display = 'none';
-    listaSald.style.display = 'block';
-    buscar.placeholder = 'Buscar factura saldada...';
-    renderFacturasSaldadas(buscar.value);
+    prender(btnSald);
+    if(listaSald) listaSald.style.display = 'block';
+    if(buscar){ buscar.style.display = ''; buscar.placeholder = 'Buscar factura saldada...'; }
+    renderFacturasSaldadas(buscar ? buscar.value : '');
+  } else if(tab === 'historial'){
+    prender(btnHist);
+    if(listaHist) listaHist.style.display = 'block';
+    // El historial no se busca por nombre: se esconde la caja de búsqueda
+    if(buscar && buscar.parentElement) buscar.parentElement.style.display = 'none';
+    renderHistorialCxC();
   } else {
-    btnPend.style.background = 'var(--nbs-gold)'; btnPend.style.color = 'white';
-    btnSald.style.background = '#F0F0F2'; btnSald.style.color = 'var(--nbs-ink)';
-    listaSald.style.display = 'none';
-    listaPend.style.display = 'block';
-    buscar.placeholder = 'Buscar por nombre o negocio...';
-    renderCxC(buscar.value);
+    prender(btnPend);
+    if(listaPend) listaPend.style.display = 'block';
+    if(buscar){ buscar.style.display = ''; buscar.placeholder = 'Buscar por nombre o negocio...'; }
+    renderCxC(buscar ? buscar.value : '');
   }
+  // la caja de búsqueda vuelve a salir en las otras dos pestañas
+  if(tab !== 'historial' && buscar && buscar.parentElement) buscar.parentElement.style.display = '';
 }
 
 function cxcBuscarActivo(q){
@@ -16351,6 +16561,134 @@ function renderCxC(q){
   });
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  USAR EL CRÉDITO A FAVOR DEL CLIENTE  (31 jul)
+//
+//  Sensei: "debería poder aplicarse el pago desde el perfil del cliente
+//  también, o cuando hago pedidos rápidos y convierto a venta".
+//
+//  Antes SOLO se podía usar al hacer una venta nueva (como una forma de
+//  pago). Aquí se agrega también en "Aplicar pago", que es donde él lo
+//  buscó. Un toque usa TODO el crédito; si sobra, se le queda a favor.
+// ═══════════════════════════════════════════════════════════════════
+function pintarCreditoAFavor(cid, saldoReal){
+  var caja = document.getElementById('cxc-credito-favor');
+  if(!caja) return;
+  var cls = LS('ncl', []);
+  var cl = cls.find(function(x){ return String(x.id) === String(cid); });
+  var credito = cl ? (parseFloat(cl.creditoAFavor) || 0) : 0;
+
+  if(credito <= 0.005 || saldoReal <= 0.005){
+    caja.style.display = 'none';
+    caja.innerHTML = '';
+    return;
+  }
+
+  var seUsan = Math.min(credito, saldoReal);
+  var sobra = Math.round((credito - seUsan) * 100) / 100;
+
+  caja.style.display = 'block';
+  caja.innerHTML =
+    '<div style="background:#FFF8E1;border:2px solid #F9A825;border-radius:11px;padding:12px">'
+  +   '<div style="font-size:11px;font-weight:800;color:#8D6E00;letter-spacing:.5px">ESTE CLIENTE TIENE A FAVOR</div>'
+  +   '<div style="font-size:26px;font-weight:900;color:#E65100;line-height:1.1;margin:2px 0 6px">$' + fmtNum(credito) + '</div>'
+  +   '<div style="font-size:12.5px;color:#6D4C00;line-height:1.45;margin-bottom:10px">'
+  +     'Se van a usar <b>$' + fmtNum(seUsan) + '</b> para bajarle la deuda'
+  +     (sobra > 0.005 ? '.<br>Le quedar\u00e1n <b>$' + fmtNum(sobra) + '</b> a favor.' : '.')
+  +   '</div>'
+  +   '<button onclick="usarCreditoAFavor(' + JSON.stringify(String(cid)) + ')" '
+  +     'style="width:100%;padding:13px;background:#E65100;color:white;border:none;border-radius:10px;'
+  +     'font-size:15px;font-weight:800;cursor:pointer">\ud83d\udcb3 Usar $' + fmtNum(seUsan) + ' de su cr\u00e9dito</button>'
+  + '</div>';
+}
+
+// Aplica el crédito como pago, de la factura MÁS VIEJA a la más nueva.
+function usarCreditoAFavor(cid){
+  var cls = LS('ncl', []);
+  var idx = cls.findIndex(function(x){ return String(x.id) === String(cid); });
+  if(idx < 0) return;
+  var credito = parseFloat(cls[idx].creditoAFavor) || 0;
+  if(credito <= 0.005){ avisoGrande('Este cliente ya no tiene cr\u00e9dito a favor.'); return; }
+
+  var V = LS('nv', []);
+  var suyas = V.filter(function(v){
+    return String(v.cid) === String(cid) && v.tipo === 'credito' && !v.cancelada;
+  });
+  // De la más vieja a la más nueva. Se usa fechaVentaAISO, que devuelve AAAA-MM-DD
+  // y por eso se puede ordenar como texto. Si una fecha viniera dañada, esa factura
+  // se va al final y no rompe el orden de las demás.
+  suyas.sort(function(a, b){
+    var fa = '', fb = '';
+    try { fa = fechaVentaAISO(a) || ''; } catch(e){}
+    try { fb = fechaVentaAISO(b) || ''; } catch(e){}
+    if(!fa) fa = '9999-99-99';
+    if(!fb) fb = '9999-99-99';
+    return fa < fb ? -1 : (fa > fb ? 1 : 0);
+  });
+
+  var queda = credito, usado = 0, tocadas = [];
+  suyas.forEach(function(v){
+    if(queda <= 0.005) return;
+    var total = parseFloat(v.total) || 0;
+    var pagado = 0;
+    (v.pagosFactura || []).forEach(function(p){
+      if(!p.esDevolucion) pagado += parseFloat(p.monto) || 0;
+    });
+    var debe = Math.round((total - pagado) * 100) / 100;
+    if(debe <= 0.005) return;
+    var pone = Math.min(queda, debe);
+    pone = Math.round(pone * 100) / 100;
+    if(pone <= 0.005) return;
+    if(!v.pagosFactura) v.pagosFactura = [];
+    v.pagosFactura.push({
+      monto: pone,
+      fecha: fechaHoy(),
+      metodo: 'credito_cliente',
+      nota: 'Cr\u00e9dito a favor aplicado'
+    });
+    queda = Math.round((queda - pone) * 100) / 100;
+    usado = Math.round((usado + pone) * 100) / 100;
+    tocadas.push({ id: v.id, monto: pone });
+  });
+
+  if(usado <= 0.005){ avisoGrande('Este cliente no tiene facturas pendientes donde aplicar el cr\u00e9dito.'); return; }
+
+  var texto = 'Se van a usar $' + fmtNum(usado) + ' del cr\u00e9dito a favor'
+            + (tocadas.length > 1 ? ' en ' + tocadas.length + ' facturas' : '')
+            + '.\n\n'
+            + (queda > 0.005 ? 'Le quedar\u00e1n $' + fmtNum(queda) + ' a favor.' : 'No le quedar\u00e1 cr\u00e9dito.')
+            + '\n\n\u00bfConfirmas?';
+  if(!confirm(texto)) return;
+
+  protegerConHuella(function(){
+    // guardar el cambio: primero las ventas, después el crédito del cliente
+    var Vg = LS('nv', []);
+    tocadas.forEach(function(t){
+      var vv = Vg.find(function(x){ return String(x.id) === String(t.id); });
+      if(!vv) return;
+      if(!vv.pagosFactura) vv.pagosFactura = [];
+      vv.pagosFactura.push({ monto: t.monto, fecha: fechaHoy(),
+                             metodo: 'credito_cliente', nota: 'Cr\u00e9dito a favor aplicado' });
+    });
+    SS('nv', Vg);
+    ventas = LS('nv', []);
+
+    var Cg = LS('ncl', []);
+    var i2 = Cg.findIndex(function(x){ return String(x.id) === String(cid); });
+    if(i2 >= 0){ Cg[i2].creditoAFavor = queda; SS('ncl', Cg); }
+    clientes = LS('ncl', []);
+
+    avisoGrande('\u2705 Se aplicaron $' + fmtNum(usado) + ' del cr\u00e9dito a favor.'
+      + (queda > 0.005 ? '\n\nLe quedan $' + fmtNum(queda) + ' a favor.' : ''));
+
+    // repintar
+    try { abrirAbono(cid); } catch(e){}
+    try { renderCxC(''); } catch(e){}
+  });
+}
+
+
 function abrirAbono(cid){
   cxcClienteId = cid;
   ventas = LS('nv',[]);
@@ -16379,6 +16717,8 @@ function abrirAbono(cid){
     ' | <span style="color:var(--nbs-green-text);font-weight:700">Pagado: $'+fmtNum(totalPagado)+'</span>' +
     ' | <span style="color:var(--nbs-muted)">Total factura: $'+fmtNum(totalFacturado)+'</span>' +
     (creditoParaMostrar>0.01 ? '<br><span style="color:#E65100;font-weight:700">💰 Tiene ($'+fmtNum(creditoParaMostrar)+') de crédito a favor</span>' : '');
+  pintarCreditoAFavor(cid, saldoReal);
+
   var el = document.getElementById('cxc-facturas');
   el.innerHTML = '';
 
@@ -16701,16 +17041,29 @@ var METODOS_PAGO_LABELS = { efectivo:'💵 Efectivo', cashapp:'📱 CashApp', ze
 // Devuelve las opciones de metodo de pago para una fila especifica -incluye "usar credito del
 // cliente" SOLO si el cliente seleccionado en Vender tiene credito a favor disponible-.
 function obtenerOpcionesMetodoPago(vid){
+  // Sensei pidio poder usar el credito tambien al cobrar pedidos rapidos,
+  // no solo en una venta nueva. -31 jul-
   var opciones = { efectivo: METODOS_PAGO_LABELS.efectivo, cashapp: METODOS_PAGO_LABELS.cashapp, zelle: METODOS_PAGO_LABELS.zelle };
+  // ═══ EL CRÉDITO A FAVOR, EN TODOS LOS SITIOS (31 jul) ═══
+  // Antes solo salía al hacer una VENTA NUEVA (vid === 'vini'). Sensei pidió poder
+  // usarlo también al cobrar un pedido rápido o al aplicar un pago. Ahora se busca
+  // el cliente de dos formas: si es venta nueva, del selector de la pantalla; si es
+  // una factura, del cliente de esa factura.
+  var cidCredito = null;
   if(vid === 'vini'){
     var clEl = document.getElementById('vcl');
-    var cid = clEl ? parseInt(clEl.value) : null;
-    if(cid){
-      var clientesLocal = LS('ncl', []);
-      var cl = clientesLocal.find(function(c){ return c.id===cid; });
-      if(cl && (cl.creditoAFavor||0) > 0.005){
-        opciones.credito_cliente = '🎁 Usar crédito del cliente ($'+fmtNum(cl.creditoAFavor)+' disponible)';
-      }
+    cidCredito = clEl ? parseInt(clEl.value) : null;
+  } else {
+    try {
+      var vv = LS('nv', []).find(function(x){ return String(x.id) === String(vid); });
+      if(vv) cidCredito = vv.cid;
+    } catch(e){}
+  }
+  if(cidCredito){
+    var clientesLocal = LS('ncl', []);
+    var cl = clientesLocal.find(function(c){ return String(c.id) === String(cidCredito); });
+    if(cl && (cl.creditoAFavor||0) > 0.005){
+      opciones.credito_cliente = '🎁 Usar crédito del cliente ($'+fmtNum(cl.creditoAFavor)+' disponible)';
     }
   }
   return opciones;
@@ -25730,12 +26083,14 @@ function verHistorialCliente(cid, modo){
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:10px">💳 Cuentas por Cobrar / Facturas</h2>
   <div style="display:flex;gap:8px;margin-bottom:10px">
     <button id="cxc-tab-pendientes" onclick="cambiarPestanaCxC('pendientes')" style="flex:1;padding:10px;background:var(--nbs-gold);color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📋 Pendientes</button>
+    <button id="cxc-tab-historial" onclick="cambiarPestanaCxC('historial')" style="flex:1;padding:10px;background:#F0F0F2;color:var(--nbs-ink);border:none;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">📅 Día por día</button>
     <button id="cxc-tab-saldadas" onclick="cambiarPestanaCxC('saldadas')" style="flex:1;padding:10px;background:#F0F0F2;color:var(--nbs-ink);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✅ Facturas Saldadas</button>
   </div>
   <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="cxc-buscar" type="text" placeholder="Buscar por nombre o negocio..." oninput="cxcBuscarActivo(this.value)" autocomplete="off"></div>
   <div id="cxc-lista"></div>
   <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="abrirMenuReporte('cxc-lista','Cuentas por Cobrar')">🖨️ Imprimir / Compartir este reporte</button>
   <div id="cxc-saldadas-lista" style="display:none"></div>
+  <div id="cxc-historial-lista" style="display:none"></div>
 
   <div style="margin-top:32px;padding-top:16px;border-top:1px solid #eee">
     <div style="font-size:10px;color:#bbb;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;text-align:center">Herramienta avanzada — usar rara vez</div>
@@ -25746,6 +26101,7 @@ function verHistorialCliente(cid, modo){
     <div class="card">
       <p style="font-size:26px;font-weight:700;margin-bottom:6px" id="cxc-nombre"></p>
       <p style="font-size:16px;font-weight:700;color:#C62828;margin-bottom:14px" id="cxc-saldo-txt"></p>
+      <div id="cxc-credito-favor" style="display:none;margin-bottom:12px"></div>
       <div id="cxc-facturas" style="margin-bottom:12px"></div>
       <button class="btn" style="background:#F0F0F2;color:var(--nbs-ink);font-weight:700" onclick="document.getElementById('cxc-abono').style.display='none';document.getElementById('cxc-lista').style.display='block'">←Volver a la lista</button>
 
