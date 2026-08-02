@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260801a-OFICIAL-V2.0">
+<meta name="app-version" content="20260801d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1621,7 +1621,204 @@ function conLogoListo(cb){
   }
   setTimeout(function(){ if(!hecho){ hecho = true; cb(); } }, 1500);
 }
-function LS(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+
+// ═══════════════════════════════════════════════════════════════════
+//  EL ALMACÉN GRANDE DE IMÁGENES  (1 ago 2026)
+//
+//  EL PROBLEMA: el navegador le da a la app un casillero de solo 5 MB
+//  (localStorage). Los datos de Sensei llegaron al 89% y las copias del
+//  teléfono empezaron a fallar. Medido: el 84% de todo eran IMÁGENES.
+//
+//  LA CURA: las imágenes se mudan a IndexedDB, que NO tiene ese tope.
+//  Los NÚMEROS (ventas, montos, pagos) se quedan donde están — no se
+//  toca ni uno.
+//
+//  CÓMO, sin cambiar las 16 funciones que las usan: se engancha en las
+//  DOS PUERTAS por donde pasa todo, `LS()` y `SS()`.
+//     · Al GUARDAR  -> la imagen sale del dato y se guarda aparte
+//     · Al LEER     -> la imagen se vuelve a pegar
+//  Así `gasto.foto` y `venta.firma` se siguen viendo igual en todas
+//  partes, y ninguna de esas 16 funciones se entera.
+//
+//  REGLA DE ORO: una imagen SOLO se le quita al dato cuando ya está
+//  CONFIRMADA en el almacén nuevo. Si IndexedDB no existe o falla, no
+//  se quita nada y la app funciona exactamente como hoy.
+// ═══════════════════════════════════════════════════════════════════
+
+// Qué clave lleva qué imagen. Fase 1: gastos, compras y firmas.
+// Las fotos de PRODUCTOS quedan para la fase 2 -tienen su propio sistema-.
+var CLAVES_CON_IMAGEN = { ngastos: 'foto', nc: 'foto', nv: 'firma' };
+
+var _IMGS = {};        // las imágenes en memoria: 'ngastos|123' -> 'data:image...'
+var _IMGS_OK = {};     // las que YA están confirmadas en el almacén grande
+var _IMGS_LISTO = false;
+var _almacenImgs = null;
+
+function _clvImg(clave, id){ return clave + '|' + String(id); }
+
+// ── Abrir el almacén grande ──
+function abrirAlmacenImagenes(){
+  return new Promise(function(listo){
+    if(_almacenImgs) return listo(_almacenImgs);
+    if(typeof indexedDB === 'undefined'){ return listo(null); }
+    try {
+      var req = indexedDB.open('nbs2_imagenes', 1);
+      req.onupgradeneeded = function(e){
+        var db = e.target.result;
+        if(!db.objectStoreNames.contains('imgs')) db.createObjectStore('imgs');
+      };
+      req.onsuccess = function(e){ _almacenImgs = e.target.result; listo(_almacenImgs); };
+      req.onerror = function(){ console.error('No se pudo abrir el almacen de imagenes'); listo(null); };
+      req.onblocked = function(){ listo(null); };
+    } catch(e){ console.error('IndexedDB no disponible:', e); listo(null); }
+  });
+}
+
+// ── Guardar una imagen en el almacén grande ──
+function guardarImagenGrande(clv, dato){
+  return abrirAlmacenImagenes().then(function(db){
+    if(!db) return false;
+    return new Promise(function(listo){
+      try {
+        var tx = db.transaction('imgs', 'readwrite');
+        tx.objectStore('imgs').put(dato, clv);
+        tx.oncomplete = function(){ _IMGS_OK[clv] = true; listo(true); };
+        tx.onerror = function(){ listo(false); };
+        tx.onabort = function(){ listo(false); };
+      } catch(e){ listo(false); }
+    });
+  }).catch(function(){ return false; });
+}
+
+// ── Borrar una imagen que ya no hace falta ──
+function borrarImagenGrande(clv){
+  return abrirAlmacenImagenes().then(function(db){
+    if(!db) return;
+    try {
+      var tx = db.transaction('imgs', 'readwrite');
+      tx.objectStore('imgs').delete(clv);
+    } catch(e){}
+  }).catch(function(){});
+}
+
+// ── Traer TODAS las imágenes a memoria, al arrancar ──
+function cargarImagenesGrandes(){
+  return abrirAlmacenImagenes().then(function(db){
+    if(!db){ _IMGS_LISTO = true; return 0; }
+    return new Promise(function(listo){
+      try {
+        var tx = db.transaction('imgs', 'readonly');
+        var st = tx.objectStore('imgs');
+        var pedir = st.openCursor();
+        var n = 0;
+        pedir.onsuccess = function(e){
+          var cur = e.target.result;
+          if(cur){
+            _IMGS[cur.key] = cur.value;
+            _IMGS_OK[cur.key] = true;
+            n++;
+            cur.continue();
+          } else {
+            _IMGS_LISTO = true;
+            listo(n);
+          }
+        };
+        pedir.onerror = function(){ _IMGS_LISTO = true; listo(0); };
+      } catch(e){ _IMGS_LISTO = true; listo(0); }
+    });
+  }).catch(function(){ _IMGS_LISTO = true; return 0; });
+}
+
+// ── AL GUARDAR: sacar la imagen del dato ──
+// Devuelve una COPIA sin la imagen. Nunca toca el objeto original, porque
+// esos mismos objetos viven en las variables de la app -ventas, gastos- y
+// si se les quitara la imagen, dejarían de verse en pantalla.
+function sacarImagenes(clave, lista){
+  var campo = CLAVES_CON_IMAGEN[clave];
+  if(!campo || !Array.isArray(lista)) return lista;
+
+  var salida = [];
+  for(var i = 0; i < lista.length; i++){
+    var r = lista[i];
+    if(!r || typeof r !== 'object' || r[campo] === undefined || r[campo] === null || r[campo] === ''){
+      salida.push(r);
+      continue;
+    }
+    var clv = _clvImg(clave, r.id);
+    var img = r[campo];
+
+    // guardarla en memoria y en el almacén grande
+    if(_IMGS[clv] !== img){
+      _IMGS[clv] = img;
+      _IMGS_OK[clv] = false;
+      guardarImagenGrande(clv, img);
+    }
+
+    // 🔑 SOLO se le quita al dato si YA está confirmada en el almacén grande.
+    // Si no, se deja donde estaba: mejor ocupar espacio que perder una imagen.
+    if(_IMGS_OK[clv]){
+      var copia = {};
+      for(var k in r){ if(k !== campo) copia[k] = r[k]; }
+      salida.push(copia);
+    } else {
+      salida.push(r);
+    }
+  }
+  return salida;
+}
+
+// ── AL LEER: volver a pegar la imagen ──
+function ponerImagenes(clave, lista){
+  var campo = CLAVES_CON_IMAGEN[clave];
+  if(!campo || !Array.isArray(lista)) return lista;
+
+  for(var i = 0; i < lista.length; i++){
+    var r = lista[i];
+    if(!r || typeof r !== 'object') continue;
+    var clv = _clvImg(clave, r.id);
+
+    if(r[campo]){
+      // Todavía viene dentro del dato -es de antes de la mudanza-.
+      // Se aprovecha para llevarla al almacén grande.
+      if(_IMGS[clv] !== r[campo]){
+        _IMGS[clv] = r[campo];
+        _IMGS_OK[clv] = false;
+        guardarImagenGrande(clv, r[campo]);
+      }
+    } else if(_IMGS[clv]){
+      r[campo] = _IMGS[clv];
+    }
+  }
+  return lista;
+}
+
+// ── El texto CON las imágenes, para la nube y los respaldos ──
+// La nube y el backup tienen que seguir llevándose las imágenes, igual que
+// hoy. Solo el casillero chico del teléfono se queda sin ellas.
+function textoConImagenes(clave){
+  if(!CLAVES_CON_IMAGEN[clave]) return localStorage.getItem(clave);
+  try { return JSON.stringify(LS(clave, [])); }
+  catch(e){ return localStorage.getItem(clave); }
+}
+
+// ── Cuánto espacio se liberó ──
+function cuantoLiberaronLasImagenes(){
+  var n = 0;
+  for(var k in _IMGS){ n += (_IMGS[k] || '').length * 2; }
+  return Math.round(n / 1024);
+}
+
+
+function LS(k,d){
+  try{
+    var v = localStorage.getItem(k);
+    if(!v) return d;
+    var dato = JSON.parse(v);
+    // Volver a pegarle las imagenes que viven en el almacen grande
+    if(CLAVES_CON_IMAGEN[k]){ try { dato = ponerImagenes(k, dato); } catch(eImg){} }
+    return dato;
+  }catch(e){ return d; }
+}
 
 // (toggleMenuExtra eliminada 18 jul 2026: ya nadie la llama)
 
@@ -1775,7 +1972,8 @@ function hacerCopiaAutomatica(forzada){
   var claves_ok = [], claves_malas = [];
 
   CLAVES_A_RESPALDAR.forEach(function(k){
-    var crudo = localStorage.getItem(k);
+    // Con las imagenes pegadas: la copia de la nube debe poder restaurarlo todo
+    var crudo = textoConImagenes(k);
     if(crudo === null) return; // no existe: no hay nada que copiar
     // Los productos se copian SIN fotos: cada foto ya esta guardada por su lado en la nube,
     // y meterlas en cada copia cada 2 horas llenaria el espacio sin necesidad
@@ -2113,7 +2311,22 @@ function revisarSiFaltaAlgo(){
   }
 }
 
+// Al arrancar: traer las imagenes del almacen grande y repintar lo que se vea.
+// Mientras cargan -son milisegundos- la app funciona igual, solo que una foto de
+// gasto o una firma podria tardar un parpadeo en aparecer.
+function arrancarAlmacenImagenes(){
+  try {
+    cargarImagenesGrandes().then(function(n){
+      if(n > 0) console.log('Almacen de imagenes: ' + n + ' imagen(es) listas.');
+      // Repintar lo que este abierto, por si ya se dibujo sin imagenes
+      try { if(typeof renderGastos === 'function' && document.getElementById('p-gastos')
+              && getComputedStyle(document.getElementById('p-gastos')).display !== 'none') renderGastos(''); } catch(e){}
+    });
+  } catch(e){ console.error('No se pudo arrancar el almacen de imagenes:', e); }
+}
+
 function iniciarCopiasAutomaticas(){
+  try { arrancarAlmacenImagenes(); } catch(e){}
   revisarSiFaltaAlgo();
   // El recordatorio de bajar respaldo se revisa cada minuto, y aparece solo a los 30 min
   setTimeout(iniciarVigilanteDeRespaldo, 2500);
@@ -2242,6 +2455,23 @@ function hacerCopiaLocal(){
         var lista = JSON.parse(crudo);
         if(Array.isArray(lista) && typeof quitarFotos === 'function'){
           crudo = JSON.stringify(quitarFotos(lista));
+        }
+      } catch(e){}
+    }
+    // Las fotos de gastos y compras y las firmas viven ahora en el almacen grande,
+    // asi que en las copias del telefono sobran igual que las de productos. Si no se
+    // quitaran, una copia hecha justo antes de la mudanza se las llevaria dentro y el
+    // espacio liberado se volveria a ocupar. -1 ago-
+    if(typeof CLAVES_CON_IMAGEN !== 'undefined' && CLAVES_CON_IMAGEN[k]){
+      try {
+        var campoImg = CLAVES_CON_IMAGEN[k];
+        var lista2 = JSON.parse(crudo);
+        if(Array.isArray(lista2)){
+          crudo = JSON.stringify(lista2.map(function(r){
+            if(!r || typeof r !== 'object' || !r[campoImg]) return r;
+            var cp = {}; for(var kk in r){ if(kk !== campoImg) cp[kk] = r[kk]; }
+            return cp;
+          }));
         }
       } catch(e){}
     }
@@ -3362,9 +3592,17 @@ function fundirConLoDelTelefono(clave, textoDeLaNube){
 
 function SS(k,v){
   try{
+    // 🔑 PRIMERO se sacan las imagenes, DESPUES se sella. En ese orden, y no al
+    // reves: `sellarCambios` compara lo nuevo contra lo guardado, y si uno tuviera
+    // la imagen y el otro no, creeria que TODOS los registros cambiaron y les
+    // pondria hora nueva a todos. Eso ensuciaria la sincronizacion. -1 ago-
+    var _paraGuardar = v;
+    if(CLAVES_CON_IMAGEN[k]){
+      try { _paraGuardar = sacarImagenes(k, v); } catch(eImg){ _paraGuardar = v; }
+    }
     // Ponerle la hora a los registros que cambiaron, para poder juntar sin pisar
-    try { v = sellarCambios(k, v); } catch(eSello){ console.error('No se pudo sellar', k, eSello); }
-    localStorage.setItem(k,JSON.stringify(v));
+    try { _paraGuardar = sellarCambios(k, _paraGuardar); } catch(eSello){ console.error('No se pudo sellar', k, eSello); }
+    localStorage.setItem(k,JSON.stringify(_paraGuardar));
     marcarHoraLocal(k);
     revisarSiTocaCopiaLocal(k, v); // cada 5 facturas guarda una copia DENTRO del telefono
   }catch(e){
@@ -16838,7 +17076,10 @@ function abrirAbono(cid){
       }
 
       // Button to apply payment to THIS invoice (con soporte para varias formas de pago a la vez)
-      if(esSaldoPendiente(saldoFactura)){
+      // 🔴 A una factura CANCELADA no se le cobra. Antes salían igual los botones
+      // "Pagar todo en efectivo" y "Registrar pago", y un toque por error le metía
+      // al negocio un cobro de dinero que no existe. -1 ago, lo encontró Sensei-
+      if(esSaldoPendiente(saldoFactura) && !v.cancelada){
         if(!window._pagoMetodos) window._pagoMetodos = {};
         window._pagoMetodos[v.id] = [{tipo:'efectivo', monto:0}];
 
@@ -20534,7 +20775,8 @@ function subirPendientes(){
   var claves = Object.keys(p);
   if(!claves.length) return;
   claves.forEach(function(k){
-    var valor = localStorage.getItem(k);
+    // Con las imagenes pegadas: la nube tiene que seguir recibiendolas igual que hoy
+    var valor = textoConImagenes(k);
     if(valor === null){ quitarPendienteDeSubir(k); return; }
     var docPend = { valor: valor, actualizado: horaLocalDe(k) || Date.now() };
     if(k === 'np'){
