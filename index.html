@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260805a-OFICIAL-V2.0">
+<meta name="app-version" content="20260806a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4306,7 +4306,87 @@ function irProtegido(dest){
 
 var VIP_META = 10;
 var VIP_PRECIOS = [9.99, 10.00];
-var VIP_PRECIO_MITAD = 5.00; // 2 unidades de $5 = 1 punto VIP
+var VIP_PRECIO_MITAD = 5.00;
+
+// ═══════════════════════════════════════════════════════════════════
+//  LA REGLA DEL VIP, COMO LA PIDIO SENSEI (5 ago 2026)
+//
+//  Cuentan juntos los productos de la MISMA MARCA y el MISMO TIPO que
+//  se hayan vendido a $10.00 o $9.99. Ejemplo suyo: todos los WAX de
+//  IMMORTAL -spicebomb, amarillo, strawberry- suman al mismo grupo.
+//
+//  ⚠️ LA CATEGORIA NO SIRVE: es muy amplia -"PRODUCTO PARA PELO" tiene
+//  81 productos, ahi caben wax, gel y spray juntos-. Por eso el TIPO se
+//  saca de la PALABRA que esta en el NOMBRE.
+//
+//  APARTE: las navajas cortadas de $5 siguen a 2 unidades = 1 punto,
+//  pero cuentan POR PRODUCTO EXACTO, no por marca+tipo.
+//
+//  Y si le baja el precio a un producto -o sea, un descuento-, esa
+//  linea deja de contar sola, porque ya no vale $10 ni $9.99.
+// ═══════════════════════════════════════════════════════════════════
+
+// Los tipos, en orden de busqueda. Los de DOS palabras van primero para que
+// "after shave" no se confunda con "shave" a secas.
+var VIP_TIPOS = [
+  // 'sea salt' se quito a proposito: "Chaos sea salt wax" tiene que contar como
+  // WAX junto a los demas wax de Immortal, no como un grupo aparte. -5 ago, Sensei-
+  'after shave', 'shaving cream', 'hair spray',
+  'colonia', 'cologne', 'shampoo', 'acondicionador', 'conditioner',
+  'pomade', 'pomada', 'mousse', 'mouse', 'serum', 'tonic', 'talco',
+  'powder', 'polvo', 'balsam', 'balm', 'paste', 'sheen', 'lotion', 'locion',
+  'spray', 'cream', 'crema', 'aceite', 'oil', 'gel', 'wax', 'cera',
+  'tinte', 'navaja', 'blade', 'peine', 'cepillo'
+];
+
+function tipoVIPdeNombre(nombre){
+  var n = ' ' + String(nombre || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') + ' ';
+  for(var i = 0; i < VIP_TIPOS.length; i++){
+    if(n.indexOf(VIP_TIPOS[i]) >= 0) return VIP_TIPOS[i].toUpperCase();
+  }
+  return null;
+}
+
+// ¿Es una navaja CORTADA de $5? Esas van aparte, por producto exacto.
+function esNavajaCortadaVIP(nombre, precio){
+  if(Math.abs((parseFloat(precio) || 0) - VIP_PRECIO_MITAD) > 0.02) return false;
+  var n = String(nombre || '').toLowerCase();
+  return (n.indexOf('navaja') >= 0 || n.indexOf('blade') >= 0)
+      && (n.indexOf('cortad') >= 0 || n.indexOf('cut') >= 0);
+}
+
+// ¿Este cliente entra al programa? Las cuentas de CONSIGNACION no.
+function clienteCuentaVIP(c){
+  return !(c && c.consignacion === true);
+}
+
+// La clave del grupo de un renglon vendido. Devuelve null si ese renglon no cuenta.
+function claveGrupoVIP(it, prod){
+  var precio = parseFloat(it.precio) || 0;
+
+  if(esNavajaCortadaVIP(it.nombre, precio)){
+    return { clave: 'NAV|' + String(it.pid),
+             nombre: String(it.nombre || 'Navajas cortadas'), mitad: true };
+  }
+
+  var esDiez = VIP_PRECIOS.some(function(p){ return Math.abs(precio - p) < 0.02; });
+  if(!esDiez) return null;
+
+  var marca = (prod && prod.marca) ? String(prod.marca).trim() : '';
+  if(!marca){
+    // Sin marca en la ficha: se usa la PRIMERA palabra del nombre, que casi siempre
+    // es la marca. Asi un producto al que se le olvido la marca no se queda fuera.
+    marca = String(it.nombre || '').trim().split(/\s+/)[0] || '';
+  }
+  if(!marca) return null;
+
+  var tipo = tipoVIPdeNombre(it.nombre);
+  if(!tipo) return null;
+
+  var nom = marca.toUpperCase() + ' \u00b7 ' + tipo;
+  return { clave: nom, nombre: nom, mitad: false };
+} // 2 unidades de $5 = 1 punto VIP
 
 // Devuelve el precio que le corresponde a un cliente por un producto -su precio personalizado
 // si tiene uno guardado para ese producto, o el precio normal del catalogo si no-.
@@ -4319,9 +4399,10 @@ function obtenerPrecioParaCliente(cid, pid, precioDefault){
   return especial ? especial.precio : precioDefault;
 }
 
-function esProductoVIP(precio){
-  return VIP_PRECIOS.some(function(p){ return Math.abs(precio - p) < 0.02; })
-    || Math.abs(precio - VIP_PRECIO_MITAD) < 0.02;
+function esProductoVIP(precio, nombre){
+  if(VIP_PRECIOS.some(function(p){ return Math.abs(precio - p) < 0.02; })) return true;
+  // Los de $5 ya NO entran todos: solo las navajas cortadas. -5 ago-
+  return esNavajaCortadaVIP(nombre, precio);
 }
 
 function calcPuntosVIP(precio, cant){
@@ -4347,55 +4428,62 @@ var VIP_FECHA_INICIO = '6/15/2026'; // Solo cuentan ventas desde esta fecha
 function calcVIP(cid){
   loadProds();
   ventas = LS('nv', []);
+  var conteo = {};
+
+  // Las cuentas de CONSIGNACION no entran al programa: son productos dejados para
+  // que se paguen segun se vendan, no compras del barbero. -5 ago, lo pidio Sensei-
+  var _cliVIP = LS('ncl', []).find(function(x){ return String(x.id) === String(cid); });
+  if(!clienteCuentaVIP(_cliVIP)) return conteo;
+
   var ventasC = ventas.filter(function(v){
     return String(v.cid)===String(cid) && !v.cancelada;
   });
-  var conteo = {};
+
   ventasC.forEach(function(v){
-    // Si esta venta tuvo un descuento aplicado -a nivel de toda la factura-, ninguno de sus
-    // productos cuenta para VIP: ya se le dio un beneficio en el precio, no puede sumar tambien
-    // el punto de lealtad. El precio guardado en cada item puede seguir siendo el de catalogo
-    // aunque el cliente en realidad haya pagado menos por el descuento de la factura completa.
+    // Si la FACTURA COMPLETA tuvo descuento, ninguno de sus productos cuenta: ya se le
+    // dio un beneficio en el precio. Y si el descuento fue a UN producto -bajandole el
+    // precio-, ese renglon se cae solo, porque deja de valer $10 o $9.99.
     if(v.descuento && v.descuento.monto > 0.005) return;
+    if(v.esPremioVIP) return;                    // el producto regalado no suma puntos
     (v.items||[]).forEach(function(it){
-      if(!esProductoVIP(it.precio)) return;
       var prod = productos.find(function(x){ return String(x.id)===String(it.pid); });
-      var key;
-      if(prod && prod.marca){
-        // Usar marca real + categoría real (mucho más preciso)
-        key = prod.marca.toUpperCase() + (prod.cat ? ' · '+prod.cat : '');
-      } else {
-        key = getMarcaVIP(it.nombre, prod ? (prod.cat||'') : '');
-      }
-      if(!conteo[key]) conteo[key] = { nombre: key, precio: it.precio, unidades: 0 };
-      conteo[key].unidades += it.cant;
+      var g = claveGrupoVIP(it, prod);
+      if(!g) return;
+      if(!conteo[g.clave]) conteo[g.clave] = { nombre: g.nombre, mitad: g.mitad,
+                                               precio: it.precio, unidades: 0 };
+      conteo[g.clave].unidades += (parseFloat(it.cant) || 0);
     });
   });
 
-  // Restar las unidades que se hayan devuelto -un producto devuelto no debe seguir contando
-  // para el punto VIP, ya que el cliente ya no se quedo con el-.
+  // Restar lo devuelto: un producto devuelto no debe seguir contando para el punto.
   var devoluciones = LS('ndevoluciones', []);
   devoluciones.filter(function(d){ return String(d.cid)===String(cid); }).forEach(function(d){
     (d.items||[]).forEach(function(it){
-      if(!esProductoVIP(it.precio)) return;
       var prod = productos.find(function(x){ return String(x.id)===String(it.pid); });
-      var key;
-      if(prod && prod.marca){
-        key = prod.marca.toUpperCase() + (prod.cat ? ' · '+prod.cat : '');
-      } else {
-        key = getMarcaVIP(it.nombre, prod ? (prod.cat||'') : '');
-      }
-      if(conteo[key]) conteo[key].unidades = Math.max(0, conteo[key].unidades - it.cant);
+      var g = claveGrupoVIP(it, prod);
+      if(!g) return;
+      if(conteo[g.clave]) conteo[g.clave].unidades =
+        Math.max(0, conteo[g.clave].unidades - (parseFloat(it.cant) || 0));
     });
+  });
+
+  // Los premios YA ENTREGADOS se descuentan, para que ese grupo vuelva a empezar.
+  var _canjes = {};
+  ((_cliVIP && _cliVIP.vipCanjes) || []).forEach(function(c){
+    _canjes[c.grupo] = (_canjes[c.grupo] || 0) + 1;
   });
 
   Object.keys(conteo).forEach(function(k){
     var p = conteo[k];
-    var puntos = calcPuntosVIP(p.precio, p.unidades);
+    // Las navajas cortadas van a 2 unidades por punto; lo demas, 1 punto por unidad.
+    var puntos = p.mitad ? Math.floor(p.unidades / 2) : p.unidades;
+    puntos = Math.max(0, puntos - (_canjes[k] || 0) * VIP_META);
     p.puntos = puntos;
     p.gratis = Math.floor(puntos / VIP_META);
     p.progreso = puntos % VIP_META;
     p.total = puntos;
+    p.entregados = _canjes[k] || 0;
+    p.claveGrupo = k;          // la necesita el boton de entregar el premio
   });
   return conteo;
 }
@@ -4457,6 +4545,25 @@ function renumerarTodasLasFacturas(){
   alert('✅ Listo. Se renumeraron '+todas.length+' facturas.\n\nLa más vieja quedó como #0001 y la más reciente como #'+todas[todas.length-1].numFactura+'.');
   if(document.getElementById('cxc-buscar')) cambiarPestanaCxC(window._cxcTabActiva || 'pendientes');
   else renderFacturas('');
+}
+
+// Prende y apaga la marca de CONSIGNACION. Al prenderla, ese cliente deja de contar
+// para el programa VIP -son productos dejados a pagar segun se vendan, no compras-.
+function toggleConsignacion(btn){
+  var id = btn.getAttribute('data-clid');
+  var C = LS('ncl', []);
+  var i = C.findIndex(function(x){ return String(x.id) === String(id); });
+  if(i < 0) return;
+  var ahora = !C[i].consignacion;
+
+  if(ahora && !confirm('Marcar a ' + nombreCl(C[i]) + ' como cuenta de CONSIGNACION?\n\n'
+      + 'Sus compras dejaran de contar para el programa VIP.')) return;
+
+  C[i].consignacion = ahora;
+  if(!ahora) delete C[i].consignacion;
+  SS('ncl', C);
+  clientes = LS('ncl', []);
+  try { verCl(id); } catch(e){}
 }
 
 function toggleVIPBtn(btn){
@@ -4616,8 +4723,41 @@ function renderVIPLista(list){
           +'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--nbs-muted)">'
           +'<span>Unidades: '+p.unidades+' → Puntos: '+p.puntos+'</span>'
           +(p.gratis>0?'<span style="color:#AD1457;font-weight:700">🎁 '+p.gratis+' gratis</span>':'<span>'+(VIP_META-p.progreso)+' para completar</span>')
-          +'</div></div>';
+          +'</div>'
+          // Si este grupo ya llego a la meta, sale el boton para entregar el premio.
+          // Antes no habia ninguno: el contador se quedaba en 10 para siempre. -5 ago-
+          +(p.gratis > 0
+            ? '<button onclick="abrirEntregaPremioVIP(' + JSON.stringify(String(c.id)) + ','
+              + JSON.stringify(String(p.claveGrupo || p.nombre)) + ')" '
+              + 'style="width:100%;margin-top:8px;padding:10px;background:#AD1457;color:#fff;'
+              + 'border:none;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">'
+              + '\ud83c\udf81 Ya se lo di</button>'
+            : '')
+          +'</div>';
       });
+
+      // El historial de premios que ya se le entregaron
+      var _canjes = (c.vipCanjes || []);
+      if(_canjes.length){
+        html += '<div style="margin-top:12px;border-top:1px solid #eee;padding-top:10px">'
+          + '<div style="font-size:11px;font-weight:800;color:#AD1457;letter-spacing:.4px;margin-bottom:6px">'
+          + '\ud83c\udf81 PREMIOS ENTREGADOS (' + _canjes.length + ')</div>';
+        _canjes.slice(-6).reverse().forEach(function(k){
+          html += '<div onclick="mostrarComprobantePremioVIP(' + JSON.stringify(String(c.id)) + ','
+            + JSON.stringify(String(k.ventaId)) + ')" '
+            + 'style="display:flex;justify-content:space-between;align-items:center;background:#FCE4EC;'
+            + 'border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:pointer">'
+            + '<div style="flex:1;min-width:0">'
+            +   '<div style="font-size:12.5px;font-weight:700;color:var(--nbs-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+            +     escaparHtml(String(k.producto || '').slice(0,30)) + '</div>'
+            +   '<div style="font-size:10.5px;color:#888">' + escaparHtml(k.fecha || '') + ' \u00b7 '
+            +     escaparHtml(String(k.nombreGrupo || k.grupo || '').slice(0,24)) + '</div>'
+            + '</div>'
+            + '<span style="font-size:11px;color:#AD1457;font-weight:800;flex-shrink:0">ver \u203a</span>'
+            + '</div>';
+        });
+        html += '</div>';
+      }
     }
     card.innerHTML=html;
     el.appendChild(card);
@@ -14477,6 +14617,305 @@ function calcularFidelidad(c, ventasActivas){
   return { total: total, meta: 400, regalosDados: regalos.length };
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  ENTREGAR EL PREMIO VIP  (5 ago 2026)
+//
+//  Sensei: "cuando yo regale el producto debe registrarse tambien para
+//  que pueda ser descontado y al mismo tiempo tambien afecte mi
+//  verdadera ganancia y todo lo que tenga que ver con los numeros de
+//  la app en cuestion de contabilidad y finanzas".
+//
+//  COMO SE REGISTRA — y por que asi:
+//     total:  $0.00   → no infla el "Vendi", porque no entro dinero
+//     costo:  el real → SI baja la ganancia, porque el producto costo
+//     stock:  baja 1  → salio de la mercancia de verdad
+//     esPremioVIP: true
+//
+//  Y la LEY DEL DINERO se sigue cumpliendo: vendido 0 = cobrado 0 +
+//  por cobrar 0.
+// ═══════════════════════════════════════════════════════════════════
+
+function abrirEntregaPremioVIP(cid, grupoClave){
+  var cls = LS('ncl', []);
+  var cl = cls.find(function(x){ return String(x.id) === String(cid); });
+  if(!cl){ avisoGrande('No encontr\u00e9 ese cliente.'); return; }
+
+  var grupos = calcVIP(cid);
+  var g = grupos[grupoClave];
+  if(!g || g.gratis < 1){
+    avisoGrande('Ese grupo todav\u00eda no llega a ' + VIP_META + ' puntos.');
+    return;
+  }
+
+  window._premioVIP = { cid: cid, grupo: grupoClave, nombreGrupo: g.nombre, pid: null };
+  loadProds();
+
+  // Los productos que PODRIA regalar: los de ese mismo grupo
+  var candidatos = productos.filter(function(p){
+    var falso = { pid: p.id, nombre: p.nombre, precio: p.precio, cant: 1 };
+    var k = claveGrupoVIP(falso, p);
+    return k && k.clave === grupoClave;
+  });
+
+  var h = '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px">'
+    + '<div style="flex:1"><div style="font-size:18px;font-weight:900;color:#1a237e">\ud83c\udf81 ENTREGAR EL PREMIO</div>'
+    + '<div style="font-size:12.5px;color:#666;margin-top:2px">' + escaparHtml(g.nombre) + '</div>'
+    + '<div style="font-size:13px;font-weight:700;color:var(--nbs-ink)">' + escaparHtml(nombreCl(cl)) + '</div></div>'
+    + '<button onclick="cerrarEntregaPremioVIP()" style="flex-shrink:0;width:34px;height:34px;border:none;border-radius:9px;background:#f0f0f0;color:#666;font-size:20px;font-weight:800;cursor:pointer">\u2715</button>'
+    + '</div>';
+
+  h += '<div style="font-size:12px;font-weight:800;color:#6A1B9A;letter-spacing:.4px;margin-bottom:6px">\u00bfCU\u00c1L PRODUCTO LE DISTE?</div>';
+
+  if(!candidatos.length){
+    h += '<div style="background:#FFF3E0;border:1.5px solid #E65100;border-radius:10px;padding:11px;font-size:13px;color:#6D4C00">'
+      + 'No encontr\u00e9 productos de ese grupo en tu cat\u00e1logo. Puede que le hayas cambiado el precio o el nombre.</div>';
+  } else {
+    h += '<div style="max-height:230px;overflow-y:auto;margin-bottom:12px">';
+    candidatos.forEach(function(p){
+      h += '<button onclick="escogerPremioVIP(' + JSON.stringify(String(p.id)) + ')" '
+        + 'id="prem-op-' + p.id + '" class="prem-op" '
+        + 'style="width:100%;text-align:left;background:#fff;border:1.5px solid #e5e7eb;border-radius:9px;'
+        + 'padding:10px 11px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
+        + '<span style="font-size:13px;font-weight:700;color:var(--nbs-ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+        + escaparHtml(String(p.nombre).slice(0, 34)) + '</span>'
+        + '<span style="font-size:12px;color:#888;flex-shrink:0">te cuesta $' + fmtNum(p.costo || 0) + '</span>'
+        + '</button>';
+    });
+    h += '</div>';
+  }
+
+  h += '<div id="prem-aviso" style="display:none;background:#FFF8E1;border:2px solid #F9A825;border-radius:10px;padding:11px;margin-bottom:12px;font-size:12.5px;color:#6D4C00;line-height:1.5"></div>';
+  h += '<button id="prem-btn" onclick="confirmarEntregaPremioVIP()" disabled '
+    + 'style="width:100%;padding:13px;background:#ccc;color:#fff;border:none;border-radius:10px;'
+    + 'font-size:15px;font-weight:800;cursor:not-allowed">Escoge el producto primero</button>';
+
+  var ov = document.getElementById('premvip-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'premvip-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99994;display:flex;align-items:center;justify-content:center;padding:14px';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:15px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto">' + h + '</div>';
+  ov.style.display = 'flex';
+}
+
+function escogerPremioVIP(pid){
+  window._premioVIP = window._premioVIP || {};
+  window._premioVIP.pid = String(pid);
+  loadProds();
+  var p = productos.find(function(x){ return String(x.id) === String(pid); });
+  if(!p) return;
+
+  var lista = document.querySelectorAll('.prem-op');
+  for(var i = 0; i < lista.length; i++){
+    lista[i].style.border = '1.5px solid #e5e7eb';
+    lista[i].style.background = '#fff';
+  }
+  var sel = document.getElementById('prem-op-' + pid);
+  if(sel){ sel.style.border = '2px solid #2E7D32'; sel.style.background = '#E8F5E9'; }
+
+  var costo = parseFloat(p.costo) || 0;
+  var av = document.getElementById('prem-aviso');
+  if(av){
+    av.style.display = 'block';
+    av.innerHTML = '<b>Al confirmar:</b><br>'
+      + '\u00b7 baja 1 de <b>' + escaparHtml(String(p.nombre).slice(0,30)) + '</b> del inventario<br>'
+      + '\u00b7 tu ganancia baja <b>$' + fmtNum(costo) + '</b> (lo que te cost\u00f3)<br>'
+      + '\u00b7 el "Vend\u00ed" NO sube, porque no entr\u00f3 dinero<br>'
+      + '\u00b7 el contador de este grupo vuelve a 0';
+  }
+  var btn = document.getElementById('prem-btn');
+  if(btn){
+    btn.disabled = false;
+    btn.style.background = '#2E7D32';
+    btn.style.cursor = 'pointer';
+    btn.textContent = '\u2713 Confirmar entrega';
+  }
+}
+
+function cerrarEntregaPremioVIP(){
+  var ov = document.getElementById('premvip-ov');
+  if(ov) ov.remove();
+}
+
+function confirmarEntregaPremioVIP(){
+  var d = window._premioVIP;
+  if(!d || !d.pid){ avisoGrande('Escoge primero cu\u00e1l producto le diste.'); return; }
+
+  loadProds();
+  var p = productos.find(function(x){ return String(x.id) === String(d.pid); });
+  var cls = LS('ncl', []);
+  var idx = cls.findIndex(function(x){ return String(x.id) === String(d.cid); });
+  if(!p || idx < 0){ avisoGrande('No encontr\u00e9 el producto o el cliente.'); return; }
+  var cl = cls[idx];
+  var costo = parseFloat(p.costo) || 0;
+
+  if(!confirm('Entregar "' + String(p.nombre).slice(0,34) + '" como premio a '
+      + nombreCl(cl) + '?\n\nSe registra como regalo: te cuesta $' + fmtNum(costo)
+      + ' y baja 1 del inventario.')) return;
+
+  protegerConHuella(function(){
+    // 1) La venta especial: $0 de venta, el costo real
+    var V = LS('nv', []);
+    var num = (typeof siguienteNumeroFactura === 'function') ? siguienteNumeroFactura() : '';
+    var venta = {
+      id: Date.now(),
+      cid: cl.id,
+      cn: nombreCl(cl),
+      tipo: 'contado',
+      items: [{ pid: p.id, nombre: p.nombre, cant: 1, precio: 0, costo: costo }],
+      subtotal: 0,
+      total: 0,
+      ganancia: -costo,          // el regalo CUESTA: la ganancia baja
+      fecha: fechaHoy(),
+      hora: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}),
+      pagosFactura: [],
+      esPremioVIP: true,
+      premioGrupo: d.grupo,
+      numFactura: num
+    };
+    V.push(venta);
+    SS('nv', V);
+    ventas = LS('nv', []);
+
+    // 2) Baja del inventario
+    var P = LS('np', []);
+    var ip = P.findIndex(function(x){ return String(x.id) === String(p.id); });
+    if(ip >= 0){
+      P[ip].stock = (parseFloat(P[ip].stock) || 0) - 1;
+      SS('np', P);
+    } else {
+      // Es del catalogo de fabrica: se crea su parche para poder bajarle el stock
+      P.push({ id: p.id, nombre: p.nombre, precio: p.precio, costo: p.costo,
+               cat: p.cat, marca: p.marca, sku: p.sku, stock: (parseFloat(p.stock)||0) - 1,
+               min: p.min || 0 });
+      SS('np', P);
+    }
+    loadProds();
+
+    // 3) El record del premio, para el historial del cliente
+    var C = LS('ncl', []);
+    var j = C.findIndex(function(x){ return String(x.id) === String(d.cid); });
+    if(j >= 0){
+      if(!C[j].vipCanjes) C[j].vipCanjes = [];
+      C[j].vipCanjes.push({
+        grupo: d.grupo, nombreGrupo: d.nombreGrupo,
+        pid: String(p.id), producto: p.nombre, costo: costo,
+        fecha: fechaHoy(),
+        hora: venta.hora,
+        ventaId: venta.id,
+        numero: C[j].vipCanjes.length + 1
+      });
+      SS('ncl', C);
+      clientes = LS('ncl', []);
+    }
+
+    cerrarEntregaPremioVIP();
+    mostrarComprobantePremioVIP(d.cid, venta.id);
+  });
+}
+
+// ═══ EL COMPROBANTE, ESTILO GIFT CARD ═══
+// Sensei: "que se lleve un record de cada cliente con detalles de cuando se le dio
+// el regalo, es como una pequena factura que luzca como gift card".
+function mostrarComprobantePremioVIP(cid, ventaId){
+  var cls = LS('ncl', []);
+  var cl = cls.find(function(x){ return String(x.id) === String(cid); });
+  if(!cl) return;
+  var canje = (cl.vipCanjes || []).find(function(c){ return String(c.ventaId) === String(ventaId); });
+  if(!canje) canje = (cl.vipCanjes || [])[(cl.vipCanjes || []).length - 1];
+  if(!canje) return;
+
+  // El nombre del negocio sale de la configuracion si esta, y si no del titulo de la app.
+  var neg = 'Nunez Beauty Supply';
+  try {
+    var cfg = LS('nbs_negocio', null);
+    if(cfg && cfg.nombre) neg = cfg.nombre;
+    else {
+      var m = document.querySelector('meta[name="application-name"]');
+      if(m && m.content) neg = m.content;
+    }
+  } catch(e){}
+
+  var h = '<div id="giftcard-vip" style="background:linear-gradient(135deg,#1a237e,#283593);border-radius:16px;padding:18px;color:#fff">'
+    + '<div style="text-align:center;margin-bottom:14px">'
+    +   '<div style="font-size:30px;line-height:1">\ud83c\udf81</div>'
+    +   '<div style="font-size:16px;font-weight:900;letter-spacing:1px;margin-top:4px">PREMIO DE LEALTAD</div>'
+    +   '<div style="font-size:11.5px;opacity:.85">' + escaparHtml(neg) + '</div>'
+    + '</div>'
+    + '<div style="border-top:1px dashed rgba(255,255,255,.35);padding-top:12px">'
+    +   '<div style="font-size:10px;opacity:.8;letter-spacing:.6px">PARA</div>'
+    +   '<div style="font-size:17px;font-weight:800;line-height:1.2">' + escaparHtml(nombreCl(cl)) + '</div>'
+    +   (cl.negocio ? '<div style="font-size:12px;opacity:.85">\ud83c\udfea ' + escaparHtml(cl.negocio) + '</div>' : '')
+    + '</div>'
+    + '<div style="background:rgba(255,255,255,.14);border-radius:11px;padding:13px;margin:13px 0;text-align:center">'
+    +   '<div style="font-size:15px;font-weight:800;line-height:1.3">' + escaparHtml(String(canje.producto).slice(0,40)) + '</div>'
+    +   '<div style="font-size:22px;font-weight:900;color:#FFD54F;margin-top:3px">GRATIS</div>'
+    + '</div>'
+    + '<div style="font-size:12px;opacity:.9;text-align:center;line-height:1.5">'
+    +   'Por completar ' + VIP_META + ' compras de<br><b>' + escaparHtml(canje.nombreGrupo || canje.grupo) + '</b>'
+    + '</div>'
+    + '<div style="border-top:1px dashed rgba(255,255,255,.35);margin-top:13px;padding-top:10px;display:flex;justify-content:space-between;font-size:11px;opacity:.85">'
+    +   '<span>Premio #' + String(canje.numero).padStart(3,'0') + '</span>'
+    +   '<span>' + escaparHtml(canje.fecha) + ' \u00b7 ' + escaparHtml(canje.hora || '') + '</span>'
+    + '</div>'
+    + '<div style="text-align:center;font-size:12px;font-weight:700;margin-top:10px">\u00a1Gracias por tu preferencia!</div>'
+    + '</div>';
+
+  h += '<div style="display:flex;gap:8px;margin-top:12px">'
+    + '<button onclick="imprimirGiftCardVIP()" style="flex:1;padding:12px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer">\ud83d\udda8\ufe0f Imprimir</button>'
+    + '<button onclick="compartirGiftCardVIP()" style="flex:1;padding:12px;background:#2E7D32;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer">\ud83d\udce4 Compartir</button>'
+    + '</div>'
+    + '<button onclick="cerrarComprobantePremioVIP()" style="width:100%;margin-top:8px;padding:11px;background:#ECEFF1;color:#546E7A;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">Cerrar</button>';
+
+  var ov = document.getElementById('giftvip-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'giftvip-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99995;display:flex;align-items:center;justify-content:center;padding:14px';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:14px;max-width:420px;width:100%;max-height:92vh;overflow-y:auto">' + h + '</div>';
+  ov.style.display = 'flex';
+}
+
+function cerrarComprobantePremioVIP(){
+  var ov = document.getElementById('giftvip-ov');
+  if(ov) ov.remove();
+  try { renderVIP(); } catch(e){}
+}
+
+function imprimirGiftCardVIP(){
+  var el = document.getElementById('giftcard-vip');
+  if(!el) return;
+  var w = window.open('', '_blank');
+  if(!w){ avisoGrande('El navegador bloque\u00f3 la ventana de impresi\u00f3n.'); return; }
+  w.document.write('<html><head><title>Premio de Lealtad</title>'
+    + '<style>body{font-family:-apple-system,system-ui,Arial;padding:20px;display:flex;justify-content:center}'
+    + '@media print{body{padding:0}}</style></head><body>'
+    + '<div style="max-width:380px;width:100%">' + el.outerHTML + '</div>'
+    + '</body></html>');
+  w.document.close();
+  setTimeout(function(){ try { w.print(); } catch(e){} }, 400);
+}
+
+function compartirGiftCardVIP(){
+  var el = document.getElementById('giftcard-vip');
+  if(!el) return;
+  var txt = el.innerText.replace(/\n{2,}/g, '\n');
+  if(navigator.share){
+    navigator.share({ title: 'Premio de Lealtad', text: txt }).catch(function(){});
+  } else {
+    try {
+      navigator.clipboard.writeText(txt);
+      avisoGrande('\u2705 Copiado. P\u00e9galo donde quieras mandarlo.');
+    } catch(e){ avisoGrande('No se pudo compartir en este aparato.'); }
+  }
+}
+
+
 function darRegaloFidelidad(cid){
   clientes = LS('ncl', []);
   var c = clientes.find(function(x){ return String(x.id)===String(cid); });
@@ -14611,6 +15050,10 @@ function verCl(id){
     +'</div>'
     +'<button class="btn" style="background:#6A1B9A;color:white" onclick="agregarBalanceInicial('+id+')">💰 Agregar balance inicial</button>'
     +'<button class="btn" id="btn-vip-cl" style="background:'+(c.vipActivo?'#AD1457':'#546E7A')+';color:white" data-clid="'+id+'" onclick="toggleVIPBtn(this)">'+(c.vipActivo?'⭐ Inscrito en VIP — Toca para retirar':'☆ Inscribir en programa VIP')+'</button>'
+    // Cuenta de CONSIGNACION: productos dejados para que se paguen segun se vendan.
+    // Esas no son compras del barbero, asi que NO cuentan para el VIP. -5 ago, Sensei-
+    +'<button class="btn" id="btn-consig-cl" style="background:'+(c.consignacion?'#00695C':'#ECEFF1')+';color:'+(c.consignacion?'white':'#546E7A')+';margin-top:6px" data-clid="'+id+'" onclick="toggleConsignacion(this)">'
+    +(c.consignacion?'🔁 Cuenta de CONSIGNACIÓN — no cuenta para VIP':'🔁 Marcar como cuenta de consignación')+'</button>'
     +(function(){
       // Detalle VIP visible de una vez en el perfil -antes solo se veia entrando a Historial Completo-
       if(!c.vipActivo) return '';
