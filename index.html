@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260806b-OFICIAL-V2.0">
+<meta name="app-version" content="20260806c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4775,13 +4775,17 @@ function renderVIPLista(list){
           +'</div>'
           // Si este grupo ya llego a la meta, sale el boton para entregar el premio.
           // Antes no habia ninguno: el contador se quedaba en 10 para siempre. -5 ago-
-          +(p.gratis > 0
-            ? '<button onclick="abrirEntregaPremioVIP(' + JSON.stringify(String(c.id)) + ','
-              + JSON.stringify(String(p.claveGrupo || p.nombre)) + ')" '
-              + 'style="width:100%;margin-top:8px;padding:10px;background:#AD1457;color:#fff;'
-              + 'border:none;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">'
-              + '\ud83c\udf81 Ya se lo di</button>'
-            : '')
+          // El boton sale SIEMPRE. Si el grupo ya llego a la meta dice "Ya se lo di";
+          // si todavia no, dice "Darle el premio ahora" y avisa antes de hacer nada.
+          // Sensei lo pidio el 6 ago: a algunos clientes ya les habia hablado del
+          // programa antes de que la app llevara la cuenta, y quiere quedar bien con
+          // ellos aunque el contador no este completo. -6 ago-
+          +'<button onclick="abrirEntregaPremioVIP(' + JSON.stringify(String(c.id)) + ','
+            + JSON.stringify(String(p.claveGrupo || p.nombre)) + ')" '
+            + 'style="width:100%;margin-top:8px;padding:10px;background:'
+            + (p.gratis > 0 ? '#AD1457' : '#ECEFF1') + ';color:' + (p.gratis > 0 ? '#fff' : '#546E7A') + ';'
+            + 'border:none;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">'
+            + (p.gratis > 0 ? '\ud83c\udf81 Ya se lo di' : '\ud83c\udf81 Darle el premio ahora') + '</button>'
           +'</div>';
       });
 
@@ -14692,12 +14696,14 @@ function abrirEntregaPremioVIP(cid, grupoClave){
 
   var grupos = calcVIP(cid);
   var g = grupos[grupoClave];
-  if(!g || g.gratis < 1){
-    avisoGrande('Ese grupo todav\u00eda no llega a ' + VIP_META + ' puntos.');
-    return;
-  }
+  if(!g){ avisoGrande('No encontr\u00e9 ese grupo.'); return; }
 
-  window._premioVIP = { cid: cid, grupo: grupoClave, nombreGrupo: g.nombre, pid: null };
+  // Se puede entregar ANTES de llegar a la meta. Solo hay que decirlo claro.
+  var _anticipado = (g.gratis < 1);
+  var _faltan = Math.max(0, VIP_META - g.progreso);
+
+  window._premioVIP = { cid: cid, grupo: grupoClave, nombreGrupo: g.nombre, pid: null,
+                        anticipado: _anticipado, tenia: g.total, faltaban: _faltan };
   loadProds();
 
   // Los productos que PODRIA regalar: los de ese mismo grupo
@@ -14714,6 +14720,14 @@ function abrirEntregaPremioVIP(cid, grupoClave){
     + '<button onclick="cerrarEntregaPremioVIP()" style="flex-shrink:0;width:34px;height:34px;border:none;border-radius:9px;background:#f0f0f0;color:#666;font-size:20px;font-weight:800;cursor:pointer">\u2715</button>'
     + '</div>';
 
+  if(_anticipado){
+    h += '<div style="background:#FFF3E0;border:2px solid #E65100;border-radius:10px;padding:11px;margin-bottom:12px">'
+      + '<div style="font-size:12.5px;font-weight:800;color:#E65100">\u26a0\ufe0f TODAV\u00cdA NO LLEGA A ' + VIP_META + '</div>'
+      + '<div style="font-size:12.5px;color:#6D4C00;line-height:1.5;margin-top:3px">'
+      +   'Tiene <b>' + g.total + ' de ' + VIP_META + '</b> \u00b7 le faltan <b>' + _faltan + '</b>.<br>'
+      +   'Si se lo das igual, su contador vuelve a <b>0</b> y empieza de nuevo desde hoy.'
+      + '</div></div>';
+  }
   h += '<div style="font-size:12px;font-weight:800;color:#6A1B9A;letter-spacing:.4px;margin-bottom:6px">\u00bfCU\u00c1L PRODUCTO LE DISTE?</div>';
 
   if(!candidatos.length){
@@ -14801,8 +14815,13 @@ function confirmarEntregaPremioVIP(){
   var cl = cls[idx];
   var costo = parseFloat(p.costo) || 0;
 
+  var _txtAnt = d.anticipado
+    ? '\n\n\u26a0\ufe0f TODAV\u00cdA NO LLEGA A ' + VIP_META + ': tiene ' + d.tenia
+      + ' y le faltan ' + d.faltaban + '.\nSu contador vuelve a 0 y empieza de nuevo desde hoy.'
+    : '';
   if(!confirm('Entregar "' + String(p.nombre).slice(0,34) + '" como premio a '
-      + nombreCl(cl) + '?\n\nSe registra como regalo: te cuesta $' + fmtNum(costo)
+      + nombreCl(cl) + '?' + _txtAnt
+      + '\n\nSe registra como regalo: te cuesta $' + fmtNum(costo)
       + ' y baja 1 del inventario.')) return;
 
   protegerConHuella(function(){
@@ -14855,7 +14874,9 @@ function confirmarEntregaPremioVIP(){
         fecha: fechaHoy(),
         hora: venta.hora,
         ventaId: venta.id,
-        numero: C[j].vipCanjes.length + 1
+        numero: C[j].vipCanjes.length + 1,
+        anticipado: !!d.anticipado,          // se dio antes de llegar a la meta
+        teniaPuntos: d.tenia
       });
       SS('ncl', C);
       clientes = LS('ncl', []);
