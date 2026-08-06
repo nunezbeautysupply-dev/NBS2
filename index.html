@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260806a-OFICIAL-V2.0">
+<meta name="app-version" content="20260806b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4339,13 +4339,62 @@ var VIP_TIPOS = [
   'tinte', 'navaja', 'blade', 'peine', 'cepillo'
 ];
 
-function tipoVIPdeNombre(nombre){
-  var n = ' ' + String(nombre || '').toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') + ' ';
+function normVIP(t){
+  return String(t || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+// Palabras que dicen VARIANTE, no tipo: colores, tamanos, "original". Ahi se corta.
+// Gracias a esto "Papel CUELLO verde" y "Papel CUELLO negro" son el MISMO tipo
+// -PAPEL CUELLO-, pero "Papel TOALLA" es otro; y "Guante MEDIANO" y "Guante LARGE"
+// son el mismo -GUANTE-, porque mediano y large son tamanos. -6 ago, lo precisó Sensei-
+var VIP_VARIANTES = ('negro negra blanco blanca rojo roja verde azul amarillo amarilla '
+  + 'dorado dorada gold plateado morado morada rosado rosa naranja orange gris cafe marron '
+  + 'transparente clear pequeno pequena grande mediano mediana chico chica large small medium '
+  + 'xl xxl mini maxi oscuro oscura claro clara nuevo nueva original').split(' ');
+
+// El TIPO de un producto, para agrupar el VIP.
+//
+// 🔴 ANTES ESTO USABA UNA LISTA CERRADA y todo lo que no estaba en ella se caia del
+// programa: "Papel cuello", "Guante", "Cool Care"... El 38% de las unidades de $10
+// no contaban y Sensei quedaba mal con sus clientes. -6 ago-
+//
+// AHORA:
+//   1. Si el nombre trae una palabra conocida -wax, gel, colonia...- esa es el tipo,
+//      aunque vaya al FINAL: "Immortal Chaos sea salt WAX" -> WAX.
+//   2. Si no, se le quita la marca y se toman hasta DOS palabras, cortando en cuanto
+//      llega un color, un tamano o un numero.
+//   3. Y si despues de eso no queda nada -el producto se llama solo por su variante,
+//      como "Alcohol Grande clear"-, se usa el nombre completo sin la marca.
+function tipoVIPdeNombre(nombre, marca){
+  var n = normVIP(nombre);
+  if(!n) return null;
+
   for(var i = 0; i < VIP_TIPOS.length; i++){
     if(n.indexOf(VIP_TIPOS[i]) >= 0) return VIP_TIPOS[i].toUpperCase();
   }
-  return null;
+
+  var pal = n.split(' ');
+  var m = normVIP(marca).split(' ').filter(function(x){ return x; });
+  var i2 = 0;
+  while(i2 < m.length && i2 < pal.length && pal[i2] === m[i2]) i2++;
+  var resto = (i2 < pal.length) ? pal.slice(i2) : pal;
+
+  var out = [];
+  for(var j2 = 0; j2 < resto.length; j2++){
+    var w = resto[j2];
+    if(!w) continue;
+    if(/^[0-9]+$/.test(w)) break;
+    if(VIP_VARIANTES.indexOf(w) >= 0) break;
+    out.push(w);
+    if(out.length === 2) break;
+  }
+  if(out.length) return out.join(' ').toUpperCase();
+
+  // Nada quedo: el nombre es puro tamano o color. Se usa lo que hay, sin la marca.
+  return resto.length ? resto.join(' ').toUpperCase() : n.toUpperCase();
 }
 
 // ¿Es una navaja CORTADA de $5? Esas van aparte, por producto exacto.
@@ -4381,8 +4430,8 @@ function claveGrupoVIP(it, prod){
   }
   if(!marca) return null;
 
-  var tipo = tipoVIPdeNombre(it.nombre);
-  if(!tipo) return null;
+  var tipo = tipoVIPdeNombre(it.nombre, marca);
+  if(!tipo) tipo = 'OTROS';   // nunca se cae un producto de $10 por no reconocerle el tipo
 
   var nom = marca.toUpperCase() + ' \u00b7 ' + tipo;
   return { clave: nom, nombre: nom, mitad: false };
