@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260801d-OFICIAL-V2.0">
+<meta name="app-version" content="20260804d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1645,9 +1645,16 @@ function conLogoListo(cb){
 //  se quita nada y la app funciona exactamente como hoy.
 // ═══════════════════════════════════════════════════════════════════
 
-// Qué clave lleva qué imagen. Fase 1: gastos, compras y firmas.
-// Las fotos de PRODUCTOS quedan para la fase 2 -tienen su propio sistema-.
-var CLAVES_CON_IMAGEN = { ngastos: 'foto', nc: 'foto', nv: 'firma' };
+// Que clave lleva que imagen.
+//   FASE 1 -1 ago-: gastos, compras y firmas.
+//   FASE 2 -4 ago-: tambien las fotos de PRODUCTOS.
+// OJO CON LA FASE 2: las fotos de productos ya tenian su propio sistema para la nube
+// -sincronizarFotos, pegarFotosQueYaTengo, descargarFotosQueFaltan, revisarFotosDeLaNube-
+// y ese sistema leia los productos con localStorage crudo. Al mudar las fotos al
+// almacen grande, esas lecturas veian los productos SIN fotos y la app se las habria
+// vuelto a bajar de la nube, gastando datos y pisando las que ya estaban. Por eso las
+// 5 lecturas crudas de 'np' pasaron a LS('np'), que si se las pega.
+var CLAVES_CON_IMAGEN = { ngastos: 'foto', nc: 'foto', nv: 'firma', np: 'foto' };
 
 var _IMGS = {};        // las imágenes en memoria: 'ngastos|123' -> 'data:image...'
 var _IMGS_OK = {};     // las que YA están confirmadas en el almacén grande
@@ -1740,7 +1747,20 @@ function sacarImagenes(clave, lista){
   var salida = [];
   for(var i = 0; i < lista.length; i++){
     var r = lista[i];
-    if(!r || typeof r !== 'object' || r[campo] === undefined || r[campo] === null || r[campo] === ''){
+    if(!r || typeof r !== 'object'){ salida.push(r); continue; }
+
+    // 🔴 SI LE QUITARON LA IMAGEN, HAY QUE BORRARLA DEL ALMACEN GRANDE TAMBIEN.
+    // Al quitarle la foto a un producto la app guarda foto:'' — si el almacen se
+    // quedara con la vieja, `ponerImagenes` la volveria a pegar y la foto borrada
+    // RESUCITARIA. Solo se borra cuando el almacen ya termino de cargar, para no
+    // confundir "todavia no cargo" con "me la quitaron". -4 ago-
+    if(r[campo] === undefined || r[campo] === null || r[campo] === ''){
+      var clvV = _clvImg(clave, r.id);
+      if(_IMGS_LISTO && (campo in r) && _IMGS[clvV]){
+        delete _IMGS[clvV];
+        delete _IMGS_OK[clvV];
+        borrarImagenGrande(clvV);
+      }
       salida.push(r);
       continue;
     }
@@ -2321,6 +2341,16 @@ function arrancarAlmacenImagenes(){
       // Repintar lo que este abierto, por si ya se dibujo sin imagenes
       try { if(typeof renderGastos === 'function' && document.getElementById('p-gastos')
               && getComputedStyle(document.getElementById('p-gastos')).display !== 'none') renderGastos(''); } catch(e){}
+      // Y el catalogo, que es el que mas se usa: recargar los productos con sus fotos
+      // ya pegadas y volver a dibujarlo si esta a la vista. -4 ago-
+      try {
+        if(typeof loadProds === 'function') loadProds();
+        var pc = document.getElementById('p-cat');
+        if(pc && getComputedStyle(pc).display !== 'none' && typeof renderCatalogo === 'function'){
+          var cb = document.getElementById('cat-buscar');
+          renderCatalogo(cb ? cb.value : '');
+        }
+      } catch(e){}
     });
   } catch(e){ console.error('No se pudo arrancar el almacen de imagenes:', e); }
 }
@@ -3014,15 +3044,13 @@ function aplicarCambiosProductos(){
     });
 
     // Si trae fotos puede pesar; si no cabe, avisar claro en vez de fallar en silencio
-    var seGuardo = true;
-    try {
-      localStorage.setItem('np', JSON.stringify(guardados));
-    } catch(e){
-      seGuardo = false;
-    }
+    // SS y no localStorage: asi las fotos que trae el respaldo van al almacen grande
+    // en vez de al casillero chico. SS devuelve si cupo. -4 ago-
+    var seGuardo = false;
+    try { seGuardo = SS('np', guardados); } catch(e){ seGuardo = false; }
     if(!seGuardo){
       try { liberarEspacioSiHaceFalta(); } catch(e){}
-      try { localStorage.setItem('np', JSON.stringify(guardados)); seGuardo = true; } catch(e){}
+      try { seGuardo = SS('np', guardados); } catch(e){ seGuardo = false; }
     }
     if(!seGuardo){
       avisoGrande('⚠️ No cupo en el teléfono.\n\nToca "🧹 Liberar espacio en el teléfono" y vuelve a intentarlo.\n\nNo se cambió nada.');
@@ -3080,7 +3108,7 @@ function revisarFotosDeLaNube(alTerminar, alAvanzar){
   loadProds();
   var tengo = {}, todos = [];
   try {
-    JSON.parse(localStorage.getItem('np') || '[]').forEach(function(p){
+    LS('np', []).forEach(function(p){
       todos.push(String(p.id));
       if(p.foto) tengo[String(p.id)] = 1;
     });
@@ -3147,7 +3175,7 @@ function revisarFotosDeLaNube(alTerminar, alAvanzar){
       var buenas = res.filter(function(x){ return x; });
       if(buenas.length){
         try {
-          var prods = JSON.parse(localStorage.getItem('np') || '[]');
+          var prods = LS('np', []);
           var mapa = {};
           buenas.forEach(function(x){ mapa[x.pid] = x.foto; });
           var cambio = false;
@@ -3155,7 +3183,13 @@ function revisarFotosDeLaNube(alTerminar, alAvanzar){
             if(!p.foto && mapa[String(p.id)]){ p.foto = mapa[String(p.id)]; cambio = true; }
           });
           if(cambio){
-            localStorage.setItem('np', JSON.stringify(prods));
+            // SS y no localStorage: si no, las fotos bajadas de la nube volverian al
+            // casillero chico y desharian la mudanza. SS devuelve si cupo. -4 ago-
+            if(!SS('np', prods)){
+              terminarUnaVez({ bajadas: bajadas, faltaban: pendientes.length, revisados: revisados,
+                               fallos: fallos, sinEspacio: true });
+              return;
+            }
             bajadas += buenas.length;
             try {
               var idx = leerIndiceFotos();
@@ -3284,7 +3318,7 @@ function sincronizarFotos(prods){
 function pegarFotosQueYaTengo(prodsDeLaNube){
   var fotos = {};
   try{
-    var local = JSON.parse(localStorage.getItem('np') || '[]');
+    var local = LS('np', []);
     local.forEach(function(p){ if(p.foto) fotos[String(p.id)] = p.foto; });
   }catch(e){}
   (prodsDeLaNube || []).forEach(function(p){
@@ -3300,7 +3334,7 @@ function descargarFotosQueFaltan(listaPids){
   if(!navigator.onLine || !listaPids || !listaPids.length) return;
   var tengo = {};
   try{
-    JSON.parse(localStorage.getItem('np') || '[]').forEach(function(p){ if(p.foto) tengo[String(p.id)] = 1; });
+    LS('np', []).forEach(function(p){ if(p.foto) tengo[String(p.id)] = 1; });
   }catch(e){}
   var faltan = listaPids.filter(function(pid){ return !tengo[pid]; });
   if(!faltan.length) return;
@@ -3320,7 +3354,7 @@ function descargarFotosQueFaltan(listaPids){
     window._ultimoIntentoFotos = { pedidas: Math.min(faltan.length, 40), existian: buenas.length, fallos: fallos };
     if(!buenas.length) return;
     try{
-      var prods = JSON.parse(localStorage.getItem('np') || '[]');
+      var prods = LS('np', []);
       var mapa = {};
       buenas.forEach(function(x){ mapa[x.pid] = x.foto; });
       var cambio = false;
@@ -3328,7 +3362,12 @@ function descargarFotosQueFaltan(listaPids){
         if(!p.foto && mapa[String(p.id)]){ p.foto = mapa[String(p.id)]; cambio = true; }
       });
       if(cambio){
-        localStorage.setItem('np', JSON.stringify(prods));
+        // SS y no localStorage, por lo mismo. Esta funcion no devuelve nada, asi que
+        // si no cupo solo se deja constancia — SS ya le enseño su aviso a Sensei.
+        if(!SS('np', prods)){
+          console.error('No cupo al guardar las fotos bajadas: el telefono esta lleno.');
+          return;
+        }
         var i = leerIndiceFotos();
         buenas.forEach(function(x){ i[x.pid] = huellaFoto(x.foto); });
         guardarIndiceFotos(i);
@@ -3591,6 +3630,9 @@ function fundirConLoDelTelefono(clave, textoDeLaNube){
 }
 
 function SS(k,v){
+  // Devuelve si de verdad se pudo guardar. Nadie usaba el resultado de SS, asi que
+  // agregarlo no rompe nada — lo necesita el puente de traer cambios. -4 ago-
+  var _seGuardoBien = false;
   try{
     // 🔑 PRIMERO se sacan las imagenes, DESPUES se sella. En ese orden, y no al
     // reves: `sellarCambios` compara lo nuevo contra lo guardado, y si uno tuviera
@@ -3603,6 +3645,7 @@ function SS(k,v){
     // Ponerle la hora a los registros que cambiaron, para poder juntar sin pisar
     try { _paraGuardar = sellarCambios(k, _paraGuardar); } catch(eSello){ console.error('No se pudo sellar', k, eSello); }
     localStorage.setItem(k,JSON.stringify(_paraGuardar));
+    _seGuardoBien = true;
     marcarHoraLocal(k);
     revisarSiTocaCopiaLocal(k, v); // cada 5 facturas guarda una copia DENTRO del telefono
   }catch(e){
@@ -3667,6 +3710,7 @@ function SS(k,v){
       // Se queda marcado como pendiente: la app avisara y reintentara
     });
   }
+  return _seGuardoBien;
 }
 
 // ===== LO QUE NO HA SUBIDO A LA NUBE =====
