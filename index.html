@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260804d-OFICIAL-V2.0">
+<meta name="app-version" content="20260805a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5260,6 +5260,14 @@ function renderGastos(){
   el.appendChild(detCard);
 }
 
+// Sube la pantalla al principio. Sin esto, al volver de un detalle a su lista el
+// contenido cambia pero uno sigue mirando la misma parte de la pantalla, y parece
+// que el boton no hizo nada. -4 ago, lo encontro Sensei en Gastos-
+function subirPantalla(){
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  catch(e){ try { window.scrollTo(0, 0); } catch(e2){} }
+}
+
 function verDetalleGasto(g){
   var el = document.getElementById('glista');
   el.innerHTML = '';
@@ -5267,7 +5275,7 @@ function verDetalleGasto(g){
 
   var card = document.createElement('div'); card.className = 'card';
   card.style.borderLeft = '4px solid #C62828';
-  card.innerHTML = '<button onclick="renderGastos()" style="background:none;border:none;cursor:pointer;color:#1565C0;font-size:13px;margin-bottom:12px;padding:0">← Volver a la lista</button>'
+  card.innerHTML = '<button onclick="renderGastos();subirPantalla()" style="background:none;border:none;cursor:pointer;color:#1565C0;font-size:13px;margin-bottom:12px;padding:0">← Volver a la lista</button>'
     +'<div style="font-size:18px;font-weight:700;margin-bottom:4px">'+g.cat+'</div>'
     +'<div style="font-size:24px;font-weight:700;color:#C62828;margin-bottom:14px">$'+fmtNum(g.monto)+'</div>'
     +'<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">'
@@ -7857,7 +7865,19 @@ function renderCatalogo(q){
   var el = document.getElementById('catlista');
   if(!el) return;
   var list = productos.slice().sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
-  if(q && q.trim()) list = filtrarPorBusqueda(list, q, function(p){ return p.nombre+' '+(p.cat||'')+' '+(p.sku||''); });
+  // Ahora tambien por MARCA, PRECIO y COSTO. El catalogo era el unico buscador de
+  // productos que no miraba la marca, y el precio no lo miraba ninguno. -4 ago-
+  // El catalogo busca por TODO lo que tiene un producto: nombre, marca, categoria,
+  // SKU, proveedor, nombre corto, descripcion, unidad, precio y costo. Antes solo
+  // miraba nombre, categoria y SKU — ni la marca. -4 ago-
+  // ⚠️ A proposito NO se meten el STOCK ni el MINIMO: escribir "8" traeria decenas
+  // de productos solo porque tienen 8 en existencia, y el buscador se llenaria de ruido.
+  if(q && q.trim()) list = filtrarPorBusqueda(list, q, function(p){
+    return p.nombre + ' ' + (p.marca||'') + ' ' + (p.cat||'') + ' ' + (p.sku||'')
+         + ' ' + (p.proveedorPref||'') + ' ' + (p.nombreCorto||'')
+         + ' ' + (p.desc||'') + ' ' + (p.unidad||'')
+         + ' ' + textoDeDinero(p.precio) + ' ' + textoDeDinero(p.costo);
+  });
   if(!list.length){ el.innerHTML = '<div class="card"><p style="color:#aaa;text-align:center;padding:20px">Sin productos encontrados</p></div>'; return; }
   el.innerHTML = '';
   list.forEach(function(p){
@@ -8795,8 +8815,37 @@ function puntajeBusqueda(textoProducto, consulta){
 }
 
 // Filtra y ordena una lista poniendo primero lo que mejor coincide
+// Devuelve un precio en las formas en que uno lo escribiria al buscar: 12 y 12.00.
+// Asi escribir "12" encuentra tanto el precio como los nombres que llevan 12.
+function textoDeDinero(v){
+  var n = parseFloat(v);
+  if(!isFinite(n)) return '';
+  var conDec = n.toFixed(2);
+  var entero = String(Math.round(n * 100) / 100);
+  return entero === conDec ? conDec : (entero + ' ' + conDec);
+}
+
 function filtrarPorBusqueda(lista, consulta, sacarTexto){
   if(!consulta || !consulta.trim()) return lista;
+
+  // ═══ BUSCAR POR DINERO EXACTO:  $12  ═══
+  // Sensei lo pidio el 4 ago: escribir 12 saca todo lo que tenga un 12 -en el nombre
+  // o en el precio-, pero con el signo delante saca SOLO lo que cuesta $12.00 exactos.
+  // Hace falta la señal porque el buscador convierte los simbolos en espacios: escribir
+  // "12.00" se vuelve "12 00" y no sirve para afinar.
+  // Vive aqui adentro para que sirva en TODAS las pantallas de productos de una vez.
+  var _c = String(consulta).trim();
+  if(_c.charAt(0) === '$'){
+    var _n = parseFloat(_c.slice(1).replace(',', '.').replace(/[^0-9.]/g, ''));
+    if(!isFinite(_n)) return [];
+    // SOLO el precio de venta, no el costo. Mezclar los dos confundia: buscar "$12"
+    // traia tambien productos de $20 cuyo COSTO era $12. -4 ago-
+    return lista.filter(function(x){
+      if(!x || typeof x !== 'object') return false;
+      var pr = parseFloat(x.precio);
+      return isFinite(pr) && Math.abs(pr - _n) < 0.005;
+    });
+  }
   var conPuntaje = [];
   for(var i=0; i<lista.length; i++){
     var p = puntajeBusqueda(sacarTexto(lista[i]), consulta);
@@ -26346,7 +26395,7 @@ function verHistorialCliente(cid, modo){
         <input type="file" id="gasto-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoGasto(this)">
         <input type="file" id="gasto-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this)">
         <button class="btn" style="background:#C62828;color:white" onclick="saveGasto()">✓ Registrar gasto</button>
-        <button class="btn" style="background:#546E7A;color:white" onclick="document.getElementById('gastos-n').style.display='none';document.getElementById('gastos-l').style.display='block'">← Volver a la lista</button>
+        <button class="btn" style="background:#546E7A;color:white" onclick="document.getElementById('gastos-n').style.display='none';document.getElementById('gastos-l').style.display='block';subirPantalla()">← Volver a la lista</button>
         <div class="snk" id="mk-gasto">Gasto registrado</div>
       </div>
     </div>
@@ -26443,7 +26492,7 @@ function verHistorialCliente(cid, modo){
       <p style="font-size:16px;font-weight:700;color:#C62828;margin-bottom:14px" id="cxc-saldo-txt"></p>
       <div id="cxc-credito-favor" style="display:none;margin-bottom:12px"></div>
       <div id="cxc-facturas" style="margin-bottom:12px"></div>
-      <button class="btn" style="background:#F0F0F2;color:var(--nbs-ink);font-weight:700" onclick="document.getElementById('cxc-abono').style.display='none';document.getElementById('cxc-lista').style.display='block'">←Volver a la lista</button>
+      <button class="btn" style="background:#F0F0F2;color:var(--nbs-ink);font-weight:700" onclick="document.getElementById('cxc-abono').style.display='none';document.getElementById('cxc-lista').style.display='block';subirPantalla()">←Volver a la lista</button>
 
 <div id="scanner-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:99998">
   <video id="scanner-video" style="width:100%;height:100%;object-fit:cover" autoplay muted playsinline></video>
