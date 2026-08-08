@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260806d-OFICIAL-V2.0">
+<meta name="app-version" content="20260806e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -8578,6 +8578,191 @@ function calcularReporteClientes(desde, hasta){
   });
   return lista;
 }
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  MARGEN POR PRODUCTO  (6 ago 2026)
+//
+//  Idea de Sensei: "un reporte donde yo pueda ver todos los productos
+//  al mismo tiempo y saber cuánto me cuestan, en cuánto lo vendo y
+//  cuánto me estoy ganando en cada producto".
+//
+//  Y él mismo aclaró que es la ganancia BRUTA — sin repartirle los
+//  otros gastos del negocio. El término es el correcto.
+//
+//  MARGEN = (precio − costo) ÷ precio × 100
+//     Es el porcentaje del precio de venta que te queda. Se usa asi
+//     y no sobre el costo, porque es como se mide en el comercio.
+// ═══════════════════════════════════════════════════════════════════
+
+var _margenOrden = 'menos';   // menos | mas | nombre
+var _margenBusca = '';
+
+function _datosMargen(){
+  loadProds();
+  var lista = [];
+  productos.forEach(function(p){
+    var precio = parseFloat(p.precio) || 0;
+    var costo  = parseFloat(p.costo)  || 0;
+    if(precio <= 0) return;                 // sin precio no hay margen que calcular
+    var gan = Math.round((precio - costo) * 100) / 100;
+    lista.push({
+      id: p.id, nombre: p.nombre || '', marca: p.marca || '', cat: p.cat || '',
+      precio: precio, costo: costo, gan: gan,
+      margen: Math.round((gan / precio) * 1000) / 10,
+      stock: parseFloat(p.stock) || 0,
+      sinCosto: costo <= 0
+    });
+  });
+  return lista;
+}
+
+function cambiarOrdenMargen(cual){ _margenOrden = cual; renderMargenProductos(); }
+function buscarEnMargen(q){ _margenBusca = q || ''; renderMargenProductos(); }
+
+function mostrarMargenProductos(){
+  _margenOrden = 'menos'; _margenBusca = '';
+  ir('p-margen');
+  renderMargenProductos();
+}
+
+function renderMargenProductos(){
+  var el = document.getElementById('margen-lista');
+  if(!el) return;
+  var todos = _datosMargen();
+
+  // El promedio se saca SOLO de los que tienen costo puesto: meter los de costo
+  // cero lo inflaria a 100% y el numero no diria nada.
+  var conCosto = todos.filter(function(p){ return !p.sinCosto; });
+  var prom = conCosto.length
+    ? Math.round(conCosto.reduce(function(a,p){ return a + p.margen; }, 0) / conCosto.length * 10) / 10
+    : 0;
+  var bajos = conCosto.filter(function(p){ return p.margen < 20; }).length;
+  var perdida = conCosto.filter(function(p){ return p.gan <= 0; }).length;
+  var sinCosto = todos.filter(function(p){ return p.sinCosto; }).length;
+
+  var lista = todos.slice();
+  if(_margenBusca && _margenBusca.trim()){
+    lista = filtrarPorBusqueda(lista, _margenBusca, function(p){
+      return p.nombre + ' ' + p.marca + ' ' + p.cat
+           + ' ' + textoDeDinero(p.precio) + ' ' + textoDeDinero(p.costo);
+    });
+  }
+  if(_margenOrden === 'menos')      lista.sort(function(a,b){ return a.margen - b.margen; });
+  else if(_margenOrden === 'mas')   lista.sort(function(a,b){ return b.margen - a.margen; });
+  else lista.sort(function(a,b){ return String(a.nombre).localeCompare(String(b.nombre)); });
+
+  var h = '';
+
+  // El resumen de arriba
+  h += '<div style="background:linear-gradient(135deg,#4A148C,#6A1B9A);border-radius:12px;padding:14px;margin-bottom:10px;color:#fff">'
+    +   '<div style="font-size:11px;opacity:.85;letter-spacing:.5px">TU MARGEN PROMEDIO</div>'
+    +   '<div style="font-size:30px;font-weight:900;line-height:1.1">' + prom + '%</div>'
+    +   '<div style="font-size:11.5px;opacity:.9;margin-top:2px">de ' + conCosto.length + ' productos con costo puesto</div>'
+    + '</div>';
+
+  if(perdida || bajos || sinCosto){
+    h += '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">';
+    if(perdida) h += '<div style="flex:1;min-width:90px;background:#FFEBEE;border-radius:9px;padding:8px;text-align:center">'
+      + '<div style="font-size:19px;font-weight:900;color:#C62828">' + perdida + '</div>'
+      + '<div style="font-size:10px;color:#C62828;font-weight:700">sin ganancia</div></div>';
+    if(bajos) h += '<div style="flex:1;min-width:90px;background:#FFF3E0;border-radius:9px;padding:8px;text-align:center">'
+      + '<div style="font-size:19px;font-weight:900;color:#E65100">' + bajos + '</div>'
+      + '<div style="font-size:10px;color:#E65100;font-weight:700">bajo 20%</div></div>';
+    if(sinCosto) h += '<div style="flex:1;min-width:90px;background:#ECEFF1;border-radius:9px;padding:8px;text-align:center">'
+      + '<div style="font-size:19px;font-weight:900;color:#546E7A">' + sinCosto + '</div>'
+      + '<div style="font-size:10px;color:#546E7A;font-weight:700">sin costo puesto</div></div>';
+    h += '</div>';
+  }
+
+  // Los botones de orden
+  var ops = [['menos','Menos ganancia'],['mas','M\u00e1s ganancia'],['nombre','Por nombre']];
+  h += '<div style="display:flex;gap:5px;margin-bottom:10px">'
+    + ops.map(function(o){
+        var act = (_margenOrden === o[0]);
+        return '<button onclick="cambiarOrdenMargen(' + JSON.stringify(o[0]) + ')" style="flex:1;padding:8px 4px;'
+          + 'background:' + (act ? '#6A1B9A' : '#F0F0F2') + ';color:' + (act ? '#fff' : 'var(--nbs-ink)')
+          + ';border:none;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">' + o[1] + '</button>';
+      }).join('')
+    + '</div>';
+
+  h += '<div style="font-size:11.5px;color:var(--nbs-muted);margin-bottom:8px">'
+    + lista.length + ' producto(s) \u00b7 toca uno para modificarlo</div>';
+
+  if(!lista.length){
+    h += '<div class="card"><p style="color:#aaa;text-align:center;padding:20px">Sin productos.</p></div>';
+    el.innerHTML = h;
+    return;
+  }
+
+  h += lista.slice(0, 400).map(function(p){
+    var col = p.sinCosto ? '#546E7A'
+            : (p.gan <= 0 ? '#C62828' : (p.margen < 20 ? '#E65100' : (p.margen >= 45 ? '#2E7D32' : '#1565C0')));
+    var pct = Math.max(0, Math.min(100, p.margen));
+    return '<div onclick="editarProductoDesdeMargen(' + JSON.stringify(String(p.id)) + ')" '
+      + 'style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 11px;margin-bottom:6px;cursor:pointer">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
+      +   '<div style="flex:1;min-width:0">'
+      +     '<div style="font-size:13px;font-weight:700;color:var(--nbs-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+      +       escaparHtml(String(p.nombre).slice(0,40)) + '</div>'
+      +     '<div style="font-size:11px;color:#888;margin-top:1px">te cuesta $' + fmtNum(p.costo)
+      +       ' \u00b7 lo vendes $' + fmtNum(p.precio) + '</div>'
+      +   '</div>'
+      +   '<div style="text-align:right;flex-shrink:0">'
+      +     '<div style="font-size:15px;font-weight:900;color:' + col + '">' + (p.sinCosto ? '\u2014' : p.margen + '%') + '</div>'
+      +     '<div style="font-size:11px;color:' + col + ';font-weight:700">' + (p.sinCosto ? 'sin costo' : '+$' + fmtNum(p.gan)) + '</div>'
+      +   '</div>'
+      + '</div>'
+      + (p.sinCosto ? '' :
+          '<div style="height:5px;background:#F0F0F2;border-radius:3px;overflow:hidden;margin-top:6px">'
+          + '<div style="height:100%;width:' + pct + '%;background:' + col + '"></div></div>')
+      + '</div>';
+  }).join('');
+
+  if(lista.length > 400) h += '<div style="font-size:11.5px;color:var(--nbs-muted);text-align:center;padding:8px">'
+    + 'Se muestran los primeros 400. Usa el buscador para afinar.</div>';
+
+  el.innerHTML = h;
+}
+
+// Al tocar un producto se abre para modificarlo, asi puede corregir el precio o el
+// costo ahi mismo sin ir hasta el catalogo.
+function editarProductoDesdeMargen(pid){
+  loadProds();
+  var p = productos.find(function(x){ return String(x.id) === String(pid); });
+  if(!p){ avisoGrande('No encontr\u00e9 ese producto.'); return; }
+  try { verProductoCatalogo(p); } catch(e){
+    try { ir('p-cat'); renderCatalogo(p.nombre); } catch(e2){}
+  }
+}
+
+// Para imprimir o mandarlo por WhatsApp
+function compartirMargenProductos(){
+  var todos = _datosMargen().filter(function(p){ return !p.sinCosto; });
+  todos.sort(function(a,b){ return a.margen - b.margen; });
+  var prom = todos.length
+    ? Math.round(todos.reduce(function(a,p){ return a + p.margen; }, 0) / todos.length * 10) / 10 : 0;
+
+  var t = 'MARGEN POR PRODUCTO\n';
+  t += 'Nunez Beauty Supply \u00b7 ' + fechaHoy() + '\n';
+  t += '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n';
+  t += 'Margen promedio: ' + prom + '%\n';
+  t += 'Productos: ' + todos.length + '\n\n';
+  t += 'DE MENOS A MAS GANANCIA:\n';
+  todos.slice(0, 60).forEach(function(p){
+    t += '\n' + String(p.nombre).slice(0,34) + '\n';
+    t += '   $' + fmtNum(p.costo) + ' \u2192 $' + fmtNum(p.precio)
+       + '   +$' + fmtNum(p.gan) + '   ' + p.margen + '%\n';
+  });
+  if(todos.length > 60) t += '\n...y ' + (todos.length - 60) + ' m\u00e1s.';
+
+  if(navigator.share){ navigator.share({ title: 'Margen por producto', text: t }).catch(function(){}); }
+  else {
+    try { navigator.clipboard.writeText(t); avisoGrande('\u2705 Copiado. P\u00e9galo donde quieras mandarlo.'); }
+    catch(e){ avisoGrande('No se pudo compartir en este aparato.'); }
+  }
+}
+
 
 function mostrarReporteClientes(orden){
   orden = orden || 'ganancia'; // 'ganancia' o 'cantidad' (cantidad = comprado, en dinero)
@@ -26915,9 +27100,29 @@ function verHistorialCliente(cid, modo){
   </div>
 </div>
 
+<div id="p-margen" style="display:none">
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <button class="btn" style="background:#F0F0F2;color:var(--nbs-ink);font-weight:700" onclick="volverAtras()">← Atrás</button>
+    <button class="btn" style="background:#F0F0F2;color:var(--nbs-ink);font-weight:700" onclick="ir('p-inicio')">🏠 Inicio</button>
+  </div>
+  <h2 style="font-size:19px;font-weight:800;color:var(--nbs-ink);margin-bottom:4px">📊 Margen por producto</h2>
+  <p style="font-size:12px;color:var(--nbs-muted);margin-bottom:10px;line-height:1.45">
+    Cuánto te cuesta cada producto, en cuánto lo vendes y cuánto te queda.
+    Es la ganancia <b>bruta</b>: no incluye gasolina, tiempo ni los demás gastos del negocio.
+  </p>
+  <div style="margin-bottom:10px">
+    <input id="margen-buscar" type="text" placeholder="🔍 Buscar producto, marca o $precio..."
+      oninput="buscarEnMargen(this.value)"
+      style="width:100%;box-sizing:border-box;padding:11px;border:2px solid var(--nbs-line);border-radius:10px;font-size:14px;font-family:inherit">
+  </div>
+  <button class="btn" style="background:#1a237e;color:white;margin-bottom:10px" onclick="compartirMargenProductos()">🖨️ Imprimir / Compartir este reporte</button>
+  <div id="margen-lista"></div>
+</div>
+
 <div id="p-rpt" class="pg">
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">📊 Reportes</h2>
+  <button onclick="mostrarMargenProductos()" style="width:100%;padding:12px;background:#6A1B9A;color:white;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:12px">📊 Margen por producto — cuánto te deja cada uno</button>
   <button onclick="mostrarReporteClientes('ganancia')" style="width:100%;padding:12px;background:#1a237e;color:white;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:8px">📊 Reporte por Cliente (comprado, pagado y ganancia)</button>
     <button onclick="revisarFechasSospechosas()" style="width:100%;padding:10px;background:#FFF3E0;color:#E65100;border:1px solid #FFCC80;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:14px">🔍 Revisar si hay fechas guardadas con formato incorrecto</button>
   <div class="card">
