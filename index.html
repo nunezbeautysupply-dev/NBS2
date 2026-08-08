@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260807a-OFICIAL-V2.0">
+<meta name="app-version" content="20260808b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1829,6 +1829,127 @@ function cuantoLiberaronLasImagenes(){
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  RED DE SEGURIDAD DE LOS PEDIDOS PENDIENTES  (8 ago 2026)
+//
+//  EL CASO: Sensei tenia 4 pedidos a medias de una barberia. Volvio a esa
+//  barberia, le hizo el pedido a un barbero que habia cambiado de opinion,
+//  y al regresar a la lista los 4 anteriores NO estaban — solo el ultimo.
+//  Trabajaba en UN solo aparato, asi que no fue la sincronizacion.
+//
+//  Se revisaron savePedido, guardarTodosLosPedidosMultiples, saveV y la
+//  lista, y se reprodujo la secuencia dos veces: los pedidos NO se
+//  perdieron. La causa sigue sin encontrarse.
+//
+//  Por eso esto no es un arreglo — es una RED:
+//     1. Se apunta cada cambio de la lista, con QUE funcion lo hizo.
+//     2. Si desaparecen dos o mas de golpe, se guarda una copia ANTES y se
+//        le avisa, con un boton para devolverlos.
+// ═══════════════════════════════════════════════════════════════════
+var CLAVE_BITACORA_PEDIDOS = 'nbs_bitacora_pedidos';
+var CLAVE_RESCATE_PEDIDOS  = 'nbs_rescate_pedidos';
+
+function _quienLlamo(){
+  try {
+    var st = (new Error()).stack || '';
+    var lineas = st.split('\n').slice(2, 8);
+    var nombres = [];
+    for(var i = 0; i < lineas.length; i++){
+      var m = lineas[i].match(/at ([A-Za-z_$][\w$]*)/);
+      if(m && ['SS','_quienLlamo','vigilarPedidos','Object'].indexOf(m[1]) < 0) nombres.push(m[1]);
+      if(nombres.length >= 3) break;
+    }
+    return nombres.join(' \u2190 ') || '(no se pudo saber)';
+  } catch(e){ return '(no se pudo saber)'; }
+}
+
+function vigilarPedidos(nuevos){
+  try {
+    if(!Array.isArray(nuevos)) return;
+    var crudo = localStorage.getItem('npedidos');
+    var antes = crudo ? (JSON.parse(crudo) || []) : [];
+    if(!Array.isArray(antes)) return;
+    if(antes.length === nuevos.length) return;
+
+    var quien = _quienLlamo();
+    var hora = new Date().toLocaleString('en-US', { hour12: true });
+
+    var bit = [];
+    try { bit = JSON.parse(localStorage.getItem(CLAVE_BITACORA_PEDIDOS) || '[]'); } catch(e){}
+    bit.push({ hora: hora, antes: antes.length, despues: nuevos.length, quien: quien });
+    if(bit.length > 30) bit = bit.slice(-30);
+    try { localStorage.setItem(CLAVE_BITACORA_PEDIDOS, JSON.stringify(bit)); } catch(e){}
+
+    var perdidos = antes.length - nuevos.length;
+    if(perdidos >= 2){
+      var idsNuevos = {};
+      nuevos.forEach(function(p){ idsNuevos[String(p.id)] = 1; });
+      var quitados = antes.filter(function(p){ return !idsNuevos[String(p.id)]; });
+      if(quitados.length >= 2){
+        try {
+          localStorage.setItem(CLAVE_RESCATE_PEDIDOS, JSON.stringify({
+            hora: hora, quien: quien, pedidos: quitados
+          }));
+        } catch(e){}
+      }
+    }
+  } catch(e){ /* la red nunca puede romper el guardado */ }
+}
+
+function hayPedidosRescatables(){
+  try {
+    var r = JSON.parse(localStorage.getItem(CLAVE_RESCATE_PEDIDOS) || 'null');
+    if(r && r.pedidos && r.pedidos.length) return r;
+  } catch(e){}
+  return null;
+}
+
+function devolverPedidosRescatados(){
+  var r = hayPedidosRescatables();
+  if(!r) return;
+  var P = LS('npedidos', []);
+  var hay = {};
+  P.forEach(function(p){ hay[String(p.id)] = 1; });
+  var devueltos = 0;
+  r.pedidos.forEach(function(p){ if(!hay[String(p.id)]){ P.push(p); devueltos++; } });
+  if(devueltos){ SS('npedidos', P); pedidos = LS('npedidos', []); }
+  localStorage.removeItem(CLAVE_RESCATE_PEDIDOS);
+  try { renderPedidosPendientes(); } catch(e){}
+  try { renderPedidos(); } catch(e){}
+  avisoGrande(devueltos
+    ? '\u2705 Se devolvieron ' + devueltos + ' pedido(s) a la lista.'
+    : 'Esos pedidos ya estaban en la lista.');
+}
+
+function descartarPedidosRescatables(){
+  if(!confirm('\u00bfBorrar el aviso? Los pedidos quitados no se van a poder devolver.')) return;
+  localStorage.removeItem(CLAVE_RESCATE_PEDIDOS);
+  try { renderPedidosPendientes(); } catch(e){}
+  try { renderPedidos(); } catch(e){}
+}
+
+function avisoRescatePedidos(){
+  var r = hayPedidosRescatables();
+  if(!r) return '';
+  return '<div style="background:#FFF3E0;border:2px solid #E65100;border-radius:12px;padding:12px;margin-bottom:10px">'
+    + '<div style="font-size:13px;font-weight:900;color:#E65100;margin-bottom:4px">\u26a0\ufe0f SE QUITARON '
+    +   r.pedidos.length + ' PEDIDO(S) DE LA LISTA</div>'
+    + '<div style="font-size:12.5px;color:#6D4C00;line-height:1.5;margin-bottom:8px">'
+    +   escaparHtml(r.hora) + '<br>'
+    +   r.pedidos.slice(0,4).map(function(p){
+          return '\u00b7 ' + escaparHtml(String(p.nombre || '').slice(0,26))
+               + ' (' + ((p.items||[]).length) + ' productos)';
+        }).join('<br>')
+    +   (r.pedidos.length > 4 ? '<br>y ' + (r.pedidos.length-4) + ' m\u00e1s' : '')
+    + '</div>'
+    + '<div style="display:flex;gap:6px">'
+    +   '<button onclick="devolverPedidosRescatados()" style="flex:1;padding:10px;background:#2E7D32;color:#fff;border:none;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">\u21a9\ufe0f Devu\u00e9lvemelos</button>'
+    +   '<button onclick="descartarPedidosRescatables()" style="flex:1;padding:10px;background:#ECEFF1;color:#546E7A;border:none;border-radius:9px;font-size:12.5px;font-weight:700;cursor:pointer">Fui yo, borra el aviso</button>'
+    + '</div></div>';
+}
+
+
 function LS(k,d){
   try{
     var v = localStorage.getItem(k);
@@ -3638,6 +3759,8 @@ function SS(k,v){
     // reves: `sellarCambios` compara lo nuevo contra lo guardado, y si uno tuviera
     // la imagen y el otro no, creeria que TODOS los registros cambiaron y les
     // pondria hora nueva a todos. Eso ensuciaria la sincronizacion. -1 ago-
+    // La red de los pedidos: apunta el cambio y guarda copia si desaparecen varios
+    if(k === 'npedidos'){ try { vigilarPedidos(v); } catch(eVig){} }
     var _paraGuardar = v;
     if(CLAVES_CON_IMAGEN[k]){
       try { _paraGuardar = sacarImagenes(k, v); } catch(eImg){ _paraGuardar = v; }
@@ -4112,59 +4235,120 @@ function pantallaActual(){
   }
   return null;
 }
+// ═══════════════════════════════════════════════════════════════════
+//  EL BOTÓN PARA ATRÁS  (reescrito el 7 ago 2026)
+//
+//  🔴 EL PROBLEMA: estaba escrito como una lista de casos A MANO, uno
+//  por pantalla. Cubria 8 subvistas de 14, y las 6 que faltaban eran
+//  casi todas de PEDIDOS RAPIDOS — la pantalla que Sensei mas usa. Cada
+//  pantalla nueva que se construia se quedaba fuera y el atras dejaba
+//  de funcionar ahi, sin que nadie se enterara.
+//
+//  AHORA es un REGISTRO declarado: cada subvista dice a donde vuelve.
+//  Agregar una pantalla nueva es agregar un renglon aqui — no hay que
+//  tocar la logica. Y el orden importa: la MAS PROFUNDA va primero.
+// ═══════════════════════════════════════════════════════════════════
+
+// { wrap: el id que esta abierto, volver: que hacer para retroceder }
+var PASOS_ATRAS = {
+  'p-ped': [
+    // El carrito del pedido: si lleva productos, se pregunta antes de descartar.
+    { wrap: 'ped-form-wrap', volver: function(){
+        var lleva = (typeof pedItemsTemp !== 'undefined' && pedItemsTemp && pedItemsTemp.length) || 0;
+        if(lleva && !confirm('Tienes ' + lleva + ' producto(s) en este pedido.\n\n\u00bfDescartarlo y volver atr\u00e1s?')) return false;
+        cancelarPedido();
+        return true;
+      } },
+    { wrap: 'ped-barbero-wrap',  volver: function(){ volverABarberias(); return true; } },
+    { wrap: 'ped-multi-wrap',    volver: function(){ cancelarPedidoMultiple(); return true; } },
+    { wrap: 'ped-barberia-wrap', volver: function(){ cancelarPedido(); return true; } },
+    // El formulario de producto nuevo, abierto DENTRO de pedidos -7 ago-
+    { wrap: 'ped-nuevo-prod-wrap', volver: function(){
+        var w = document.getElementById('ped-nuevo-prod-wrap');
+        if(w) w.style.display = 'none';
+        return true;
+      } }
+  ],
+  'p-cat': [
+    { wrap: 'cat-edit-wrap',         volver: function(){ cerrarEdicionProducto(); return true; } },
+    { wrap: 'cat-marca-lista-wrap',  volver: function(){ cerrarEditarProductosDeMarca(); return true; } },
+    { wrap: 'cat-marca-wrap',        volver: function(){ cerrarEditarPorMarca(); return true; } }
+  ],
+  'p-cl': [
+    { wrap: 'cl-n', volver: function(){
+        document.getElementById('cl-n').style.display = 'none';
+        document.getElementById('cl-l').style.display = 'block';
+        return true;
+      } }
+  ],
+  'p-sup': [
+    { wrap: 'sup-perfil-wrap', volver: function(){
+        document.getElementById('sup-perfil-wrap').style.display = 'none';
+        var l = document.getElementById('sup-lista-wrap');
+        if(l) l.style.display = 'block';
+        return true;
+      } }
+  ],
+  'p-gastos': [
+    { wrap: 'gastos-n', volver: function(){
+        document.getElementById('gastos-n').style.display = 'none';
+        document.getElementById('gastos-l').style.display = 'block';
+        subirPantalla();
+        return true;
+      } }
+  ]
+};
+
+function _estaAbierto(id){
+  var el = document.getElementById(id);
+  if(!el) return false;
+  try { return getComputedStyle(el).display !== 'none'; }
+  catch(e){ return el.style.display === 'block'; }
+}
+
 function volverAtras(){
-  // Si la pantalla actual tiene una "subvista" abierta (un formulario, perfil, o editor
-  // que se muestra/oculta DENTRO de la misma pantalla, sin pasar por ir()), hay que cerrar
-  // esa subvista primero, en vez de salir de la pantalla por completo hacia el historial.
   var actual = pantallaActual();
 
-  if(actual === 'p-cat'){
-    var catEdit = document.getElementById('cat-edit-wrap');
-    var catMarcaLista = document.getElementById('cat-marca-lista-wrap');
-    var catMarca = document.getElementById('cat-marca-wrap');
-    if(catEdit && catEdit.style.display === 'block'){ cerrarEdicionProducto(); return; }
-    if(catMarcaLista && catMarcaLista.style.display === 'block'){ cerrarEditarProductosDeMarca(); return; }
-    if(catMarca && catMarca.style.display === 'block'){ cerrarEditarPorMarca(); return; }
-  }
-  if(actual === 'p-cl'){
-    var clN = document.getElementById('cl-n');
-    if(clN && clN.style.display === 'block'){
-      clN.style.display = 'none';
-      document.getElementById('cl-l').style.display = 'block';
-      return;
-    }
-  }
-  if(actual === 'p-sup'){
-    var supPerfil = document.getElementById('sup-perfil-wrap');
-    var supN = document.getElementById('sup-n');
-    if(supPerfil && supPerfil.style.display === 'block'){
-      supPerfil.style.display = 'none';
-      document.getElementById('sup-lista-wrap').style.display = 'block';
-      return;
-    }
-    if(supN && supN.style.display === 'block'){
-      supN.style.display = 'none';
-      document.getElementById('sup-l').style.display = 'block';
-      return;
-    }
-  }
-  if(actual === 'p-gastos'){
-    var gastosN = document.getElementById('gastos-n');
-    if(gastosN && gastosN.style.display === 'block'){
-      gastosN.style.display = 'none';
-      document.getElementById('gastos-l').style.display = 'block';
-      return;
+  // 1) ¿Hay una subvista abierta en esta pantalla? Se cierra ESA primero.
+  var pasos = PASOS_ATRAS[actual];
+  if(pasos){
+    for(var i = 0; i < pasos.length; i++){
+      if(_estaAbierto(pasos[i].wrap)){
+        var hecho = pasos[i].volver();
+        if(hecho !== false) subirPantalla();
+        return;                       // aunque diga que no, no se sale de la pantalla
+      }
     }
   }
 
+  // 2) Si no hay ninguna abierta, se sale de la pantalla como siempre.
+  // Este es el MISMO codigo que tenia la version anterior — no se cambia.
   if(historialPantallas.length){
     var prev = historialPantallas.pop();
     ir(prev, true);
   } else {
-    // Antes mandaba a Pedidos Rapidos. Ahora termina en el Inicio, que es
-    // donde de verdad empieza la app -arreglado 22 jul 2026-.
+    // Termina en el Inicio, que es donde de verdad empieza la app -22 jul 2026-.
     ir('p-inicio', true);
   }
+}
+
+// Para que nunca se vuelva a quedar una subvista sin cubrir: esto avisa en la consola
+// si aparece una que el registro no conoce. -7 ago-
+function revisarSubvistasSinCubrir(){
+  var faltan = [];
+  Object.keys(PASOS_ATRAS).forEach(function(p){});
+  try {
+    var todas = document.querySelectorAll('[id$="-wrap"],[id$="-n"],[id$="-l"]');
+    for(var i = 0; i < todas.length; i++){
+      var id = todas[i].id;
+      var cubierta = false;
+      Object.keys(PASOS_ATRAS).forEach(function(p){
+        PASOS_ATRAS[p].forEach(function(x){ if(x.wrap === id) cubierta = true; });
+      });
+      if(!cubierta) faltan.push(id);
+    }
+  } catch(e){}
+  return faltan;
 }
 function ir(id, sinHistorial){
   if(!sinHistorial){
@@ -8387,12 +8571,10 @@ function revisarIntegridad(){
     var items = v.items || [];
     if(!items.length) return;
     if(esBalanceInicial(v)) return;                       // nunca se tocan
-    var completo = true, calc = 0;
-    items.forEach(function(i){
-      if(i.costo === undefined || i.costo === null){ completo = false; return; }
-      calc += ((parseFloat(i.precio)||0) - (parseFloat(i.costo)||0)) * (parseFloat(i.cant)||0);
-    });
-    if(!completo) return;
+    // Con la formula UNICA, que si resta el descuento de la factura. Antes esta cuenta
+    // lo ignoraba y marcaba como "mal" ventas que estaban bien. -8 ago-
+    if(!sePuedeCalcularGanancia(v)) return;
+    var calc = gananciaDeVenta(v);
     var g = parseFloat(v.ganancia) || 0;
     if(Math.abs(calc - g) > 0.05) window._ganMal.push({ id: v.id, cn: v.cn, fecha: v.fecha, dice: g, real: calc });
   });
@@ -12023,17 +12205,33 @@ function guardarEdicionProducto(){
     if(corregirHistorial){
       var ventasCorregir = LS('nv', []);
       var lineasCorregidas = 0;
+      var ventasRecalculadas = 0;
       ventasCorregir.forEach(function(v){
+        var tocada = false;
         (v.items||[]).forEach(function(it){
           if(it.pid && String(it.pid) === String(idProductoEditado)){
             it.costo = costo;
             lineasCorregidas++;
+            tocada = true;
           }
         });
+        // 🔴 Y AHORA SI SE RECALCULA LA GANANCIA DE ESA VENTA. ESTE ERA EL FALLO QUE
+        // LE VOLVIA A SENSEI CADA SEMANA: la app cambiaba el costo de las ventas viejas
+        // pero dejaba la ganancia con el numero anterior, asi que la Revision de
+        // Integridad se lo marcaba una y otra vez. -8 ago-
+        // Los "Balance inicial" NO se tocan: su ganancia cero es correcta.
+        if(tocada && !v.cancelada && !esBalanceInicial(v) && sePuedeCalcularGanancia(v)){
+          var gNueva = gananciaDeVenta(v);
+          if(Math.abs((parseFloat(v.ganancia) || 0) - gNueva) > 0.005){
+            v.ganancia = gNueva;
+            ventasRecalculadas++;
+          }
+        }
       });
       if(lineasCorregidas > 0){
         SS('nv', ventasCorregir);
-        setTimeout(function(){ alert('Corregido: '+lineasCorregidas+' línea(s) en ventas ya registradas ahora reflejan el costo correcto de $'+costo.toFixed(2)+'.'); }, 300);
+        setTimeout(function(){ alert('Corregido: '+lineasCorregidas+' línea(s) en ventas ya registradas ahora reflejan el costo correcto de $'+costo.toFixed(2)+'.'
+          + (ventasRecalculadas ? '\n\nY se recalculó la ganancia de '+ventasRecalculadas+' venta(s), para que la Revisión de Integridad no te las vuelva a marcar.' : '')); }, 300);
       }
     }
   }
@@ -12659,6 +12857,44 @@ function verificarStockSuficiente(items){
     return '• "'+f.nombre+'" — tienes '+f.stock+' en existencia, estás vendiendo '+f.cant+'.';
   }).join('\n');
   return confirm('⚠️ Stock insuficiente\n\n'+detalle+'\n\nEl stock quedará en 0, no en negativo. Corrige tu inventario cuando puedas.\n\n¿Vender igual?');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  LA GANANCIA DE UNA VENTA — UNA SOLA FÓRMULA PARA TODA LA APP
+//
+//  🔴 EL PROBLEMA QUE ESTO RESUELVE (7-8 ago 2026):
+//  Habia CUATRO formulas distintas — al vender, al editar la factura, en
+//  la Revision de Integridad y en "Arreglar las ganancias" — y SOLO la de
+//  vender restaba el descuento de la factura. Por eso la Revision marcaba
+//  como "mal" ventas que estaban BIEN, y "Arreglar las ganancias" las
+//  dejaba INFLADAS. A Sensei le salia el mismo aviso cada semana.
+//
+//  Ahora todas llaman aqui. Si algun dia cambia la regla, cambia en un
+//  solo sitio y no se pueden volver a contradecir.
+// ═══════════════════════════════════════════════════════════════════
+function gananciaDeVenta(v){
+  if(!v) return 0;
+  var items = v.items || [];
+  var g = 0;
+  for(var i = 0; i < items.length; i++){
+    var it = items[i];
+    g += ((parseFloat(it.precio) || 0) - (parseFloat(it.costo) || 0)) * (parseFloat(it.cant) || 0);
+  }
+  var desc = (v.descuento && parseFloat(v.descuento.monto)) || 0;
+  g = g - desc;
+  if(g < 0) g = 0;
+  return Math.round(g * 100) / 100;
+}
+
+// ¿Se le puede calcular la ganancia? Si a algun renglon le falta el costo, NO —
+// porque el resultado seria mentira.
+function sePuedeCalcularGanancia(v){
+  var items = (v && v.items) || [];
+  if(!items.length) return false;
+  for(var i = 0; i < items.length; i++){
+    if(items[i].costo === undefined || items[i].costo === null) return false;
+  }
+  return true;
 }
 
 function saveV(){
@@ -14187,9 +14423,14 @@ function renderPedidosPendientes(){
   var el = document.getElementById('ped-pendientes-wrap');
   if(!el) return;
   el.innerHTML = '';
+  // El aviso de rescate va SIEMPRE, aunque la lista quede vacia: si se quitaron todos
+  // es justo cuando mas falta hace poder devolverlos. -8 ago-
+  var _avisoRes = '';
+  try { _avisoRes = avisoRescatePedidos(); } catch(e){}
+  if(_avisoRes) el.innerHTML = _avisoRes;
   if(!pedidos.length) return;
 
-  el.innerHTML = '<div style="font-size:11px;font-weight:600;color:var(--nbs-gold-dark);letter-spacing:0.5px;text-transform:uppercase;padding:8px 0 6px;display:flex;align-items:center;gap:5px">⚡Pedidos pendientes ('+pedidos.length+')</div>';
+  el.innerHTML += '<div style="font-size:11px;font-weight:600;color:var(--nbs-gold-dark);letter-spacing:0.5px;text-transform:uppercase;padding:8px 0 6px;display:flex;align-items:center;gap:5px">⚡Pedidos pendientes ('+pedidos.length+')</div>';
   pedidos.forEach(function(p, idx){
     var totalItems = (p.items || []).reduce(function(s,it){ return s+it.cant; },0);
     var totalMonto = (p.items || []).reduce(function(s,it){ return s+(it.cant*it.precio); },0);
@@ -16507,7 +16748,8 @@ window.guardarModificacionFactura = function(vid){
   });
 
   var nuevoTotal = window._itemsEdit.reduce(function(s,it){ return s+it.cant*it.precio; }, 0);
-  var nuevaGanancia = window._itemsEdit.reduce(function(s,it){ return s+it.cant*(it.precio-(it.costo||0)); }, 0);
+  // Con la formula UNICA, para que no se contradiga con el chequeo. -8 ago-
+  var nuevaGanancia = gananciaDeVenta({ items: window._itemsEdit, descuento: ventaReal.descuento });
 
   ventaReal.items = window._itemsEdit.slice();
   ventaReal.total = nuevoTotal;
