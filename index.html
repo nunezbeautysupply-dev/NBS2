@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260806f-OFICIAL-V2.0">
+<meta name="app-version" content="20260807a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4411,6 +4411,26 @@ function clienteCuentaVIP(c){
 }
 
 // La clave del grupo de un renglon vendido. Devuelve null si ese renglon no cuenta.
+// Dibuja los productos exactos de un grupo VIP, con su nombre COMPLETO y cuántos
+// lleva de cada uno. Asi Sensei ve que compra de verdad el cliente y puede decidir
+// si le adelanta el regalo o espera. -7 ago-
+function detalleProdsVIP(p, chico){
+  if(!p || !p.prods) return '';
+  var nombres = Object.keys(p.prods).filter(function(n){ return p.prods[n] > 0; });
+  if(!nombres.length) return '';
+  nombres.sort(function(a,b){ return p.prods[b] - p.prods[a]; });
+  var fs = chico ? '10.5px' : '11.5px';
+  return '<div style="margin-top:4px;padding-left:2px">'
+    + nombres.map(function(n){
+        return '<div style="display:flex;justify-content:space-between;gap:6px;font-size:' + fs + ';color:#777;line-height:1.5">'
+          + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\u00b7 '
+          +   escaparHtml(n) + '</span>'
+          + '<span style="flex-shrink:0;font-weight:700;color:#555">\u00d7' + p.prods[n] + '</span>'
+          + '</div>';
+      }).join('')
+    + '</div>';
+}
+
 function claveGrupoVIP(it, prod){
   var precio = parseFloat(it.precio) || 0;
 
@@ -4499,8 +4519,14 @@ function calcVIP(cid){
       var g = claveGrupoVIP(it, prod);
       if(!g) return;
       if(!conteo[g.clave]) conteo[g.clave] = { nombre: g.nombre, mitad: g.mitad,
-                                               precio: it.precio, unidades: 0 };
+                                               precio: it.precio, unidades: 0, prods: {} };
       conteo[g.clave].unidades += (parseFloat(it.cant) || 0);
+      // Guardar el NOMBRE COMPLETO del producto y cuántos lleva de cada uno. Sensei lo
+      // pidió el 7 ago: "que no diga solo gummy gel sino gummy hair gel 700 ml, el nombre
+      // completo como está en la descripción, para yo estar más claro" y poder decidir si
+      // le da el regalo antes o espera. -7 ago-
+      var _nomP = String((prod && prod.nombre) || it.nombre || '').trim();
+      if(_nomP) conteo[g.clave].prods[_nomP] = (conteo[g.clave].prods[_nomP] || 0) + (parseFloat(it.cant) || 0);
     });
   });
 
@@ -4511,8 +4537,14 @@ function calcVIP(cid){
       var prod = productos.find(function(x){ return String(x.id)===String(it.pid); });
       var g = claveGrupoVIP(it, prod);
       if(!g) return;
-      if(conteo[g.clave]) conteo[g.clave].unidades =
-        Math.max(0, conteo[g.clave].unidades - (parseFloat(it.cant) || 0));
+      if(conteo[g.clave]){
+        conteo[g.clave].unidades = Math.max(0, conteo[g.clave].unidades - (parseFloat(it.cant) || 0));
+        var _nomD = String((prod && prod.nombre) || it.nombre || '').trim();
+        if(_nomD && conteo[g.clave].prods && conteo[g.clave].prods[_nomD]){
+          conteo[g.clave].prods[_nomD] = Math.max(0, conteo[g.clave].prods[_nomD] - (parseFloat(it.cant) || 0));
+          if(!conteo[g.clave].prods[_nomD]) delete conteo[g.clave].prods[_nomD];
+        }
+      }
     });
   });
 
@@ -4773,6 +4805,9 @@ function renderVIPLista(list){
           +'<span>Unidades: '+p.unidades+' → Puntos: '+p.puntos+'</span>'
           +(p.gratis>0?'<span style="color:#AD1457;font-weight:700">🎁 '+p.gratis+' gratis</span>':'<span>'+(VIP_META-p.progreso)+' para completar</span>')
           +'</div>'
+          // Los productos exactos de este grupo, con su nombre COMPLETO. -7 ago, Sensei:
+          // "que no diga solo gummy gel sino gummy hair gel 700 ml, para yo estar mas claro"
+          +detalleProdsVIP(p, false)
           // Si este grupo ya llego a la meta, sale el boton para entregar el premio.
           // Antes no habia ninguno: el contador se quedaba en 10 para siempre. -5 ago-
           // El boton sale SIEMPRE. Si el grupo ya llego a la meta dice "Ya se lo di";
@@ -15328,9 +15363,46 @@ function verCl(id){
           return '<div style="margin-bottom:6px">'
             +'<div style="display:flex;justify-content:space-between;font-size:12px;color:#333;margin-bottom:2px"><span style="font-weight:600">'+escaparHtml(v.nombre)+'</span><span style="font-weight:700;color:'+colorDet+'">'+v.progreso+'/'+VIP_META+(v.gratis>0?' 🎁x'+v.gratis:'')+'</span></div>'
             +'<div style="height:6px;background:white;border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+colorDet+'"></div></div>'
+            // Los productos exactos, con su nombre COMPLETO -7 ago-
+            +detalleProdsVIP(v, true)
+            // Y el boton de entregar el premio, aqui mismo en la ficha: asi no hay que ir
+            // hasta la pantalla del VIP para darselo. -6 ago-
+            +'<button onclick="event.stopPropagation();abrirEntregaPremioVIP('+JSON.stringify(String(id))+','+JSON.stringify(String(k))+')" '
+            +'style="width:100%;margin-top:6px;padding:7px;background:'+(v.gratis>0?'#AD1457':'#fff')+';color:'+(v.gratis>0?'#fff':'#AD1457')+';'
+            +'border:'+(v.gratis>0?'none':'1px solid #AD1457')+';border-radius:7px;font-size:11.5px;font-weight:800;cursor:pointer">'
+            +(v.gratis>0?'\ud83c\udf81 Ya se lo di':'\ud83c\udf81 Darle el premio ahora')+'</button>'
             +'</div>';
         }).join('')
         +'</div>';
+    })()
+    // ═══ EL RECORD DE PREMIOS, EN SU FICHA ═══
+    // Sensei: "si entro en el perfil de un cliente deberia estar eso como parte de su
+    // record, asi veo de una vez como va su record completo incluyendo los regalos VIP".
+    +(function(){
+      var canjes = c.vipCanjes || [];
+      if(!canjes.length) return '';
+      var totalC = canjes.reduce(function(a,x){ return a + (parseFloat(x.costo)||0); }, 0);
+      return '<div style="background:#FFF8E1;border:1.5px solid #F9A825;border-radius:10px;padding:10px;margin-bottom:8px">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+        +   '<span style="font-size:11px;font-weight:800;color:#8D6E00;letter-spacing:.4px">\ud83c\udf81 PREMIOS QUE LE HAS DADO (' + canjes.length + ')</span>'
+        +   '<span style="font-size:11px;color:#8D6E00">te costaron $' + fmtNum(totalC) + '</span>'
+        + '</div>'
+        + canjes.slice(-5).reverse().map(function(x){
+            return '<div onclick="event.stopPropagation();mostrarComprobantePremioVIP(' + JSON.stringify(String(id)) + ',' + JSON.stringify(String(x.ventaId)) + ')" '
+              + 'style="display:flex;justify-content:space-between;align-items:center;background:#fff;'
+              + 'border-radius:7px;padding:7px 9px;margin-bottom:4px;cursor:pointer">'
+              + '<div style="flex:1;min-width:0">'
+              +   '<div style="font-size:12px;font-weight:700;color:var(--nbs-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+              +     escaparHtml(String(x.producto || '').slice(0,34)) + (x.anticipado ? ' \u2733\ufe0f' : '') + '</div>'
+              +   '<div style="font-size:10px;color:#999">' + escaparHtml(x.fecha || '') + ' \u00b7 '
+              +     escaparHtml(String(x.nombreGrupo || x.grupo || '').slice(0,22)) + '</div>'
+              + '</div>'
+              + '<span style="font-size:10.5px;color:#AD1457;font-weight:800;flex-shrink:0">ver \u203a</span>'
+              + '</div>';
+          }).join('')
+        + (canjes.some(function(x){ return x.anticipado; })
+            ? '<div style="font-size:10px;color:#8D6E00;margin-top:2px">\u2733\ufe0f = se lo diste antes de que completara</div>' : '')
+        + '</div>';
     })()
     +'<button class="btn" style="background:#1a237e;color:white" onclick="verHistorialCliente('+id+',\'completo\')">📋 Ver historial completo -pagos, facturas, VIP, visitas</button>'
     +'<button class="btn" style="background:#00695C;color:white" onclick="abrirPreciosPersonalizados('+id+')">💲 Precios especiales de este cliente</button>';
