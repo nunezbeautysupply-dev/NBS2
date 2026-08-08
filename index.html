@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260806e-OFICIAL-V2.0">
+<meta name="app-version" content="20260806f-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4859,6 +4859,7 @@ function verificarFidelidadDespuesDeVenta(cid){
   if(!c) return;
   ventas = LS('nv', []);
   var ventasActivas = ventas.filter(function(v){ return String(v.cid)===String(cid) && !v.cancelada; });
+  if(!clienteCuentaVIP(c)) return;      // consignacion: no avisa ni acumula
   var fidelidad = calcularFidelidad(c, ventasActivas);
   if(fidelidad.total >= fidelidad.meta && !c.fidelidadNotificado){
     c.fidelidadNotificado = true;
@@ -14843,6 +14844,10 @@ function cancelarConversionPedido(){
 // Suma todas las compras de productos menores a $30, desde el ultimo regalo dado.
 // Meta: $400. Al llegar, se puede registrar un regalo y el ciclo empieza de nuevo desde 0.
 function calcularFidelidad(c, ventasActivas){
+  // Las cuentas de CONSIGNACION tampoco entran a este programa. Son productos
+  // dejados para pagar segun se vendan, no compras del barbero — no pueden ganar
+  // el regalo de los $400. -6 ago, lo cazo Sensei con la cuenta de Isidro-
+  if(!clienteCuentaVIP(c)) return { total: 0, meta: 400, regalosDados: 0, consignacion: true };
   var regalos = c.fidelidadRegalos || [];
   var ultimoRegaloFecha = regalos.length ? parsearFechaVenta(regalos[regalos.length-1].fecha) : null;
   var total = 0;
@@ -15332,7 +15337,20 @@ function verCl(id){
   el.appendChild(header);
 
   // Programa de Fidelidad (compras generales de productos menores a $30)
+  // Las cuentas de CONSIGNACION no entran, asi que el recuadro ni se dibuja: si no,
+  // se veria una barra en $0 que no significa nada. -6 ago, lo cazo Sensei-
   var fidelidad = calcularFidelidad(c, ventasActivas);
+  // ⚠️ SIN `return`: despues de este bloque vienen LAS FACTURAS del cliente, y con un
+  // return se le esconderian. Solo se salta el recuadro de fidelidad. -6 ago-
+  if(fidelidad.consignacion){
+    var avisoCons = document.createElement('div');
+    avisoCons.className = 'card';
+    avisoCons.style.cssText = 'border-left:4px solid #00695C';
+    avisoCons.innerHTML = '<div style="font-size:12.5px;font-weight:700;color:#00695C">\U0001F501 Cuenta de consignaci\u00f3n</div>'
+      + '<div style="font-size:11.5px;color:var(--nbs-muted);margin-top:3px;line-height:1.45">'
+      + 'No entra al Programa de Fidelidad ni al VIP. Son productos dejados para pagar seg\u00fan se vendan.</div>';
+    el.appendChild(avisoCons);
+  }
   var fidCard = document.createElement('div');
   fidCard.className = 'card';
   fidCard.style.cssText = 'border-left:4px solid var(--nbs-gold)';
@@ -15346,7 +15364,7 @@ function verCl(id){
     +'<div style="height:100%;width:'+pctFid+'%;background:'+(listo?'var(--nbs-green-text)':'var(--nbs-gold)')+';border-radius:4px" class="barra-brillo"></div></div>'
     +'<div style="font-size:11px;color:var(--nbs-muted);margin-bottom:10px">Suma compras de productos menores a $30. Al llegar a $'+fmtNum(fidelidad.meta)+', dale un regalo entre $10 y $20 para agradecer su preferencia.'+(fidelidad.regalosDados>0?' · '+fidelidad.regalosDados+' regalo(s) dado(s) antes.':'')+'</div>'
     +'<button onclick="darRegaloFidelidad(\''+id+'\')" style="width:100%;padding:10px;background:'+(listo?'var(--nbs-gold)':'#F0F0F2')+';color:'+(listo?'white':'var(--nbs-muted)')+';border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🎁 Ya le di el regalo'+(listo?'':' (aún no llega a la meta)')+'</button>';
-  el.appendChild(fidCard);
+  if(!fidelidad.consignacion) el.appendChild(fidCard);
 
   // Invoices
   if(todasVentas.length){
