@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260808b-OFICIAL-V2.0">
+<meta name="app-version" content="20260808c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4590,8 +4590,67 @@ function esNavajaCortadaVIP(nombre, precio){
 }
 
 // ¿Este cliente entra al programa? Las cuentas de CONSIGNACION no.
+// ═══════════════════════════════════════════════════════════════════
+//  BARBEROS A LOS QUE YA NO SE LES DA SERVICIO  (8 ago 2026)
+//
+//  Sensei: "hay barberos que se han mudado de barbershop y no les voy a
+//  seguir dando servicio". Antes lo unico que podia hacer era ELIMINARLOS,
+//  y eso le borraba su historial y lo que le debian.
+//
+//  Ahora se marcan como SIN SERVICIO. Desaparecen de donde estorban —los
+//  pedidos, la ruta, el VIP— pero NO de su dinero: si le deben, siguen en
+//  Cuentas por Cobrar hasta que paguen, y su historial queda intacto.
+//  Sensei lo confirmo: "debe aparecer en cuentas por cobrar hasta que me
+//  pague, claro que si".
+// ═══════════════════════════════════════════════════════════════════
+function sinServicio(c){
+  return !!(c && c.sinServicio === true);
+}
+
+function soloConServicio(lista){
+  if(!Array.isArray(lista)) return lista;
+  return lista.filter(function(c){ return !sinServicio(c); });
+}
+
+function toggleSinServicio(btn){
+  var id = btn.getAttribute('data-clid');
+  var C = LS('ncl', []);
+  var i = C.findIndex(function(x){ return String(x.id) === String(id); });
+  if(i < 0) return;
+  var ahora = !C[i].sinServicio;
+
+  if(ahora){
+    var debe = 0;
+    try {
+      LS('nv', []).forEach(function(v){
+        if(String(v.cid) !== String(id) || v.cancelada || v.tipo !== 'credito') return;
+        var pg = 0;
+        (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
+        debe += (parseFloat(v.total) || 0) - pg;
+      });
+    } catch(e){}
+    var msg = 'Marcar a ' + nombreCl(C[i]) + ' como SIN SERVICIO?\n\n'
+      + 'Va a desaparecer de los pedidos, de la ruta y del VIP.\n'
+      + 'Su historial y sus facturas NO se tocan.';
+    if(debe > 0.005) msg += '\n\n\u26a0\ufe0f TE DEBE $' + fmtNum(debe)
+      + '.\nSigue apareciendo en Cuentas por Cobrar hasta que pague.';
+    if(!confirm(msg)) return;
+  }
+
+  C[i].sinServicio = ahora;
+  if(!ahora) delete C[i].sinServicio;
+  SS('ncl', C);
+  clientes = LS('ncl', []);
+  try { verCl(id); } catch(e){}
+}
+
 function clienteCuentaVIP(c){
-  return !(c && c.consignacion === true);
+  // Ni las cuentas de CONSIGNACION ni los barberos SIN SERVICIO entran a los
+  // programas -ni el VIP de productos ni el de los $400-. -8 ago-
+  if(!c) return true;
+  if(c.consignacion === true) return false;
+  if(c.sinServicio === true) return false;
+  return true;
 }
 
 // La clave del grupo de un renglon vendido. Devuelve null si ese renglon no cuenta.
@@ -4955,6 +5014,9 @@ function diagnosticoVIP(){
 }
 
 function renderVIPLista(list){
+  // Fuera los barberos SIN SERVICIO: si ya no le compran, no tiene sentido llevarles
+  // el conteo del premio. -8 ago-
+  try { list = soloConServicio(list); } catch(e){}
   var el=document.getElementById('vip-lista');
   el.innerHTML='';
   if(!list||!list.length){
@@ -7650,8 +7712,11 @@ function marcarVisitaNegocio(id){
 
 function negociosParaVisitar(){
   clientes = LS('ncl', []);
+  // Fuera los barberos SIN SERVICIO: no deben salir en la ruta de visitas. -8 ago-
+  var _conServ = clientes;
+  try { _conServ = soloConServicio(clientes); } catch(e){}
   var lista = [];
-  clientes.forEach(function(c){
+  _conServ.forEach(function(c){
     if(!c.tipoNegocio || c.tipoNegocio === 'Barberia') return;
     if(!c.intervaloVisitaDias) return;
     var diasDesde = c.ultimaVisitaNegocio ? Math.floor((new Date() - parsearFechaVenta(c.ultimaVisitaNegocio)) / 86400000) : null;
@@ -12411,6 +12476,8 @@ function filtrarClienteVenta(q){
   if(!lista) return;
   if(!q || !q.trim()){ lista.style.display='none'; lista.innerHTML=''; return; }
   clientes = LS('ncl', []);
+  // Fuera los barberos SIN SERVICIO: no aparecen para venderles ni pedirles. -8 ago-
+  var _clConServicio = soloConServicio(clientes);
   // Buscar por nombre Y por negocio (barbería)
   var res = filtrarPorBusqueda(clientes, q, function(c){ return nombreCl(c) + ' ' + (c.negocio||''); }).slice(0,15);
   if(!res.length){ lista.style.display='block'; lista.innerHTML='<div style="padding:12px;color:#999;font-size:13px">Sin coincidencias</div>'; return; }
@@ -13480,12 +13547,14 @@ var pedBarberoNombre = null;
 
 function renderBarberias(q){
   clientes = LS('ncl', []);
+  // Fuera los barberos SIN SERVICIO: no aparecen para venderles ni pedirles. -8 ago-
+  var _clConServicio = soloConServicio(clientes);
   var el = document.getElementById('ped-barberia-lista');
   el.innerHTML = '';
 
   // Agrupar clientes por negocio/barbería
   var barberias = {};
-  clientes.forEach(function(c){
+  _clConServicio.forEach(function(c){
     var neg = (c.negocio||'').trim() || 'Sin barbería';
     if(!barberias[neg]) barberias[neg] = [];
     barberias[neg].push(c);
@@ -13611,12 +13680,14 @@ var barberosSel = {}; // {cid: {cliente, barberia}}
 
 function renderBarberiasInicio(q){
   clientes = LS('ncl', []);
+  // Fuera los barberos SIN SERVICIO: no aparecen para venderles ni pedirles. -8 ago-
+  var _clConServicio = soloConServicio(clientes);
   var el = document.getElementById('ped-inicio-lista');
   if(!el) return;
   el.innerHTML = '';
 
   var barberias = {};
-  clientes.forEach(function(c){
+  _clConServicio.forEach(function(c){
     var neg = (c.negocio||'').trim() || 'Sin barbería';
     if(!barberias[neg]) barberias[neg] = [];
     barberias[neg].push(c);
@@ -15590,6 +15661,9 @@ function verCl(id){
     // Esas no son compras del barbero, asi que NO cuentan para el VIP. -5 ago, Sensei-
     +'<button class="btn" id="btn-consig-cl" style="background:'+(c.consignacion?'#00695C':'#ECEFF1')+';color:'+(c.consignacion?'white':'#546E7A')+';margin-top:6px" data-clid="'+id+'" onclick="toggleConsignacion(this)">'
     +(c.consignacion?'🔁 Cuenta de CONSIGNACIÓN — no cuenta para VIP':'🔁 Marcar como cuenta de consignación')+'</button>'
+    // Barberos que se mudaron de barberia y ya no reciben servicio. -8 ago-
+    +'<button class="btn" id="btn-sinserv-cl" style="background:'+(c.sinServicio?'#B71C1C':'#ECEFF1')+';color:'+(c.sinServicio?'white':'#546E7A')+';margin-top:6px" data-clid="'+id+'" onclick="toggleSinServicio(this)">'
+    +(c.sinServicio?'🚫 SIN SERVICIO — toca para volver a atenderlo':'🚫 Ya no le doy servicio')+'</button>'
     +(function(){
       // Detalle VIP visible de una vez en el perfil -antes solo se veia entrando a Historial Completo-
       if(!c.vipActivo) return '';
