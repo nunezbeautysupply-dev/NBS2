@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260808c-OFICIAL-V2.0">
+<meta name="app-version" content="20260808d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -12939,6 +12939,25 @@ function verificarStockSuficiente(items){
 //  Ahora todas llaman aqui. Si algun dia cambia la regla, cambia en un
 //  solo sitio y no se pueden volver a contradecir.
 // ═══════════════════════════════════════════════════════════════════
+// El subtotal de una factura: lo que suman los renglones ANTES del descuento.
+// Se calcula de los items y no del campo `subtotal`, porque las facturas viejas
+// pueden no tenerlo. -8 ago-
+function subtotalDeVenta(v){
+  if(!v) return 0;
+  var items = v.items || [];
+  var s = 0;
+  for(var i = 0; i < items.length; i++){
+    s += (parseFloat(items[i].precio) || 0) * (parseFloat(items[i].cant) || 0);
+  }
+  return Math.round(s * 100) / 100;
+}
+
+// Cuanto descuento lleva la factura. 0 si no lleva.
+function descuentoDeVenta(v){
+  var d = (v && v.descuento && parseFloat(v.descuento.monto)) || 0;
+  return d > 0.005 ? Math.round(d * 100) / 100 : 0;
+}
+
 function gananciaDeVenta(v){
   if(!v) return 0;
   var items = v.items || [];
@@ -19243,6 +19262,23 @@ function verFacturaProfesional(vid){
     +'<span style="font-size:13px;color:#555">Tipo de pago:</span>'
     +'<span style="font-size:13px;font-weight:600;color:'+(v.tipo==='credito'?'#E65100':'#2E7D32')+'">'+(v.tipo==='credito'?'A crédito':'Contado')+'</span>'
     +'</div>'
+    // 🧾 EL DESCUENTO, QUE ANTES NO SE VEIA EN NINGUN SITIO.
+    // Sensei lo cazo el 8 ago mirando una factura: "por que en la factura no se ve el
+    // descuento, aparece como que no se lo di". La app lo guardaba y lo restaba del
+    // total, pero ni el cliente ni el lo veian. Ahora sale el subtotal, el descuento
+    // en verde con su signo menos, y el total.
+    +(function(){
+      var _desc = descuentoDeVenta(v);
+      if(!_desc) return '';
+      return '<div style="display:flex;justify-content:space-between;margin-top:8px">'
+        +   '<span style="font-size:13px;color:#555">Subtotal</span>'
+        +   '<span style="font-size:13px;color:#555">$' + fmtNum(subtotalDeVenta(v)) + '</span>'
+        + '</div>'
+        + '<div style="display:flex;justify-content:space-between;margin-top:3px">'
+        +   '<span style="font-size:13px;font-weight:700;color:#2E7D32">🎁 Descuento</span>'
+        +   '<span style="font-size:13px;font-weight:700;color:#2E7D32">\u2212$' + fmtNum(_desc) + '</span>'
+        + '</div>';
+    })()
     +'<div style="display:flex;justify-content:space-between;margin-top:8px">'
     +'<span style="font-size:17px;font-weight:800;color:#1a237e">TOTAL</span>'
     +'<span style="font-size:20px;font-weight:800;color:#1565C0">$'+fmtNum(v.total)+'</span>'
@@ -19639,6 +19675,21 @@ function dibujarContenidoFactura(ctx, W, pad, v, cl, pagado, saldo, numFact, abo
     ctx.fillStyle = (v.tipo==='credito' ? '#E65100' : '#2E7D32');
     ctx.textAlign='right'; ctx.fillText(v.tipo==='credito'?'A credito':'Contado', W-pad, y);
     y += 30;
+
+    // 🧾 EL DESCUENTO, TAMBIEN EN LA FACTURA QUE SE IMPRIME Y SE COMPARTE.
+    // Es la que ve el cliente — si no sale, no se entera de lo que le rebajaste. -8 ago-
+    var _descF = descuentoDeVenta(v);
+    if(_descF){
+      ctx.font='bold '+fs.pago+'px '+ffFam+'';
+      ctx.fillStyle = '#555';
+      ctx.textAlign='left';  ctx.fillText('Subtotal', pad, y);
+      ctx.textAlign='right'; ctx.fillText('$'+fmtNum(subtotalDeVenta(v)), W-pad, y);
+      y += 26;
+      ctx.fillStyle = '#2E7D32';
+      ctx.textAlign='left';  ctx.fillText('Descuento', pad, y);
+      ctx.textAlign='right'; ctx.fillText('-$'+fmtNum(_descF), W-pad, y);
+      y += 30;
+    }
 
     ctx.font='bold '+fs.total+'px '+ffFam+'';
     ctx.fillStyle = '#1a237e';
