@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260808d-OFICIAL-V2.0">
+<meta name="app-version" content="20260809a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -26568,6 +26568,45 @@ function actualizarDiferenciaCambio(vid, totalDevuelto){
     +'<div style="font-size:16px;font-weight:800;margin-top:4px;color:'+color+'">'+texto+'</div>';
 }
 
+// Le quita a una factura los productos devueltos y recalcula su total y su ganancia.
+// Devuelve cuanto bajo el total. NO toca pagos ni credito: de eso se encarga quien llama.
+// -9 ago 2026-
+function ajustarFacturaPorDevolucion(v, itemsDevueltos, itemsNuevos){
+  var antesTotal = parseFloat(v.total) || 0;
+
+  (itemsDevueltos || []).forEach(function(dev){
+    for(var i = 0; i < (v.items || []).length; i++){
+      var it = v.items[i];
+      var mismo = (dev.pid != null && it.pid != null)
+        ? String(it.pid) === String(dev.pid)
+        : String(it.nombre) === String(dev.nombre);
+      if(!mismo) continue;
+      if(Math.abs((parseFloat(it.precio)||0) - (parseFloat(dev.precio)||0)) > 0.005) continue;
+      var queda = (parseFloat(it.cant) || 0) - (parseFloat(dev.cant) || 0);
+      if(queda > 0.0001){ it.cant = queda; }
+      else { v.items.splice(i, 1); }
+      break;
+    }
+  });
+
+  (itemsNuevos || []).forEach(function(nu){
+    v.items.push({ pid: nu.pid || null, nombre: nu.nombre,
+                   cant: parseFloat(nu.cant) || 0,
+                   precio: parseFloat(nu.precio) || 0,
+                   costo: parseFloat(nu.costo) || 0 });
+  });
+
+  var sub = subtotalDeVenta(v);
+  var desc = descuentoDeVenta(v);
+  if(desc > sub){ desc = sub; if(v.descuento) v.descuento.monto = desc; }
+  v.total = Math.round((sub - desc) * 100) / 100;
+
+  if(sePuedeCalcularGanancia(v)) v.ganancia = gananciaDeVenta(v);
+
+  v.ajustadaPorDevolucion = true;
+  return Math.round((antesTotal - v.total) * 100) / 100;
+}
+
 function procesarDevolucion(vid){
   ventas = LS('nv', []);
   loadProds();
@@ -26645,32 +26684,55 @@ function procesarDevolucion(vid){
   // Calcular cuanto de lo devuelto se puede aplicar directamente al SALDO PENDIENTE de esta
   // factura especifica -si era a credito y todavia debia algo-, y cuanto queda como EXCEDENTE
   // -que se convierte en credito a favor del cliente, aplicable a cualquier factura futura-.
+  // ═══ EL CAMBIO DE FONDO DEL 9 AGO 2026 ═══
+  // ANTES se apuntaba un PAGO falso de lo devuelto. Sensei lo corrigio:
+  // "no es un pago, es simplemente una devolucion de mercancia, porque no es dinero;
+  //  en la devolucion no hay ganancia, lo que hay es un ajuste de inventario, no se
+  //  puede contar como una venta".
+  // AHORA se le quitan a la factura los productos devueltos y se recalcula su total y
+  // su ganancia. Vendiste menos, punto. Y si el cliente ya habia pagado mas de lo que
+  // queda, ese excedente se le deja como CREDITO A FAVOR.
+  //
+  // Esto ademas arregla una inconsistencia vieja: el pago falso lo contaban 39 sitios
+  // como pago y 3 no -revisarIntegridad, calcularReporteClientes y pintarDetalleClientes-,
+  // asi que el mismo cliente salia con DOS deudas distintas segun donde se mirara.
+  // ⚠️ EN UNA VENTA AL CONTADO EL PAGO NO QUEDA EN LA LISTA: el cliente pago todo al
+  // momento y la app lo cuenta por el tipo. Si no se toma en cuenta aqui, al devolver
+  // mercancia de una venta al contado la app NO le apuntaria lo que hay que devolverle.
+  // -9 ago, cazado antes de entregar-
+  var pagadoAntes = (v.tipo === 'contado')
+    ? (parseFloat(v.total) || 0)
+    : (v.pagosFactura||[])
+        .filter(function(p){ return typeof p.monto === 'number' && !p.esDevolucion; })
+        .reduce(function(s,p){ return s + p.monto; }, 0);
+
+  var bajoElTotal = ajustarFacturaPorDevolucion(v, itemsDevueltos, itemsNuevos);
+  SS('nv', ventas);
+
+  var excedenteComoCreditoAFavor = Math.max(0, Math.round((pagadoAntes - (parseFloat(v.total)||0)) * 100) / 100);
   var montoADevolverOAplicar = esCambio ? Math.max(0, -diferencia) : totalDevuelto;
-  var excedenteComoCreditoAFavor = montoADevolverOAplicar;
   var mensajeFinal = '';
 
-  if(montoADevolverOAplicar > 0.005){
-    if(v.tipo === 'credito'){
-      var pagadoActual = (v.pagosFactura||[]).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0);
-      var saldoActual = Math.max(0, v.total - pagadoActual);
-      var aplicaAEstaFactura = Math.min(saldoActual, montoADevolverOAplicar);
-      if(aplicaAEstaFactura > 0.005){
-        if(!v.pagosFactura) v.pagosFactura = [];
-        v.pagosFactura.push({ monto: aplicaAEstaFactura, fecha: fechaHoyStr, nota: '↩️ '+(esCambio?'Cambio de producto':'Devolución')+(nota?': '+nota:''), esDevolucion: true });
-        SS('nv', ventas);
-      }
-      excedenteComoCreditoAFavor = montoADevolverOAplicar - aplicaAEstaFactura;
+  if(excedenteComoCreditoAFavor > 0.005){
+    clientes = LS('ncl', []);
+    var clIdx = clientes.findIndex(function(c){ return String(c.id)===String(v.cid); });
+    if(clIdx >= 0){
+      clientes[clIdx].creditoAFavor = (clientes[clIdx].creditoAFavor||0) + excedenteComoCreditoAFavor;
+      SS('ncl', clientes);
     }
-    // Si sobra dinero -la factura ya estaba saldada, o el excedente supera lo que debia, o era de contado-,
-    // se guarda como credito a favor del cliente para aplicarlo a cualquier factura futura.
-    if(excedenteComoCreditoAFavor > 0.005){
-      clientes = LS('ncl', []);
-      var clIdx = clientes.findIndex(function(c){ return String(c.id)===String(v.cid); });
-      if(clIdx >= 0){
-        clientes[clIdx].creditoAFavor = (clientes[clIdx].creditoAFavor||0) + excedenteComoCreditoAFavor;
-        SS('ncl', clientes);
-      }
+    // Y se le quita a la factura lo que paso al credito, para que no quede "pagada de
+    // mas" y la Revision de Integridad no la marque.
+    // En contado no hay pagos que recortar: el total ya bajo y con eso basta.
+    var restante = (v.tipo === 'contado') ? 0 : excedenteComoCreditoAFavor;
+    for(var iP = (v.pagosFactura||[]).length - 1; iP >= 0 && restante > 0.005; iP--){
+      var pg = v.pagosFactura[iP];
+      if(typeof pg.monto !== 'number' || pg.esDevolucion) continue;
+      var quita = Math.min(pg.monto, restante);
+      pg.monto = Math.round((pg.monto - quita) * 100) / 100;
+      restante = Math.round((restante - quita) * 100) / 100;
+      if(pg.monto <= 0.005) v.pagosFactura.splice(iP, 1);
     }
+    SS('nv', ventas);
   }
 
   if(!esCambio){
@@ -26913,20 +26975,66 @@ function deshacerDevolucion(devId){
   SS('np', productos);
 
   // Revertir el dinero: primero buscar si esta devolucion dejo un pago -abono- en la factura de origen
-  var montoRevertidoDeFactura = 0;
+  // ═══ DESHACER, CON LA REGLA NUEVA DEL 9 AGO 2026 ═══
+  // Antes esto buscaba el PAGO falso que se apuntaba al devolver. Ya no existe: ahora
+  // la devolucion AJUSTA LA FACTURA. Asi que deshacer tiene que devolver la factura a
+  // como estaba — los productos, el total y la ganancia — y quitarle al cliente el
+  // credito que se le habia dejado.
   ventas = LS('nv', []);
   var ventaOrigen = ventas.find(function(v){ return String(v.id)===String(d.ventaId); });
-  if(ventaOrigen && ventaOrigen.pagosFactura){
-    var idxPago = ventaOrigen.pagosFactura.findIndex(function(p){ return p.esDevolucion && p.fecha === d.fecha; });
-    if(idxPago >= 0){
-      montoRevertidoDeFactura = ventaOrigen.pagosFactura[idxPago].monto;
-      ventaOrigen.pagosFactura.splice(idxPago, 1);
-      SS('nv', ventas);
-    }
+  var montoRevertidoDeFactura = 0;
+
+  if(ventaOrigen){
+    var totalAntesDeshacer = parseFloat(ventaOrigen.total) || 0;
+
+    // 1) Devolver a la factura los productos que se habian devuelto
+    (d.items || []).forEach(function(dev){
+      var enc = null;
+      for(var i2 = 0; i2 < (ventaOrigen.items || []).length; i2++){
+        var it = ventaOrigen.items[i2];
+        var mismo = (dev.pid != null && it.pid != null)
+          ? String(it.pid) === String(dev.pid)
+          : String(it.nombre) === String(dev.nombre);
+        if(mismo && Math.abs((parseFloat(it.precio)||0) - (parseFloat(dev.precio)||0)) < 0.005){ enc = it; break; }
+      }
+      if(enc){ enc.cant = (parseFloat(enc.cant) || 0) + (parseFloat(dev.cant) || 0); }
+      else {
+        if(!ventaOrigen.items) ventaOrigen.items = [];
+        ventaOrigen.items.push({ pid: dev.pid || null, nombre: dev.nombre,
+                                 cant: parseFloat(dev.cant) || 0,
+                                 precio: parseFloat(dev.precio) || 0,
+                                 costo: parseFloat(dev.costo) || 0 });
+      }
+    });
+
+    // 2) Y quitarle los que se habia llevado a cambio
+    (d.itemsNuevos || []).forEach(function(nu){
+      for(var i3 = 0; i3 < (ventaOrigen.items || []).length; i3++){
+        var it = ventaOrigen.items[i3];
+        var mismo = (nu.pid != null && it.pid != null)
+          ? String(it.pid) === String(nu.pid)
+          : String(it.nombre) === String(nu.nombre);
+        if(!mismo) continue;
+        var queda = (parseFloat(it.cant) || 0) - (parseFloat(nu.cant) || 0);
+        if(queda > 0.0001) it.cant = queda; else ventaOrigen.items.splice(i3, 1);
+        break;
+      }
+    });
+
+    // 3) Recalcular total y ganancia con las formulas UNICAS
+    var sub2 = subtotalDeVenta(ventaOrigen);
+    var desc2 = descuentoDeVenta(ventaOrigen);
+    if(desc2 > sub2){ desc2 = sub2; if(ventaOrigen.descuento) ventaOrigen.descuento.monto = desc2; }
+    ventaOrigen.total = Math.round((sub2 - desc2) * 100) / 100;
+    if(sePuedeCalcularGanancia(ventaOrigen)) ventaOrigen.ganancia = gananciaDeVenta(ventaOrigen);
+    delete ventaOrigen.ajustadaPorDevolucion;
+    SS('nv', ventas);
+
+    montoRevertidoDeFactura = Math.round(((parseFloat(ventaOrigen.total)||0) - totalAntesDeshacer) * 100) / 100;
   }
 
-  // Si sobra monto de la devolucion que no estaba en la factura, es porque se habia ido a credito a favor del cliente
-  var restante = Math.max(0, d.monto - montoRevertidoDeFactura);
+  // 4) Quitarle al cliente el credito que se le habia dejado por esta devolucion
+  var restante = Math.max(0, parseFloat(d.monto) || 0);
   var avisoCredito = '';
   var montoQuitadoDeCredito = 0;
   if(restante > 0.005){
@@ -26938,9 +27046,6 @@ function deshacerDevolucion(devId){
       montoQuitadoDeCredito = aQuitar;
       clientes[clIdx].creditoAFavor = Math.max(0, creditoActual - aQuitar);
       SS('ncl', clientes);
-      if(aQuitar < restante){
-        avisoCredito = '\n\n⚠️ Aviso: $'+fmtNum(restante-aQuitar)+' de esta devolución ya no estaban disponibles como crédito -probablemente porque ya se usaron en otra factura-, así que no se pudieron quitar. Revisa el balance del cliente por si acaso.';
-      }
     }
   }
 
