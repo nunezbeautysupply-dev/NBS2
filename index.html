@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260811a-OFICIAL-V2.0">
+<meta name="app-version" content="20260811b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15706,6 +15706,95 @@ function pintarPanelCliente(cid){
   var D = datosDelCliente(cid);
   var h = '';
 
+  // ── 📇 SUS DATOS ── (va PRIMERO: es lo que más necesita a mano)
+  // Sensei: "falta toda la información del cliente... todos los datos del cliente
+  // los necesito y desplegables estaría bien". -11 ago-
+  var _tel = String(c.tel || '').trim();
+  var _telLimpio = _tel.replace(/[^0-9]/g, '');
+  var _dirCompleta = [c.dir, c.ciudad, c.estado, c.zip]
+    .map(function(x){ return String(x || '').trim(); })
+    .filter(function(x){ return x; }).join(', ');
+
+  var _dato = function(icono, rotulo, valor, extra){
+    if(!valor) return '';
+    return '<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #F0F0F5">'
+      + '<span style="font-size:14px;width:20px;flex-shrink:0;text-align:center">' + icono + '</span>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:9.5px;font-weight:800;color:var(--nbs-muted);letter-spacing:.3px">' + rotulo + '</div>'
+      +   '<div style="font-size:13px;color:var(--nbs-ink);font-weight:600;word-break:break-word">' + valor + '</div>'
+      +   (extra || '')
+      + '</div></div>';
+  };
+
+  var contDatos = _sub(
+      _dato('\ud83d\udcde', 'TEL\u00c9FONO', _tel ? escaparHtml(_tel) : '',
+        _telLimpio ? '<div style="display:flex;gap:6px;margin-top:6px">'
+          + '<a href="tel:' + escaparHtml(_telLimpio) + '" onclick="event.stopPropagation()" '
+          +   'style="flex:1;text-align:center;padding:8px;background:#00695C;color:#fff;border-radius:8px;'
+          +   'font-size:11.5px;font-weight:800;text-decoration:none">\ud83d\udcde Llamar</a>'
+          + '<a href="https://wa.me/' + escaparHtml(_telLimpio.length === 10 ? '1' + _telLimpio : _telLimpio) + '" '
+          +   'target="_blank" onclick="event.stopPropagation()" '
+          +   'style="flex:1;text-align:center;padding:8px;background:#25D366;color:#fff;border-radius:8px;'
+          +   'font-size:11.5px;font-weight:800;text-decoration:none">\ud83d\udcac WhatsApp</a>'
+          + '</div>' : '')
+    + _dato('\u2709\ufe0f', 'CORREO', c.email ? escaparHtml(c.email) : '')
+    + _dato('\ud83d\udccd', 'DIRECCI\u00d3N', _dirCompleta ? escaparHtml(_dirCompleta) : '',
+        _dirCompleta ? '<div style="margin-top:6px">'
+          + '<a href="https://www.google.com/maps/search/?api=1&query='
+          +   encodeURIComponent(_dirCompleta) + '" target="_blank" onclick="event.stopPropagation()" '
+          +   'style="display:block;text-align:center;padding:8px;background:#1565C0;color:#fff;border-radius:8px;'
+          +   'font-size:11.5px;font-weight:800;text-decoration:none">\ud83d\uddfa\ufe0f C\u00f3mo llegar</a>'
+          + '</div>' : '')
+    + _dato('\ud83c\udfea', 'NEGOCIO', c.negocio ? escaparHtml(c.negocio) : '')
+    + _dato('\ud83c\udff7\ufe0f', 'TIPO', escaparHtml(String(etiquetaTipoNegocio(c) || '').replace(/<[^>]*>/g, '').trim())
+        + (c.subtipoTienda ? ' \u00b7 ' + escaparHtml(c.subtipoTienda) : '')
+        + (c.subtipoTiendaOtro ? ' \u00b7 ' + escaparHtml(c.subtipoTiendaOtro) : ''))
+    + _dato('\ud83d\udc64', 'APODO', c.apodo ? escaparHtml(c.apodo) : '')
+    + _dato('\ud83e\udd1d', 'PERSONA DE CONTACTO',
+        c.contacto ? escaparHtml(c.contacto)
+          + (c.contactoApodo ? ' "' + escaparHtml(c.contactoApodo) + '"' : '')
+          + (c.contactoTel ? '<br>\ud83d\udcde ' + escaparHtml(c.contactoTel) : '') : '')
+    + _dato('\ud83d\udd01', 'CADA CU\u00c1NTO LO VISITAS',
+        c.intervaloVisitaDias ? 'cada ' + c.intervaloVisitaDias + ' d\u00edas' : '')
+    + '<div style="display:flex;gap:8px;padding:7px 0">'
+      + '<span style="font-size:14px;width:20px;flex-shrink:0;text-align:center">\ud83c\udd94</span>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:9.5px;font-weight:800;color:var(--nbs-muted);letter-spacing:.3px">FICHA CREADA</div>'
+      +   '<div style="font-size:13px;color:var(--nbs-ink);font-weight:600">'
+      +     (Number(c.id) > 1000000000000
+              ? new Date(Number(c.id)).toLocaleDateString('es-DO', { day:'numeric', month:'long', year:'numeric' })
+              : '\u2014') + '</div>'
+      + '</div></div>'
+  );
+
+  // El record de visitas, dentro del mismo renglon
+  var _vb = [];
+  try {
+    var todasVis = LS('nbs_visitas_barberos', []);
+    if(Array.isArray(todasVis)) _vb = todasVis.filter(function(v){ return String(v.cid) === String(cid); });
+  } catch(e){}
+  if(_vb.length){
+    var compro = _vb.filter(function(v){ return v.compro; }).length;
+    var pctV = Math.round(compro / _vb.length * 100);
+    contDatos += _sub(
+      '<div style="font-size:11px;font-weight:800;color:var(--nbs-muted);letter-spacing:.3px;margin-bottom:5px">\ud83d\udccd R\u00c9CORD DE VISITAS</div>'
+      + '<div style="display:flex;gap:10px;font-size:12.5px;font-weight:700">'
+      +   '<span style="color:var(--nbs-green-text)">\u2713 ' + compro + ' compr\u00f3</span>'
+      +   '<span style="color:var(--nbs-red-text)">\u2717 ' + (_vb.length - compro) + ' no compr\u00f3</span>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--nbs-muted);margin-top:3px">'
+      +   pctV + '% de ' + _vb.length + ' visita' + (_vb.length === 1 ? '' : 's') + '</div>'
+    );
+  }
+
+  contDatos += '<button onclick="event.stopPropagation();editarCl(' + cid + ')" '
+    + 'style="width:100%;margin-top:2px;padding:10px;background:#1565C0;color:#fff;border:none;'
+    + 'border-radius:9px;font-size:12px;font-weight:800;cursor:pointer">\u270f\ufe0f Corregir estos datos</button>';
+
+  h += _filaPanel('datos', '\ud83d\udcc7', 'Sus datos',
+    _tel ? escaparHtml(_tel.length > 15 ? _tel.slice(0, 15) : _tel) : (c.negocio ? 'ver ficha' : ''),
+    null, contDatos);
+
   // ── ⭐ PROGRAMA VIP ──
   if(c.vipActivo){
     var grupos = calcVIP(cid);
@@ -15921,16 +16010,8 @@ function pintarPanelCliente(cid){
       + 'border:' + (borde || 'none') + ';border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">'
       + txt + '</button>';
   };
+  // El contacto ya NO va aqui: tiene su propio renglon 📇 Sus datos. -11 ago-
   var contAj = ''
-    + '<div style="font-size:11px;font-weight:800;color:var(--nbs-muted);letter-spacing:.4px;padding:2px 2px 6px">CONTACTO</div>'
-    + _sub('<div style="font-size:12px;color:var(--nbs-ink);line-height:1.8">'
-        + '\ud83d\udcde ' + escaparHtml(c.tel || 'sin tel\u00e9fono') + '<br>'
-        + '\u2709\ufe0f ' + escaparHtml(c.email || 'sin correo') + '<br>'
-        + '\ud83d\udccd ' + escaparHtml(c.dir || 'sin direcci\u00f3n')
-        + (c.ciudad ? ', ' + escaparHtml(c.ciudad) : '')
-        + (c.contacto ? '<br>\ud83d\udc64 Contacto: ' + escaparHtml(c.contacto)
-            + (c.contactoTel ? ' \u00b7 ' + escaparHtml(c.contactoTel) : '') : '')
-        + '</div>')
     + '<div style="font-size:11px;font-weight:800;color:var(--nbs-muted);letter-spacing:.4px;padding:6px 2px 6px">PROGRAMAS</div>'
     + btn((c.vipActivo ? '\u2b50 Inscrito en VIP \u2014 Toca para retirar' : '\u2606 Inscribir en programa VIP'),
           'toggleVIPBtn(this)', (c.vipActivo ? '#AD1457' : '#546E7A'))
@@ -15994,8 +16075,9 @@ function verCl(id){
     +   '<div style="font-size:17px;font-weight:800;color:var(--nbs-ink);line-height:1.2;overflow:hidden;text-overflow:ellipsis">'
     +     escaparHtml(nombreCl(c)) + '</div>'
     +   '<div style="font-size:12px;color:var(--nbs-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
-    +     (c.negocio ? '\ud83c\udfea ' + escaparHtml(c.negocio) : etiquetaTipoNegocio(c))
-    +     (c.tel ? ' \u00b7 \ud83d\udcde ' + escaparHtml(c.tel) : '') + '</div>'
+    +     (c.negocio ? '\ud83c\udfea ' + escaparHtml(c.negocio) : etiquetaTipoNegocio(c)) + '</div>'
+    +   (c.tel ? '<div style="font-size:12.5px;color:var(--nbs-ink);font-weight:700;margin-top:2px">'
+    +     '\ud83d\udcde ' + escaparHtml(c.tel) + '</div>' : '')
     + '</div></div>';
 
   // Aviso si hay otra copia de este mismo cliente
