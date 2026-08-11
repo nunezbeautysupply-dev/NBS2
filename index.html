@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260809a-OFICIAL-V2.0">
+<meta name="app-version" content="20260809b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15581,6 +15581,253 @@ function posiblesDuplicadosDe(c, listaClientes){
   });
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  EL PANEL COMPACTO DEL PERFIL DE CLIENTE  (9 ago 2026)
+//
+//  Una sola lista de renglones iguales. Cada uno enseña YA el numero que
+//  importa, asi muchas veces ni hay que abrirlo. Se abre UNO A LA VEZ,
+//  para que la pantalla no se corra. Y lo que esta vacio NO SE VE.
+// ═══════════════════════════════════════════════════════════════════
+
+var _panelAbierto = null;   // que renglon esta abierto ahora
+
+// ── Los datos de un cliente, todos juntos ──
+function datosDelCliente(cid){
+  ventas = LS('nv', []);
+  var suyas = ventas.filter(function(v){ return String(v.cid) === String(cid); });
+  var activas = suyas.filter(function(v){ return !v.cancelada; });
+
+  var comprado = 0, ganancia = 0, pagado = 0, debe = 0;
+  activas.forEach(function(v){
+    var t = parseFloat(v.total) || 0;
+    comprado += t;
+    ganancia += (parseFloat(v.ganancia) || 0);
+    if(v.tipo === 'contado'){ pagado += t; return; }
+    var pg = 0;
+    (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
+    pagado += pg;
+    debe += (t - pg);
+  });
+
+  // Cuando fue la ultima compra y cada cuanto compra
+  var fechas = [];
+  activas.forEach(function(v){
+    var f = parsearFechaVenta(v.fecha);
+    if(f && !isNaN(f.getTime())) fechas.push(f.getTime());
+  });
+  fechas.sort(function(a,b){ return a-b; });
+  var ultima = fechas.length ? new Date(fechas[fechas.length-1]) : null;
+  var diasDesde = ultima ? Math.floor((Date.now() - ultima.getTime()) / 86400000) : null;
+
+  // El ritmo: promedio de dias entre compras de DIAS DISTINTOS
+  var dias = [];
+  fechas.forEach(function(t){
+    var d = new Date(t); d.setHours(0,0,0,0);
+    if(!dias.length || dias[dias.length-1] !== d.getTime()) dias.push(d.getTime());
+  });
+  var cadaCuanto = null;
+  if(dias.length >= 2){
+    var suma = 0;
+    for(var i = 1; i < dias.length; i++) suma += (dias[i] - dias[i-1]) / 86400000;
+    cadaCuanto = Math.round(suma / (dias.length - 1));
+  }
+
+  // Lo que mas compra
+  var porProd = {};
+  activas.forEach(function(v){
+    (v.items || []).forEach(function(it){
+      var n = String(it.nombre || '').trim();
+      if(!n) return;
+      if(!porProd[n]) porProd[n] = { nombre: n, uds: 0, monto: 0, veces: 0 };
+      porProd[n].uds += parseFloat(it.cant) || 0;
+      porProd[n].monto += (parseFloat(it.cant) || 0) * (parseFloat(it.precio) || 0);
+      porProd[n].veces++;
+    });
+  });
+  var top = Object.keys(porProd).map(function(k){ return porProd[k]; })
+    .sort(function(a,b){ return b.uds - a.uds; });
+
+  // Sus devoluciones
+  var devs = LS('ndevoluciones', []).filter(function(d){ return String(d.cid) === String(cid); })
+    .sort(function(a,b){ return String(b.fecha).localeCompare(String(a.fecha)); });
+
+  return {
+    facturas: suyas, activas: activas, canceladas: suyas.length - activas.length,
+    comprado: Math.round(comprado*100)/100, ganancia: Math.round(ganancia*100)/100,
+    pagado: Math.round(pagado*100)/100, debe: Math.round(debe*100)/100,
+    margen: comprado > 0 ? Math.round(ganancia / comprado * 1000)/10 : 0,
+    ultima: ultima, diasDesde: diasDesde, cadaCuanto: cadaCuanto,
+    top: top, devoluciones: devs
+  };
+}
+
+function togglePanelCl(clave){
+  _panelAbierto = (_panelAbierto === clave) ? null : clave;
+  var cid = window._clientePerfilActual;
+  if(cid != null) pintarPanelCliente(cid);
+}
+
+// ── Un renglon de la lista ──
+function _filaPanel(clave, icono, texto, detalle, colorDet, contenido){
+  var abierto = (_panelAbierto === clave);
+  var h = '<div onclick="togglePanelCl(' + JSON.stringify(clave) + ')" '
+    + 'style="display:flex;align-items:center;gap:9px;padding:12px 13px;border-bottom:1px solid #EFEFF4;'
+    + 'cursor:pointer;background:' + (abierto ? '#F7F7FC' : '#fff') + '">'
+    + '<span style="font-size:15px;width:20px;text-align:center;flex-shrink:0">' + icono + '</span>'
+    + '<span style="flex:1;font-size:13.5px;font-weight:700;color:' + (abierto ? '#1a237e' : 'var(--nbs-ink)') + '">' + texto + '</span>'
+    + '<span style="font-size:12px;font-weight:800;color:' + (colorDet || 'var(--nbs-muted)') + ';flex-shrink:0">' + (detalle || '') + '</span>'
+    + '<span style="font-size:14px;color:#B9B9C6;flex-shrink:0;width:12px;text-align:center">' + (abierto ? '\u2304' : '\u203a') + '</span>'
+    + '</div>';
+  if(abierto && contenido){
+    h += '<div style="background:#F7F7FC;padding:3px 13px 13px;border-bottom:1px solid #EFEFF4">' + contenido + '</div>';
+  }
+  return h;
+}
+
+function _sub(inner){
+  return '<div style="background:#fff;border-radius:9px;padding:10px;margin-bottom:6px">' + inner + '</div>';
+}
+
+// ═══ EL PANEL COMPLETO ═══
+function pintarPanelCliente(cid){
+  var el = document.getElementById('cl-panel-completo');
+  if(!el) return;
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c) return;
+  var D = datosDelCliente(cid);
+  var h = '';
+
+  // ── ⭐ PROGRAMA VIP ──
+  if(c.vipActivo){
+    var grupos = calcVIP(cid);
+    var keys = Object.keys(grupos);
+    if(keys.length){
+      var listos = keys.filter(function(k){ return grupos[k].gratis > 0; }).length;
+      var cont = keys.map(function(k){
+        var g = grupos[k];
+        var pct = Math.min(100, Math.round((g.progreso / VIP_META) * 100));
+        return _sub(
+          '<div style="display:flex;justify-content:space-between">'
+          + '<span style="font-size:12.5px;font-weight:800;color:var(--nbs-ink)">' + escaparHtml(g.nombre) + '</span>'
+          + '<span style="font-size:12.5px;font-weight:800;color:#AD1457">' + g.progreso + '/' + VIP_META + (g.gratis>0?' \ud83c\udf81':'') + '</span>'
+          + '</div>'
+          + '<div style="height:6px;background:#EAEAF2;border-radius:3px;margin-top:6px;overflow:hidden">'
+          +   '<div style="height:100%;width:' + pct + '%;background:#AD1457"></div></div>'
+          + detalleProdsVIP(g, true)
+          + '<button onclick="event.stopPropagation();abrirEntregaPremioVIP(' + JSON.stringify(String(cid)) + ',' + JSON.stringify(String(k)) + ')" '
+          + 'style="width:100%;margin-top:7px;padding:8px;background:' + (g.gratis>0?'#AD1457':'#fff') + ';color:' + (g.gratis>0?'#fff':'#AD1457') + ';'
+          + 'border:' + (g.gratis>0?'none':'1px solid #AD1457') + ';border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">'
+          + (g.gratis>0?'\ud83c\udf81 Ya se lo di':'\ud83c\udf81 Darle el premio ahora') + '</button>'
+        );
+      }).join('');
+      h += _filaPanel('vip', '\u2b50', 'Programa VIP',
+        keys.length + ' grupo' + (keys.length>1?'s':'') + (listos ? ' \u00b7 ' + listos + ' \ud83c\udf81' : ''),
+        listos ? '#AD1457' : null, cont);
+    }
+  }
+
+  // ── 🎁 PREMIOS QUE LE DI ──
+  var canjes = c.vipCanjes || [];
+  if(canjes.length){
+    var costoTotal = canjes.reduce(function(a,x){ return a + (parseFloat(x.costo)||0); }, 0);
+    var contP = canjes.slice().reverse().map(function(x){
+      return _sub(
+        '<div style="display:flex;justify-content:space-between">'
+        + '<span style="font-size:12.5px;font-weight:700;color:var(--nbs-ink)">' + escaparHtml(String(x.producto||'').slice(0,32)) + (x.anticipado?' \u2733\ufe0f':'') + '</span>'
+        + '<span style="font-size:11.5px;color:#8D6E00;font-weight:800">te cost\u00f3 $' + fmtNum(x.costo||0) + '</span>'
+        + '</div>'
+        + '<div style="font-size:11px;color:var(--nbs-muted);margin-top:2px">' + escaparHtml(x.fecha||'') + ' \u00b7 ' + escaparHtml(String(x.nombreGrupo||x.grupo||'')) + '</div>'
+        + '<button onclick="event.stopPropagation();mostrarComprobantePremioVIP(' + JSON.stringify(String(cid)) + ',' + JSON.stringify(String(x.ventaId)) + ')" '
+        + 'style="width:100%;margin-top:6px;padding:7px;background:#fff;border:1px solid #AD1457;color:#AD1457;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer">\ud83e\uddfe Ver su comprobante</button>'
+      );
+    }).join('')
+    + (canjes.some(function(x){ return x.anticipado; })
+        ? '<div style="font-size:10.5px;color:#8D6E00;padding:2px 2px 0">\u2733\ufe0f = se lo diste antes de que completara</div>' : '');
+    h += _filaPanel('premios', '\ud83c\udf81', 'Premios que le di',
+      canjes.length + ' \u00b7 $' + fmtNum(costoTotal), '#8D6E00', contP);
+  }
+
+  // ── ↩️ DEVOLUCIONES ── (lo que Sensei no veía por ningún lado)
+  if(D.devoluciones.length){
+    var montoDev = D.devoluciones.reduce(function(a,x){ return a + (parseFloat(x.monto)||0); }, 0);
+    var contD = D.devoluciones.map(function(d){
+      var prods = (d.items || []).map(function(it){
+        return '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:#777;line-height:1.6">'
+          + '<span>' + (parseFloat(it.cant)||0) + ' \u00d7 ' + escaparHtml(String(it.nombre||'').slice(0,26)) + '</span>'
+          + '<span>$' + fmtNum((parseFloat(it.cant)||0) * (parseFloat(it.precio)||0)) + '</span></div>';
+      }).join('');
+      var vOrigen = ventas.find(function(v){ return String(v.id) === String(d.ventaId); });
+      return _sub(
+        '<div style="display:flex;justify-content:space-between">'
+        + '<span style="font-size:12.5px;font-weight:800;color:var(--nbs-ink)">' + escaparHtml(d.fecha||'') + '</span>'
+        + '<span style="font-size:12.5px;font-weight:800;color:var(--nbs-red-text)">\u2212$' + fmtNum(d.monto||0) + '</span>'
+        + '</div>'
+        + '<div style="font-size:11px;color:var(--nbs-muted);margin-top:2px">'
+        +   (vOrigen ? 'De la factura #' + escaparHtml(String(vOrigen.numFactura||vOrigen.id)) : 'Factura no encontrada')
+        +   (d.hora ? ' \u00b7 ' + escaparHtml(d.hora) : '') + (d.esCambio ? ' \u00b7 cambio de producto' : '') + '</div>'
+        + '<div style="margin-top:5px">' + prods + '</div>'
+        + (d.nota ? '<div style="font-size:11px;color:var(--nbs-muted);margin-top:4px;font-style:italic">\u201c' + escaparHtml(d.nota) + '\u201d</div>' : '')
+        + '<button onclick="event.stopPropagation();deshacerDevolucion(' + JSON.stringify(String(d.id)) + ')" '
+        + 'style="width:100%;margin-top:7px;padding:8px;background:#fff;border:1px solid #96331A;color:#96331A;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">\u21a9\ufe0f Deshacer esta devoluci\u00f3n</button>'
+      );
+    }).join('');
+    h += _filaPanel('devs', '\u21a9\ufe0f', 'Devoluciones',
+      D.devoluciones.length + ' \u00b7 $' + fmtNum(montoDev), 'var(--nbs-red-text)', contD);
+  }
+
+  // ── 🛒 LO QUE MÁS COMPRA ──
+  if(D.top.length){
+    var contT = D.top.slice(0, 8).map(function(p, i){
+      return '<div style="display:flex;align-items:center;gap:8px;background:#fff;border-radius:8px;padding:8px 10px;margin-bottom:5px">'
+        + '<span style="font-size:11px;font-weight:900;color:#B9B9C6;width:14px">' + (i+1) + '</span>'
+        + '<span style="flex:1;font-size:12.5px;font-weight:700;color:var(--nbs-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escaparHtml(p.nombre.slice(0,30)) + '</span>'
+        + '<span style="font-size:11.5px;color:var(--nbs-muted);flex-shrink:0">' + p.uds + ' uds \u00b7 $' + fmtNum(p.monto) + '</span>'
+        + '</div>';
+    }).join('');
+    h += _filaPanel('top', '\ud83d\uded2', 'Lo que m\u00e1s compra',
+      String(D.top[0].nombre).slice(0, 14), null, contT);
+  }
+
+  // ── 📅 CADA CUÁNTO COMPRA ──
+  if(D.ultima){
+    var proxima = '';
+    if(D.cadaCuanto){
+      var p = new Date(D.ultima.getTime() + D.cadaCuanto * 86400000);
+      proxima = p.toLocaleDateString('es-DO', { day:'numeric', month:'short' });
+    }
+    var contC = _sub(
+      '<div style="font-size:12.5px;color:var(--nbs-ink);line-height:1.7">'
+      + '\u00daltima compra: <b>' + D.ultima.toLocaleDateString('es-DO', { day:'numeric', month:'long', year:'numeric' }) + '</b>'
+      + ' (hace ' + D.diasDesde + ' d\u00eda' + (D.diasDesde===1?'':'s') + ')<br>'
+      + (D.cadaCuanto ? 'Te compra cada <b>' + D.cadaCuanto + ' d\u00edas</b> en promedio<br>Pr\u00f3xima estimada: <b>' + proxima + '</b><br>' : '')
+      + 'Le has vendido <b>' + D.activas.length + '</b> vez' + (D.activas.length===1?'':'es')
+      + (D.canceladas ? ' (y ' + D.canceladas + ' cancelada' + (D.canceladas===1?'':'s') + ')' : '')
+      + '</div>'
+    );
+    h += _filaPanel('ritmo', '\ud83d\udcc5', 'Cada cu\u00e1nto compra',
+      D.cadaCuanto ? D.cadaCuanto + ' d\u00edas' : 'hace ' + D.diasDesde + ' d', null, contC);
+  }
+
+  // ── 💵 LO QUE TE DEJA ──
+  if(D.comprado > 0){
+    var contG = _sub(
+      '<div style="font-size:12.5px;color:var(--nbs-ink);line-height:1.7">'
+      + 'Te ha comprado <b>$' + fmtNum(D.comprado) + '</b><br>'
+      + 'Te deja <b style="color:var(--nbs-green-text)">$' + fmtNum(D.ganancia) + '</b> de ganancia bruta<br>'
+      + 'O sea un margen del <b>' + D.margen + '%</b>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--nbs-muted);margin-top:6px;line-height:1.5">'
+      + '\u26a0\ufe0f Es ganancia <b>bruta</b>: no incluye gasolina, tiempo ni los dem\u00e1s gastos del negocio.</div>'
+    );
+    h += _filaPanel('deja', '\ud83d\udcb5', 'Lo que te deja',
+      '$' + fmtNum(D.ganancia) + ' \u00b7 ' + D.margen + '%', 'var(--nbs-green-text)', contG);
+  }
+
+  el.innerHTML = h;
+}
+
 function verCl(id){
   clientes=LS('ncl',[]);
   var c=clientes.find(function(x){return String(x.id)===String(id);});if(!c)return;
@@ -15602,6 +15849,9 @@ function verCl(id){
   var cr=balancePendiente>0?{saldo:balancePendiente}:null;
 
   var el=document.getElementById('cl-perfil-contenido');el.innerHTML='';
+  // De quien es el perfil abierto, para que el panel compacto sepa a quien repintar
+  if(String(window._clientePerfilActual) !== String(id)) _panelAbierto = null;
+  window._clientePerfilActual = id;
 
   // Header
   var header=document.createElement('div');
@@ -15742,6 +15992,16 @@ function verCl(id){
     +'<button class="btn" style="background:#00695C;color:white" onclick="abrirPreciosPersonalizados('+id+')">💲 Precios especiales de este cliente</button>';
   el.appendChild(header);
 
+  // ═══ EL PANEL COMPACTO — todo lo del cliente, en renglones desplegables ═══
+  // Va DESPUES de la cabecera y ANTES de lo que ya habia. Nada de lo viejo se toca:
+  // el credito a favor, el record de visitas, la fidelidad y sus facturas siguen
+  // exactamente donde estaban. -9 ago 2026-
+  var panelWrap = document.createElement('div');
+  panelWrap.id = 'cl-panel-completo';
+  panelWrap.style.cssText = 'background:#fff;border-radius:13px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.09)';
+  el.appendChild(panelWrap);
+  try { pintarPanelCliente(id); } catch(ePanel){}
+
   // Programa de Fidelidad (compras generales de productos menores a $30)
   // Las cuentas de CONSIGNACION no entran, asi que el recuadro ni se dibuja: si no,
   // se veria una barra en $0 que no significa nada. -6 ago, lo cazo Sensei-
@@ -15796,7 +16056,7 @@ function verCl(id){
       } else {
         card.style.borderLeft='4px solid '+(v.tipo==='credito'?(esSaldoPendiente(saldo)?'#C62828':'#2E7D32'):'#1565C0');
         card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center">'
-          +'<div><div style="font-size:14px;font-weight:700">'+v.fecha+' - '+v.hora+'</div>'
+          +'<div><div style="font-size:14px;font-weight:700">'+v.fecha+(v.hora?' - '+v.hora:'')+'</div>'
           +'<div style="font-size:12px;color:#aaa;margin-top:2px">'+(v.items || []).length+' producto(s)'+(v.modificada?' · <span style="color:#E65100">Modificada</span>':'')+'</div>'
           +'<div style="margin-top:4px"><span style="font-size:16px;padding:4px 11px;border-radius:10px;font-weight:600;'+(v.tipo==='credito'?'background:#FFF8E1;color:#E65100':'background:#E8F5E9;color:#2E7D32')+'">'+(v.tipo==='credito'?'a credito':v.tipo)+'</span></div></div>'
           +'<div style="text-align:right">'
