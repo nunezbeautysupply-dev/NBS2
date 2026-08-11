@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260811b-OFICIAL-V2.0">
+<meta name="app-version" content="20260811c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -630,7 +630,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       </div>
     </div>
     <button onclick="bloquearAhora()" style="width:100%;margin-top:8px;background:none;border:1px solid #546E7A;color:#546E7A;padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">🔒 Bloquear ahora</button>
-    <button onclick="cerrarSesionNBS()" style="width:100%;margin-top:8px;background:none;border:1px solid #e0574a;color:#e0574a;padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">🚪 Cerrar sesión</button></div><button onclick="toggleGrupoMenu('herramientas')" id="gm-t-herramientas" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">⚙️</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">HERRAMIENTAS</span><span id="gm-f-herramientas" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-herramientas" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenu('p-docs')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📁</span></span>Mis Documentos<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">guías y papeles guardados</span></button><button onclick="irMenu('p-academia')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🎓</span></span>Academia<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">aprender de negocio escuchando</span></button><button onclick="irMenu('p-manual')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📖</span></span>Manual de Usuario<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">cómo se usa cada cosa</span></button><button onclick="abrirConfigImpresora();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🖨️</span></span>Configurar Impresora</button><button onclick="adminAccion('huerfanas');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🧹</span></span>Limpiar ventas huérfanas</button><button onclick="cerrarMenuLateral();setTimeout(verLogAtras,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🔧</span></span>Registro bot&oacute;n atr&aacute;s</button><button onclick="adminAccion('borrar');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon" style="background:var(--nbs-red-bg)"><span style="font-size:19px">⚠️</span></span><span style="color:var(--nbs-red-dark)">Borrar todos los datos</span></button></div></div>
+    <button onclick="cerrarSesionNBS()" style="width:100%;margin-top:8px;background:none;border:1px solid #e0574a;color:#e0574a;padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">🚪 Cerrar sesión</button></div><button onclick="toggleGrupoMenu('herramientas')" id="gm-t-herramientas" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">⚙️</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">HERRAMIENTAS</span><span id="gm-f-herramientas" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-herramientas" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenu('p-docs')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📁</span></span>Mis Documentos<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">guías y papeles guardados</span></button><button onclick="irMenu('p-academia')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🎓</span></span>Academia<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">aprender de negocio escuchando</span></button><button onclick="irMenu('p-manual')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📖</span></span>Manual de Usuario<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">cómo se usa cada cosa</span></button><button onclick="abrirConfigImpresora();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🖨️</span></span>Configurar Impresora</button><button onclick="cambiarWhatsAppApp();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💬</span></span>Cuál WhatsApp usar</button><button onclick="adminAccion('huerfanas');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🧹</span></span>Limpiar ventas huérfanas</button><button onclick="cerrarMenuLateral();setTimeout(verLogAtras,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🔧</span></span>Registro bot&oacute;n atr&aacute;s</button><button onclick="adminAccion('borrar');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon" style="background:var(--nbs-red-bg)"><span style="font-size:19px">⚠️</span></span><span style="color:var(--nbs-red-dark)">Borrar todos los datos</span></button></div></div>
 </div>
 
 
@@ -15672,6 +15672,53 @@ function togglePanelCl(clave){
 // Un valor para meter DENTRO de un onclick="..." — con comillas SIMPLES.
 // JSON.stringify usa comillas DOBLES y rompe el atributo: el navegador lo corta
 // y el boton no hace nada. Lo cazo Sensei probando los botones del panel. -11 ago-
+// El enlace de WhatsApp. Sensei lo pidio el 11 ago: "en vez de whatsapp normal, que se
+// pueda abrir whatsapp de negocio, porque cuando le doy a whatsapp sale el normal".
+//
+// En ANDROID se le puede decir al telefono EXACTAMENTE cual app abrir, con el paquete:
+//    com.whatsapp.w4b  = WhatsApp Business
+//    com.whatsapp      = WhatsApp normal
+// Si esa app no esta instalada, el `browser_fallback_url` lo manda al wa.me de siempre,
+// asi que nunca se queda sin abrir nada.
+//
+// En iPhone y en la computadora no existe esa forma: ahi se usa wa.me y abre la que el
+// sistema tenga puesta. -11 ago-
+var WA_NEGOCIO = 'com.whatsapp.w4b';
+
+function esAndroid(){
+  try { return /android/i.test(navigator.userAgent || ''); } catch(e){ return false; }
+}
+
+// Que WhatsApp usar. Se guarda una vez y vale para toda la app. -11 ago-
+function cambiarWhatsAppApp(){
+  var actual = LS('nbs_whatsapp_app', WA_NEGOCIO);
+  var esNegocio = (actual === WA_NEGOCIO);
+  var msg = 'Ahora mismo los botones de WhatsApp abren:\n\n'
+    + (esNegocio ? '\ud83d\udcbc WhatsApp BUSINESS (el de negocio)' : '\ud83d\udcac WhatsApp normal')
+    + '\n\n\u00bfCambiarlo a ' + (esNegocio ? 'WhatsApp normal' : 'WhatsApp BUSINESS') + '?';
+  if(!confirm(msg)) return;
+  var nuevo = esNegocio ? 'com.whatsapp' : WA_NEGOCIO;
+  SS('nbs_whatsapp_app', nuevo);
+  avisoGrande('\u2705 Los botones de WhatsApp van a abrir '
+    + (nuevo === WA_NEGOCIO ? 'WhatsApp BUSINESS' : 'WhatsApp normal') + '.'
+    + (esAndroid() ? '' : '\n\n\u26a0\ufe0f En este aparato no es Android, as\u00ed que abre el que tengas puesto por defecto.'));
+  try { if(window._clientePerfilActual != null) pintarPanelCliente(window._clientePerfilActual); } catch(e){}
+}
+
+function _linkWhatsApp(telLimpio){
+  var num = String(telLimpio || '').replace(/[^0-9]/g, '');
+  if(!num) return '#';
+  if(num.length === 10) num = '1' + num;          // numeros de aqui, sin el 1
+  var normal = 'https://wa.me/' + num;
+  if(!esAndroid()) return normal;
+  // Preferir el WhatsApp que el escogio; si no esta, cae al normal solo.
+  var cual = LS('nbs_whatsapp_app', WA_NEGOCIO);
+  if(!cual) return normal;
+  return 'intent://send?phone=' + num
+    + '#Intent;scheme=whatsapp;package=' + cual
+    + ';S.browser_fallback_url=' + encodeURIComponent(normal) + ';end';
+}
+
 function _arg(v){
   return "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
 }
@@ -15732,7 +15779,7 @@ function pintarPanelCliente(cid){
           + '<a href="tel:' + escaparHtml(_telLimpio) + '" onclick="event.stopPropagation()" '
           +   'style="flex:1;text-align:center;padding:8px;background:#00695C;color:#fff;border-radius:8px;'
           +   'font-size:11.5px;font-weight:800;text-decoration:none">\ud83d\udcde Llamar</a>'
-          + '<a href="https://wa.me/' + escaparHtml(_telLimpio.length === 10 ? '1' + _telLimpio : _telLimpio) + '" '
+          + '<a href="' + _linkWhatsApp(_telLimpio) + '" '
           +   'target="_blank" onclick="event.stopPropagation()" '
           +   'style="flex:1;text-align:center;padding:8px;background:#25D366;color:#fff;border-radius:8px;'
           +   'font-size:11.5px;font-weight:800;text-decoration:none">\ud83d\udcac WhatsApp</a>'
