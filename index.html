@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260811c-OFICIAL-V2.0">
+<meta name="app-version" content="20260811e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15725,16 +15725,32 @@ function _arg(v){
 
 function _filaPanel(clave, icono, texto, detalle, colorDet, contenido){
   var abierto = (_panelAbierto === clave);
+  // 🔤 EL TITULO EN NEGRITA Y LA FLECHA BIEN VISIBLE. Sensei lo pidio el 11 ago:
+  // "el titulo de la barra desplegable creo que deberia ser en negrita para saber de
+  //  donde parte la apertura del despliegue... al ser todos los textos iguales uno se
+  //  confunde, y tambien la flechita de cada titulo debe ser mas visible".
+  // Por eso: el titulo va en 900 (negrita fuerte) y la flecha en un circulo con color.
+  // Y al abrirse, el renglon se pinta de azul con la flecha en blanco, para que se vea
+  // CLARISIMO de donde sale lo que esta desplegado.
   var h = '<div onclick="togglePanelCl(' + _arg(clave) + ')" '
-    + 'style="display:flex;align-items:center;gap:9px;padding:12px 13px;border-bottom:1px solid #EFEFF4;'
-    + 'cursor:pointer;background:' + (abierto ? '#F7F7FC' : '#fff') + '">'
-    + '<span style="font-size:15px;width:20px;text-align:center;flex-shrink:0">' + icono + '</span>'
-    + '<span style="flex:1;font-size:13.5px;font-weight:700;color:' + (abierto ? '#1a237e' : 'var(--nbs-ink)') + '">' + texto + '</span>'
-    + '<span style="font-size:12px;font-weight:800;color:' + (colorDet || 'var(--nbs-muted)') + ';flex-shrink:0">' + (detalle || '') + '</span>'
-    + '<span style="font-size:14px;color:#B9B9C6;flex-shrink:0;width:12px;text-align:center">' + (abierto ? '\u2304' : '\u203a') + '</span>'
+    + 'style="display:flex;align-items:center;gap:10px;padding:13px;'
+    + 'border-bottom:' + (abierto ? 'none' : '1px solid #EFEFF4') + ';cursor:pointer;'
+    + 'background:' + (abierto ? '#1a237e' : '#fff') + '">'
+    + '<span style="font-size:16px;width:22px;text-align:center;flex-shrink:0">' + icono + '</span>'
+    + '<span style="flex:1;font-size:15px;font-weight:900;letter-spacing:-.2px;'
+    +   'color:' + (abierto ? '#fff' : 'var(--nbs-ink)') + '">' + texto + '</span>'
+    + '<span style="font-size:12px;font-weight:800;flex-shrink:0;'
+    +   'color:' + (abierto ? 'rgba(255,255,255,.85)' : (colorDet || 'var(--nbs-muted)')) + '">'
+    +   (detalle || '') + '</span>'
+    + '<span style="flex-shrink:0;width:24px;height:24px;border-radius:50%;'
+    +   'display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;'
+    +   'background:' + (abierto ? 'rgba(255,255,255,.22)' : '#EEEEF5') + ';'
+    +   'color:' + (abierto ? '#fff' : '#5A5A66') + '">'
+    +   (abierto ? '\u2303' : '\u203a') + '</span>'
     + '</div>';
   if(abierto && contenido){
-    h += '<div style="background:#F7F7FC;padding:3px 13px 13px;border-bottom:1px solid #EFEFF4">' + contenido + '</div>';
+    h += '<div style="background:#F7F7FC;padding:11px 11px 13px;border-bottom:1px solid #EFEFF4;'
+      + 'border-left:4px solid #1a237e">' + contenido + '</div>';
   }
   return h;
 }
@@ -15765,9 +15781,9 @@ function pintarPanelCliente(cid){
   var _dato = function(icono, rotulo, valor, extra){
     if(!valor) return '';
     return '<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #F0F0F5">'
-      + '<span style="font-size:14px;width:20px;flex-shrink:0;text-align:center">' + icono + '</span>'
+      + '<span style="font-size:13px;width:20px;flex-shrink:0;text-align:center">' + icono + '</span>'
       + '<div style="flex:1;min-width:0">'
-      +   '<div style="font-size:9.5px;font-weight:800;color:var(--nbs-muted);letter-spacing:.3px">' + rotulo + '</div>'
+      +   '<div style="font-size:10px;font-weight:800;color:var(--nbs-muted);letter-spacing:.3px">' + rotulo + '</div>'
       +   '<div style="font-size:13px;color:var(--nbs-ink);font-weight:600;word-break:break-word">' + valor + '</div>'
       +   (extra || '')
       + '</div></div>';
@@ -15804,7 +15820,7 @@ function pintarPanelCliente(cid){
     + _dato('\ud83d\udd01', 'CADA CU\u00c1NTO LO VISITAS',
         c.intervaloVisitaDias ? 'cada ' + c.intervaloVisitaDias + ' d\u00edas' : '')
     + '<div style="display:flex;gap:8px;padding:7px 0">'
-      + '<span style="font-size:14px;width:20px;flex-shrink:0;text-align:center">\ud83c\udd94</span>'
+      + '<span style="font-size:13px;width:20px;flex-shrink:0;text-align:center">\ud83c\udd94</span>'
       + '<div style="flex:1;min-width:0">'
       +   '<div style="font-size:9.5px;font-weight:800;color:var(--nbs-muted);letter-spacing:.3px">FICHA CREADA</div>'
       +   '<div style="font-size:13px;color:var(--nbs-ink);font-weight:600">'
