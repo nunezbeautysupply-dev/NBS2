@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260809b-OFICIAL-V2.0">
+<meta name="app-version" content="20260811a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15669,9 +15669,16 @@ function togglePanelCl(clave){
 }
 
 // ── Un renglon de la lista ──
+// Un valor para meter DENTRO de un onclick="..." — con comillas SIMPLES.
+// JSON.stringify usa comillas DOBLES y rompe el atributo: el navegador lo corta
+// y el boton no hace nada. Lo cazo Sensei probando los botones del panel. -11 ago-
+function _arg(v){
+  return "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+}
+
 function _filaPanel(clave, icono, texto, detalle, colorDet, contenido){
   var abierto = (_panelAbierto === clave);
-  var h = '<div onclick="togglePanelCl(' + JSON.stringify(clave) + ')" '
+  var h = '<div onclick="togglePanelCl(' + _arg(clave) + ')" '
     + 'style="display:flex;align-items:center;gap:9px;padding:12px 13px;border-bottom:1px solid #EFEFF4;'
     + 'cursor:pointer;background:' + (abierto ? '#F7F7FC' : '#fff') + '">'
     + '<span style="font-size:15px;width:20px;text-align:center;flex-shrink:0">' + icono + '</span>'
@@ -15716,7 +15723,7 @@ function pintarPanelCliente(cid){
           + '<div style="height:6px;background:#EAEAF2;border-radius:3px;margin-top:6px;overflow:hidden">'
           +   '<div style="height:100%;width:' + pct + '%;background:#AD1457"></div></div>'
           + detalleProdsVIP(g, true)
-          + '<button onclick="event.stopPropagation();abrirEntregaPremioVIP(' + JSON.stringify(String(cid)) + ',' + JSON.stringify(String(k)) + ')" '
+          + '<button onclick="event.stopPropagation();abrirEntregaPremioVIP(' + _arg(cid) + ',' + _arg(k) + ')" '
           + 'style="width:100%;margin-top:7px;padding:8px;background:' + (g.gratis>0?'#AD1457':'#fff') + ';color:' + (g.gratis>0?'#fff':'#AD1457') + ';'
           + 'border:' + (g.gratis>0?'none':'1px solid #AD1457') + ';border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">'
           + (g.gratis>0?'\ud83c\udf81 Ya se lo di':'\ud83c\udf81 Darle el premio ahora') + '</button>'
@@ -15739,7 +15746,7 @@ function pintarPanelCliente(cid){
         + '<span style="font-size:11.5px;color:#8D6E00;font-weight:800">te cost\u00f3 $' + fmtNum(x.costo||0) + '</span>'
         + '</div>'
         + '<div style="font-size:11px;color:var(--nbs-muted);margin-top:2px">' + escaparHtml(x.fecha||'') + ' \u00b7 ' + escaparHtml(String(x.nombreGrupo||x.grupo||'')) + '</div>'
-        + '<button onclick="event.stopPropagation();mostrarComprobantePremioVIP(' + JSON.stringify(String(cid)) + ',' + JSON.stringify(String(x.ventaId)) + ')" '
+        + '<button onclick="event.stopPropagation();mostrarComprobantePremioVIP(' + _arg(cid) + ',' + _arg(x.ventaId) + ')" '
         + 'style="width:100%;margin-top:6px;padding:7px;background:#fff;border:1px solid #AD1457;color:#AD1457;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer">\ud83e\uddfe Ver su comprobante</button>'
       );
     }).join('')
@@ -15769,7 +15776,7 @@ function pintarPanelCliente(cid){
         +   (d.hora ? ' \u00b7 ' + escaparHtml(d.hora) : '') + (d.esCambio ? ' \u00b7 cambio de producto' : '') + '</div>'
         + '<div style="margin-top:5px">' + prods + '</div>'
         + (d.nota ? '<div style="font-size:11px;color:var(--nbs-muted);margin-top:4px;font-style:italic">\u201c' + escaparHtml(d.nota) + '\u201d</div>' : '')
-        + '<button onclick="event.stopPropagation();deshacerDevolucion(' + JSON.stringify(String(d.id)) + ')" '
+        + '<button onclick="event.stopPropagation();deshacerDevolucion(' + _arg(d.id) + ')" '
         + 'style="width:100%;margin-top:7px;padding:8px;background:#fff;border:1px solid #96331A;color:#96331A;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">\u21a9\ufe0f Deshacer esta devoluci\u00f3n</button>'
       );
     }).join('');
@@ -15810,6 +15817,137 @@ function pintarPanelCliente(cid){
       D.cadaCuanto ? D.cadaCuanto + ' d\u00edas' : 'hace ' + D.diasDesde + ' d', null, contC);
   }
 
+  // ── 💰 CRÉDITO A FAVOR ──
+  var cred = parseFloat(c.creditoAFavor) || 0;
+  if(cred > 0.005){
+    var contCr = _sub(
+      '<div style="font-size:12.5px;color:var(--nbs-ink);line-height:1.7">'
+      + 'Este cliente tiene <b style="color:var(--nbs-gold-dark)">$' + fmtNum(cred) + '</b> a favor.<br>'
+      + 'Se le puede aplicar a cualquier factura que deba, desde <b>\ud83d\udcb5 Cobrar</b>.'
+      + '</div>'
+    );
+    h += _filaPanel('credito', '\ud83d\udcb0', 'Cr\u00e9dito a favor',
+      '$' + fmtNum(cred), 'var(--nbs-gold-dark)', contCr);
+  }
+
+  // ── 📄 SUS FACTURAS ──
+  if(D.facturas.length){
+    var listaF = D.facturas.slice().sort(function(a,b){
+      var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
+      return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
+    });
+    var contF = listaF.slice(0, 40).map(function(v){
+      var pg = 0;
+      (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
+      var saldo = (parseFloat(v.total) || 0) - pg;
+      var canc = !!v.cancelada;
+      var col = canc ? '#B71C1C' : (esSaldoPendiente(saldo) ? 'var(--nbs-red-text)' : 'var(--nbs-green-text)');
+      return '<div onclick="event.stopPropagation();verFacturaProfesional(' + _arg(v.id) + ')" '
+        + 'style="background:#fff;border-left:3px solid ' + col + ';border-radius:8px;padding:9px 10px;'
+        + 'margin-bottom:5px;cursor:pointer' + (canc ? ';opacity:.7' : '') + '">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+        +   '<div style="flex:1;min-width:0">'
+        +     '<div style="font-size:12.5px;font-weight:700;color:var(--nbs-ink)' + (canc ? ';text-decoration:line-through' : '') + '">'
+        +       escaparHtml(v.fecha || '') + (v.hora ? ' \u00b7 ' + escaparHtml(v.hora) : '') + '</div>'
+        +     '<div style="font-size:10.5px;color:var(--nbs-muted);margin-top:1px">'
+        +       ((v.items || []).length) + ' producto(s) \u00b7 ' + (v.tipo === 'credito' ? 'a cr\u00e9dito' : 'contado')
+        +       (canc ? ' \u00b7 \ud83d\udeab CANCELADA' : '')
+        +       (v.modificada ? ' \u00b7 modificada' : '') + '</div>'
+        +   '</div>'
+        +   '<div style="text-align:right;flex-shrink:0">'
+        +     '<div style="font-size:13px;font-weight:800;color:var(--nbs-ink)">$' + fmtNum(v.total) + '</div>'
+        +     '<div style="font-size:10.5px;font-weight:700;color:' + col + '">'
+        +       (canc ? 'cancelada' : (esSaldoPendiente(saldo) ? 'debe $' + fmtNum(saldo) : 'pagada')) + '</div>'
+        +   '</div>'
+        + '</div></div>';
+    }).join('')
+    + (listaF.length > 40 ? '<div style="font-size:11px;color:var(--nbs-muted);text-align:center;padding:6px">y ' + (listaF.length - 40) + ' m\u00e1s</div>' : '')
+    + '<button onclick="event.stopPropagation();verHistorialCliente(' + _arg(cid) + ',\'completo\')" '
+    + 'style="width:100%;margin-top:6px;padding:9px;background:#1a237e;color:#fff;border:none;border-radius:8px;'
+    + 'font-size:11.5px;font-weight:800;cursor:pointer">\ud83d\udccb Ver historial completo</button>';
+    h += _filaPanel('facturas', '\ud83d\udcc4', 'Sus facturas',
+      String(D.activas.length) + (D.canceladas ? ' + ' + D.canceladas + ' canc.' : ''), null, contF);
+  }
+
+  // ── 📍 VISITAS ──
+  var visitasCont = _sub(
+    '<div style="font-size:12.5px;color:var(--nbs-ink);line-height:1.7">'
+    + (c.ultimaVisitaNegocio
+        ? '\u00daltima visita marcada: <b>' + escaparHtml(String(c.ultimaVisitaNegocio)) + '</b>'
+        : 'Todav\u00eda no le has marcado ninguna visita.')
+    + (c.intervaloVisitaDias ? '<br>Lo visitas cada <b>' + c.intervaloVisitaDias + ' d\u00edas</b>' : '')
+    + '</div>'
+    + '<button onclick="event.stopPropagation();marcarVisitaNegocio(' + _arg(cid) + ')" '
+    + 'style="width:100%;margin-top:7px;padding:9px;background:#00695C;color:#fff;border:none;border-radius:8px;'
+    + 'font-size:11.5px;font-weight:800;cursor:pointer">\ud83d\udccd Marcar visita de hoy</button>'
+  );
+  h += _filaPanel('visitas', '\ud83d\udccd', 'Visitas',
+    c.ultimaVisitaNegocio ? escaparHtml(String(c.ultimaVisitaNegocio).slice(0,10)) : 'ninguna', null, visitasCont);
+
+  // ── 🎁 PROGRAMA DE FIDELIDAD (el de los $400) ──
+  var fid = null;
+  try { fid = calcularFidelidad(c, D.activas); } catch(e){}
+  if(fid && fid.consignacion){
+    h += _filaPanel('consig', '\ud83d\udd01', 'Cuenta de consignaci\u00f3n', 'fuera de programas', '#00695C',
+      _sub('<div style="font-size:12.5px;color:var(--nbs-ink);line-height:1.6">'
+        + 'No entra al Programa de Fidelidad ni al VIP. Son productos dejados para pagar seg\u00fan se vendan.</div>'));
+  } else if(fid){
+    var pctF = Math.min(100, Math.round((fid.total / fid.meta) * 100));
+    var listoF = fid.total >= fid.meta;
+    var contFid = _sub(
+      '<div style="display:flex;justify-content:space-between">'
+      + '<span style="font-size:12.5px;font-weight:800;color:var(--nbs-ink)">Compras de menos de $30</span>'
+      + '<span style="font-size:12.5px;font-weight:800;color:var(--nbs-gold-dark)">$' + fmtNum(fid.total) + ' / $' + fmtNum(fid.meta) + '</span>'
+      + '</div>'
+      + '<div style="height:6px;background:#EAEAF2;border-radius:3px;margin-top:6px;overflow:hidden">'
+      +   '<div style="height:100%;width:' + pctF + '%;background:var(--nbs-gold)"></div></div>'
+      + '<div style="font-size:11px;color:var(--nbs-muted);margin-top:6px;line-height:1.5">'
+      +   'Al llegar a $' + fmtNum(fid.meta) + ', dale un regalo entre $10 y $20 para agradecer su preferencia.'
+      +   (fid.regalosDados ? '<br>Ya le has dado <b>' + fid.regalosDados + '</b> regalo(s).' : '') + '</div>'
+      + '<button onclick="event.stopPropagation();darRegaloFidelidad(' + _arg(cid) + ')" '
+      + 'style="width:100%;margin-top:7px;padding:9px;background:' + (listoF ? 'var(--nbs-gold)' : '#fff') + ';'
+      + 'color:' + (listoF ? '#fff' : 'var(--nbs-gold-dark)') + ';border:' + (listoF ? 'none' : '1px solid var(--nbs-gold)') + ';'
+      + 'border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">\ud83c\udf81 Ya le di el regalo'
+      + (listoF ? '' : ' (a\u00fan no llega a la meta)') + '</button>'
+    );
+    h += _filaPanel('fidelidad', '\ud83c\udf81', 'Programa de Fidelidad',
+      '$' + fmtNum(fid.total) + ' / $' + fmtNum(fid.meta), 'var(--nbs-gold-dark)', contFid);
+  }
+
+  // ── ⚙️ AJUSTES DE ESTE CLIENTE ──
+  var btn = function(txt, fn, bg, col, borde){
+    return '<button onclick="event.stopPropagation();' + fn + '" '
+      + 'style="width:100%;margin-bottom:6px;padding:11px;background:' + bg + ';color:' + (col || '#fff') + ';'
+      + 'border:' + (borde || 'none') + ';border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">'
+      + txt + '</button>';
+  };
+  var contAj = ''
+    + '<div style="font-size:11px;font-weight:800;color:var(--nbs-muted);letter-spacing:.4px;padding:2px 2px 6px">CONTACTO</div>'
+    + _sub('<div style="font-size:12px;color:var(--nbs-ink);line-height:1.8">'
+        + '\ud83d\udcde ' + escaparHtml(c.tel || 'sin tel\u00e9fono') + '<br>'
+        + '\u2709\ufe0f ' + escaparHtml(c.email || 'sin correo') + '<br>'
+        + '\ud83d\udccd ' + escaparHtml(c.dir || 'sin direcci\u00f3n')
+        + (c.ciudad ? ', ' + escaparHtml(c.ciudad) : '')
+        + (c.contacto ? '<br>\ud83d\udc64 Contacto: ' + escaparHtml(c.contacto)
+            + (c.contactoTel ? ' \u00b7 ' + escaparHtml(c.contactoTel) : '') : '')
+        + '</div>')
+    + '<div style="font-size:11px;font-weight:800;color:var(--nbs-muted);letter-spacing:.4px;padding:6px 2px 6px">PROGRAMAS</div>'
+    + btn((c.vipActivo ? '\u2b50 Inscrito en VIP \u2014 Toca para retirar' : '\u2606 Inscribir en programa VIP'),
+          'toggleVIPBtn(this)', (c.vipActivo ? '#AD1457' : '#546E7A'))
+      .replace('<button ', '<button id="btn-vip-cl" data-clid="' + cid + '" ')
+    + btn((c.consignacion ? '\ud83d\udd01 Cuenta de CONSIGNACI\u00d3N' : '\ud83d\udd01 Marcar como cuenta de consignaci\u00f3n'),
+          'toggleConsignacion(this)', (c.consignacion ? '#00695C' : '#ECEFF1'), (c.consignacion ? '#fff' : '#546E7A'))
+      .replace('<button ', '<button id="btn-consig-cl" data-clid="' + cid + '" ')
+    + btn((c.sinServicio ? '\ud83d\udeab SIN SERVICIO \u2014 toca para volver a atenderlo' : '\ud83d\udeab Ya no le doy servicio'),
+          'toggleSinServicio(this)', (c.sinServicio ? '#B71C1C' : '#ECEFF1'), (c.sinServicio ? '#fff' : '#546E7A'))
+      .replace('<button ', '<button id="btn-sinserv-cl" data-clid="' + cid + '" ')
+    + '<div style="font-size:11px;font-weight:800;color:var(--nbs-muted);letter-spacing:.4px;padding:6px 2px 6px">ADMINISTRAR</div>'
+    + btn('\u270f\ufe0f Editar cliente', 'editarCl(' + cid + ')', '#1565C0')
+    + btn('\ud83d\udcb2 Precios especiales de este cliente', 'abrirPreciosPersonalizados(' + cid + ')', '#00695C')
+    + btn('\ud83d\udcb0 Agregar balance inicial', 'agregarBalanceInicial(' + cid + ')', '#6A1B9A')
+    + btn('\ud83d\uddd1\ufe0f Eliminar cliente', 'eliminarCl(' + cid + ')', '#fff', '#B71C1C', '1px solid #B71C1C');
+  h += _filaPanel('ajustes', '\u2699\ufe0f', 'Ajustes', '', null, contAj);
+
   // ── 💵 LO QUE TE DEJA ──
   if(D.comprado > 0){
     var contG = _sub(
@@ -15829,252 +15967,77 @@ function pintarPanelCliente(cid){
 }
 
 function verCl(id){
-  clientes=LS('ncl',[]);
-  var c=clientes.find(function(x){return String(x.id)===String(id);});if(!c)return;
-  // Aviso EN EL MOMENTO si hay otra copia de este mismo cliente -pedido por Sensei el 25
-  // jul, tras preguntarle un cliente cuanto debia y la app decir $0.00 estando su deuda
-  // real escondida en una copia duplicada-.
-  var posiblesDup = posiblesDuplicadosDe(c, clientes);
-  ventas=LS('nv',[]);creditos=LS('ncr',[]);
-  var todasVentas=ventas.filter(function(v){return String(v.cid)===String(id);});
-  var ventasActivas=todasVentas.filter(function(v){return !v.cancelada;});
-  var totalCompras=ventasActivas.reduce(function(s,v){return s+v.total;},0);
-  // Calculate real balance from invoice payments (excluding cancelled)
-  var totalPagado=ventasActivas.filter(function(v){return v.tipo==='credito';}).reduce(function(s,v){
-    var pf=v.pagosFactura?(v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(sp,p){return sp+p.monto;},0):0;
-    return s+pf;
-  },0);
-  var totalCredito=ventasActivas.filter(function(v){return v.tipo==='credito';}).reduce(function(s,v){return s+v.total;},0);
-  var balancePendiente=Math.max(0,totalCredito-totalPagado);
-  var cr=balancePendiente>0?{saldo:balancePendiente}:null;
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(id); });
+  if(!c) return;
+  ventas = LS('nv', []); creditos = LS('ncr', []);
 
-  var el=document.getElementById('cl-perfil-contenido');el.innerHTML='';
-  // De quien es el perfil abierto, para que el panel compacto sepa a quien repintar
+  // Al cambiar de cliente, todos los renglones arrancan cerrados
   if(String(window._clientePerfilActual) !== String(id)) _panelAbierto = null;
   window._clientePerfilActual = id;
 
-  // Header
-  var header=document.createElement('div');
-  header.className='card';
-  var etiquetaTipo = etiquetaTipoNegocio(c);
-  var esNoBarberia = c.tipoNegocio && c.tipoNegocio !== 'Barberia';
-  var infoVisita = '';
-  if(esNoBarberia && c.intervaloVisitaDias){
-    var diasDesde = c.ultimaVisitaNegocio ? Math.floor((new Date() - parsearFechaVenta(c.ultimaVisitaNegocio)) / 86400000) : null;
-    var diasFaltan = diasDesde === null ? null : (c.intervaloVisitaDias - diasDesde);
-    var textoVisita = !c.ultimaVisitaNegocio ? 'Nunca marcada — toca abajo cuando la visites'
-      : (diasFaltan <= 0 ? '🔔 Ya toca visitar (hace '+diasDesde+' día(s) desde la última vez)' : 'Próxima visita en '+diasFaltan+' día(s)');
-    infoVisita = '<div style="background:'+(diasFaltan!==null&&diasFaltan<=0?'#FFEBEE':'#E3F2FD')+';border-radius:8px;padding:10px;grid-column:span 2">'
-      +'<div style="font-size:10px;color:#aaa;font-weight:700">🔔 RECORDATORIO DE VISITA (cada '+c.intervaloVisitaDias+' días)</div>'
-      +'<div style="font-size:13px;margin-top:2px;color:'+(diasFaltan!==null&&diasFaltan<=0?'#C62828':'#1565C0')+';font-weight:600">'+textoVisita+'</div>'
-      +'</div>';
-  }
-  // Record de visitas: cuantas veces compro y cuantas veces se le visito pero no compro
-  // -esto ultimo se registra con la ✕ del barbero en Pedidos Rapidos-.
-  var visitasB = LS('nvisitas_barberos', {})[String(id)] || {};
-  var vCompro = (visitasB.compro || []).length;
-  var vNoCompro = (visitasB.noCompro || []).length;
-  var vTotal = vCompro + vNoCompro;
-  var recordVisitasHtml = '';
-  if(vTotal > 0){
-    var pctCompra = Math.round(vCompro / vTotal * 100);
-    recordVisitasHtml = '<div style="background:#f5f5f5;border-radius:8px;padding:10px;grid-column:span 2">'
-      +'<div style="font-size:10px;color:#aaa;font-weight:700">📊 RÉCORD DE VISITAS</div>'
-      +'<div style="display:flex;align-items:center;gap:12px;margin-top:5px;flex-wrap:wrap">'
-      +'<span style="font-size:14px;font-weight:700;color:#2E7D32">✓ '+vCompro+' compró</span>'
-      +'<span style="font-size:14px;font-weight:700;color:#C62828">✕ '+vNoCompro+' no compró</span>'
-      +'<span style="font-size:12px;color:#888;margin-left:auto">'+pctCompra+'% de '+vTotal+' visita(s)</span>'
-      +'</div></div>';
-  }
-  header.innerHTML='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
-    +(c.foto ? '<div style="width:56px;height:56px;border-radius:50%;overflow:hidden;flex-shrink:0"><img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover"></div>' : '<div class="av" style="width:56px;height:56px;font-size:20px">'+ini(c.nombre,c.apellido)+'</div>')
-    +'<div><div style="font-size:22px;font-weight:700">'+escaparHtml(nombreCl(c))+'</div>'
-    +'<div style="font-size:13px;color:#aaa">'+(c.negocio?escaparHtml(c.negocio):'Cliente individual')+'</div>'
-    +'<div style="font-size:11px;color:var(--nbs-gold-dark);font-weight:700;margin-top:2px">'+etiquetaTipo+'</div></div></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">TELEFONO</div><div style="font-size:14px;margin-top:2px">'+escaparHtml(c.tel||'N/A')+'</div></div>'
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">EMAIL</div><div style="font-size:14px;margin-top:2px">'+escaparHtml(c.email||'N/A')+'</div></div>'
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px;grid-column:span 2"><div style="font-size:10px;color:#aaa;font-weight:700">DIRECCION</div><div style="font-size:14px;margin-top:2px">'+escaparHtml((c.dir||'')+(c.ciudad?', '+c.ciudad:'')+(c.estado?', '+c.estado:'')+(c.zip?' '+c.zip:''))+((!c.dir&&!c.ciudad&&!c.estado)?'N/A':'')+'</div></div>'
-    +((c.contacto||c.contactoTel) ? '<div style="background:#F5F5F5;border-radius:8px;padding:10px;grid-column:span 2"><div style="font-size:10px;color:#aaa;font-weight:700">📇 CONTACTO ADICIONAL</div><div style="font-size:14px;margin-top:2px">'+escaparHtml(c.contacto||'Sin nombre')+(c.contactoApodo?' "'+escaparHtml(c.contactoApodo)+'"':'')+(c.contactoTel?' · '+escaparHtml(c.contactoTel):'')+'</div></div>' : '')
-    +infoVisita
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">TOTAL COMPRAS</div><div style="font-size:18px;font-weight:700;color:#1565C0;margin-top:2px">$'+fmtNum(totalCompras)+'</div></div>'
-    +'<div style="background:'+(cr?'#FFEBEE':'#f5f5f5')+';border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">BALANCE PENDIENTE</div><div style="font-size:18px;font-weight:700;color:'+(cr?'#C62828':'#2E7D32')+';margin-top:2px">'+(cr?'$'+fmtNum(cr.saldo):'$0.00')+'</div></div>'
-    // La tarjeta del CREDITO A FAVOR faltaba aqui -en el PERFIL PRINCIPAL del cliente-.
-    // Solo estaba en la pantalla de Historial, nunca en este perfil (24 jul, hallazgo
-    // al revisar a fondo por pedido de Sensei).
-    +(c.creditoAFavor && c.creditoAFavor > 0.005 ? '<div style="background:#FFF3E0;border-radius:8px;padding:10px;grid-column:span 2"><div style="font-size:10px;color:#E65100;font-weight:700">💰 CRÉDITO A FAVOR</div><div style="font-size:18px;font-weight:700;color:#E65100;margin-top:2px">($'+fmtNum(c.creditoAFavor)+')</div></div>' : '')
-    +recordVisitasHtml
-    +'</div>'
-    +(posiblesDup.length ? '<div style="background:#FFF3E0;border:2px solid #F9A825;border-radius:10px;padding:12px;margin-bottom:10px">'
-      +'<div style="font-size:13px;font-weight:800;color:#8a6d00;margin-bottom:6px">\u26a0\ufe0f \u00bfEs la misma persona que...?</div>'
-      +posiblesDup.map(function(d){
-        return '<div onclick="verCl(\''+d.id+'\')" style="background:white;border-radius:8px;padding:8px 10px;margin-bottom:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
-          +'<span style="font-size:13px;color:#555">'+escaparHtml(nombreCl(d))+(d.negocio?' \u00b7 '+escaparHtml(d.negocio):'')+'</span>'
-          +'<span style="font-size:11px;color:#1565C0;font-weight:700">Ver \u203a</span></div>';
-      }).join('')
-      +'<div style="font-size:11px;color:#8a6d00;margin-top:4px">Tienen el mismo nombre o tel\u00e9fono. Si es la misma persona, usa "Eliminar clientes duplicados" en el men\u00fa de Clientes para juntar su historial y su deuda en un solo lugar.</div>'
-      +'</div>' : '')
-    +(esNoBarberia && c.intervaloVisitaDias ? '<button class="btn" style="background:#1565C0;color:white;margin-bottom:8px" onclick="marcarVisitaNegocio('+id+');verCl('+id+')">✓ Marqué la visita de hoy</button>' : '')
-    +'<div style="display:flex;gap:8px">'
-    +'<button class="btn" style="flex:1;background:#1565C0;color:white;margin:0" onclick="editarCl('+id+')">✏️ Editar cliente</button>'
-    +'<button class="btn" style="flex:1;background:#D32F2F;color:white;margin:0" onclick="eliminarCl('+id+')">🗑️ Eliminar</button>'
-    +'</div>'
-    +'<div style="display:flex;gap:8px;margin-bottom:0">'
-    +'<button class="btn" style="flex:1;background:#2E7D32;color:white;margin:0" onclick="irAVenderCliente('+id+')">🧾 Vender</button>'
-    +'<button class="btn" style="flex:1;background:var(--nbs-gold);color:white;margin:0" onclick="irACobrarCliente('+id+')">💵 Aplicar pago</button>'
-    +'<button class="btn" style="flex:1;background:#F9A825;color:#1a1a1a;margin:0" onclick="irAPedidoCliente('+id+')">⚡ Pedido rápido</button>'
-    +'</div>'
-    +'<button class="btn" style="background:#6A1B9A;color:white" onclick="agregarBalanceInicial('+id+')">💰 Agregar balance inicial</button>'
-    +'<button class="btn" id="btn-vip-cl" style="background:'+(c.vipActivo?'#AD1457':'#546E7A')+';color:white" data-clid="'+id+'" onclick="toggleVIPBtn(this)">'+(c.vipActivo?'⭐ Inscrito en VIP — Toca para retirar':'☆ Inscribir en programa VIP')+'</button>'
-    // Cuenta de CONSIGNACION: productos dejados para que se paguen segun se vendan.
-    // Esas no son compras del barbero, asi que NO cuentan para el VIP. -5 ago, Sensei-
-    +'<button class="btn" id="btn-consig-cl" style="background:'+(c.consignacion?'#00695C':'#ECEFF1')+';color:'+(c.consignacion?'white':'#546E7A')+';margin-top:6px" data-clid="'+id+'" onclick="toggleConsignacion(this)">'
-    +(c.consignacion?'🔁 Cuenta de CONSIGNACIÓN — no cuenta para VIP':'🔁 Marcar como cuenta de consignación')+'</button>'
-    // Barberos que se mudaron de barberia y ya no reciben servicio. -8 ago-
-    +'<button class="btn" id="btn-sinserv-cl" style="background:'+(c.sinServicio?'#B71C1C':'#ECEFF1')+';color:'+(c.sinServicio?'white':'#546E7A')+';margin-top:6px" data-clid="'+id+'" onclick="toggleSinServicio(this)">'
-    +(c.sinServicio?'🚫 SIN SERVICIO — toca para volver a atenderlo':'🚫 Ya no le doy servicio')+'</button>'
-    +(function(){
-      // Detalle VIP visible de una vez en el perfil -antes solo se veia entrando a Historial Completo-
-      if(!c.vipActivo) return '';
-      var vipDet = calcVIP(id);
-      var keysDet = Object.keys(vipDet);
-      if(!keysDet.length) return '<div style="background:#FCE4EC;border-radius:10px;padding:10px;margin-bottom:8px;font-size:12px;color:#777">⭐ Inscrito en VIP, sin compras VIP registradas todavía.</div>';
-      return '<div style="background:#FCE4EC;border-radius:10px;padding:10px;margin-bottom:8px">'
-        +keysDet.map(function(k){
-          var v = vipDet[k];
-          var pct = Math.min(100, Math.round((v.progreso/VIP_META)*100));
-          var colorDet = v.gratis>0 ? '#AD1457' : '#C2185B';
-          return '<div style="margin-bottom:6px">'
-            +'<div style="display:flex;justify-content:space-between;font-size:12px;color:#333;margin-bottom:2px"><span style="font-weight:600">'+escaparHtml(v.nombre)+'</span><span style="font-weight:700;color:'+colorDet+'">'+v.progreso+'/'+VIP_META+(v.gratis>0?' 🎁x'+v.gratis:'')+'</span></div>'
-            +'<div style="height:6px;background:white;border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+colorDet+'"></div></div>'
-            // Los productos exactos, con su nombre COMPLETO -7 ago-
-            +detalleProdsVIP(v, true)
-            // Y el boton de entregar el premio, aqui mismo en la ficha: asi no hay que ir
-            // hasta la pantalla del VIP para darselo. -6 ago-
-            +'<button onclick="event.stopPropagation();abrirEntregaPremioVIP('+JSON.stringify(String(id))+','+JSON.stringify(String(k))+')" '
-            +'style="width:100%;margin-top:6px;padding:7px;background:'+(v.gratis>0?'#AD1457':'#fff')+';color:'+(v.gratis>0?'#fff':'#AD1457')+';'
-            +'border:'+(v.gratis>0?'none':'1px solid #AD1457')+';border-radius:7px;font-size:11.5px;font-weight:800;cursor:pointer">'
-            +(v.gratis>0?'\ud83c\udf81 Ya se lo di':'\ud83c\udf81 Darle el premio ahora')+'</button>'
-            +'</div>';
-        }).join('')
-        +'</div>';
-    })()
-    // ═══ EL RECORD DE PREMIOS, EN SU FICHA ═══
-    // Sensei: "si entro en el perfil de un cliente deberia estar eso como parte de su
-    // record, asi veo de una vez como va su record completo incluyendo los regalos VIP".
-    +(function(){
-      var canjes = c.vipCanjes || [];
-      if(!canjes.length) return '';
-      var totalC = canjes.reduce(function(a,x){ return a + (parseFloat(x.costo)||0); }, 0);
-      return '<div style="background:#FFF8E1;border:1.5px solid #F9A825;border-radius:10px;padding:10px;margin-bottom:8px">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
-        +   '<span style="font-size:11px;font-weight:800;color:#8D6E00;letter-spacing:.4px">\ud83c\udf81 PREMIOS QUE LE HAS DADO (' + canjes.length + ')</span>'
-        +   '<span style="font-size:11px;color:#8D6E00">te costaron $' + fmtNum(totalC) + '</span>'
-        + '</div>'
-        + canjes.slice(-5).reverse().map(function(x){
-            return '<div onclick="event.stopPropagation();mostrarComprobantePremioVIP(' + JSON.stringify(String(id)) + ',' + JSON.stringify(String(x.ventaId)) + ')" '
-              + 'style="display:flex;justify-content:space-between;align-items:center;background:#fff;'
-              + 'border-radius:7px;padding:7px 9px;margin-bottom:4px;cursor:pointer">'
-              + '<div style="flex:1;min-width:0">'
-              +   '<div style="font-size:12px;font-weight:700;color:var(--nbs-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
-              +     escaparHtml(String(x.producto || '').slice(0,34)) + (x.anticipado ? ' \u2733\ufe0f' : '') + '</div>'
-              +   '<div style="font-size:10px;color:#999">' + escaparHtml(x.fecha || '') + ' \u00b7 '
-              +     escaparHtml(String(x.nombreGrupo || x.grupo || '').slice(0,22)) + '</div>'
-              + '</div>'
-              + '<span style="font-size:10.5px;color:#AD1457;font-weight:800;flex-shrink:0">ver \u203a</span>'
-              + '</div>';
-          }).join('')
-        + (canjes.some(function(x){ return x.anticipado; })
-            ? '<div style="font-size:10px;color:#8D6E00;margin-top:2px">\u2733\ufe0f = se lo diste antes de que completara</div>' : '')
-        + '</div>';
-    })()
-    +'<button class="btn" style="background:#1a237e;color:white" onclick="verHistorialCliente('+id+',\'completo\')">📋 Ver historial completo -pagos, facturas, VIP, visitas</button>'
-    +'<button class="btn" style="background:#00695C;color:white" onclick="abrirPreciosPersonalizados('+id+')">💲 Precios especiales de este cliente</button>';
-  el.appendChild(header);
+  var el = document.getElementById('cl-perfil-contenido');
+  el.innerHTML = '';
 
-  // ═══ EL PANEL COMPACTO — todo lo del cliente, en renglones desplegables ═══
-  // Va DESPUES de la cabecera y ANTES de lo que ya habia. Nada de lo viejo se toca:
-  // el credito a favor, el record de visitas, la fidelidad y sus facturas siguen
-  // exactamente donde estaban. -9 ago 2026-
-  var panelWrap = document.createElement('div');
-  panelWrap.id = 'cl-panel-completo';
-  panelWrap.style.cssText = 'background:#fff;border-radius:13px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.09)';
-  el.appendChild(panelWrap);
+  var D = datosDelCliente(id);
+  var ini = (nombreCl(c) || '?').split(' ').map(function(p){ return p.charAt(0); })
+              .join('').slice(0,2).toUpperCase();
+
+  // ══════════ LA CABECERA ══════════
+  var cab = document.createElement('div');
+  cab.className = 'card';
+  var h = '<div style="display:flex;align-items:center;gap:11px">'
+    + '<div style="width:46px;height:46px;border-radius:12px;background:#1a237e;color:#fff;'
+    +   'display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;flex-shrink:0">'
+    +   escaparHtml(ini) + '</div>'
+    + '<div style="flex:1;min-width:0">'
+    +   '<div style="font-size:17px;font-weight:800;color:var(--nbs-ink);line-height:1.2;overflow:hidden;text-overflow:ellipsis">'
+    +     escaparHtml(nombreCl(c)) + '</div>'
+    +   '<div style="font-size:12px;color:var(--nbs-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+    +     (c.negocio ? '\ud83c\udfea ' + escaparHtml(c.negocio) : etiquetaTipoNegocio(c))
+    +     (c.tel ? ' \u00b7 \ud83d\udcde ' + escaparHtml(c.tel) : '') + '</div>'
+    + '</div></div>';
+
+  // Aviso si hay otra copia de este mismo cliente
+  var dups = posiblesDuplicadosDe(c, clientes);
+  if(dups && dups.length){
+    h += '<div style="background:var(--nbs-red-bg);border-radius:9px;padding:9px;margin-top:9px;'
+      + 'font-size:12px;color:var(--nbs-red-text);font-weight:700">'
+      + '\u26a0\ufe0f Hay otra ficha parecida a esta: ' + escaparHtml(nombreCl(dups[0]))
+      + '. Su deuda podr\u00eda estar repartida entre las dos.</div>';
+  }
+
+  // Los cuatro números
+  var n = function(t, v, col){
+    return '<div style="flex:1;background:#F5F5F9;border-radius:10px;padding:8px 4px;text-align:center;min-width:0">'
+      + '<div style="font-size:9px;font-weight:800;color:var(--nbs-muted);letter-spacing:.3px">' + t + '</div>'
+      + '<div style="font-size:14.5px;font-weight:900;margin-top:2px;color:' + (col || 'var(--nbs-ink)') + ';'
+      +   'overflow:hidden;text-overflow:ellipsis">' + v + '</div></div>';
+  };
+  h += '<div style="display:flex;gap:6px;margin-top:12px">'
+    + n('COMPR\u00d3', '$' + fmtNum(D.comprado))
+    + n('DEBE', '$' + fmtNum(D.debe), D.debe > 0.005 ? 'var(--nbs-red-text)' : 'var(--nbs-ink)')
+    + n('TE DEJA', '$' + fmtNum(D.ganancia), 'var(--nbs-green-text)')
+    + n('\u00daLTIMA', D.diasDesde === null ? '\u2014' : (D.diasDesde + ' d'))
+    + '</div>';
+
+  // Los tres botones de siempre
+  h += '<div style="display:flex;gap:6px;margin-top:11px">'
+    + '<button class="btn" style="flex:1;margin:0;background:#6A1B9A;color:#fff;padding:11px 4px;font-size:12.5px" onclick="irAPedidoCliente(' + id + ')">\u26a1 Pedido</button>'
+    + '<button class="btn" style="flex:1;margin:0;background:#00695C;color:#fff;padding:11px 4px;font-size:12.5px" onclick="irACobrarCliente(' + id + ')">\ud83d\udcb5 Cobrar</button>'
+    + '<button class="btn" style="flex:1;margin:0;background:#1565C0;color:#fff;padding:11px 4px;font-size:12.5px" onclick="irAVenderCliente(' + id + ')">\ud83e\uddfe Vender</button>'
+    + '</div>';
+  cab.innerHTML = h;
+  el.appendChild(cab);
+
+  // ══════════ LA LISTA COMPACTA ══════════
+  var panel = document.createElement('div');
+  panel.id = 'cl-panel-completo';
+  panel.style.cssText = 'background:#fff;border-radius:13px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.09)';
+  el.appendChild(panel);
   try { pintarPanelCliente(id); } catch(ePanel){}
 
-  // Programa de Fidelidad (compras generales de productos menores a $30)
-  // Las cuentas de CONSIGNACION no entran, asi que el recuadro ni se dibuja: si no,
-  // se veria una barra en $0 que no significa nada. -6 ago, lo cazo Sensei-
-  var fidelidad = calcularFidelidad(c, ventasActivas);
-  // ⚠️ SIN `return`: despues de este bloque vienen LAS FACTURAS del cliente, y con un
-  // return se le esconderian. Solo se salta el recuadro de fidelidad. -6 ago-
-  if(fidelidad.consignacion){
-    var avisoCons = document.createElement('div');
-    avisoCons.className = 'card';
-    avisoCons.style.cssText = 'border-left:4px solid #00695C';
-    avisoCons.innerHTML = '<div style="font-size:12.5px;font-weight:700;color:#00695C">\U0001F501 Cuenta de consignaci\u00f3n</div>'
-      + '<div style="font-size:11.5px;color:var(--nbs-muted);margin-top:3px;line-height:1.45">'
-      + 'No entra al Programa de Fidelidad ni al VIP. Son productos dejados para pagar seg\u00fan se vendan.</div>';
-    el.appendChild(avisoCons);
-  }
-  var fidCard = document.createElement('div');
-  fidCard.className = 'card';
-  fidCard.style.cssText = 'border-left:4px solid var(--nbs-gold)';
-  var pctFid = Math.min(100, Math.round((fidelidad.total/fidelidad.meta)*100));
-  var listo = fidelidad.total >= fidelidad.meta;
-  fidCard.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
-    +'<span style="font-size:13px;font-weight:700;color:var(--nbs-ink)">🎁 Programa de Fidelidad</span>'
-    +'<span style="font-size:12px;font-weight:700;color:var(--nbs-gold-dark)">$'+fmtNum(fidelidad.total)+' / $'+fmtNum(fidelidad.meta)+'</span>'
-    +'</div>'
-    +'<div style="height:8px;background:#F0F0F2;border-radius:4px;overflow:hidden;margin-bottom:6px">'
-    +'<div style="height:100%;width:'+pctFid+'%;background:'+(listo?'var(--nbs-green-text)':'var(--nbs-gold)')+';border-radius:4px" class="barra-brillo"></div></div>'
-    +'<div style="font-size:11px;color:var(--nbs-muted);margin-bottom:10px">Suma compras de productos menores a $30. Al llegar a $'+fmtNum(fidelidad.meta)+', dale un regalo entre $10 y $20 para agradecer su preferencia.'+(fidelidad.regalosDados>0?' · '+fidelidad.regalosDados+' regalo(s) dado(s) antes.':'')+'</div>'
-    +'<button onclick="darRegaloFidelidad(\''+id+'\')" style="width:100%;padding:10px;background:'+(listo?'var(--nbs-gold)':'#F0F0F2')+';color:'+(listo?'white':'var(--nbs-muted)')+';border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🎁 Ya le di el regalo'+(listo?'':' (aún no llega a la meta)')+'</button>';
-  if(!fidelidad.consignacion) el.appendChild(fidCard);
-
-  // Invoices
-  if(todasVentas.length){
-    var tit=document.createElement('div');
-    tit.style.cssText='font-size:13px;font-weight:700;color:#1a237e;text-transform:uppercase;margin-bottom:10px';
-    tit.textContent='Historial de facturas ('+todasVentas.length+')';
-    el.appendChild(tit);
-
-    todasVentas.slice().reverse().forEach(function(v){
-      var pagado=v.pagosFactura?(v.pagosFactura || []).filter(function(p){return p.monto!==undefined&&typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0):0;
-      var saldo=Math.max(0,v.total-pagado);
-      var card=document.createElement('div');
-      card.className='card';
-      card.style.cursor='pointer';
-      if(v.cancelada){
-        card.style.borderLeft='4px solid #B71C1C';
-        card.style.opacity='0.7';
-        card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center">'
-          +'<div><div style="font-size:14px;font-weight:700;text-decoration:line-through;color:#aaa">'+v.fecha+' - '+v.hora+'</div>'
-          +'<div style="font-size:12px;color:#aaa;margin-top:2px">'+(v.items || []).length+' producto(s)</div>'
-          +'<div style="margin-top:4px"><span style="font-size:13px;padding:3px 9px;border-radius:10px;font-weight:600;background:#FFEBEE;color:#B71C1C">🚫 Cancelada</span></div></div>'
-          +'<div style="text-align:right"><div style="font-size:18px;font-weight:700;color:#aaa;text-decoration:line-through">$'+fmtNum(v.total)+'</div></div></div>';
-      } else {
-        card.style.borderLeft='4px solid '+(v.tipo==='credito'?(esSaldoPendiente(saldo)?'#C62828':'#2E7D32'):'#1565C0');
-        card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center">'
-          +'<div><div style="font-size:14px;font-weight:700">'+v.fecha+(v.hora?' - '+v.hora:'')+'</div>'
-          +'<div style="font-size:12px;color:#aaa;margin-top:2px">'+(v.items || []).length+' producto(s)'+(v.modificada?' · <span style="color:#E65100">Modificada</span>':'')+'</div>'
-          +'<div style="margin-top:4px"><span style="font-size:16px;padding:4px 11px;border-radius:10px;font-weight:600;'+(v.tipo==='credito'?'background:#FFF8E1;color:#E65100':'background:#E8F5E9;color:#2E7D32')+'">'+(v.tipo==='credito'?'a credito':v.tipo)+'</span></div></div>'
-          +'<div style="text-align:right">'
-          +'<div style="font-size:18px;font-weight:700;color:#1565C0">$'+fmtNum(v.total)+'</div>'
-          +(v.tipo==='credito'?'<div style="font-size:12px;color:'+(esSaldoPendiente(saldo)?'#C62828':'#2E7D32')+'">'+(esSaldoPendiente(saldo)?'Debe: $'+fmtNum(saldo):'Pagado')+'</div>':'')
-          +'</div></div>';
-      }
-      card.onclick=(function(venta){return function(){verFacturaProfesional(venta.id);};})(v);
-      el.appendChild(card);
-    });
-  } else {
-    var noVentas=document.createElement('div');
-    noVentas.className='card';
-    noVentas.innerHTML='<p style="color:#aaa;text-align:center;padding:10px">Sin facturas aun</p>';
-    el.appendChild(noVentas);
-  }
-
-  // Show profile page (usando ir() para que el historial de navegacion funcione correctamente)
+  // Show profile page (usando ir() para que el historial de navegacion funcione)
   ir('p-cl-perfil');
 }
 
