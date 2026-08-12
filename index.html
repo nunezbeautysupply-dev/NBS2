@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260811f-OFICIAL-V2.0">
+<meta name="app-version" content="20260812a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4308,30 +4308,141 @@ function _estaAbierto(id){
   catch(e){ return el.style.display === 'block'; }
 }
 
-function volverAtras(){
-  var actual = pantallaActual();
 
-  // 1) ¿Hay una subvista abierta en esta pantalla? Se cierra ESA primero.
-  var pasos = PASOS_ATRAS[actual];
-  if(pasos){
-    for(var i = 0; i < pasos.length; i++){
-      if(_estaAbierto(pasos[i].wrap)){
-        var hecho = pasos[i].volver();
-        if(hecho !== false) subirPantalla();
-        return;                       // aunque diga que no, no se sale de la pantalla
+// ═══════════════════════════════════════════════════════════════════
+//  LA ESCALERA DE ATRÁS  (12 ago 2026)
+//  Un toque = un peldaño. Los dos botones —el de la app y el del
+//  teléfono— llaman a `unPasoAtras()`, así hacen exactamente lo mismo.
+// ═══════════════════════════════════════════════════════════════════
+
+// Los recuadros que se abren ENCIMA de la pantalla. El de más arriba
+// primero. Cada uno dice cómo se cierra; si no lo dice, se esconde.
+var RECUADROS_ENCIMA = [
+  { id: 'crop-foto-overlay' },
+  { id: 'firma-canvas-overlay' },
+  { id: 'firma-overlay' },
+  { id: 'firma-pregunta-overlay' },
+  { id: 'foto-visor-overlay' },
+  { id: 'foto-acciones-overlay' },
+  { id: 'scanner-overlay' },
+  { id: 'fact-edit-total-box' },
+  { id: 'fact-acciones-overlay' },
+  { id: 'fact-edit-overlay',        cerrar: 'cerrarEdicionFactura' },
+  { id: 'editor-pago-overlay',      cerrar: 'cerrarEditorPago' },
+  { id: 'devolucion-overlay',       cerrar: 'cerrarDevolucion' },
+  { id: 'giftvip-ov' },
+  { id: 'premvip-ov' },
+  { id: 'factura-view-overlay',     cerrar: 'cerrarFacturaView' },
+  { id: 'factura-ov' },
+  { id: 'precios-esp-overlay' },
+  { id: 'historial-costo-overlay' },
+  { id: 'historial-overlay',        cerrar: 'cerrarHistorial' },
+  { id: 'difprod-ov' },
+  { id: 'prod-nuevo-ov' },
+  { id: 'buscar-prod-ov' },
+  { id: 'compra-edit-overlay' },
+  { id: 'descartar-compra-ov' },
+  { id: 'cxp-form-overlay' },
+  { id: 'sup-edit-overlay' },
+  { id: 'relvan-ov',                cerrar: 'cerrarRellenarVan' },
+  { id: 'van-cargar-overlay',       cerrar: 'cerrarCargarVan' },
+  { id: 'diacxc-ov' },
+  { id: 'topclientes-ov' },
+  { id: 'recvis-ov' },
+  { id: 'visitas-negocios-overlay' },
+  { id: 'comparar-ruta-ov' },
+  { id: 'cargando-ruta-ov' },
+  { id: 'integridad-ov' },
+  { id: 'diagnostico-fechas-overlay' },
+  { id: 'diagnostico-direcciones-overlay' },
+  { id: 'backup-texto-overlay' },
+  { id: 'backup-overlay' },
+  { id: 'printer-config-overlay' },
+  { id: 'print-overlay' },
+  { id: 'reporte-acciones-overlay' },
+  { id: 'fidelidad-popup-overlay' },
+  { id: 'ayuda-overlay',            cerrar: 'cerrarAyuda' },
+  { id: 'logatras-ov' },
+  { id: 'aviso-ov' }
+];
+
+function _estaVisible(id){
+  var el = document.getElementById(id);
+  if(!el) return false;
+  try {
+    var st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  } catch(e){ return el.style.display === 'block' || el.style.display === 'flex'; }
+}
+
+// ¿Hay un recuadro abierto? Se cierra el de más arriba y se dice que sí.
+function cerrarRecuadroDeArriba(){
+  for(var i = 0; i < RECUADROS_ENCIMA.length; i++){
+    var r = RECUADROS_ENCIMA[i];
+    if(!_estaVisible(r.id)) continue;
+    if(r.cerrar && typeof window[r.cerrar] === 'function'){
+      try { window[r.cerrar](); } catch(e){ var e1 = document.getElementById(r.id); if(e1) e1.style.display = 'none'; }
+    } else {
+      var el = document.getElementById(r.id);
+      if(el){
+        // Los que se crean al vuelo se quitan; los que viven en el HTML solo se esconden.
+        if(el.parentNode && el.getAttribute('data-fijo') !== '1' && /-ov$/.test(r.id)) el.parentNode.removeChild(el);
+        else el.style.display = 'none';
       }
     }
+    return true;
   }
+  return false;
+}
 
-  // 2) Si no hay ninguna abierta, se sale de la pantalla como siempre.
-  // Este es el MISMO codigo que tenia la version anterior — no se cambia.
-  if(historialPantallas.length){
+// ═══ UN SOLO PASO ATRÁS ═══
+// La usan LOS DOS botones: el de la app y el del telefono.
+function unPasoAtras(){
+  // Peldaño 0 — el menú lateral, que tapa todo
+  try {
+    if(typeof menuLateralAbierto === 'function' && menuLateralAbierto()){
+      cerrarMenuLateral();
+      return true;
+    }
+  } catch(e){}
+
+  // Peldaño 1 — un recuadro abierto encima
+  try { if(cerrarRecuadroDeArriba()) return true; } catch(e){}
+
+  // Peldaño 2 — una subvista dentro de la pantalla
+  try {
+    var actual = pantallaActual();
+    var pasos = PASOS_ATRAS[actual];
+    if(pasos){
+      for(var i = 0; i < pasos.length; i++){
+        if(_estaAbierto(pasos[i].wrap)){
+          var hecho = pasos[i].volver();
+          if(hecho !== false) subirPantalla();
+          return true;   // aunque diga que no: NO se sale de la pantalla
+        }
+      }
+    }
+  } catch(e){}
+
+  // Peldaño 3 — la pantalla anterior
+  if(historialPantallas && historialPantallas.length){
     var prev = historialPantallas.pop();
     ir(prev, true);
-  } else {
-    // Termina en el Inicio, que es donde de verdad empieza la app -22 jul 2026-.
-    ir('p-inicio', true);
+    return true;
   }
+
+  // Ya no hay a dónde: solo si no estamos en el Inicio
+  if(pantallaActual() !== 'p-inicio'){
+    ir('p-inicio', true);
+    return true;
+  }
+  return false;   // de aqui no se puede retroceder mas
+}
+
+function volverAtras(){
+  // 🔑 EL BOTON DE LA APP Y EL DEL TELEFONO HACEN LO MISMO: los dos llaman a
+  // `unPasoAtras()`. UN TOQUE = UN PELDAÑO. Nunca dos. -Sensei, 12 ago-
+  unPasoAtras();
 }
 
 // Para que nunca se vuelva a quedar una subvista sin cubrir: esto avisa en la consola
@@ -20941,67 +21052,33 @@ window.addEventListener('popstate', function(){
            +(_saliendoApp?' | SALIENDO':''));
   if(_saliendoApp) return;
 
-  // OJO: aqui NO se pone guardian. Un guardian creado dentro del propio evento
-  // de atras no lleva toque del usuario, y Chrome lo descarta -ese fue el error
-  // de los intentos anteriores-. Los guardianes buenos ya se pusieron con cada
-  // toque de Sensei mientras navegaba, y hay uno por cada paso que dio.
+  // OJO: aqui NO se pone guardian. Un guardian creado dentro del propio evento de atras
+  // no lleva toque del usuario, y Chrome lo descarta -ese fue el error de los intentos
+  // anteriores-. Los guardianes buenos ya se pusieron con cada toque de Sensei mientras
+  // navegaba, y hay uno por cada paso que dio.
 
-  // 1) Si el menu lateral esta abierto, el boton atras solo lo cierra
-  if(menuLateralAbierto()){
-    logAtras('  -> cerro menu lateral');
-    cerrarMenuLateral();
-    return;
-  }
+  // 🔑 EL BOTON DEL TELEFONO HACE EXACTAMENTE LO MISMO QUE EL DE LA APP.
+  // Los dos llaman a `unPasoAtras()`: UN TOQUE = UN PELDAÑO. -Sensei, 12 ago-
+  //
+  // 🔴 ANTES esto revisaba SEIS recuadros escritos a mano, y la app tiene 49. Con una
+  // factura abierta el boton "no hacia nada" visible: retrocedia por detras, y a la
+  // cuarta vez se acababa el historial y Android CERRABA LA APP. Lo cazo Sensei.
+  var seMovio = false;
+  try { seMovio = unPasoAtras(); } catch(e){ logAtras('  -> ERROR: '+String(e).slice(0,60)); }
 
-  // 1.5) Si la ventana del registro esta abierta, atras la cierra
-  var vlog = document.getElementById('logatras-caja');
-  if(vlog && vlog.style.display && vlog.style.display !== 'none'){
-    logAtras('  -> cerro ventana registro');
-    cerrarLogAtras();
-    return;
-  }
-
-  // 1.6) VENTANAS DE LA OPTIMIZACION DE RUTA -26 jul-. Antes, el atras se las
-  //       saltaba y llegaba hasta el letrero de "salir de la app". Ahora las
-  //       cierra y devuelve a Ruta de Visitas. Solo estas dos: NO se toco el
-  //       resto de la app, por decision de Sensei.
-  if(document.getElementById('buscar-prod-ov')){
-    logAtras('  -> cerro buscador de producto');
-    cerrarBuscadorProducto();
-    return;
-  }
-  if(document.getElementById('comparar-ruta-ov')){
-    logAtras('  -> cerro comparacion de ruta');
-    cerrarComparacionRuta();
-    return;
-  }
-  if(document.getElementById('cargando-ruta-ov')){
-    logAtras('  -> cancelo busqueda de ruta');
-    cancelarBusquedaRuta();
+  if(seMovio){
+    logAtras('  -> un paso atras');
     return;
   }
 
-  // 2) Si el letrero esta abierto y AUN asi llega un aviso de atras, es que
-  //    quedaban guardianes: se cierra el letrero y se repone la proteccion.
-  //    -Lo normal es que no llegue: al mostrar el letrero la app queda en el
-  //     borde, asi que el atras cierra la app directamente.-
-  if(document.getElementById('salir-box') && document.getElementById('salir-box').style.display === 'block'){
-    logAtras('  -> atras con letrero abierto: se cierra el letrero');
-    cerrarLetreroSalir();
+  // Ya no hay a donde retroceder: preguntar antes de salir.
+  // Se usa un letrero PROPIO de la app -no el confirm() de Android- porque ese congela
+  // la app y estorba con la navegacion.
+  var caja = document.getElementById('salir-box');
+  if(caja && caja.style.display === 'block'){
+    logAtras('  -> ya estaba el letrero de salir');
     return;
   }
-
-  // 3) Si hay a donde volver, hacer lo mismo que el boton "<- Atras" de la app
-  //    -volverAtras ya sabe cerrar formularios, perfiles y editores primero-
-  if(hayADondeVolver()){
-    logAtras('  -> volverAtras()');
-    volverAtras();
-    return;
-  }
-
-  // 4) Estamos en el Inicio y no hay nada mas atras: preguntar antes de salir.
-  //    Se usa un letrero PROPIO de la app -no el confirm() de Android- porque
-  //    ese congela la app y estorba con la navegacion.
   logAtras('  -> LETRERO SALIR');
   mostrarLetreroSalir();
 });
