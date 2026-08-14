@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260814g-OFICIAL-V2.0">
+<meta name="app-version" content="20260814h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -6468,8 +6468,10 @@ var MANUAL_SECCIONES = [
     "## 3. TE AVISA SI VENDES M\u00c1S DE LO QUE HAY",
     "\u201cTe quedan 2 y est\u00e1s vendiendo 5\u201d.",
     "!! SOLO AVISA. Si le das que s\u00ed, la venta se hace igual \u2014 puede que lo tengas y no lo hayas apuntado.",
-    "## 4. TE RECUERDA EL BACKUP LOS DOMINGOS",
-    "Y te dice cu\u00e1ntos d\u00edas llevas sin bajarlo.",
+    "## 4. TE AVISA SI PASA UNA SEMANA SIN BACKUP",
+    "Ya tienes la barra de color de arriba, que te avisa cada 30 minutos o cada varias facturas. Esa es la principal.",
+    "Y ADEM\u00c1S, si de verdad pasan 7 d\u00edas sin que bajes un backup, sale un letrero que te lo dice.",
+    "!! Casi nunca lo vas a ver. Si lo ves, es porque el riesgo ya es serio.",
     "## 5. GUARDA LA HORA DE CADA VISITA",
     "Para que la Bit\u00e1cora sepa a qu\u00e9 hora pasaste por cada sitio.",
     "## 6. TE AVISA SI SALES DE UNA BARBER\u00cdA SIN MARCAR",
@@ -28706,26 +28708,40 @@ function avisarSiNoAlcanza(items){
   } catch(e){ return true; }   // si algo falla, NUNCA se traba la venta
 }
 
-// ── 4️⃣ RECORDARLE EL BACKUP LOS DOMINGOS ──
+// ── 4️⃣ EL BACKUP: SOLO SI LLEVA MÁS DE 7 DÍAS SIN BAJAR UNO ──
+//
+// ⚠️ SENSEI YA TENÍA UN AVISO Y ESTE ESTABA DE MÁS. El de siempre es la barra de
+// color de arriba (`mostrarAvisoRespaldo`), que aparece cada 30 minutos o cada X
+// facturas y se pone naranja y roja según pasa el tiempo. ESE es el bueno: le avisa
+// MIENTRAS TRABAJA, que es cuando importa.
+//
+// Él escogió dejar los dos, pero que este solo salga si de verdad lleva MÁS DE UNA
+// SEMANA sin bajar un backup — así casi nunca lo ve, y cuando lo vea será porque el
+// riesgo es serio. -14 ago-
+var DIAS_SIN_BACKUP_PARA_AVISAR = 7;
+
 function revisarRecordatorioBackup(){
   try {
-    var hoy = new Date();
-    if(hoy.getDay() !== 0) return;                 // solo los domingos
     var hoyTxt = fechaHoy();
-    if(LS('nbs_aviso_backup_dia', '') === hoyTxt) return;   // ya se lo dije hoy
     var ultimo = LS('nbs_ultimo_backup_bajado', '');
-    var dias = ultimo ? _diasDesde(ultimo) : null;
+
+    // Si nunca ha bajado uno, se apunta HOY como punto de partida y NO se le molesta.
+    // Si no, el aviso saltaría desde el primer día de usar esta versión.
+    if(!ultimo){ SS('nbs_ultimo_backup_bajado', hoyTxt); return; }
+
+    var dias = _diasDesde(ultimo);
+    if(dias === null || dias < DIAS_SIN_BACKUP_PARA_AVISAR) return;
+
+    // Una sola vez al día
+    if(LS('nbs_aviso_backup_dia', '') === hoyTxt) return;
     SS('nbs_aviso_backup_dia', hoyTxt);
-    var msg = '\ud83d\udcbe ES DOMINGO \u2014 baja tu backup\n\n';
-    msg += (dias === null)
-      ? 'No tengo apuntado que hayas bajado uno todav\u00eda.'
-      : 'El \u00faltimo lo bajaste hace ' + dias + ' d\u00eda(s).';
-    msg += '\n\nSi pierdes el tel\u00e9fono, es lo \u00fanico que te devuelve todo.';
-    avisoGrande(msg);
+
+    avisoGrande('\ud83d\udcbe HACE ' + dias + ' D\u00cdAS QUE NO BAJAS UN BACKUP\n\n'
+      + 'El backup es el archivo que te devuelve TODO si pierdes el tel\u00e9fono.\n\n'
+      + 'B\u00e1jalo desde el Men\u00fa \u2630 \u2192 \ud83d\udee1\ufe0f SEGURIDAD.');
   } catch(e){}
 }
 
-// ── 6️⃣ AVISAR SI SE VA DE UNA BARBERÍA SIN MARCAR NADA ──
 // Se apunta la llegada; si pasan 40 minutos y no marcó ni vendió, se le dice.
 var MINUTOS_SIN_MARCAR = 40;
 
