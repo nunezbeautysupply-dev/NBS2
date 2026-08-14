@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260814f-OFICIAL-V2.0">
+<meta name="app-version" content="20260814g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -6456,7 +6456,30 @@ var MANUAL_SECCIONES = [
     "[[ SE BORRA                    \n  las copias viejas que        \n  guarda el teléfono           \n                               \n NO SE TOCA                    \n  ventas · clientes ·          \n  productos · fotos ·          \n  tu backup ni el de la nube   ]]",
     "!! Si te sale \"NO SE PUDO GUARDAR\", toca ese botón y vuelve a intentar. Y baja un backup antes, por si acaso."
   ]},
-  { g:"HERRAMIENTAS", t:"\ud83e\udd16 El Asistente \u2014 tu ayudante", c:[
+    { g:"HERRAMIENTAS", t:"\ud83e\udd16 Lo que la app hace SOLA", c:[
+    "## \u00bfPARA QU\u00c9 SIRVE?",
+    "Para que t\u00fa no tengas que acordarte de los detalles. La app los hace sola.",
+    "## 1. LA RUTA SE MARCA SOLA AL VENDER",
+    "Cuando le vendes a un barbero de una barber\u00eda que est\u00e1 en la ruta de hoy, la visita queda marcada con la hora. Lo mismo al guardar un pedido.",
+    "!! Se hizo porque el 36% de tus ventas no ten\u00edan su visita apuntada \u2014 la mitad de tus d\u00edas de trabajo.",
+    "## 2. TE OFRECE LA FIRMA EN LAS VENTAS A CR\u00c9DITO",
+    "Al terminar una venta a cr\u00e9dito te pregunta si le tomas la firma al cliente. Con la firma tienes prueba de que se llev\u00f3 la mercanc\u00eda.",
+    "!! Solo en las de cr\u00e9dito, que son las que pueden dar problema.",
+    "## 3. TE AVISA SI VENDES M\u00c1S DE LO QUE HAY",
+    "\u201cTe quedan 2 y est\u00e1s vendiendo 5\u201d.",
+    "!! SOLO AVISA. Si le das que s\u00ed, la venta se hace igual \u2014 puede que lo tengas y no lo hayas apuntado.",
+    "## 4. TE RECUERDA EL BACKUP LOS DOMINGOS",
+    "Y te dice cu\u00e1ntos d\u00edas llevas sin bajarlo.",
+    "## 5. GUARDA LA HORA DE CADA VISITA",
+    "Para que la Bit\u00e1cora sepa a qu\u00e9 hora pasaste por cada sitio.",
+    "## 6. TE AVISA SI SALES DE UNA BARBER\u00cdA SIN MARCAR",
+    "A los 40 minutos de haber llegado, si no marcaste ni vendiste, te lo dice.",
+    "!! Si ya la marcaste, NO te molesta.",
+    "## 7. LLENA TU LISTA DE RELLENO SOLA",
+    "Una vez por semana le mete lo que se te est\u00e1 acabando, con la cantidad que vendes en un mes. Rev\u00edsala antes de comprarle al suplidor.",
+    "[[ \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 T\u00da VENDES                \u2502\n\u2502        \u2193                 \u2502\n\u2502 \u2713 la ruta se marca      \u2502\n\u2502 \u2713 el r\u00e9cord se apunta   \u2502\n\u2502 \u2713 la bit\u00e1cora lo guarda \u2502\n\u2502 \u2713 te ofrece la firma    \u2502\n\u2502                          \u2502\n\u2502 T\u00fa no tocaste NADA      \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518 ]]"
+  ]},
+{ g:"HERRAMIENTAS", t:"\ud83e\udd16 El Asistente \u2014 tu ayudante", c:[
     "## \u00bfPARA QU\u00c9 SIRVE?",
     "Es un ayudante que mira TUS datos y te dice lo que se te est\u00e1 escapando. Y tambi\u00e9n le puedes hablar y te contesta.",
     "No necesita internet y no cuesta nada. No adivina: cuenta lo que hay en tu app.",
@@ -10060,6 +10083,34 @@ var _van = null;
 // ═══════════════════════════════════════════════════════════════════════════
 function baseAyudaNBS(){
   return [
+    { t:'\ud83e\udd16 El Asistente (el bot\u00f3n de abajo a la derecha)',
+      k:'asistente robot boton redondo abajo derecha ayudante avisos hablar voz microfono me habla escuchar puntito rojo inteligencia artificial ia',
+      r:'Es el bot\u00f3n redondo \ud83e\udd16 de abajo a la derecha. T\u00f3calo y te DICE EN VOZ ALTA lo que se te est\u00e1 escapando: qu\u00e9 se te acab\u00f3, qu\u00e9 clientes dejaron de venir, las deudas de m\u00e1s de 30 d\u00edas, los que te compraron una sola vez y los productos que casi no dejan ganancia. El puntito rojo dice cu\u00e1ntas cosas tiene que decirte. Cada aviso trae SU BOT\u00d3N para resolverlo ah\u00ed mismo. Y con \ud83c\udfa4 H\u00e1blame le preguntas: \u201c\u00bfcu\u00e1nto me debe Isidro?\u201d, \u201c\u00bfqui\u00e9n no viene hace tiempo?\u201d, \u201c\u00bfc\u00f3mo me fue hoy?\u201d, \u201c\u00bfqu\u00e9 se me est\u00e1 acabando?\u201d, \u201cprepara un pedido para Luis\u201d. Si no quieres que te hable, el bot\u00f3n \ud83d\udd0a de arriba lo calla. Funciona SIN internet y no cuesta nada.' },
+
+    { t:'\ud83d\udccb Bit\u00e1cora de visitas (todo lo que pas\u00f3 con cada cliente)',
+      k:'bitacora visitas reporte historial que compro cuando hora fecha detalle record semanal por fecha rango imprimir compartir',
+      r:'Men\u00fa \u2630 \u2192 \ud83d\udcca REPORTES \u2192 \ud83d\udccb Bit\u00e1cora de visitas. Ah\u00ed est\u00e1 TODO lo que pas\u00f3 con cada cliente: qu\u00e9 d\u00eda lo visitaste, A QU\u00c9 HORA, si te compr\u00f3 y qu\u00e9 se llev\u00f3 producto por producto, cu\u00e1nto y si fue a cr\u00e9dito o contado, y tu ganancia. CADA VENTA ES SU PROPIO RENGL\u00d3N con su hora: si le vendiste a las 8:15 y otra vez a las 11:30, salen las dos. Escoge Hoy, 7 d\u00edas, 30 d\u00edas, Todo, o las fechas que quieras. Y busca por cliente, barber\u00eda o producto. Con \ud83d\udda8\ufe0f Imprimir y \ud83d\udce4 Compartir. Se llena SOLA, t\u00fa no apuntas nada.' },
+
+    { t:'\ud83e\udd16 La ruta se marca sola al vender',
+      k:'ruta marca sola automatico visitada olvido marcar visita se me olvida automatizado auto',
+      r:'Ya no tienes que acordarte. Cuando le vendes a un barbero de una barber\u00eda que est\u00e1 en la ruta de hoy, LA RUTA SE MARCA SOLA con la hora. Lo mismo al guardar un pedido. Y si pasas 40 minutos en una barber\u00eda sin marcar ni vender, la app te avisa. Al terminar una barber\u00eda en Pedidos R\u00e1pidos, los barberos que no llevaron nada quedan apuntados como \u201cno compr\u00f3\u201d, para que tu r\u00e9cord est\u00e9 completo.' },
+
+    { t:'\ud83d\uddd1\ufe0f Borrar un pedido que el cliente ya no quiere',
+      k:'borrar pedido cancelar eliminar quitar pendiente cambio de opinion no lo quiere carrito',
+      r:'Ve a Pedidos Pendientes y toca el pedido para convertirlo en venta. Abajo salen DOS botones: \u201c\u2715 Cancelar y volver a Pedidos Pendientes\u201d te saca SIN borrar nada \u2014 el pedido se queda. Y \u201c\ud83d\uddd1\ufe0f El cliente ya no lo quiere \u2014 borrar este pedido\u201d s\u00ed lo BORRA del carrito: te pregunta con el nombre y el monto, y desaparece.' },
+
+    { t:'\ud83d\udcbe Guardar los pedidos uno por uno',
+      k:'pedidos rapidos guardar individual uno por uno barberos orden flechas botones un toque perder pedidos',
+      r:'En Pedidos R\u00e1pidos escoges la barber\u00eda y salen TODOS sus barberos. Cada uno tiene su bot\u00f3n \ud83d\udcbe Guardar este pedido: al tocarlo se guarda ESE y se cierra solo para pasar al siguiente \u2014 as\u00ed no pierdes la barber\u00eda entera si algo pasa. Cada barbero trae dos filas de botones de un toque: \u26a1 LO QUE M\u00c1S VENDES y \ud83d\udc64 LO QUE M\u00c1S COMPRA \u00e9l. Y con las flechitas \u25b2\u25bc los pones en el orden que quieras, que queda guardado. Al final, \u201c\u2713 Terminar con esta barber\u00eda\u201d.' },
+
+    { t:'\ud83d\udce6 Hacer el inventario por marca',
+      k:'inventario marca contar existencia stock cantidad corregir invertido valor editar por marca vale',
+      r:'Cat\u00e1logo \u2192 Editar por marca \u2192 escoge una marca. Arriba salen sus n\u00fameros: cu\u00e1ntos productos, cu\u00e1ntos con existencia, unidades, INVERTIDO, a venta y ganancia. Cada producto tiene su EXISTENCIA y su VALE (cantidad \u00d7 costo). Escribes la cantidad real y el INVERTIDO de arriba baja EN VIVO mientras cuentas. As\u00ed haces una marca completa de una sola vez. Si dejas un campo vac\u00edo o escribes letras, se queda la cantidad de antes \u2014 nunca se pone en cero por error.' },
+
+    { t:'\u21a9\ufe0f El bot\u00f3n de atr\u00e1s y el del celular',
+      k:'atras volver regresar boton celular se cierra la app pantalla anterior salir',
+      r:'El bot\u00f3n \u2190 Atr\u00e1s de la app y el bot\u00f3n de atr\u00e1s del celular hacen LO MISMO, y dan UN SOLO PASO cada vez. Si tienes una factura abierta, el primer toque la cierra y te quedas donde estabas; el siguiente te saca de la pantalla; y cuando ya no hay a d\u00f3nde volver, te pregunta si quieres salir. La app ya no se cierra sola.' },
+
     { t:'✏️ Corregir o borrar un pago',
       k:'pago pagos cobro cobrar abono abonos me pagaron dinero editar corregir borrar eliminar cambiar monto fecha metodo dividir efectivo tarjeta zelle equivocado error',
       r:'Ve a Cuentas por Cobrar (💳) → toca el cliente → toca la factura. En "Pagos aplicados" cada pago tiene un lápiz ✏️. Tócalo para cambiar el monto, la fecha y el método, o dividirlo en varios (efectivo + tarjeta + Zelle). El total se suma solo. También puedes borrarlo con 🗑️. El saldo del cliente se ajusta solo.' },
