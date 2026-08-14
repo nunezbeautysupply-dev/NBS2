@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260814a-OFICIAL-V2.0">
+<meta name="app-version" content="20260814c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4230,7 +4230,7 @@ function pintarSegunPantalla(id){
 
 var historialPantallas = [];
 function pantallaActual(){
-  var all = ['menu','p-inicio','p-cl','p-v','p-rpt','p-cxc','p-cl-perfil','p-cl-factura','p-cat','p-inventario','p-panorama','p-docs','p-relleno','p-van','p-copias','p-sup','p-comp','p-ped','p-gastos','p-vip','p-mas','p-facturas','p-dashboard','p-rutas','p-manual','p-cxp','p-academia','p-resumen'];
+  var all = ['menu','p-inicio','p-cl','p-v','p-rpt','p-cxc','p-cl-perfil','p-cl-factura','p-cat','p-inventario','p-margen','p-panorama','p-docs','p-relleno','p-van','p-copias','p-sup','p-comp','p-ped','p-gastos','p-vip','p-mas','p-facturas','p-dashboard','p-rutas','p-manual','p-cxp','p-academia','p-resumen'];
   for(var i=0;i<all.length;i++){
     var el = document.getElementById(all[i]);
     if(el && el.style.display === 'block') return all[i];
@@ -4470,7 +4470,7 @@ function ir(id, sinHistorial){
     if(actual && actual !== id) historialPantallas.push(actual);
   }
   window.scrollTo(0, 0);
-  var all = ['menu','p-inicio','p-cl','p-v','p-rpt','p-cxc','p-cl-perfil','p-cl-factura','p-cat','p-inventario','p-panorama','p-docs','p-relleno','p-van','p-copias','p-sup','p-comp','p-ped','p-gastos','p-vip','p-mas','p-facturas','p-dashboard','p-rutas','p-manual','p-cxp','p-academia','p-resumen'];
+  var all = ['menu','p-inicio','p-cl','p-v','p-rpt','p-cxc','p-cl-perfil','p-cl-factura','p-cat','p-inventario','p-margen','p-panorama','p-docs','p-relleno','p-van','p-copias','p-sup','p-comp','p-ped','p-gastos','p-vip','p-mas','p-facturas','p-dashboard','p-rutas','p-manual','p-cxp','p-academia','p-resumen'];
   // BLINDAJE (23 jul): antes, si un id de la lista no existia, el bucle se
   // rompia y las pantallas siguientes NO se escondian. Ahora se salta el que
   // falte y sigue. Ademas se esconde CUALQUIER pantalla .pg aunque no este
@@ -6071,20 +6071,32 @@ var MANUAL_SECCIONES = [
     "!! Si el cliente tiene CRÉDITO A FAVOR, la app te pregunta si quieres usarlo. Nunca lo aplica sola — tú decides."
   ]},
   { g:"VENDER", t:"⚡ Pedidos Rápidos", c:[
-    "## ¿PARA QUÉ SIRVE?",
-    "Para anotar rápido lo que varios barberos de una misma barbería te piden, sin cobrar todavía.",
-    "> Menú ☰ → 🛒 VENDER → ⚡ Pedidos rápidos",
+    "## \u00bfPARA QU\u00c9 SIRVE?",
+    "Para tomarle el pedido a TODOS los barberos de una barber\u00eda de una sola pasada, y de paso llevar el r\u00e9cord de qui\u00e9n te compr\u00f3 y qui\u00e9n no.",
+    "> Men\u00fa \u2630 \u2192 \ud83d\uded2 VENDER \u2192 \u26a1 Pedidos R\u00e1pidos",
     "## PASO A PASO",
-    "1. Escoge la barbería.",
-    "2. Marca los barberos que van a pedir.",
-    "3. A cada uno, búscale sus productos y agrégalos.",
-    "4. Toca ✓ Guardar pedidos.",
-    "## DESPUÉS, CUANDO LES COBRES",
-    "El pedido queda pendiente. Cuando le cobres, se convierte en venta de verdad.",
-    "[[ PEDIDO PENDIENTE          \n  Juan · 3 productos · $85   \n  [ 💵 Cobrar ] [ ✏️ ] [ 🗑️ ] ]]",
-    "## SI DEJAS UNO A MEDIAS",
-    "La app te lo guarda y al volver te dice \"TIENES UN PEDIDO A MEDIAS\", con dos botones: ↺ Seguir con ese, o Descartar.",
-    "!! El pedido NO baja el stock ni cuenta como venta hasta que lo cobres."
+    "1. Escoge la barber\u00eda. Se te seleccionan TODOS sus barberos de una vez.",
+    "2. A cada barbero le salen dos filas de botones de un toque:",
+    "3. \u26a1 LO QUE M\u00c1S VENDES \u2014 tus productos m\u00e1s vendidos de los \u00faltimos 60 d\u00edas",
+    "4. \ud83d\udc64 LO QUE M\u00c1S COMPRA \u2014 lo que ESE barbero suele llevar",
+    "5. Un toque agrega el producto. Otro toque sube la cantidad.",
+    "6. Si no est\u00e1 en los botones, b\u00fascalo o d\u00edctalo con el \ud83c\udfa4",
+    "7. Al terminar con ese barbero, dale a \ud83d\udcbe Guardar este pedido.",
+    "8. Cuando acabes con todos, dale a \u2713 Terminar con esta barber\u00eda.",
+    "[[ \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 \u25b2\u25bc Yordys Santiago     $20.00 \u2502\n\u2502                               \u2502\n\u2502 \u26a1 LO QUE M\u00c1S VENDES          \u2502\n\u2502 [Cool Care][Gummy gel][Dorco] \u2502\n\u2502 [Guante   ][Chaos wax][Navaja]\u2502\n\u2502                               \u2502\n\u2502 \ud83d\udc64 LO QUE M\u00c1S COMPRA          \u2502\n\u2502 [Persona blade][Nishman]      \u2502\n\u2502                               \u2502\n\u2502 [ \ud83d\udcbe Guardar este pedido ]    \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518 ]]",
+    "## \ud83d\udcbe GUARDAR UNO POR UNO",
+    "Cada barbero tiene su propio bot\u00f3n. Al tocarlo, ESE pedido queda guardado y el barbero se cierra solo para pasar al siguiente.",
+    "Su pedido pasa a la lista de pendientes, donde despu\u00e9s lo conviertes en venta \u2014 y ah\u00ed todav\u00eda le puedes agregar algo si hace falta.",
+    "!! ESTO ES IMPORTANTE: antes se guardaban TODOS al final. Si algo pasaba en medio se perd\u00eda la barber\u00eda entera. Ahora, lo que guardas ya no se puede perder.",
+    "## \u25b2\u25bc EL ORDEN DE LOS BARBEROS",
+    "Con las flechitas subes o bajas cada barbero. El orden queda guardado por barber\u00eda: la pr\u00f3xima vez que entres, est\u00e1n como los dejaste.",
+    "## \u2713 TERMINAR CON ESTA BARBER\u00cdA",
+    "El bot\u00f3n de abajo hace dos cosas: guarda los pedidos que te queden sin guardar, y apunta como NO COMPR\u00d3 a los barberos que no llevaron nada.",
+    "As\u00ed tu r\u00e9cord de compra y no compra queda completo. Lo ves en la ficha de cada cliente, en \ud83d\udcc7 Sus datos.",
+    "## \ud83d\uddd1\ufe0f ELIMINAR UN PEDIDO",
+    "Si abres un pedido guardado y quieres botarlo, el bot\u00f3n dice \ud83d\uddd1\ufe0f Eliminar este pedido. Te pregunta con el nombre y el monto, y lo borra del carrito.",
+    "Si est\u00e1s haciendo uno nuevo, el bot\u00f3n dice \u2190 Volver sin guardar y no borra nada de nadie.",
+    "!! Un pedido NO es una venta. El inventario no baja y el dinero no se mueve hasta que lo conviertas en venta."
   ]},
   { g:"VENDER", t:"🗺️ Ruta de Visitas", c:[
     "## ¿PARA QUÉ SIRVE?",
@@ -6101,16 +6113,30 @@ var MANUAL_SECCIONES = [
     "!! Waze no acepta varias paradas de una vez. Para Waze, la app te abre una por una."
   ]},
   { g:"VENDER", t:"👥 Clientes", c:[
-    "## ¿PARA QUÉ SIRVE?",
-    "Es la ficha de cada barbero y cada barbería: su teléfono, su dirección, lo que te debe y lo que más compra.",
-    "> Menú ☰ → 🛒 VENDER → 👥 Clientes",
-    "## LO QUE VES AL ABRIR UN CLIENTE",
-    "[[ JUAN PEREZ                 \n MODERN CUTS                  \n                              \n TOTAL COMPRAS   BALANCE      \n   $840.00        $30.00      \n                              \n LO QUE MÁS COMPRA:           \n  DORCO NAVAJAS      4/10     \n  NISHMAN COLONIA    2/10     ]]",
-    "## LOS BOTONES DE ADENTRO",
-    "🧾 Vender · 💵 Aplicar pago · ⚡ Pedido rápido · 💲 Precios especiales · 📋 Historial completo.",
-    "## SI DOS FICHAS SON LA MISMA PERSONA",
-    "La app te avisa con un recuadro amarillo si otro cliente se parece — mismo nombre o mismo teléfono. Y tienes 🔍 Eliminar clientes duplicados para juntarlos.",
-    "!! Si juntas dos fichas por error, sus deudas se suman en una. Revisa antes de fusionar."
+    "## \u00bfPARA QU\u00c9 SIRVE?",
+    "Para ver y manejar TODO lo de un cliente desde un solo sitio: sus datos, lo que compra, lo que debe, sus facturas y sus programas.",
+    "> Men\u00fa \u2630 \u2192 \ud83d\uded2 VENDER \u2192 \ud83d\udc65 Clientes",
+    "## LA FICHA, DE UN VISTAZO",
+    "Arriba salen sus cuatro n\u00fameros y los tres botones que m\u00e1s usas.",
+    "[[ \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 JD  Jorge Duarte              \u2502\n\u2502     \ud83c\udfea ELITE CUTS BARBERSHOP  \u2502\n\u2502     \ud83d\udcde +1 (401) 570-9745      \u2502\n\u2502                               \u2502\n\u2502 COMPR\u00d3  DEBE  TE DEJA  \u00daLTIMA\u2502\n\u2502 $201.99 $60.00 $92.89   13 d  \u2502\n\u2502                               \u2502\n\u2502 [\u26a1Pedido][\ud83d\udcb5Cobrar][\ud83e\uddfeVender] \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518 ]]",
+    "## LOS RENGLONES",
+    "Debajo va una lista. Cada renglón ya te ense\u00f1a su n\u00famero, as\u00ed que muchas veces ni tienes que abrirlo. Se abre UNO A LA VEZ, y el que est\u00e1 abierto se pinta de azul.",
+    "1. \ud83d\udcc7 Sus datos \u2014 tel\u00e9fono, correo, direcci\u00f3n, negocio, apodo, persona de contacto, y su R\u00c9CORD DE VISITAS (cu\u00e1ntas veces te compr\u00f3 y cu\u00e1ntas no)",
+    "2. \u2b50 Programa VIP \u2014 sus grupos y el bot\u00f3n de darle el premio",
+    "3. \ud83c\udf81 Premios que le di",
+    "4. \u21a9\ufe0f Devoluciones \u2014 con el bot\u00f3n de deshacerla",
+    "5. \ud83d\uded2 Lo que m\u00e1s compra",
+    "6. \ud83d\udcc5 Cada cu\u00e1nto compra",
+    "7. \ud83d\udcb0 Cr\u00e9dito a favor",
+    "8. \ud83d\udcc4 Sus facturas \u2014 t\u00f3calas para verlas",
+    "9. \ud83d\udccd Visitas",
+    "10. \ud83c\udf81 Programa de Fidelidad (el de los $400)",
+    "11. \u2699\ufe0f Ajustes \u2014 VIP, consignaci\u00f3n, sin servicio, editar, precios especiales, balance inicial y eliminar",
+    "12. \ud83d\udcb5 Lo que te deja \u2014 tu ganancia con \u00e9l y su margen",
+    "## \ud83d\udcde LLAMAR Y WHATSAPP DE UN TOQUE",
+    "En \ud83d\udcc7 Sus datos tienes botones para llamarlo, mandarle WhatsApp o abrir el mapa a su direcci\u00f3n. Ya no tienes que copiar el n\u00famero.",
+    "!! El WhatsApp abre el de NEGOCIO. Si quieres cambiarlo al normal: Men\u00fa \u2630 \u2192 \u2699\ufe0f HERRAMIENTAS \u2192 \ud83d\udcac Cu\u00e1l WhatsApp usar",
+    "!! Lo que est\u00e1 vac\u00edo no se ve. Un cliente sin correo no ve ese rengl\u00f3n."
   ]},
   { g:"VENDER", t:"⭐ Programa VIP", c:[
     "## ¿PARA QUÉ SIRVE?",
@@ -6256,14 +6282,23 @@ var MANUAL_SECCIONES = [
     "!! Cada vez que cambias un precio queda apuntado en el historial de precios, con el antes y el después."
   ]},
   { g:"MERCANCÍA", t:"💰 Inventario", c:[
-    "## ¿PARA QUÉ SIRVE?",
-    "Para ver todo lo que tienes en el almacén, cuánto vale al costo y cuánto a precio de venta.",
-    "> Menú ☰ → 📦 MERCANCÍA → 💰 Inventario",
-    "## LO QUE TE DICE",
-    "[[ VALOR AL COSTO             \n   $49,897.97                 \n                              \n VALOR A PRECIO DE VENTA      \n   $88,552.40                 \n                              \n GANANCIA SI VENDES TODO      \n   $38,654.43                 ]]",
-    "## LOS FILTROS",
-    "Por categoría, y \"solo lo que queda poco\" para ver qué reponer.",
-    "!! Si un producto sale con existencia NEGATIVA quiere decir que vendiste más de lo que la app creía que tenías. Se arregla contando de verdad y poniendo la cantidad correcta."
+    "## \u00bfPARA QU\u00c9 SIRVE?",
+    "Para ver cu\u00e1nto vale lo que tienes: al costo, a precio de venta, y cu\u00e1nta ganancia hay guardada ah\u00ed.",
+    "> Men\u00fa \u2630 \u2192 \ud83d\udce6 MERCANC\u00cdA \u2192 \ud83d\udcb0 Inventario",
+    "## HACER EL INVENTARIO POR MARCA",
+    "Esta es la forma r\u00e1pida: cuentas una marca completa en el estante y la corriges toda de una vez.",
+    "> Men\u00fa \u2630 \u2192 \ud83d\udce6 MERCANC\u00cdA \u2192 \ud83d\udcda Cat\u00e1logo \u2192 Editar por marca",
+    "1. Escoge la marca.",
+    "2. Arriba te salen sus n\u00fameros: cu\u00e1ntos productos, cu\u00e1ntos con existencia, cu\u00e1ntas unidades, cu\u00e1nto tienes INVERTIDO, a cu\u00e1nto lo vender\u00edas y cu\u00e1nta ganancia hay.",
+    "3. Cada producto tiene su EXISTENCIA y su VALE (cantidad \u00d7 costo).",
+    "4. Escribes la cantidad real y el VALE se recalcula al momento.",
+    "5. Y el INVERTIDO de arriba BAJA EN VIVO mientras cuentas.",
+    "6. Al final, un solo bot\u00f3n para guardar toda la marca.",
+    "[[ \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 PRODUCTOS  CON EXIST.  UNIDADES\u2502\n\u2502    30          24        1,247 \u2502\n\u2502                                \u2502\n\u2502 INVERTIDO  A VENTA   GANANCIA  \u2502\n\u2502 $5,899.25 $11,240.00 $5,340.75 \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 Immortal Colonia negra         \u2502\n\u2502 EXISTENCIA    VALE             \u2502\n\u2502 [   25   ]   $150.00           \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518 ]]",
+    "!! SI DEJAS UN CAMPO VAC\u00cdO O ESCRIBES LETRAS, se queda la cantidad de antes. NUNCA se pone en cero por error.",
+    "## \ud83e\udd16 Y EL ASISTENTE TE AVISA",
+    "El bot\u00f3n \ud83e\udd16 de abajo a la derecha te dice qu\u00e9 se te acab\u00f3 y qu\u00e9 se te acaba pronto, mirando lo que vendes al mes. Y te lo mete a la Lista de Relleno de un toque.",
+    "!! Si tu inventario no est\u00e1 al d\u00eda, los n\u00fameros de esta pantalla tampoco lo van a estar. Cuenta marca por marca cuando tengas un rato."
   ]},
   { g:"MERCANCÍA", t:"🚐 LA VAN — inventario inicial y cargar", c:[
     "## ¿PARA QUÉ SIRVE?",
@@ -6401,6 +6436,35 @@ var MANUAL_SECCIONES = [
     "## QUÉ BORRA Y QUÉ NO",
     "[[ SE BORRA                    \n  las copias viejas que        \n  guarda el teléfono           \n                               \n NO SE TOCA                    \n  ventas · clientes ·          \n  productos · fotos ·          \n  tu backup ni el de la nube   ]]",
     "!! Si te sale \"NO SE PUDO GUARDAR\", toca ese botón y vuelve a intentar. Y baja un backup antes, por si acaso."
+  ]},
+  { g:"HERRAMIENTAS", t:"\ud83e\udd16 El Asistente \u2014 tu ayudante", c:[
+    "## \u00bfPARA QU\u00c9 SIRVE?",
+    "Es un ayudante que mira TUS datos y te dice lo que se te est\u00e1 escapando. Y tambi\u00e9n le puedes hablar y te contesta.",
+    "No necesita internet y no cuesta nada. No adivina: cuenta lo que hay en tu app.",
+    "> Bot\u00f3n redondo \ud83e\udd16 abajo a la derecha, en cualquier pantalla",
+    "[[ \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502                  \u2502\n\u2502  la pantalla     \u2502\n\u2502                  \u2502\n\u2502            \u256d\u2500\u2500\u256e \u2502\n\u2502            \u2502\ud83e\udd16\u2502\u25cf\u2502  \u2190 el puntito rojo dice\n\u2502            \u2570\u2500\u2500\u256f \u2502     cu\u00e1ntas cosas tiene\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518     que decirte ]]",
+    "## LO QUE TE AVISA SOLO",
+    "T\u00f3calo y te dice, sin que le preguntes:",
+    "1. \ud83d\udce6 Qu\u00e9 se te acab\u00f3 y qu\u00e9 se te acaba pronto \u2014 mirando lo que vendes al mes, no lo que hay en la lista",
+    "2. \ud83d\udc64 Qu\u00e9 clientes dejaron de venir \u2014 los que compraban seguido y llevan m\u00e1s del doble de su ritmo sin aparecer",
+    "3. \ud83d\udcb0 Las deudas de m\u00e1s de 30 d\u00edas, con el nombre y cu\u00e1nto lleva cada una",
+    "4. \ud83c\udfaf Los clientes que te compraron UNA sola vez \u2014 tu dinero m\u00e1s f\u00e1cil",
+    "5. \ud83d\udcc9 Los productos que casi no te dejan ganancia",
+    "## Y CADA AVISO TRAE SU BOT\u00d3N",
+    "No es solo avisarte: es resolverlo ah\u00ed mismo.",
+    "[[ \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 \ud83d\udce6 Se te acab\u00f3 Cool Care    \u2502\n\u2502    vendes 26 al mes          \u2502\n\u2502  [ \u2795 A la lista de relleno ]\u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 \ud83d\udcb0 $1,284 en deudas viejas   \u2502\n\u2502  [ \ud83d\udcb5 Ir a cobrar ]         \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518 ]]",
+    "## LO QUE LE PUEDES PREGUNTAR",
+    "Toca \ud83c\udfa4 H\u00e1blame y dile con tus palabras:",
+    "1. \u201c\u00bfcu\u00e1nto me debe Isidro?\u201d \u2014 te dice cu\u00e1nto, en cu\u00e1ntas facturas y cu\u00e1ntos d\u00edas lleva la m\u00e1s vieja, con el bot\u00f3n de cobrarle",
+    "2. \u201c\u00bfqui\u00e9n no viene hace tiempo?\u201d \u2014 la lista de los que se callaron",
+    "3. \u201c\u00bfc\u00f3mo me fue hoy?\u201d \u2014 vendido, cobrado, ganancia, cu\u00e1ntos visitaste y cu\u00e1ntos compraron",
+    "4. \u201c\u00bfqu\u00e9 se me est\u00e1 acabando?\u201d \u2014 lo que hay que comprar, con el bot\u00f3n de meterlo al relleno",
+    "5. \u201c\u00bfcu\u00e1nto llevo este mes?\u201d \u2014 vendido y ganancia del mes",
+    "6. \u201cprepara un pedido para Luis\u201d \u2014 te abre su pedido",
+    "7. \u201cdos cool care y tres gel\u201d \u2014 entiende la cantidad y el producto",
+    "8. \u201chazme un reporte de qui\u00e9n me debe\u201d \u2014 te ofrece los reportes",
+    "!! NO ES UNA INTELIGENCIA ARTIFICIAL DE VERDAD. Entiende TUS palabras: tus productos, tus clientes y tus n\u00fameros. Por eso funciona sin internet y sin costar nada. Si le dices algo que no est\u00e1 en su mundo, te dice que no entendi\u00f3 y te ense\u00f1a qu\u00e9 s\u00ed puede. NUNCA se inventa un n\u00famero.",
+    "!! Si el micr\u00f3fono no funciona, revisa que le hayas dado permiso a la app. Y si tu tel\u00e9fono no tiene micr\u00f3fono disponible, te deja escribirle."
   ]},
   { g:"HERRAMIENTAS", t:"📷 Las fotos de tus productos", c:[
     "## ¿PARA QUÉ SIRVE?",
@@ -14770,6 +14834,100 @@ function agregarRapidoMulti(idx, pid){
 var _asistenteAbierto = false;
 
 // ═══════════════════════════════════════════════════════════════════
+//  🔊 QUE EL ASISTENTE TE HABLE  (14 ago 2026)
+//  Sensei: "pensé que el botón me iba a hablar, que yo iba a poder
+//  escucharlo también". Tiene razon: si le hablas, tiene que contestarte
+//  con la voz. Usa la MISMA voz que le lee las lecciones de la Academia.
+// ═══════════════════════════════════════════════════════════════════
+var _asisHablando = false;
+
+// ¿Quiere que le hable? Se guarda para que no tenga que decirlo cada vez.
+function asistenteHablaEncendido(){
+  var v = LS('nbs_asis_voz', null);
+  return (v === null || v === undefined) ? true : !!v;   // por defecto SI habla
+}
+
+function toggleVozAsistente(){
+  var ahora = !asistenteHablaEncendido();
+  SS('nbs_asis_voz', ahora);
+  if(!ahora) pararVozAsistente();
+  var b = document.getElementById('asis-btn-voz');
+  if(b){
+    b.innerHTML = ahora ? '\ud83d\udd0a' : '\ud83d\udd07';
+    b.title = ahora ? 'Te hablo' : 'Callado';
+  }
+  if(ahora) hablarAsistente('Ya te escucho y te hablo.');
+}
+
+function pararVozAsistente(){
+  try { if(window.speechSynthesis) window.speechSynthesis.cancel(); } catch(e){}
+  _asisHablando = false;
+}
+
+// Decir un texto en voz alta. Se le quitan los emojis y los signos raros,
+// porque la voz del telefono los lee y suena mal.
+function hablarAsistente(texto){
+  if(!asistenteHablaEncendido()) return;
+  var synth = window.speechSynthesis;
+  if(!synth) return;
+  try {
+    synth.cancel();
+    var limpio = String(texto || '')
+      // Los emojis suenan mal leidos
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2705}\u{274C}\u{2713}\u{2717}]/gu, ' ')
+      // 🔴 "$400.00" se parte en "400." y "00" al cortar por frases, y suena horrible.
+      // Se dice "400 dolares" y se le quitan los centavos cuando son .00. -14 ago-
+      .replace(/\$\s*([\d,]+)\.00\b/g, '$1 dolares')
+      .replace(/\$\s*([\d,]+)\.(\d\d)\b/g, '$1 dolares con $2')
+      .replace(/\$\s*([\d,]+)/g, '$1 dolares')
+      // "producto(s)" se lee "producto parentesis ese". Se deja el plural.
+      .replace(/\(s\)/g, 's')
+      .replace(/\(es\)/g, 'es')
+      // Los numeros con coma de miles: "1,284" se lee "uno coma dos ocho cuatro"
+      .replace(/(\d),(\d{3})\b/g, '$1$2')
+      .replace(/[·•|_*#>\[\]]/g, ' ')
+      .replace(/(\d)\s*d\b(?![a-zA-Z\u00e0-\u00ff])/g, '$1 dias')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if(!limpio) return;
+    var pedazos = limpio.match(/[^.!?\n]{1,180}[.!?\n]?/g) || [limpio];
+    _asisHablando = true;
+    pedazos.forEach(function(t){
+      var txt = t.trim();
+      if(!txt || txt.length < 2) return;
+      var u = new SpeechSynthesisUtterance(txt);
+      u.lang = 'es-US';
+      u.rate = 1.02;
+      u.pitch = 1;
+      try {
+        var voz = (typeof acaElegirVoz === 'function') ? acaElegirVoz() : null;
+        if(voz) u.voice = voz;
+      } catch(e){}
+      synth.speak(u);
+    });
+  } catch(e){}
+}
+
+// Lo que le dice al abrir el panel: el saludo y los avisos, en corto.
+function hablarLosAvisos(avisos, hoy){
+  if(!asistenteHablaEncendido()) return;
+  var t = saludoAsistente() + ', Sensei. ';
+  if(hoy && hoy.vendido > 0){
+    t += 'Hoy llevas ' + Math.round(hoy.vendido) + ' dolares vendidos. ';
+  }
+  if(!avisos || !avisos.length){
+    t += 'No veo nada que te este costando dinero ahora mismo.';
+  } else {
+    t += 'Tengo ' + avisos.length + (avisos.length === 1 ? ' cosa' : ' cosas') + ' que decirte. ';
+    // Solo las 3 primeras, que son las que mas le importan
+    avisos.slice(0, 3).forEach(function(a){ t += a.titulo + '. '; });
+  }
+  hablarAsistente(t);
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════════
 //  🎤 HABLARLE AL ASISTENTE
 // ═══════════════════════════════════════════════════════════════════
 
@@ -14868,7 +15026,41 @@ function entenderLoQueDijo(texto){
 }
 
 // ═══ CONTESTAR ═══
+// 🔊 Envoltorio: contesta como siempre y DESPUÉS lee en voz alta lo que escribió.
+// Se hace aquí y no en los 9 casos, para que nunca se olvide en uno. -14 ago-
 function contestarAsistente(texto){
+  var q = _contestarAsistenteTexto(texto);
+  try {
+    var el = document.getElementById('asis-respuesta');
+    if(el && asistenteHablaEncendido()){
+      // ⚠️ NO se puede usar cloneNode + innerText: un nodo fuera del documento
+      // devuelve innerText VACÍO. Se recorren los hijos y se saltan los botones. -14 ago-
+      var partes = [];
+      var recorrer = function(nodo){
+        for(var k = 0; k < nodo.childNodes.length; k++){
+          var h = nodo.childNodes[k];
+          if(h.nodeType === 3){                       // texto suelto
+            var t = String(h.textContent || '').trim();
+            if(t) partes.push(t);
+          } else if(h.nodeType === 1){                // un elemento
+            var tag = (h.tagName || '').toLowerCase();
+            if(tag === 'button' || tag === 'a') continue;   // los botones NO se leen
+            recorrer(h);
+          }
+        }
+      };
+      recorrer(el);
+      var dicho = partes.join(' ')
+        .replace(/^[\s\S]*?DIJISTE:\s*[\u201c"][^\u201d"]*[\u201d"]\s*/, '')   // quitar el "TÚ DIJISTE"
+        .replace(/\s+/g, ' ')
+        .trim();
+      if(dicho) hablarAsistente(dicho);
+    }
+  } catch(e){}
+  return q;
+}
+
+function _contestarAsistenteTexto(texto){
   var q = entenderLoQueDijo(texto);
   var el = document.getElementById('asis-respuesta');
   if(!el) return q;
@@ -15168,6 +15360,7 @@ function pintarPuntoAsistente(){
 }
 
 function cerrarAsistente(){
+  try { pararVozAsistente(); } catch(e){}
   var o = document.getElementById('asistente-ov');
   if(o && o.parentNode) o.parentNode.removeChild(o);
   _asistenteAbierto = false;
@@ -15207,6 +15400,10 @@ function abrirAsistente(){
     +       (avisos.length ? 'Tengo ' + avisos.length + ' cosa(s) que decirte' : 'Todo tranquilo por aqu\u00ed')
     +     '</div>'
     +   '</div>'
+    +   '<button id="asis-btn-voz" onclick="toggleVozAsistente()" title="' + (asistenteHablaEncendido() ? 'Te hablo' : 'Callado') + '" '
+    +     'style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:50%;'
+    +     'width:32px;height:32px;font-size:15px;cursor:pointer;margin-right:5px">'
+    +     (asistenteHablaEncendido() ? '\ud83d\udd0a' : '\ud83d\udd07') + '</button>'
     +   '<button onclick="cerrarAsistente()" style="background:rgba(255,255,255,.18);color:#fff;'
     +     'border:none;border-radius:50%;width:32px;height:32px;font-size:17px;cursor:pointer">\u00d7</button>'
     + '</div></div>';
@@ -15247,6 +15444,9 @@ function abrirAsistente(){
   caja.innerHTML = h;
   ov.appendChild(caja);
   document.body.appendChild(ov);
+
+  // 🔊 Y te lo dice en voz alta. Sensei: "pensé que el botón me iba a hablar". -14 ago-
+  try { hablarLosAvisos(avisos, hoy); } catch(eVoz){}
 }
 
 function _cajaAsis(rot, val, col){
