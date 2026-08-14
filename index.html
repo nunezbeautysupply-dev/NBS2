@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260813a-OFICIAL-V2.0">
+<meta name="app-version" content="20260814a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4318,6 +4318,7 @@ function _estaAbierto(id){
 // Los recuadros que se abren ENCIMA de la pantalla. El de más arriba
 // primero. Cada uno dice cómo se cierra; si no lo dice, se esconde.
 var RECUADROS_ENCIMA = [
+  { id: 'asistente-ov',            cerrar: 'cerrarAsistente' },
   { id: 'crop-foto-overlay' },
   { id: 'firma-canvas-overlay' },
   { id: 'firma-overlay' },
@@ -13667,6 +13668,8 @@ function editarPedido(idx){
   var multiWrap = document.getElementById('ped-multi-wrap');
   if(multiWrap) multiWrap.style.display = 'none';
   document.getElementById('ped-form-wrap').style.display = 'block';
+  try { ponerTextoBotonesPedido(); } catch(e){}
+  try { pintarBotonCancelarPedido(); } catch(eBtn){}
   document.getElementById('ped-barbero-actual').textContent = '✏️ Editando: ' + (p.nombre||'');
   document.getElementById('ped-barberia-actual').textContent = p.barberia||'';
   renderPedItems();
@@ -13782,6 +13785,8 @@ function selBarbero(cid, nombre){
   try{ marcarLlegadaBarberia(pedBarberiaSel); }catch(e){}
   document.getElementById('ped-barbero-wrap').style.display = 'none';
   document.getElementById('ped-form-wrap').style.display = 'block';
+  try { ponerTextoBotonesPedido(); } catch(e){}
+  try { pintarBotonCancelarPedido(); } catch(eBtn){}
   document.getElementById('ped-barbero-actual').textContent = nombre;
   document.getElementById('ped-barberia-actual').textContent = pedBarberiaSel||'';
   // Balance del cliente aqui tambien -pedido por Sensei el 24 jul-, igual que en
@@ -14756,6 +14761,845 @@ function agregarRapidoMulti(idx, pid){
   renderPedidosMultiples();
 }
 
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  🤖 EL ASISTENTE — LA CARA
+// ═══════════════════════════════════════════════════════════════════
+
+var _asistenteAbierto = false;
+
+// ═══════════════════════════════════════════════════════════════════
+//  🎤 HABLARLE AL ASISTENTE
+// ═══════════════════════════════════════════════════════════════════
+
+// Los números escritos como él los dice
+var _NUMEROS = { 'un':1,'una':1,'uno':1,'dos':2,'tres':3,'cuatro':4,'cinco':5,'seis':6,
+  'siete':7,'ocho':8,'nueve':9,'diez':10,'once':11,'doce':12,'quince':15,'veinte':20,
+  'veinticinco':25,'treinta':30,'cuarenta':40,'cincuenta':50 };
+
+function _num(txt){
+  var t = String(txt || '').trim().toLowerCase();
+  if(_NUMEROS[t] !== undefined) return _NUMEROS[t];
+  var n = parseFloat(t.replace(/[^0-9.]/g, ''));
+  return isNaN(n) ? null : n;
+}
+
+// Buscar UN cliente por lo que él diga: nombre, apodo o barbería
+function buscarClientePorVoz(txt){
+  var q = normalizarTextoBusqueda(String(txt || ''));
+  if(!q || q.length < 3) return [];
+  clientes = LS('ncl', []);
+  var res = [];
+  clientes.forEach(function(c){
+    if(c.sinServicio) return;
+    var campos = normalizarTextoBusqueda(
+      [c.nombre, c.apellido, c.apodo, c.negocio].filter(Boolean).join(' '));
+    if(campos.indexOf(q) >= 0) res.push({ c: c, exacto: campos === q });
+  });
+  res.sort(function(a,b){ return (b.exacto?1:0) - (a.exacto?1:0); });
+  return res.map(function(x){ return x.c; });
+}
+
+// Buscar UN producto por lo que él diga
+function buscarProductoPorVoz(txt){
+  var q = normalizarTextoBusqueda(String(txt || ''));
+  if(!q || q.length < 3) return [];
+  loadProds();
+  var res = [];
+  productos.forEach(function(p){
+    var n = normalizarTextoBusqueda(String(p.nombre || '') + ' ' + String(p.marca || ''));
+    if(n.indexOf(q) >= 0) res.push({ p: p, largo: n.length });
+  });
+  // El nombre más corto que contiene lo que dijo suele ser el que quería
+  res.sort(function(a,b){ return a.largo - b.largo; });
+  return res.map(function(x){ return x.p; });
+}
+
+// ═══ ENTENDER LO QUE DIJO ═══
+// Devuelve { tipo, ... }. Si no entiende, tipo='nada'.
+function entenderLoQueDijo(texto){
+  var t = normalizarTextoBusqueda(String(texto || ''));
+  if(!t) return { tipo: 'nada' };
+
+  // ── ¿CUÁNTO ME DEBE X? ──
+  var m = t.match(/(?:cuanto|cuando)\s+(?:me\s+)?debe\s+(.+)/);
+  if(m) return { tipo: 'cuantoDebe', quien: m[1] };
+
+  // ── ¿QUIÉN NO VIENE? ──
+  if(/quien(es)?\s+no\s+(viene|ha venido|compra)/.test(t) || /clientes?\s+(perdidos?|callados?)/.test(t))
+    return { tipo: 'callados' };
+
+  // ── ¿CÓMO ME FUE HOY? ──
+  if(/como\s+(me\s+)?(fue|voy|va)/.test(t) || /(cuanto|que)\s+(vendi|llevo)\s+hoy/.test(t))
+    return { tipo: 'comoMeFue' };
+
+  // ── ¿QUÉ SE ME ACABA? ──
+  if(/(que|cuales?)\s+(se\s+me\s+)?(acaba|esta acaband|falta|tengo que comprar)/.test(t)
+     || /(que\s+)?comprar/.test(t))
+    return { tipo: 'seAcaba' };
+
+  // ── ¿CUÁNTO LLEVO ESTE MES? ──
+  if(/(cuanto|que)\s+(llevo|vendi|he vendido)\s+(este\s+)?mes/.test(t))
+    return { tipo: 'esteMes' };
+
+  // ── UN REPORTE ──
+  m = t.match(/(?:hazme|dame|quiero|prepara(?:me)?)\s+(?:un\s+)?reporte\s+(?:de\s+)?(.*)/);
+  if(m) return { tipo: 'reporte', de: m[1] || '' };
+
+  // ── PREPARA UN PEDIDO PARA X ──
+  m = t.match(/(?:prepara|hazme|abre|empieza)\s+(?:un\s+)?pedido\s+(?:para|de|a)\s+(.+)/);
+  if(m) return { tipo: 'abrirPedido', quien: m[1] };
+
+  // ── AGREGAR PRODUCTOS: "dos cool care y tres gel" ──
+  var partes = t.split(/\s+(?:y|mas|tambien)\s+/);
+  var items = [];
+  partes.forEach(function(p){
+    var mm = p.match(/^\s*([a-z0-9]+)\s+(.+)$/);
+    if(!mm) return;
+    var cant = _num(mm[1]);
+    if(cant === null || cant <= 0) return;
+    var prods = buscarProductoPorVoz(mm[2]);
+    if(prods.length) items.push({ cant: cant, prod: prods[0], dijo: mm[2], opciones: prods.length });
+  });
+  if(items.length) return { tipo: 'agregar', items: items };
+
+  return { tipo: 'nada', dijo: texto };
+}
+
+// ═══ CONTESTAR ═══
+function contestarAsistente(texto){
+  var q = entenderLoQueDijo(texto);
+  var el = document.getElementById('asis-respuesta');
+  if(!el) return q;
+
+  var caja = function(cuerpo, botones){
+    return '<div style="background:#fff;border-left:4px solid #1a237e;border-radius:11px;'
+      + 'padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)">'
+      + '<div style="font-size:10px;font-weight:800;color:var(--nbs-muted);letter-spacing:.3px;margin-bottom:5px">'
+      +   '\ud83e\udd16 T\u00da DIJISTE: \u201c' + escaparHtml(String(texto).slice(0, 46)) + '\u201d</div>'
+      + cuerpo
+      + (botones ? '<div style="display:flex;gap:6px;margin-top:9px">' + botones + '</div>' : '')
+      + '</div>';
+  };
+  var linea = function(t, grande){
+    return '<div style="font-size:' + (grande ? '14' : '12.5') + 'px;color:var(--nbs-ink);'
+      + 'font-weight:' + (grande ? '900' : '600') + ';line-height:1.6">' + t + '</div>';
+  };
+  var btn = function(txt, fn){
+    return '<button onclick="' + fn + '" style="flex:1;padding:9px 6px;background:#1a237e;color:#fff;'
+      + 'border:none;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">' + txt + '</button>';
+  };
+
+  if(q.tipo === 'cuantoDebe'){
+    var cls = buscarClientePorVoz(q.quien);
+    if(!cls.length){ el.innerHTML = caja(linea('No encontr\u00e9 a nadie que se llame \u201c'
+      + escaparHtml(q.quien) + '\u201d.')); return q; }
+    var c = cls[0];
+    var V = _ventasReales().filter(function(v){ return String(v.cid) === String(c.id) && v.tipo === 'credito'; });
+    var debe = 0, facturas = 0, masVieja = 0;
+    V.forEach(function(v){
+      var pg = 0;
+      (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
+      var s = (parseFloat(v.total) || 0) - pg;
+      if(s <= 0.01) return;
+      debe += s; facturas++;
+      var d = _diasDesde(v.fecha);
+      if(d !== null && d > masVieja) masVieja = d;
+    });
+    el.innerHTML = caja(
+      linea(escaparHtml(nombreCl(c)), true)
+      + linea(debe > 0.01
+          ? 'Te debe <b style="color:var(--nbs-red-text)">$' + fmtNum(debe) + '</b> en '
+            + facturas + ' factura(s).<br>La m\u00e1s vieja lleva <b>' + masVieja + ' d\u00edas</b>.'
+          : 'No te debe nada. Est\u00e1 al d\u00eda \u2705'),
+      debe > 0.01
+        ? btn('\ud83d\udcb5 Cobrarle', 'cerrarAsistente();irACobrarCliente(' + _arg(c.id) + ')')
+          + btn('\ud83d\udc41\ufe0f Su ficha', 'cerrarAsistente();verCl(' + _arg(c.id) + ')')
+        : btn('\ud83d\udc41\ufe0f Su ficha', 'cerrarAsistente();verCl(' + _arg(c.id) + ')'));
+    return q;
+  }
+
+  if(q.tipo === 'callados'){
+    var lista = clientesQueSeCallaron();
+    if(!lista.length){ el.innerHTML = caja(linea('Ninguno. Todos tus clientes vienen al d\u00eda \u2705')); return q; }
+    el.innerHTML = caja(
+      linea(lista.length + ' cliente(s) dejaron de venir', true)
+      + lista.slice(0, 6).map(function(x){
+          return linea('\u00b7 <b>' + escaparHtml(nombreCl(x.cliente)) + '</b> \u2014 ven\u00eda cada '
+            + x.ritmo + 'd, lleva <b>' + x.diasSinVenir + 'd</b>');
+        }).join(''),
+      btn('\ud83d\udc41\ufe0f Verlos todos', 'asisVerCallados()'));
+    return q;
+  }
+
+  if(q.tipo === 'comoMeFue'){
+    var h = comoMeFueHoy();
+    el.innerHTML = caja(
+      linea('Hoy', true)
+      + linea('Vendiste <b>$' + fmtNum(h.vendido) + '</b> en ' + h.facturas + ' factura(s).<br>'
+        + 'Cobraste <b style="color:var(--nbs-green-text)">$' + fmtNum(h.cobrado) + '</b>.<br>'
+        + 'Ganancia: <b>$' + fmtNum(h.ganancia) + '</b>.'
+        + (h.visitasCompro + h.visitasNoCompro > 0
+            ? '<br>Visitaste ' + (h.visitasCompro + h.visitasNoCompro) + ' y te compraron <b>'
+              + h.visitasCompro + '</b>.' : '')
+        + (h.pedidosPendientes ? '<br>\u26a1 Tienes <b>' + h.pedidosPendientes + '</b> pedido(s) sin convertir.' : '')));
+    return q;
+  }
+
+  if(q.tipo === 'seAcaba'){
+    var ac = loQueSeAcaba(21);
+    if(!ac.length){ el.innerHTML = caja(linea('No se te est\u00e1 acabando nada \u2705')); return q; }
+    el.innerHTML = caja(
+      linea(ac.length + ' producto(s) para comprar', true)
+      + ac.slice(0, 8).map(function(x){
+          return linea('\u00b7 <b>' + escaparHtml(String(x.prod.nombre).slice(0, 28)) + '</b> \u2014 te quedan '
+            + x.stock + ', vendes ' + x.alMes + '/mes');
+        }).join(''),
+      btn('\u2795 A la lista de relleno', 'asisAgregarAlRelleno(\'todos\')'));
+    return q;
+  }
+
+  if(q.tipo === 'esteMes'){
+    var V2 = _ventasReales();
+    var ahora = new Date();
+    var vend = 0, gan = 0, n = 0;
+    V2.forEach(function(v){
+      var f = parsearFechaVenta(v.fecha);
+      if(!f || f.getMonth() !== ahora.getMonth() || f.getFullYear() !== ahora.getFullYear()) return;
+      vend += parseFloat(v.total) || 0;
+      gan += parseFloat(v.ganancia) || 0;
+      n++;
+    });
+    el.innerHTML = caja(
+      linea('Este mes', true)
+      + linea('Llevas <b>$' + fmtNum(vend) + '</b> vendidos en ' + n + ' factura(s).<br>'
+        + 'Ganancia: <b style="color:var(--nbs-green-text)">$' + fmtNum(gan) + '</b>'
+        + (vend > 0 ? ' (' + Math.round(gan / vend * 100) + '%)' : '')));
+    return q;
+  }
+
+  if(q.tipo === 'reporte'){
+    el.innerHTML = caja(
+      linea('\u00bfQu\u00e9 reporte quieres?', true),
+      btn('\ud83d\udcb0 Qui\u00e9n me debe', 'cerrarAsistente();ir(\'p-cxc\')')
+      + btn('\ud83d\udcca Por cliente', 'cerrarAsistente();mostrarReporteClientes(\'ganancia\')')
+      + btn('\ud83d\udcc8 Margen', 'cerrarAsistente();mostrarMargenProductos()'));
+    return q;
+  }
+
+  if(q.tipo === 'abrirPedido'){
+    var cl2 = buscarClientePorVoz(q.quien);
+    if(!cl2.length){ el.innerHTML = caja(linea('No encontr\u00e9 a \u201c'
+      + escaparHtml(q.quien) + '\u201d entre tus clientes.')); return q; }
+    var c2 = cl2[0];
+    el.innerHTML = caja(
+      linea('Pedido para <b>' + escaparHtml(nombreCl(c2)) + '</b>', true)
+      + linea(c2.negocio ? escaparHtml(c2.negocio) : ''),
+      btn('\u26a1 Abrir su pedido', 'cerrarAsistente();irAPedidoCliente(' + _arg(c2.id) + ')'));
+    return q;
+  }
+
+  if(q.tipo === 'agregar'){
+    el.innerHTML = caja(
+      linea('Entend\u00ed ' + q.items.length + ' producto(s)', true)
+      + q.items.map(function(x){
+          return linea('\u00b7 <b>' + x.cant + ' \u00d7 ' + escaparHtml(String(x.prod.nombre).slice(0, 30))
+            + '</b> \u2014 $' + fmtNum((x.prod.precio || 0) * x.cant));
+        }).join(''),
+      btn('\u26a1 Ir a Pedidos R\u00e1pidos', 'cerrarAsistente();ir(\'p-ped\')'));
+    return q;
+  }
+
+  // No entendió
+  el.innerHTML = caja(
+    linea('No te entend\u00ed \ud83d\ude45', true)
+    + linea('Puedo con estas:<br>'
+      + '\u00b7 \u201c\u00bfcu\u00e1nto me debe Isidro?\u201d<br>'
+      + '\u00b7 \u201c\u00bfqui\u00e9n no viene hace tiempo?\u201d<br>'
+      + '\u00b7 \u201c\u00bfc\u00f3mo me fue hoy?\u201d<br>'
+      + '\u00b7 \u201c\u00bfqu\u00e9 se me est\u00e1 acabando?\u201d<br>'
+      + '\u00b7 \u201c\u00bfcu\u00e1nto llevo este mes?\u201d<br>'
+      + '\u00b7 \u201cprepara un pedido para Luis\u201d<br>'
+      + '\u00b7 \u201cdos cool care y tres gel\u201d'));
+  return q;
+}
+
+// ═══ EL MICRÓFONO ═══
+function hablarleAlAsistente(){
+  var btn = document.getElementById('asis-mic');
+  var Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!Rec){
+    // Sin micrófono: que pueda escribirlo
+    var t = prompt('Escr\u00edbeme qu\u00e9 necesitas:');
+    if(t) contestarAsistente(t);
+    return;
+  }
+  var r = new Rec();
+  r.lang = 'es-DO';
+  r.interimResults = false;
+  r.maxAlternatives = 1;
+  if(btn){ btn.innerHTML = '<span style="font-size:19px">\ud83d\udd34</span> Te escucho...'; btn.style.background = '#FFEBEE'; }
+  r.onresult = function(e){
+    var txt = e.results[0][0].transcript;
+    contestarAsistente(txt);
+  };
+  r.onerror = function(){
+    var el = document.getElementById('asis-respuesta');
+    if(el) el.innerHTML = '<div style="background:#fff;border-radius:11px;padding:12px;font-size:12.5px;color:var(--nbs-muted)">'
+      + 'No pude escucharte. Revisa que le hayas dado permiso al micr\u00f3fono.</div>';
+  };
+  r.onend = function(){
+    if(btn){ btn.innerHTML = '<span style="font-size:19px">\ud83c\udfa4</span> H\u00e1blame'; btn.style.background = '#fff'; }
+  };
+  try { r.start(); } catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  LAS ACCIONES DE LOS AVISOS
+// ═══════════════════════════════════════════════════════════════════
+
+function asisAgregarAlRelleno(cual){
+  var lista = loQueSeAcaba(21);
+  if(cual === 'agotados') lista = lista.filter(function(x){ return x.stock <= 0; });
+  else if(cual === 'porAcabarse') lista = lista.filter(function(x){ return x.stock > 0; });
+  if(!lista.length) return;
+
+  var rel = LS('nrelleno', {});
+  if(!rel.items) rel.items = [];
+  var puestos = 0;
+  lista.forEach(function(x){
+    var ya = rel.items.some(function(i){ return String(i.pid) === String(x.prod.id); });
+    if(ya) return;
+    // Lo que vende en un mes, para no quedarse corto
+    rel.items.push({ pid: x.prod.id, cant: Math.max(1, Math.round(x.alMes)) });
+    puestos++;
+  });
+  SS('nrelleno', rel);
+  try { listaRelleno = LS('nrelleno', {}); } catch(e){}
+  cerrarAsistente();
+  avisoGrande('\u2705 Se agregaron ' + puestos + ' producto(s) a tu Lista de Relleno.'
+    + (puestos ? '\n\nCon la cantidad que vendes en un mes.' : ''));
+  try { ir('p-relleno'); } catch(e){}
+}
+
+function asisVerAgotados(cual){
+  var lista = loQueSeAcaba(21);
+  if(cual === 'agotados') lista = lista.filter(function(x){ return x.stock <= 0; });
+  var t = lista.map(function(x){
+    return '\u00b7 ' + String(x.prod.nombre).slice(0, 32) + '\n   te quedan ' + x.stock
+         + ' \u00b7 vendes ' + x.alMes + ' al mes \u00b7 ' + x.diasQueQuedan + ' d\u00edas';
+  }).join('\n');
+  avisoGrande('\ud83d\udce6 LO QUE SE TE ACABA\n\n' + t);
+}
+
+function asisVerCallados(){
+  var lista = clientesQueSeCallaron();
+  var t = lista.map(function(x){
+    return '\u00b7 ' + nombreCl(x.cliente).slice(0, 26) + '\n   ven\u00eda cada ' + x.ritmo
+         + ' d\u00edas \u00b7 lleva ' + x.diasSinVenir + ' \u00b7 te dej\u00f3 $' + fmtNum(x.leCompro);
+  }).join('\n');
+  avisoGrande('\ud83d\udc64 LOS QUE DEJARON DE VENIR\n\n' + t
+    + '\n\nEntra a su ficha y ll\u00e1malos o mand\u00e1les WhatsApp.');
+}
+
+function asisVerDeudas(){
+  var lista = deudasViejas(30);
+  var t = lista.slice(0, 12).map(function(x){
+    return '\u00b7 ' + nombreCl(x.cliente).slice(0, 26) + '\n   $' + fmtNum(x.debe)
+         + ' en ' + x.facturas + ' factura(s) \u00b7 la m\u00e1s vieja hace ' + x.diasMasVieja + 'd';
+  }).join('\n');
+  avisoGrande('\ud83d\udcb0 DEUDAS DE M\u00c1S DE 30 D\u00cdAS\n\n' + t);
+}
+
+function asisVerUnaVez(){
+  var lista = compraronUnaVez();
+  var t = lista.slice(0, 15).map(function(x){
+    return '\u00b7 ' + nombreCl(x.cliente).slice(0, 26) + ' \u2014 $' + fmtNum(x.monto)
+         + ' hace ' + x.diasDesde + 'd';
+  }).join('\n');
+  avisoGrande('\ud83c\udfaf TE COMPRARON UNA SOLA VEZ (' + lista.length + ')\n\n' + t
+    + '\n\nYa te conocen. Es tu dinero m\u00e1s f\u00e1cil.');
+}
+
+
+
+function saludoAsistente(){
+  var h = new Date().getHours();
+  if(h < 12) return 'Buenos d\u00edas';
+  if(h < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
+// El botón redondo, abajo a la derecha
+function ponerBotonAsistente(){
+  if(document.getElementById('btn-asistente')) return;
+  var b = document.createElement('button');
+  b.id = 'btn-asistente';
+  b.setAttribute('aria-label', 'Asistente');
+  b.onclick = function(){ abrirAsistente(); };
+  b.style.cssText = 'position:fixed;right:16px;bottom:82px;width:58px;height:58px;border-radius:50%;'
+    + 'background:linear-gradient(135deg,#1a237e,#3949AB);color:#fff;border:none;font-size:25px;'
+    + 'box-shadow:0 4px 14px rgba(26,35,126,.45);cursor:pointer;z-index:99990;'
+    + 'display:flex;align-items:center;justify-content:center;padding:0';
+  b.innerHTML = '\ud83e\udd16';
+  document.body.appendChild(b);
+  pintarPuntoAsistente();
+}
+
+// El puntito rojo con cuántas cosas tiene que decirle
+function pintarPuntoAsistente(){
+  var b = document.getElementById('btn-asistente');
+  if(!b) return;
+  var viejo = document.getElementById('asis-punto');
+  if(viejo && viejo.parentNode) viejo.parentNode.removeChild(viejo);
+  var n = 0;
+  try {
+    n = analizarNegocio().filter(function(a){ return a.nivel === 'rojo' || a.nivel === 'amarillo'; }).length;
+  } catch(e){}
+  if(!n) return;
+  var p = document.createElement('span');
+  p.id = 'asis-punto';
+  p.textContent = n;
+  p.style.cssText = 'position:absolute;top:-3px;right:-3px;background:#C62828;color:#fff;'
+    + 'min-width:21px;height:21px;border-radius:11px;font-size:11.5px;font-weight:900;'
+    + 'display:flex;align-items:center;justify-content:center;border:2px solid #fff;padding:0 3px';
+  b.appendChild(p);
+}
+
+function cerrarAsistente(){
+  var o = document.getElementById('asistente-ov');
+  if(o && o.parentNode) o.parentNode.removeChild(o);
+  _asistenteAbierto = false;
+  pintarPuntoAsistente();
+}
+
+// ═══ EL PANEL ═══
+function abrirAsistente(){
+  cerrarAsistente();
+  _asistenteAbierto = true;
+
+  var ov = document.createElement('div');
+  ov.id = 'asistente-ov';
+  ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,15,24,.55);'
+    + 'z-index:99995;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick = function(e){ if(e.target === ov) cerrarAsistente(); };
+
+  var caja = document.createElement('div');
+  caja.style.cssText = 'background:#F4F4F8;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;'
+    + 'border-radius:18px 18px 0 0;padding:0 0 14px';
+
+  var avisos = [];
+  try { avisos = analizarNegocio(); } catch(e){}
+  var hoy = { facturas: 0, vendido: 0, cobrado: 0 };
+  try { hoy = comoMeFueHoy(); } catch(e){}
+
+  var h = '';
+
+  // Cabecera
+  h += '<div style="position:sticky;top:0;background:#1a237e;color:#fff;padding:14px 16px;'
+    + 'border-radius:18px 18px 0 0;z-index:2">'
+    + '<div style="display:flex;align-items:center;gap:9px">'
+    +   '<span style="font-size:24px">\ud83e\udd16</span>'
+    +   '<div style="flex:1;min-width:0">'
+    +     '<div style="font-size:16px;font-weight:900">' + saludoAsistente() + ', Sensei</div>'
+    +     '<div style="font-size:11.5px;opacity:.85">'
+    +       (avisos.length ? 'Tengo ' + avisos.length + ' cosa(s) que decirte' : 'Todo tranquilo por aqu\u00ed')
+    +     '</div>'
+    +   '</div>'
+    +   '<button onclick="cerrarAsistente()" style="background:rgba(255,255,255,.18);color:#fff;'
+    +     'border:none;border-radius:50%;width:32px;height:32px;font-size:17px;cursor:pointer">\u00d7</button>'
+    + '</div></div>';
+
+  // Cómo va el día
+  h += '<div style="padding:12px 12px 0">'
+    + '<div style="background:#fff;border-radius:12px;padding:11px;display:flex;gap:6px">'
+    +   _cajaAsis('HOY VENDISTE', '$' + fmtNum(hoy.vendido))
+    +   _cajaAsis('COBRASTE', '$' + fmtNum(hoy.cobrado), 'var(--nbs-green-text)')
+    +   _cajaAsis('FACTURAS', String(hoy.facturas))
+    + '</div></div>';
+
+  // Los avisos
+  if(!avisos.length){
+    h += '<div style="padding:20px 16px;text-align:center;color:var(--nbs-muted);font-size:13px">'
+      + '\u2705 No veo nada que te est\u00e9 costando dinero ahora mismo.</div>';
+  } else {
+    h += '<div style="padding:12px">';
+    avisos.forEach(function(a){
+      h += _tarjetaAviso(a);
+    });
+    h += '</div>';
+  }
+
+  // El micrófono
+  h += '<div style="padding:0 12px">'
+    + '<button id="asis-mic" onclick="hablarleAlAsistente()" '
+    +   'style="width:100%;padding:14px;background:#fff;border:2px solid #1a237e;border-radius:13px;'
+    +   'font-size:14.5px;font-weight:900;color:#1a237e;cursor:pointer;display:flex;'
+    +   'align-items:center;justify-content:center;gap:8px">'
+    +   '<span style="font-size:19px">\ud83c\udfa4</span> H\u00e1blame</button>'
+    + '<div id="asis-respuesta" style="margin-top:9px"></div>'
+    + '<div style="font-size:10.5px;color:var(--nbs-muted);text-align:center;padding:9px 4px 0;line-height:1.5">'
+    +   'Prueba: \u201cdos cool care para Luis\u201d \u00b7 \u201c\u00bfcu\u00e1nto me debe Isidro?\u201d<br>'
+    +   '\u201c\u00bfqui\u00e9n no viene hace tiempo?\u201d \u00b7 \u201c\u00bfc\u00f3mo me fue hoy?\u201d</div>'
+    + '</div>';
+
+  caja.innerHTML = h;
+  ov.appendChild(caja);
+  document.body.appendChild(ov);
+}
+
+function _cajaAsis(rot, val, col){
+  return '<div style="flex:1;text-align:center;min-width:0">'
+    + '<div style="font-size:9px;font-weight:800;color:var(--nbs-muted);letter-spacing:.3px">' + rot + '</div>'
+    + '<div style="font-size:15px;font-weight:900;margin-top:2px;color:' + (col || 'var(--nbs-ink)') + ';'
+    +   'overflow:hidden;text-overflow:ellipsis">' + val + '</div></div>';
+}
+
+// Una tarjeta de aviso, con SU botón para resolverlo
+function _tarjetaAviso(a){
+  var colores = {
+    rojo:     { borde: '#C62828', fondo: 'var(--nbs-red-bg)',   texto: 'var(--nbs-red-text)' },
+    amarillo: { borde: '#E65100', fondo: '#FFF3E0',             texto: '#8D4A00' },
+    azul:     { borde: '#1565C0', fondo: '#E8F1FB',             texto: '#0D47A1' }
+  };
+  var c = colores[a.nivel] || colores.azul;
+  var h = '<div style="background:#fff;border-left:4px solid ' + c.borde + ';border-radius:11px;'
+    + 'padding:12px;margin-bottom:9px;box-shadow:0 1px 3px rgba(0,0,0,.08)">'
+    + '<div style="display:flex;align-items:flex-start;gap:8px">'
+    +   '<span style="font-size:18px;flex-shrink:0">' + a.icono + '</span>'
+    +   '<div style="flex:1;min-width:0">'
+    +     '<div style="font-size:13.5px;font-weight:900;color:' + c.texto + ';line-height:1.3">'
+    +       escaparHtml(a.titulo) + '</div>'
+    +     '<div style="font-size:11.5px;color:var(--nbs-muted);margin-top:4px;line-height:1.55;white-space:pre-line">'
+    +       escaparHtml(a.detalle) + '</div>'
+    +   '</div>'
+    + '</div>'
+    + _botonesDelAviso(a, c)
+    + '</div>';
+  return h;
+}
+
+// 🔑 AQUI ESTA LA FUSION: cada aviso trae el boton que lo resuelve.
+function _botonesDelAviso(a, c){
+  var b = function(txt, fn, principal){
+    return '<button onclick="' + fn + '" style="flex:1;padding:9px 6px;border-radius:8px;'
+      + 'font-size:11.5px;font-weight:800;cursor:pointer;'
+      + (principal
+          ? 'background:' + c.borde + ';color:#fff;border:none'
+          : 'background:#fff;color:' + c.texto + ';border:1px solid ' + c.borde)
+      + '">' + txt + '</button>';
+  };
+  var botones = '';
+  if(a.clave === 'agotados' || a.clave === 'porAcabarse'){
+    botones = b('\u2795 A la lista de relleno', 'asisAgregarAlRelleno(' + _arg(a.clave) + ')', true)
+            + b('\ud83d\udc41\ufe0f Verlos', 'asisVerAgotados(' + _arg(a.clave) + ')');
+  } else if(a.clave === 'callados'){
+    botones = b('\ud83d\udc41\ufe0f Ver qui\u00e9nes son', 'asisVerCallados()', true);
+  } else if(a.clave === 'deudas'){
+    botones = b('\ud83d\udcb5 Ir a cobrar', 'cerrarAsistente();ir(\'p-cxc\')', true)
+            + b('\ud83d\udc41\ufe0f Ver la lista', 'asisVerDeudas()');
+  } else if(a.clave === 'unaVez'){
+    botones = b('\ud83d\udc41\ufe0f Ver los ' + (a.datos ? a.datos.length : '') + '', 'asisVerUnaVez()', true);
+  } else if(a.clave === 'sinGanancia'){
+    botones = b('\ud83d\udcca Ver el margen', 'cerrarAsistente();mostrarMargenProductos()', true);
+  }
+  if(!botones) return '';
+  return '<div style="display:flex;gap:6px;margin-top:9px">' + botones + '</div>';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  🤖 EL ASISTENTE — EL CEREBRO
+//  Mira los datos de Sensei y saca lo que él no está viendo.
+//  Sin internet, sin costo. No adivina: cuenta.
+// ═══════════════════════════════════════════════════════════════════
+
+// Cuántos días pasaron desde una fecha de la app (MM/DD/AAAA)
+function _diasDesde(fechaTxt){
+  var f = parsearFechaVenta(fechaTxt);
+  if(!f || isNaN(f.getTime())) return null;
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+  var d = new Date(f.getTime()); d.setHours(0,0,0,0);
+  return Math.floor((hoy - d) / 86400000);
+}
+
+// Las ventas de verdad: sin canceladas y sin los "Balance inicial"
+function _ventasReales(){
+  return LS('nv', []).filter(function(v){
+    if(v.cancelada) return false;
+    return !esBalanceInicial(v);
+  });
+}
+
+// ── 1. LOS CLIENTES QUE SE CALLARON ──
+// Compraban seguido y llevan MÁS DEL DOBLE de su ritmo sin venir.
+function clientesQueSeCallaron(){
+  var V = _ventasReales();
+  var porCli = {};
+  V.forEach(function(v){
+    var f = parsearFechaVenta(v.fecha);
+    if(!f || isNaN(f.getTime())) return;
+    var k = String(v.cid);
+    if(!porCli[k]) porCli[k] = [];
+    porCli[k].push({ t: f.getTime(), monto: parseFloat(v.total) || 0 });
+  });
+  clientes = LS('ncl', []);
+  var res = [];
+  Object.keys(porCli).forEach(function(k){
+    var lista = porCli[k];
+    if(lista.length < 2) return;
+    lista.sort(function(a,b){ return a.t - b.t; });
+    var suma = 0;
+    for(var i = 1; i < lista.length; i++) suma += (lista[i].t - lista[i-1].t) / 86400000;
+    var ritmo = suma / (lista.length - 1);
+    if(ritmo <= 0) return;
+    var desde = Math.floor((Date.now() - lista[lista.length-1].t) / 86400000);
+    if(desde <= ritmo * 2 || desde <= 20) return;
+    var c = clientes.find(function(x){ return String(x.id) === k; });
+    if(!c || c.sinServicio) return;
+    res.push({
+      cliente: c, ritmo: Math.round(ritmo), diasSinVenir: desde,
+      leCompro: Math.round(lista.reduce(function(s,x){ return s + x.monto; }, 0) * 100) / 100,
+      veces: lista.length
+    });
+  });
+  res.sort(function(a,b){ return b.leCompro - a.leCompro; });
+  return res;
+}
+
+// ── 2. LO QUE SE LE ESTÁ ACABANDO ──
+// Se mira lo que vendió en los últimos 60 días, no el histórico:
+// lo que vendía en marzo no dice nada de lo que necesita hoy.
+function loQueSeAcaba(diasAviso){
+  var tope = diasAviso || 21;
+  var V = _ventasReales();
+  var corte = Date.now() - 60 * 86400000;
+  var vendido = {};
+  V.forEach(function(v){
+    var f = parsearFechaVenta(v.fecha);
+    if(!f || f.getTime() < corte) return;
+    (v.items || []).forEach(function(it){
+      if(!it.pid) return;
+      var k = String(it.pid);
+      vendido[k] = (vendido[k] || 0) + (parseFloat(it.cant) || 0);
+    });
+  });
+  loadProds();
+  var res = [];
+  productos.forEach(function(p){
+    var uds = vendido[String(p.id)] || 0;
+    if(uds < 4) return;                       // menos de 2 al mes: no vale avisar
+    var alMes = uds / 2;
+    var st = parseFloat(p.stock) || 0;
+    var dias = alMes > 0 ? Math.floor(st / (alMes / 30)) : 999;
+    if(dias > tope) return;
+    res.push({ prod: p, stock: st, alMes: Math.round(alMes), diasQueQuedan: Math.max(0, dias) });
+  });
+  res.sort(function(a,b){ return a.diasQueQuedan - b.diasQueQuedan; });
+  return res;
+}
+
+// ── 3. LAS DEUDAS VIEJAS ──
+function deudasViejas(diasMin){
+  var tope = (diasMin === 0 || diasMin > 0) ? diasMin : 30;
+  var V = _ventasReales();
+  clientes = LS('ncl', []);
+  var porCli = {};
+  V.forEach(function(v){
+    if(v.tipo !== 'credito') return;
+    var pg = 0;
+    (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
+    var saldo = (parseFloat(v.total) || 0) - pg;
+    if(saldo <= 0.01) return;
+    var d = _diasDesde(v.fecha);
+    if(d === null || d < tope) return;
+    var k = String(v.cid);
+    if(!porCli[k]) porCli[k] = { debe: 0, facturas: 0, masVieja: 0 };
+    porCli[k].debe += saldo;
+    porCli[k].facturas++;
+    if(d > porCli[k].masVieja) porCli[k].masVieja = d;
+  });
+  var res = [];
+  Object.keys(porCli).forEach(function(k){
+    var c = clientes.find(function(x){ return String(x.id) === k; });
+    if(!c) return;
+    res.push({ cliente: c, debe: Math.round(porCli[k].debe * 100) / 100,
+               facturas: porCli[k].facturas, diasMasVieja: porCli[k].masVieja });
+  });
+  res.sort(function(a,b){ return b.debe - a.debe; });
+  return res;
+}
+
+// ── 4. LOS QUE COMPRARON UNA SOLA VEZ ──
+// Su dinero más fácil: ya lo conocen y ya le compraron.
+function compraronUnaVez(){
+  var V = _ventasReales();
+  var cuenta = {};
+  V.forEach(function(v){
+    var k = String(v.cid);
+    if(!cuenta[k]) cuenta[k] = { veces: 0, monto: 0, ultima: null };
+    cuenta[k].veces++;
+    cuenta[k].monto += parseFloat(v.total) || 0;
+    var d = _diasDesde(v.fecha);
+    if(d !== null && (cuenta[k].ultima === null || d < cuenta[k].ultima)) cuenta[k].ultima = d;
+  });
+  clientes = LS('ncl', []);
+  var res = [];
+  Object.keys(cuenta).forEach(function(k){
+    if(cuenta[k].veces !== 1) return;
+    var c = clientes.find(function(x){ return String(x.id) === k; });
+    if(!c || c.sinServicio) return;
+    res.push({ cliente: c, monto: Math.round(cuenta[k].monto * 100) / 100,
+               diasDesde: cuenta[k].ultima });
+  });
+  res.sort(function(a,b){ return b.monto - a.monto; });
+  return res;
+}
+
+// ── 5. PRODUCTOS QUE CASI NO DEJAN GANANCIA ──
+function sinGanancia(){
+  loadProds();
+  var res = [];
+  productos.forEach(function(p){
+    var pr = parseFloat(p.precio) || 0;
+    var co = parseFloat(p.costo) || 0;
+    if(!pr || !co) return;
+    var g = pr - co;
+    var pct = pr > 0 ? (g / pr * 100) : 0;
+    if(pct >= 15) return;
+    res.push({ prod: p, gana: Math.round(g * 100) / 100, pct: Math.round(pct * 10) / 10 });
+  });
+  res.sort(function(a,b){ return a.pct - b.pct; });
+  return res;
+}
+
+// ── 6. CÓMO LE FUE HOY ──
+function comoMeFueHoy(){
+  var hoy = fechaHoy();
+  var V = _ventasReales().filter(function(v){ return String(v.fecha) === hoy; });
+  var vendido = 0, ganancia = 0, cobrado = 0;
+  V.forEach(function(v){
+    var t = parseFloat(v.total) || 0;
+    vendido += t;
+    ganancia += parseFloat(v.ganancia) || 0;
+    if(v.tipo === 'contado'){ cobrado += t; return; }
+    (v.pagosFactura || []).forEach(function(p){
+      if(!p.esDevolucion && String(p.fecha) === hoy) cobrado += parseFloat(p.monto) || 0;
+    });
+  });
+  // Los abonos de hoy a facturas viejas
+  _ventasReales().forEach(function(v){
+    if(String(v.fecha) === hoy) return;
+    (v.pagosFactura || []).forEach(function(p){
+      if(!p.esDevolucion && String(p.fecha) === hoy) cobrado += parseFloat(p.monto) || 0;
+    });
+  });
+  // Las visitas de hoy
+  var vis = LS('nvisitas_barberos', {});
+  var compro = 0, noCompro = 0;
+  Object.keys(vis).forEach(function(k){
+    (vis[k].compro || []).forEach(function(f){ if(String(f) === hoy) compro++; });
+    (vis[k].noCompro || []).forEach(function(f){ if(String(f) === hoy) noCompro++; });
+  });
+  var r2 = function(n){ return Math.round(n * 100) / 100; };
+  return { facturas: V.length, vendido: r2(vendido), ganancia: r2(ganancia),
+           cobrado: r2(cobrado), visitasCompro: compro, visitasNoCompro: noCompro,
+           pedidosPendientes: LS('npedidos', []).length };
+}
+
+// ═══ TODO JUNTO: LO QUE EL ASISTENTE TIENE QUE DECIRLE ═══
+// Devuelve los avisos ordenados por lo que más le importa al bolsillo.
+function analizarNegocio(){
+  var avisos = [];
+
+  // Lo que se acabó del todo y es de lo que más vende — lo más urgente
+  var acaba = loQueSeAcaba(21);
+  var enCero = acaba.filter(function(x){ return x.stock <= 0; });
+  if(enCero.length){
+    avisos.push({
+      nivel: 'rojo', clave: 'agotados', icono: '\ud83d\udce6',
+      titulo: enCero.length === 1
+        ? 'Se te acab\u00f3 ' + String(enCero[0].prod.nombre).slice(0, 26)
+        : 'Se te acabaron ' + enCero.length + ' productos',
+      detalle: enCero.slice(0, 3).map(function(x){
+        return String(x.prod.nombre).slice(0, 30) + ' \u00b7 vendes ' + x.alMes + ' al mes';
+      }).join('\n'),
+      datos: enCero
+    });
+  }
+  var porAcabarse = acaba.filter(function(x){ return x.stock > 0; });
+  if(porAcabarse.length){
+    avisos.push({
+      nivel: 'amarillo', clave: 'porAcabarse', icono: '\u23f3',
+      titulo: porAcabarse.length + ' producto(s) se te acaban pronto',
+      detalle: porAcabarse.slice(0, 3).map(function(x){
+        return String(x.prod.nombre).slice(0, 26) + ' \u00b7 te quedan ' + x.stock
+             + ' \u00b7 ' + x.diasQueQuedan + ' d\u00edas';
+      }).join('\n'),
+      datos: porAcabarse
+    });
+  }
+
+  // Los que se callaron
+  var callados = clientesQueSeCallaron();
+  if(callados.length){
+    var plata = callados.reduce(function(s,x){ return s + x.leCompro; }, 0);
+    avisos.push({
+      nivel: 'amarillo', clave: 'callados', icono: '\ud83d\udc64',
+      titulo: callados.length === 1
+        ? nombreCl(callados[0].cliente) + ' no viene hace ' + callados[0].diasSinVenir + ' d\u00edas'
+        : callados.length + ' clientes dejaron de venir',
+      detalle: callados.slice(0, 3).map(function(x){
+        return nombreCl(x.cliente).slice(0, 22) + ' \u00b7 ven\u00eda cada ' + x.ritmo
+             + 'd \u00b7 lleva ' + x.diasSinVenir + 'd';
+      }).join('\n') + '\nTe compraron $' + fmtNum(plata),
+      datos: callados
+    });
+  }
+
+  // Las deudas viejas
+  var deudas = deudasViejas(30);
+  if(deudas.length){
+    var total = deudas.reduce(function(s,x){ return s + x.debe; }, 0);
+    avisos.push({
+      nivel: total > 500 ? 'rojo' : 'amarillo', clave: 'deudas', icono: '\ud83d\udcb0',
+      titulo: '$' + fmtNum(total) + ' en deudas de m\u00e1s de 30 d\u00edas',
+      detalle: deudas.slice(0, 3).map(function(x){
+        return nombreCl(x.cliente).slice(0, 22) + ' \u00b7 $' + fmtNum(x.debe)
+             + ' \u00b7 hace ' + x.diasMasVieja + 'd';
+      }).join('\n'),
+      datos: deudas
+    });
+  }
+
+  // Los que compraron una sola vez
+  var unaVez = compraronUnaVez();
+  if(unaVez.length >= 5){
+    avisos.push({
+      nivel: 'azul', clave: 'unaVez', icono: '\ud83c\udfaf',
+      titulo: unaVez.length + ' clientes te compraron UNA sola vez',
+      detalle: 'Ya te conocen y ya te compraron.\nEs tu dinero m\u00e1s f\u00e1cil.',
+      datos: unaVez
+    });
+  }
+
+  // Productos que casi no dejan
+  var flojos = sinGanancia();
+  if(flojos.length){
+    avisos.push({
+      nivel: 'azul', clave: 'sinGanancia', icono: '\ud83d\udcc9',
+      titulo: flojos.length + ' producto(s) casi no te dejan ganancia',
+      detalle: flojos.slice(0, 3).map(function(x){
+        return String(x.prod.nombre).slice(0, 26) + ' \u00b7 ganas $' + fmtNum(x.gana)
+             + ' (' + x.pct + '%)';
+      }).join('\n'),
+      datos: flojos
+    });
+  }
+
+  return avisos;
+}
+
 function guardarUnPedidoMulti(idx){
   var p = pedidosMultiTemp[idx];
   if(!p) return;
@@ -14969,7 +15813,112 @@ function borrarPedido(idx){
   renderBarberiasInicio(document.getElementById('ped-inicio-buscar') ? document.getElementById('ped-inicio-buscar').value : '');
 }
 
+// El botón de abajo dice LO QUE VA A HACER: si está editando un pedido ya guardado
+// dice "Eliminar este pedido" y se pone rojo; si es uno nuevo, "Volver sin guardar".
+// Sensei lo cazó porque decía "Cancelar" y no cancelaba nada. -13 ago-
+function pintarBotonCancelarPedido(){
+  var b = document.getElementById('btn-cancelar-pedido');
+  if(!b) return;
+  var editando = (pedidoEditandoIdx !== null && pedidoEditandoIdx !== undefined);
+  if(editando){
+    b.innerHTML = '\ud83d\uddd1\ufe0f Eliminar este pedido';
+    b.style.background = '#C62828';
+  } else {
+    b.innerHTML = '\u2190 Volver sin guardar';
+    b.style.background = '#546E7A';
+  }
+}
+
+// Los botones de salir dicen LO QUE DE VERDAD HACEN, segun donde este:
+//  · editando un pedido guardado → "Eliminar este pedido" (rojo)
+//  · haciendo uno nuevo          → "Volver sin guardar"
+// Sensei lo cazo probando: el boton decia cancelar y NO CANCELABA NADA. -14 ago-
+function ponerTextoBotonesPedido(){
+  var editando = (pedidoEditandoIdx !== null && pedidoEditandoIdx !== undefined);
+  var arriba = document.getElementById('ped-btn-cancelar-arriba');
+  var abajo  = document.getElementById('ped-btn-cancelar-abajo');
+  var otro   = document.getElementById('btn-cancelar-pedido');
+  if(arriba){
+    arriba.textContent = editando ? '\ud83d\uddd1\ufe0f Eliminar' : '\u2715 Salir';
+    arriba.style.color = editando ? '#B71C1C' : '#546E7A';
+    arriba.style.background = editando ? '#FFEBEE' : '#f5f5f5';
+  }
+  [abajo, otro].forEach(function(b){
+    if(!b) return;
+    b.textContent = editando ? '\ud83d\uddd1\ufe0f Eliminar este pedido' : '\u2190 Volver sin guardar';
+    b.style.background = editando ? '#B71C1C' : '#546E7A';
+  });
+}
+
 function cancelarPedido(){
+  // 🔴 ARREGLADO EL 14 AGO. Sensei: "hice una orden a un cliente y le di a cancelar este
+  // pedido y se salio a donde aparecen los pedidos, PERO NO CANCELO NADA". Tenia razon:
+  // solo limpiaba la pantalla. Y aclaro que esperaba: "era un pedido ya hecho, ya estaba
+  // en el carrito para convertirlo a venta, y esperaba que DESAPARECIERA y que SE BORRARA
+  // DEL CARRITO tambien".
+  if(pedidoEditandoIdx !== null && pedidoEditandoIdx !== undefined){
+    pedidos = LS('npedidos', []);
+    var ped = pedidos[pedidoEditandoIdx];
+    if(ped){
+      var cuantos = (ped.items || []).length;
+      var monto = (ped.items || []).reduce(function(s,it){ return s + ((it.cant||0) * (it.precio||0)); }, 0);
+      if(!confirm('\u00bfEliminar el pedido de ' + (ped.nombre || 'este cliente') + '?\n\n'
+          + cuantos + ' producto(s) \u00b7 $' + fmtNum(monto)
+          + '\n\nVa a desaparecer del carrito. Esto NO se puede deshacer.')) return;
+      pedidos.splice(pedidoEditandoIdx, 1);
+      SS('npedidos', pedidos);
+      _salirDelFormPedido();
+      try { avisoChico('\ud83d\uddd1\ufe0f Pedido eliminado'); } catch(e){}
+      return;
+    }
+  }
+  if((pedItemsTemp || []).length){
+    var totalNuevo = pedItemsTemp.reduce(function(s,it){ return s + ((it.cant||0) * (it.precio||0)); }, 0);
+    if(!confirm('\u00bfSalir SIN GUARDAR este pedido?\n\n' + pedItemsTemp.length + ' producto(s) \u00b7 $'
+        + fmtNum(totalNuevo) + '\n\nSe pierde lo que llevas escrito.')) return;
+  }
+  _salirDelFormPedido();
+}
+
+// Limpia el formulario y vuelve a la lista. Solo la pantalla: no toca datos.
+function _salirDelFormPedido(){
+  document.getElementById('ped-form-wrap').style.display = 'none';
+  document.getElementById('ped-barberia-wrap').style.display = 'none';
+  document.getElementById('ped-barbero-wrap').style.display = 'none';
+  document.getElementById('ped-lista-wrap').style.display = 'block';
+  pedItemsTemp = [];
+  pedidoEditandoIdx = null;
+  pedBarberiaSel = null;
+  pedBarberoCid = null;
+  pedBarberoNombre = null;
+  try { olvidarPedidoEnProceso(); } catch(e){}
+  renderBarberiasInicio('');
+  renderPedidosPendientes();
+  try { renderAvisoPedidoEnProceso(); } catch(e){}
+  subirPantalla();
+}
+
+// Borra un pedido que YA estaba guardado en el carrito, preguntando antes.
+function borrarPedidoDelCarrito(idx){
+  pedidos = LS('npedidos', []);
+  var p = pedidos[idx];
+  if(!p){ salirDelFormularioPedido(); return; }
+  var cuantos = (p.items || []).length;
+  var monto = (p.items || []).reduce(function(s, it){
+    return s + ((parseFloat(it.cant) || 0) * (parseFloat(it.precio) || 0));
+  }, 0);
+  var msg = '\u00bfEliminar el pedido de ' + (p.nombre || 'este cliente') + '?\n\n'
+    + cuantos + ' producto(s) \u00b7 $' + fmtNum(monto)
+    + '\n\nEsto lo saca del carrito y NO se puede deshacer.';
+  if(!confirm(msg)) return;
+  pedidos.splice(idx, 1);
+  SS('npedidos', pedidos);
+  salirDelFormularioPedido();
+  try { avisoChico('\ud83d\uddd1\ufe0f Pedido de ' + (p.nombre || '') + ' eliminado'); } catch(e){}
+}
+
+// Solo cerrar el formulario y volver a la lista. No borra nada.
+function salirDelFormularioPedido(){
   document.getElementById('ped-form-wrap').style.display = 'none';
   document.getElementById('ped-barberia-wrap').style.display = 'none';
   document.getElementById('ped-barbero-wrap').style.display = 'none';
@@ -14981,7 +15930,9 @@ function cancelarPedido(){
   pedBarberoNombre = null;
   renderBarberiasInicio('');
   renderPedidosPendientes();
+  subirPantalla();
 }
+
 
 function filterPed(q){
   loadProds();
@@ -22075,7 +23026,9 @@ function iniciarAppDespuesDeLogin(){
   setTimeout(revisarVersionNueva, 8000);
   setInterval(revisarVersionNueva, 30 * 60 * 1000);
   iniciarVigilanteDeSincronizacion(); // avisa si algo no ha subido a la nube, y reintenta solo
-  iniciarCopiasAutomaticas();         // copia completa cada 2 horas + aviso si algo se borro
+  iniciarCopiasAutomaticas();
+  // 🤖 El asistente: su botón abajo a la derecha, y el puntito con lo que tiene que decirle
+  try { setTimeout(function(){ ponerBotonAsistente(); }, 1500); } catch(eAsis){}         // copia completa cada 2 horas + aviso si algo se borro
   repararDatosIncompletos();
   limpiarDatosGuardadosUnaVez();
   // La app abre en la pantalla de inicio, con los 6 accesos de todos los dias
@@ -28326,7 +29279,7 @@ function verHistorialCliente(cid, modo){
       <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="ped-barberia-buscar" type="text" placeholder="Buscar barbería..." oninput="renderBarberias(this.value)" autocomplete="off"></div>
       <button class="btn" style="background:#546E7A;color:white;font-size:12px" onclick="var n=prompt('Nombre del cliente a verificar:');if(n)diagnosticoBarberias(n);">🔍 Verificar cliente</button>
       <div id="ped-barberia-lista"></div>
-      <button class="btn" style="background:#546E7A;color:white" onclick="cancelarPedido()">← Cancelar</button>
+      <button class="btn" id="btn-cancelar-pedido" style="background:#546E7A;color:white" onclick="cancelarPedido()">← Volver sin guardar</button>
     </div>
   </div>
 
@@ -28357,7 +29310,7 @@ function verHistorialCliente(cid, modo){
           <div id="ped-barberia-actual" style="font-size:12px;color:#aaa;margin-top:2px"></div>
           <div id="ped-balance-actual" style="font-size:13px;font-weight:800;margin-top:4px"></div>
         </div>
-        <button onclick="cancelarPedido()" style="background:#f5f5f5;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px;color:#546E7A;font-weight:600">✕ Cancelar</button>
+        <button id="ped-btn-cancelar-arriba" onclick="cancelarPedido()" style="background:#f5f5f5;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px;color:#546E7A;font-weight:600">✕ Cancelar</button>
       </div>
       <div id="ped-favoritos" style="display:none;margin-bottom:10px"></div>
       <label class="lbl">Buscar producto</label>
@@ -28399,7 +29352,7 @@ function verHistorialCliente(cid, modo){
       </div><!-- cierra ped-nuevo-prod-casa -->
       <div id="pedItems" style="margin:8px 0"></div>
       <button class="btn" style="background:#F9A825;color:#1a1a1a" onclick="savePedido()">✓ Guardar pedido</button>
-      <button class="btn" style="background:#546E7A;color:white" onclick="cancelarPedido()">← Volver a la lista</button>
+      <button class="btn" id="ped-btn-cancelar-abajo" style="background:#546E7A;color:white" onclick="cancelarPedido()">← Volver a la lista</button>
       <div class="snk" id="mk-ped">Pedido guardado</div>
     </div>
   </div>
