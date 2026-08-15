@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260814h-OFICIAL-V2.0">
+<meta name="app-version" content="20260815c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -8730,7 +8730,12 @@ function revisarIntegridad(){
   V.forEach(function(v){
     if(v.cancelada) return;
     totalVendido += (v.total||0);
-    if(v.tipo === 'contado'){ totalCobrado += (v.total||0); return; }
+    if(v.tipo === 'contado'){
+      var _ci = cobradoYDebeDe(v);
+      totalCobrado += _ci.cobrado;
+      totalPorCobrar += _ci.debe;
+      return;
+    }
     var pag = (v.pagosFactura||[]).reduce(function(s,p){ return s+(typeof p.monto==='number'&&!p.esDevolucion?p.monto:0); },0);
     totalCobrado += pag;
     totalPorCobrar += Math.max(0, (v.total||0) - pag);
@@ -9064,7 +9069,7 @@ function calcularReporteClientes(desde, hasta){
     porCliente[k].comprado += (v.total||0);
     porCliente[k].ganancia += (v.ganancia||0);
     if(v.tipo === 'contado'){
-      porCliente[k].pagado += (v.total||0);
+      porCliente[k].pagado += cobradoYDebeDe(v).cobrado;
     } else {
       var pag = (v.pagosFactura||[]).reduce(function(s,p){
         return s + ((typeof p.monto==='number' && !p.esDevolucion) ? p.monto : 0);
@@ -12453,6 +12458,114 @@ function cerrarEdicionProducto(){
   }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  🔄 AL CORREGIR UN NOMBRE, ACTUALIZARLO EN LO PENDIENTE  (15 ago 2026)
+//
+//  Sensei: "si tengo un pedido a medio hacer y me salgo y voy al catálogo
+//  para corregir un nombre, ese nombre corregido no se actualiza cuando
+//  tengo ese producto ya en el carrito del pedido del cliente; debería
+//  actualizarse".
+//
+//  🔑 POR QUÉ PASABA: el carrito guarda una COPIA del nombre
+//  (`items.push({ pid, nombre, ... })`). Al corregir el catálogo, la copia
+//  se queda vieja. Pero el `pid` SÍ está guardado, así que se puede buscar.
+//
+//  ⚠️ LAS VENTAS YA HECHAS NO SE TOCAN. Una factura entregada es un
+//  documento: tiene que coincidir con el papel que tiene el cliente.
+//  Solo se actualiza LO PENDIENTE.
+// ═══════════════════════════════════════════════════════════════════
+function actualizarNombreEnPendientes(pid, nombreNuevo){
+  if(!pid || !nombreNuevo) return { pedidos: 0, carrito: 0, aMedias: 0, relleno: 0 };
+  var pidT = String(pid);
+  var r = { pedidos: 0, carrito: 0, aMedias: 0, relleno: 0 };
+
+  // ── 1. Los pedidos pendientes ──
+  try {
+    var peds = LS('npedidos', []);
+    var cambio = false;
+    peds.forEach(function(p){
+      (p.items || []).forEach(function(it){
+        if(String(it.pid) === pidT && it.nombre !== nombreNuevo){
+          it.nombre = nombreNuevo; cambio = true; r.pedidos++;
+        }
+      });
+    });
+    if(cambio){ SS('npedidos', peds); try { pedidos = LS('npedidos', []); } catch(e){} }
+  } catch(e){}
+
+  // ── 2. El carrito de la venta que esté abierta ──
+  try {
+    if(typeof iV !== 'undefined' && Array.isArray(iV)){
+      iV.forEach(function(it){
+        if(String(it.pid) === pidT && it.nombre !== nombreNuevo){
+          it.nombre = nombreNuevo; r.carrito++;
+        }
+      });
+      if(r.carrito) { try { renderIV(); } catch(e){} }
+    }
+  } catch(e){}
+
+  // ── 3. El pedido a medias de varios barberos ──
+  try {
+    if(typeof pedidosMultiTemp !== 'undefined' && Array.isArray(pedidosMultiTemp)){
+      pedidosMultiTemp.forEach(function(p){
+        (p.items || []).forEach(function(it){
+          if(String(it.pid) === pidT && it.nombre !== nombreNuevo){
+            it.nombre = nombreNuevo; r.aMedias++;
+          }
+        });
+      });
+      if(r.aMedias){
+        try { guardarPedidoEnProceso(); } catch(e){}
+        try { if(pantallaActual() === 'p-ped') renderPedidosMultiples(); } catch(e){}
+      }
+    }
+    // Y el que esté guardado en el aparato, aunque no esté abierto ahora
+    var enProceso = LS('nbs_pedido_en_proceso', null);
+    if(enProceso && enProceso.barberos){
+      var c2 = false;
+      enProceso.barberos.forEach(function(p){
+        (p.items || []).forEach(function(it){
+          if(String(it.pid) === pidT && it.nombre !== nombreNuevo){
+            it.nombre = nombreNuevo; c2 = true; r.aMedias++;
+          }
+        });
+      });
+      if(c2) SS('nbs_pedido_en_proceso', enProceso);
+    }
+  } catch(e){}
+
+  // ── 4. La lista de relleno ──
+  try {
+    var rel = LS('nrelleno', {});
+    var c3 = false;
+    (rel.items || []).forEach(function(it){
+      if(String(it.pid) === pidT && it.nombre && it.nombre !== nombreNuevo){
+        it.nombre = nombreNuevo; c3 = true; r.relleno++;
+      }
+    });
+    if(c3){ SS('nrelleno', rel); try { listaRelleno = LS('nrelleno', {}); } catch(e){} }
+  } catch(e){}
+
+  return r;
+}
+
+// El aviso, solo si de verdad cambió algo en algún sitio
+function avisarNombreActualizado(r){
+  if(!r) return;
+  var total = (r.pedidos || 0) + (r.carrito || 0) + (r.aMedias || 0) + (r.relleno || 0);
+  if(!total) return;
+  var partes = [];
+  if(r.pedidos)  partes.push(r.pedidos + ' en pedidos pendientes');
+  if(r.carrito)  partes.push(r.carrito + ' en la venta que tienes abierta');
+  if(r.aMedias)  partes.push(r.aMedias + ' en el pedido a medias');
+  if(r.relleno)  partes.push(r.relleno + ' en la lista de relleno');
+  try {
+    avisoChico('\ud83d\udd04 Nombre actualizado tambi\u00e9n en ' + partes.join(' y '));
+  } catch(e){}
+}
+
 function guardarEdicionProducto(){
   var marca = limpiarTexto(document.getElementById('ep-marca').value.trim());
   if(!marca){ alert('La marca es requerida'); return; }
@@ -12487,7 +12600,13 @@ function guardarEdicionProducto(){
     precioAntes = (typeof p.precio === 'number') ? p.precio : parseFloat(p.precio) || 0;
     p.marca = marca;
     p.nombreCorto = nombre;
+    // 🔄 Si el nombre cambió, actualizarlo en TODO lo pendiente. -15 ago-
+    var _nomAntes = p.nombre;
     p.nombre = nombreCompleto;
+    if(_nomAntes !== nombreCompleto){
+      try { window._nombresCambiados = window._nombresCambiados || [];
+            window._nombresCambiados.push({ pid: p.id, nombre: nombreCompleto }); } catch(e){}
+    }
     p.cat = cat;
     p.sku = sku;
     p.costo = costo;
@@ -12506,6 +12625,20 @@ function guardarEdicionProducto(){
   var idProductoEditado = productoEditandoId;
   SS('np', productos);
   flash('mk-ep');
+  // 🔄 Aplicar los nombres corregidos a TODO lo pendiente. -15 ago-
+  try {
+    var _cambios = window._nombresCambiados || [];
+    if(_cambios.length){
+      var _tot = { pedidos: 0, carrito: 0, aMedias: 0, relleno: 0 };
+      _cambios.forEach(function(c){
+        var r = actualizarNombreEnPendientes(c.pid, c.nombre);
+        _tot.pedidos += r.pedidos; _tot.carrito += r.carrito;
+        _tot.aMedias += r.aMedias; _tot.relleno += r.relleno;
+      });
+      window._nombresCambiados = [];
+      avisarNombreActualizado(_tot);
+    }
+  } catch(eNom){}
   // Si el COSTO cambio en un producto ya existente, preguntar si fue un error de captura
   // -en cuyo caso se corrige tambien en las ventas ya registradas, para que la ganancia de
   // los reportes pasados quede correcta- o si el costo realmente cambio con el proveedor
@@ -13294,7 +13427,58 @@ function saveV(){
     var fparts = vfechaEl.value.split('-');
     if(fparts.length === 3) fechaVenta = fparts[1]+'/'+fparts[2]+'/'+fparts[0];
   }
-  if(ini > 0) pagosIniciales.push({monto:ini, fecha:fechaVenta, nota:'Pago inicial', metodos: metodosPagoV});
+  // 🔑 EL PAGO NUNCA PUEDE PASARSE DE LA FACTURA. Lo que sobre abona las facturas
+  // viejas -de la mas vieja a la mas nueva- y si todavia sobra, va a credito a favor.
+  // Sensei lo cazo: vendio $34, el cliente debia $20 y le pago $35, y el dolar que
+  // sobro no abono la factura vieja ni quedo a favor: se colgaba como saldo negativo
+  // en la factura nueva. -14 ago-
+  var _paraEsta = Math.min(ini, tot);
+  var _sobra = Math.round((ini - _paraEsta) * 100) / 100;
+  if(_paraEsta > 0) pagosIniciales.push({monto:_paraEsta, fecha:fechaVenta, nota:'Pago inicial', metodos: metodosPagoV});
+
+  var _abonadoAViejas = 0;
+  var _cuantasViejas = 0;
+  if(_sobra > 0.005 && cid){
+    ventas = LS('nv', []);
+    var _viejas = ventas.filter(function(v){
+      if(v.cancelada || String(v.cid) !== String(cid) || v.tipo !== 'credito') return false;
+      var pg = 0;
+      (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
+      return ((parseFloat(v.total) || 0) - pg) > 0.005;
+    }).sort(function(a, b){
+      var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
+      return (fa ? fa.getTime() : 0) - (fb ? fb.getTime() : 0);
+    });
+
+    _viejas.forEach(function(v){
+      if(_sobra <= 0.005) return;
+      var pg = 0;
+      (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
+      var debe = Math.round(((parseFloat(v.total) || 0) - pg) * 100) / 100;
+      var usar = Math.min(_sobra, debe);
+      if(usar <= 0.005) return;
+      if(!v.pagosFactura) v.pagosFactura = [];
+      v.pagosFactura.push({ monto: usar, fecha: fechaVenta,
+                            nota: 'Abono del vuelto de la venta de hoy',
+                            metodos: metodosPagoV });
+      _sobra = Math.round((_sobra - usar) * 100) / 100;
+      _abonadoAViejas = Math.round((_abonadoAViejas + usar) * 100) / 100;
+      _cuantasViejas++;
+    });
+    if(_abonadoAViejas > 0) SS('nv', ventas);
+  }
+
+  var _aFavor = 0;
+  if(_sobra > 0.005 && cid){
+    clientes = LS('ncl', []);
+    var _iCl = clientes.findIndex(function(c){ return c.id === cid; });
+    if(_iCl >= 0){
+      clientes[_iCl].creditoAFavor = Math.round(((clientes[_iCl].creditoAFavor || 0) + _sobra) * 100) / 100;
+      SS('ncl', clientes);
+      _aFavor = _sobra;
+      _sobra = 0;
+    }
+  }
 
   // Si el usuario eligio "Usar credito del cliente" como uno de los metodos de pago,
   // se descuenta ese monto del credito a favor que tenia -nunca se aplica solo, sin que se elija-.
@@ -13369,7 +13553,16 @@ function saveV(){
   verificarFidelidadDespuesDeVenta(cid);
   var ultV = ventas[ventas.length-1];
   var pagadoTotalVenta = pagosIniciales.reduce(function(s,p){ return s+p.monto; }, 0);
-  var msg = 'Venta registrada por $'+fmtNum(tot)+(tipo==='credito'?' - Saldo pendiente: $'+fmtNum(Math.max(0,tot-pagadoTotalVenta)):'')+creditoAplicadoMsg;
+  var _msgVuelto = '';
+  if(_abonadoAViejas > 0.005){
+    _msgVuelto += '\n\n\ud83d\udcb5 Te sobraron $' + fmtNum(_abonadoAViejas)
+      + ' y se le abonaron a ' + _cuantasViejas + ' factura(s) que ten\u00eda pendiente(s).';
+  }
+  if(_aFavor > 0.005){
+    _msgVuelto += '\n\n\ud83d\udcb0 Y quedaron $' + fmtNum(_aFavor)
+      + ' a favor de este cliente para su pr\u00f3xima compra.';
+  }
+  var msg = 'Venta registrada por $'+fmtNum(tot)+(tipo==='credito'?' - Saldo pendiente: $'+fmtNum(Math.max(0,tot-pagadoTotalVenta)):'')+creditoAplicadoMsg+_msgVuelto;
   var accDiv = document.getElementById('venta-acciones');
   if(!accDiv){
     accDiv = document.createElement('div');
@@ -14264,7 +14457,9 @@ function calcularBalancesClientes(){
     // perfil del cliente. Antes esta función miraba TODAS las ventas por igual, y
     // una venta de contado sin su pago completo en pagosFactura se contaba como
     // deuda, aunque el cliente ya había pagado en el momento de la venta.
-    if(v.tipo !== 'credito') return;
+    // 🔴 ANTES se saltaba TODAS las de contado. Pero una de contado MODIFICADA
+    // puede quedar debiendo, y ese dinero no se contaba. -15 ago-
+    if(v.tipo !== 'credito' && cobradoYDebeDe(v).debe <= 0.005) return;
     var pagado = (v.pagosFactura || []).reduce(function(s,p){
       return s + (typeof p.monto === 'number' ? p.monto : 0);
     }, 0);
@@ -14334,8 +14529,12 @@ function descartarPedidoEnProceso(){
   if(!d) return;
   var conItems = d.barberos.filter(function(p){ return p.items && (p.items || []).length; }).length;
   var msj = conItems
-    ? '¿Descartar el pedido a medias?\n\nTiene ' + conItems + ' barbero(s) con productos ya agregados. Se van a perder.'
-    : '¿Descartar el pedido a medias?';
+    ? '\u00bfBotar el pedido que dejaste A MEDIAS?\n\n'
+      + 'Tiene ' + conItems + ' barbero(s) con productos agregados que NO has guardado.\n\n'
+      + '\u26a0\ufe0f Esto NO toca los pedidos que ya guardaste. Esos siguen en Pedidos Pendientes.'
+    : '\u00bfBotar el pedido que dejaste a medias?\n\n'
+      + 'No tiene productos agregados.\n\n'
+      + '\u26a0\ufe0f Esto NO toca los pedidos que ya guardaste.';
   if(!confirm(msj)) return;
   olvidarPedidoEnProceso();
   pedidosMultiTemp = [];
@@ -14390,7 +14589,7 @@ function renderAvisoPedidoEnProceso(){
     +'<div style="font-size:11px;color:var(--nbs-muted);margin-bottom:9px">'+d.barberos.length+' barbero(s) · '+conItems+' con productos · $'+fmtNum(totalMonto)+' · '+cuando+'</div>'
     +'<div style="display:flex;gap:7px">'
     +'<button onclick="retomarPedidoEnProceso()" style="flex:1;padding:10px;background:var(--nbs-gold);color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">↺ Seguir con ese</button>'
-    +'<button onclick="descartarPedidoEnProceso()" style="padding:10px 13px;background:white;color:#888;border:1px solid #ddd;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">Descartar</button>'
+    +'<button onclick="descartarPedidoEnProceso()" style="padding:10px 13px;background:white;color:#888;border:1px solid #ddd;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">🗑️ Botar lo que dejé a medias</button>'
     +'</div></div>';
 }
 
@@ -14504,6 +14703,27 @@ function renderPedidosMultiples(){
     //     pedido normal (arreglado 23 jul, pedido por Sensei: "asi es que lo
     //     quiero donde quiera que toque pedidos rapido o hacer un pedido").
     //     Antes aqui salian como chips chiquitos, dificiles de leer y tocar.
+    // SI YA LO GUARDO, LA TARJETA SE CIERRA. Solo queda la cabecera con el visto.
+    // Sensei lo reporto: al darle a guardar en pedidos rapidos NO SE CERRABA.
+    // Tenia razon: `_abierto` se escribia pero la pantalla nunca lo leia. -14 ago-
+    if(p._guardado){
+      html += '<div style="padding:11px 12px;background:var(--nbs-green-bg);'
+        + 'display:flex;align-items:center;gap:8px">'
+        +   '<span style="font-size:16px">\u2705</span>'
+        +   '<div style="flex:1;min-width:0">'
+        +     '<div style="font-size:12.5px;font-weight:900;color:var(--nbs-green-text)">Pedido guardado</div>'
+        +     '<div style="font-size:10.5px;color:var(--nbs-muted)">Est\u00e1 en Pedidos Pendientes</div>'
+        +   '</div>'
+        +   '<button onclick="event.stopPropagation();reabrirBarberoMulti(' + idx + ')" '
+        +     'style="background:#fff;border:1px solid var(--nbs-green-text);color:var(--nbs-green-text);'
+        +     'border-radius:7px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer">'
+        +     '\u2795 Agregar m\u00e1s</button>'
+        + '</div>';
+      card.innerHTML = html;
+      el.appendChild(card);
+      return;
+    }
+
     p._habituales = productosHabituales(p.cliente.id, ventasParaHabituales);
 
     // ⚡ LO QUE MÁS VENDES — la fila nueva del 12 ago. Sus datos dijeron que los
@@ -15315,6 +15535,57 @@ function imprimirBitacora(){
 var _asistenteAbierto = false;
 
 // ═══════════════════════════════════════════════════════════════════
+//  🔊 ESCUCHAR LO NUEVO  (15 ago 2026)
+//
+//  Sensei, desde la ruta: "no puedo estar leyendo todo lo que me
+//  escribes... si pudiera escucharlo en vez de leerlo fuera mucho mejor".
+//
+//  Usa la misma voz del Asistente. Le lee lo que trae la versión que
+//  acaba de subir, en palabras cortas, sin tecnicismos.
+// ═══════════════════════════════════════════════════════════════════
+var NOVEDADES_VERSION = '20260815c';
+
+var NOVEDADES = [
+  'Esto es lo que arreglamos desde ayer.',
+  'Uno. El dinero escondido. En la ficha de un cliente el DEBE decia treinta y cinco dolares y eran cuarenta y cinco. La app daba por sentado que toda factura de contado estaba pagada completa, y si una se modificaba y quedaba debiendo, ese dinero no lo contaba nadie. Ya esta arreglado en las ocho pantallas donde pasaba.',
+  'Dos. Esa factura tampoco se podia cobrar. No aparecia en la pantalla de recibir pago. Ahora si aparece.',
+  'Tres. El vuelto. Si te pagan de mas, lo que sobra ahora abona las facturas viejas del cliente, de la mas vieja a la mas nueva. Y si todavia sobra, queda a su favor. Antes ese dinero se quedaba colgado.',
+  'Cuatro. Los nombres. Si corriges el nombre de un producto en el catalogo, ahora se actualiza solo en los pedidos pendientes, en el carrito y en la lista de relleno. Las facturas ya hechas no se tocan, porque tienen que coincidir con el papel que tiene el cliente.',
+  'Cinco. La ruta se marca sola cuando vendes. Antes el dia de la semana estaba corrido y marcaba en el dia equivocado. Ya esta bien.',
+  'Seis. En pedidos rapidos, cuando guardas un barbero la tarjeta ahora se cierra sola.',
+  'Y siete. Hay una bitacora nueva de visitas, en Reportes, donde ves todo lo que paso con cada cliente: la hora, si te compro y que se llevo.',
+  'Eso es todo. Todo esto se probo quinientas setenta veces, dos vueltas completas, y el dinero cuadra.'
+];
+
+function hayNovedadesSinEscuchar(){
+  try { return LS('nbs_novedades_oidas', '') !== NOVEDADES_VERSION; } catch(e){ return true; }
+}
+
+function escucharNovedades(){
+  try { SS('nbs_novedades_oidas', NOVEDADES_VERSION); } catch(e){}
+  var b = document.getElementById('asis-btn-novedades');
+  if(b){ b.innerHTML = '\ud83d\udd0a Leyendo... (toca para parar)'; b.onclick = function(){ pararNovedades(); }; }
+  // Se lee con la voz del asistente, aunque él lo tenga callado: lo pidió a propósito
+  var antes = null;
+  try { antes = LS('nbs_asis_voz', null); SS('nbs_asis_voz', true); } catch(e){}
+  try { hablarAsistente(NOVEDADES.join(' ')); } catch(e){}
+  // Devolverle su ajuste cuando termine
+  setTimeout(function(){
+    try { if(antes !== null) SS('nbs_asis_voz', antes); } catch(e){}
+    var b2 = document.getElementById('asis-btn-novedades');
+    if(b2){ b2.innerHTML = '\ud83d\udd0a Escuchar lo nuevo otra vez'; b2.onclick = function(){ escucharNovedades(); }; }
+  }, 90000);
+}
+
+function pararNovedades(){
+  try { pararVozAsistente(); } catch(e){}
+  var b = document.getElementById('asis-btn-novedades');
+  if(b){ b.innerHTML = '\ud83d\udd0a Escuchar lo nuevo otra vez'; b.onclick = function(){ escucharNovedades(); }; }
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════════
 //  🔊 QUE EL ASISTENTE TE HABLE  (14 ago 2026)
 //  Sensei: "pensé que el botón me iba a hablar, que yo iba a poder
 //  escucharlo también". Tiene razon: si le hablas, tiene que contestarte
@@ -15889,6 +16160,16 @@ function abrirAsistente(){
     +     'border:none;border-radius:50%;width:32px;height:32px;font-size:17px;cursor:pointer">\u00d7</button>'
     + '</div></div>';
 
+  // 🔊 ESCUCHAR LO NUEVO — lo primero si acaba de actualizar. -15 ago-
+  h += '<div style="padding:12px 12px 0">'
+    + '<button id="asis-btn-novedades" onclick="escucharNovedades()" '
+    +   'style="width:100%;padding:13px;background:' + (hayNovedadesSinEscuchar() ? '#F9A825' : '#fff')
+    +   ';color:' + (hayNovedadesSinEscuchar() ? '#1a1a1a' : 'var(--nbs-ink)')
+    +   ';border:' + (hayNovedadesSinEscuchar() ? 'none' : '1.5px solid #DDD')
+    +   ';border-radius:12px;font-size:14px;font-weight:900;cursor:pointer">'
+    +   '\ud83d\udd0a ' + (hayNovedadesSinEscuchar() ? 'Escuchar lo nuevo de esta versi\u00f3n' : 'Escuchar lo nuevo otra vez')
+    + '</button></div>';
+
   // Cómo va el día
   h += '<div style="padding:12px 12px 0">'
     + '<div style="background:#fff;border-radius:12px;padding:11px;display:flex;gap:6px">'
@@ -16279,6 +16560,16 @@ function analizarNegocio(){
   }
 
   return avisos;
+}
+
+// Volver a abrir un barbero ya guardado, por si le quiere agregar algo mas.
+// Lo que agregue se guarda como un pedido NUEVO: el que ya guardo no se toca. -14 ago-
+function reabrirBarberoMulti(idx){
+  var p = pedidosMultiTemp[idx];
+  if(!p) return;
+  p._guardado = false;
+  p.items = [];
+  renderPedidosMultiples();
 }
 
 function guardarUnPedidoMulti(idx){
@@ -17008,7 +17299,12 @@ function irAVenderCliente(id){
 // Pedido por Sensei: aplicar pagos desde el perfil sin tener que ir a buscar el cliente en CxC.
 function irACobrarCliente(id){
   ventas = LS('nv',[]);
-  var facturasC = ventas.filter(function(v){ return String(v.cid)===String(id) && v.tipo==='credito' && !v.cancelada; });
+  var facturasC = ventas.filter(function(v){
+    // 🔴 También las de contado MODIFICADAS que quedaron debiendo. -15 ago-
+    if(String(v.cid) !== String(id) || v.cancelada) return false;
+    if(v.tipo === 'credito') return true;
+    return cobradoYDebeDe(v).debe > 0.005;
+  });
   ir('p-cxc');
   setTimeout(function(){
     if(facturasC.length){
@@ -17701,6 +17997,36 @@ function posiblesDuplicadosDe(c, listaClientes){
 var _panelAbierto = null;   // que renglon esta abierto ahora
 
 // ── Los datos de un cliente, todos juntos ──
+
+// ═══════════════════════════════════════════════════════════════════
+//  💵 CUÁNTO SE COBRÓ Y CUÁNTO SE DEBE DE UNA FACTURA  (15 ago 2026)
+//
+//  🔴 EL FALLO QUE CAZÓ SENSEI: en la ficha de José Rodríguez el DEBE
+//  decía $35 y eran $45. Su factura del 26 de junio era de CONTADO,
+//  pero fue MODIFICADA y quedó debiendo $10. Toda la app daba por
+//  sentado que una factura de contado está pagada completa, así que
+//  esos $10 no los contaba NADIE.
+//
+//  🔑 LA REGLA, en un solo sitio para que no se contradigan:
+//    · contado SIN pagos apuntados → pagada completa (así son las de siempre)
+//    · contado CON pagos apuntados → se les hace caso: lo que falte SE DEBE
+//    · a crédito                   → lo de siempre: total menos los abonos
+// ═══════════════════════════════════════════════════════════════════
+function cobradoYDebeDe(v){
+  var t = parseFloat((v && v.total) || 0) || 0;
+  var pagos = (v && v.pagosFactura) || [];
+  var pg = 0;
+  pagos.forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
+  var r2 = function(x){ return Math.round(x * 100) / 100; };
+
+  if(v && v.tipo === 'contado'){
+    if(!pagos.length) return { cobrado: r2(t), debe: 0 };
+    var falta = r2(t - pg);
+    return { cobrado: r2(pg), debe: falta > 0.005 ? falta : 0 };
+  }
+  return { cobrado: r2(pg), debe: r2(t - pg) };
+}
+
 function datosDelCliente(cid){
   ventas = LS('nv', []);
   var suyas = ventas.filter(function(v){ return String(v.cid) === String(cid); });
@@ -17711,9 +18037,26 @@ function datosDelCliente(cid){
     var t = parseFloat(v.total) || 0;
     comprado += t;
     ganancia += (parseFloat(v.ganancia) || 0);
-    if(v.tipo === 'contado'){ pagado += t; return; }
+    // 🔑 La regla vive en cobradoYDebeDe: contado sin pagos = pagada; contado CON
+    // pagos apuntados = se les hace caso. -15 ago-
+    var _cd = cobradoYDebeDe(v);
+    pagado += _cd.cobrado;
+    debe += _cd.debe;
+    return;
     var pg = 0;
     (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
+    if(v.tipo === 'contado'){
+      // Una venta al contado SIN pagos apuntados se cuenta pagada completa: así son
+      // las de siempre. Pero si TIENE pagos apuntados -porque la factura se modificó
+      // después- hay que hacerle caso a lo que digan. Sensei lo cazó: su factura del
+      // 26 de junio era contado, la modificaron, y quedó debiendo $10 que la ficha
+      // no contaba. Decía DEBE $35 cuando eran $45. -15 ago-
+      if(!(v.pagosFactura || []).length){ pagado += t; return; }
+      pagado += pg;
+      var faltaC = Math.round((t - pg) * 100) / 100;
+      if(faltaC > 0.005) debe += faltaC;
+      return;
+    }
     pagado += pg;
     debe += (t - pg);
   });
@@ -19202,7 +19545,13 @@ function guardarProductoIndividualDeMarca(i){
 
   var marcaFinal = (marcaSelInput.value === '__otra__' ? marcaInput.value.trim() : marcaSelInput.value);
   var restoFinal = nombreInput.value.trim();
+  var _nomAntes = p.nombre;
   p.nombre = (marcaFinal ? marcaFinal + ' ' : '') + restoFinal;
+  // 🔄 Si el nombre cambió, se apunta para actualizar lo pendiente. -15 ago-
+  if(_nomAntes !== p.nombre){
+    try { window._nombresCambiados = window._nombresCambiados || [];
+          window._nombresCambiados.push({ pid: p.id, nombre: p.nombre }); } catch(e){}
+  }
   p.nombreCorto = restoFinal;
   p.marca = marcaFinal;
   p.foto = fotoInput ? fotoInput.value : (p.foto || '');
@@ -19227,6 +19576,20 @@ function guardarProductoIndividualDeMarca(i){
 
   SS('np', productos);
   flash('epml-mk-'+i);
+  // 🔄 Aplicar los nombres corregidos a TODO lo pendiente. -15 ago-
+  try {
+    var _cambios = window._nombresCambiados || [];
+    if(_cambios.length){
+      var _tot = { pedidos: 0, carrito: 0, aMedias: 0, relleno: 0 };
+      _cambios.forEach(function(c){
+        var r = actualizarNombreEnPendientes(c.pid, c.nombre);
+        _tot.pedidos += r.pedidos; _tot.carrito += r.carrito;
+        _tot.aMedias += r.aMedias; _tot.relleno += r.relleno;
+      });
+      window._nombresCambiados = [];
+      avisarNombreActualizado(_tot);
+    }
+  } catch(eNom){}
 }
 
 function guardarTodosLosProductosDeMarca(){
@@ -19266,7 +19629,13 @@ function guardarTodosLosProductosDeMarca(){
     if(!nombreInput) return;
     var marcaFinal = (marcaSelInput.value === '__otra__' ? marcaInput.value.trim() : marcaSelInput.value);
     var restoFinal = nombreInput.value.trim();
+    var _nomAntes = p.nombre;
     p.nombre = (marcaFinal ? marcaFinal + ' ' : '') + restoFinal;
+    // 🔄 Si el nombre cambió, se apunta para actualizar lo pendiente. -15 ago-
+    if(_nomAntes !== p.nombre){
+      try { window._nombresCambiados = window._nombresCambiados || [];
+            window._nombresCambiados.push({ pid: p.id, nombre: p.nombre }); } catch(e){}
+    }
     p.nombreCorto = restoFinal;
     p.marca = marcaFinal;
     p.foto = fotoInput ? fotoInput.value : (p.foto || '');
@@ -19294,6 +19663,20 @@ function guardarTodosLosProductosDeMarca(){
 
   SS('np_eliminados', eliminados);
   SS('np', productos);
+  // 🔄 Aplicar los nombres corregidos a TODO lo pendiente. -15 ago-
+  try {
+    var _cambios = window._nombresCambiados || [];
+    if(_cambios.length){
+      var _tot = { pedidos: 0, carrito: 0, aMedias: 0, relleno: 0 };
+      _cambios.forEach(function(c){
+        var r = actualizarNombreEnPendientes(c.pid, c.nombre);
+        _tot.pedidos += r.pedidos; _tot.carrito += r.carrito;
+        _tot.aMedias += r.aMedias; _tot.relleno += r.relleno;
+      });
+      window._nombresCambiados = [];
+      avisarNombreActualizado(_tot);
+    }
+  } catch(eNom){}
   // Antes se quedaba DENTRO de la misma marca, a proposito, "para poder seguir haciendo
   // cambios ahi". Sensei pidio el 27 jul que lo llevara de vuelta al listado de todos los
   // productos, que es lo que espera al terminar de guardar.
@@ -20266,7 +20649,8 @@ function calcularHistorialCxC(){
 
   V.forEach(function(v){
     if(v.cancelada) return;
-    if(v.tipo !== 'credito') return;          // el contado no deja deuda
+    // 🔴 El contado normal no deja deuda, PERO una modificada sí puede. -15 ago-
+    if(v.tipo !== 'credito' && cobradoYDebeDe(v).debe <= 0.005) return;
     var fv = _histFecha(v.fecha);
     var total = parseFloat(v.total) || 0;
     if(fv && total > 0) anota(_histClave(fv), 'fio', total, v.cn || 'sin nombre', v.id);
@@ -20515,7 +20899,15 @@ function renderCxC(q){
 
   // Calculate balance per client DIRECTLY from invoices (pagosFactura) - excluding cancelled
   var balancesPorCliente = {};
-  ventas.filter(function(v){ return v.tipo==='credito' && !v.cancelada; }).forEach(function(v){
+  // 🔴 ANTES solo miraba las de CRÉDITO, así que una factura de contado MODIFICADA
+  // que quedara debiendo NO SE PODÍA COBRAR: ni salía en la lista. Sensei lo cazó:
+  // "cuando toco recibir un pago desde el perfil, la factura de $10 no se ve".
+  // Ahora entra cualquier factura que DEBA algo, según cobradoYDebeDe. -15 ago-
+  ventas.filter(function(v){
+    if(v.cancelada) return false;
+    if(v.tipo === 'credito') return true;
+    return cobradoYDebeDe(v).debe > 0.005;
+  }).forEach(function(v){
     var key = String(v.cid);
     if(!balancesPorCliente[key]) balancesPorCliente[key] = {cid:v.cid, cn:v.cn, total:0, pagado:0};
     balancesPorCliente[key].total += v.total;
@@ -20767,7 +21159,12 @@ function abrirAbono(cid){
   cxcClienteId = cid;
   ventas = LS('nv',[]);
   clientes = LS('ncl',[]);
-  var facturasC = ventas.filter(function(v){ return String(v.cid)===String(cid) && v.tipo==='credito' && !v.cancelada; });
+  var facturasC = ventas.filter(function(v){
+    if(String(v.cid) !== String(cid) || v.cancelada) return false;
+    if(v.tipo === 'credito') return true;
+    // Y las de contado MODIFICADAS que quedaron debiendo: si no, no se pueden cobrar
+    return cobradoYDebeDe(v).debe > 0.005;
+  });
   if(!facturasC.length) return;
   var cl = clientes.find(function(x){ return String(x.id)===String(cid); });
   var cn = cl ? nombreCl(cl) : facturasC[0].cn;
@@ -20798,7 +21195,9 @@ function abrirAbono(cid){
 
   // Show invoices with pending balance
   var facturasCredito = ventas.filter(function(v){
-    return String(v.cid)===String(cid) && v.tipo==='credito';
+    if(String(v.cid) !== String(cid)) return false;
+    if(v.tipo === 'credito') return true;
+    return cobradoYDebeDe(v).debe > 0.005;
   });
   // Las canceladas van AL FINAL de la lista, para que no se confundan con las que
   // de verdad debe. Se siguen viendo -para poder consultarlas- pero marcadas. -1 ago-
@@ -25520,7 +25919,7 @@ function pintarMiniResumen(){
       if(v.cancelada) return;
       if(dentro(v.fecha)){
         vendido += (v.total || 0);
-        if(v.tipo === 'contado') cobrado += (v.total || 0);
+        if(v.tipo === 'contado') cobrado += cobradoYDebeDe(v).cobrado;
       }
       if(v.tipo === 'credito' && v.pagosFactura){
         (v.pagosFactura || []).forEach(function(p){
@@ -25552,7 +25951,7 @@ function pintarDetalleClientes(d0, d1, dentro){
 
     // PAGO: contado del rango + abonos pagados en el rango
     if(v.tipo === 'contado'){
-      if(dentro(v.fecha)) porCli[cid].pago += (v.total || 0);
+      if(dentro(v.fecha)) porCli[cid].pago += cobradoYDebeDe(v).cobrado;
     } else {
       (v.pagosFactura || []).forEach(function(p){
         if(typeof p.monto !== 'number' || p.monto <= 0 || p.esDevolucion) return;
@@ -25647,7 +26046,8 @@ function calcularResumen(){
     if(dentro(v.fecha)){
       var t = v.total || 0;
       vendido += t; nVentas++;
-      if(v.tipo === 'contado'){ contado += t; cobrado += t; nCobros++; }
+      var _cd = cobradoYDebeDe(v);
+      if(v.tipo === 'contado'){ contado += _cd.cobrado; cobrado += _cd.cobrado; if(_cd.cobrado > 0) nCobros++; }
       else { credito += t; }
     }
     // ── COBRADO: abonos pagados en el rango, sea cual sea la fecha de la factura ──
@@ -28748,7 +29148,7 @@ var MINUTOS_SIN_MARCAR = 40;
 function revisarBarberiaSinMarcar(){
   try {
     var lleg = LS(CLAVE_LLEGADAS, {});
-    var hoyKey = DIAS_KEYS[new Date().getDay()];
+    var hoyKey = getDiaHoy();
     var key = 'visitas_' + hoyKey + '_' + fechaMasRecienteParaDia(hoyKey);
     var visitas = LS(key, []);
     var avisados = LS('nbs_avisado_sin_marcar', {});
@@ -28812,7 +29212,7 @@ function correrAutomatismos(){
 function marcarVisitaAutomatica(negocio){
   if(!negocio) return false;
   try {
-    var hoyKey = DIAS_KEYS[new Date().getDay()];
+    var hoyKey = getDiaHoy();
     var rutas  = LS('rutas_por_dia', {});
     var rutaHoy = rutas[hoyKey] || [];
     if(rutaHoy.indexOf(negocio) < 0) return false;      // no está en la ruta de hoy
@@ -28826,7 +29226,7 @@ function marcarVisitaAutomatica(negocio){
     SS(key, visitas);
     try { cancelarRecordatorioBarberia(negocio); } catch(e){}
     // Si está mirando la ruta, que lo vea al momento
-    try { if(pantallaActual() === 'p-ruta') renderRutaDia(hoyKey); } catch(e){}
+    try { if(pantallaActual() === 'p-rutas') renderRutaDia(hoyKey); } catch(e){}
     return true;
   } catch(e){ return false; }
 }
@@ -28847,7 +29247,7 @@ function apuntarTodoDeLaVisita(cl, compro, extra){
 function marcarLlegadaBarberia(negocio){
   if(!negocio) return;
   try{
-    var hoyKey = DIAS_KEYS[new Date().getDay()];
+    var hoyKey = getDiaHoy();
     var rutas  = LS('rutas_por_dia', {});
     var rutaHoy = rutas[hoyKey] || [];
     if(rutaHoy.indexOf(negocio) < 0) return;         // no esta en la ruta de hoy
@@ -28881,7 +29281,7 @@ function revisarRecordatoriosVisita(){
     if(caja && caja.style.display === 'block') return;   // ya hay uno en pantalla
 
     var lleg = LS(CLAVE_LLEGADAS, {});
-    var hoyKey = DIAS_KEYS[new Date().getDay()];
+    var hoyKey = getDiaHoy();
     var key = 'visitas_'+hoyKey+'_'+fechaMasRecienteParaDia(hoyKey);
     var visitas = LS(key, []);
     var ahora = Date.now();
@@ -28925,7 +29325,7 @@ function recvisMarcar(){
   var neg = caja ? caja.getAttribute('data-neg') : '';
   cerrarRecordatorioVisita();
   if(!neg) return;
-  var hoyKey = DIAS_KEYS[new Date().getDay()];
+  var hoyKey = getDiaHoy();
   toggleVisita(hoyKey, neg);     // esto ya guarda la hora y cancela el reloj
 }
 
