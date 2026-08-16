@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260815i-OFICIAL-V2.0">
+<meta name="app-version" content="20260815j-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15604,10 +15604,11 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260815i';
+var NOVEDADES_VERSION = '20260815j';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Lo que me acabas de decir: en la seccion de Sus pagos de cada cliente ahora cada pago tiene su lapiz y su papelera. Lo corriges o lo borras ahi mismo, y el DEBE de arriba se actualiza al momento.',
   'Primero, el fallo que me mandaste en la foto. Cuando tocabas el lapiz de un pago decia: no se encontro el pago. Era culpa mia: el boton pasaba el numero de la factura como texto y la app lo comparaba como numero, asi que nunca coincidian. Ya esta arreglado, y de paso arregle otras veinticuatro funciones que tenian el mismo problema esperando a pasar.',
   'Segundo, los lapices. Tenias razon: yo los habia puesto DENTRO de cada renglon, y habia que abrirlo para verlos. Ahora cada renglon que se puede editar tiene su lapiz A LA VISTA, sin abrir nada. Credito a favor, notas, cada cuanto visitarlo, precios especiales y sus datos.',
   'Uno. En pedidos rapidos ahora ves lo que cada barbero te debe, debajo de su nombre, y sigue ahi despues de guardar el pedido.',
@@ -19053,7 +19054,7 @@ function cambiarCreditoAFavor(cid){
       + 'Antes ten\u00eda $' + fmtNum(actual) + '.')) return;
   clientes[i].creditoAFavor = nuevo;
   SS('ncl', clientes);
-  try { pintarPanelCliente(cid); } catch(e){}
+  try { repintarCuentaCliente(cid); } catch(e){}
   try { avisoChico('\ud83d\udcb0 Cr\u00e9dito a favor: $' + fmtNum(nuevo)); } catch(e){}
 }
 
@@ -19087,7 +19088,7 @@ function editarNotaCliente(cid){
   if(txt === null) return;
   clientes[i].nota = String(txt).trim();
   SS('ncl', clientes);
-  try { pintarPanelCliente(cid); } catch(e){}
+  try { repintarCuentaCliente(cid); } catch(e){}
   try { avisoChico(clientes[i].nota ? '\ud83d\udcdd Nota guardada' : '\ud83d\udcdd Nota borrada'); } catch(e){}
 }
 
@@ -19127,7 +19128,7 @@ function cambiarIntervaloVisita(cid){
   if(isNaN(n) || n < 0){ alert('Escribe un n\u00famero de d\u00edas.'); return; }
   clientes[i].intervaloVisitaDias = n;
   SS('ncl', clientes);
-  try { pintarPanelCliente(cid); } catch(e){}
+  try { repintarCuentaCliente(cid); } catch(e){}
   try { avisoChico(n ? '\ud83d\udcc5 Cada ' + n + ' d\u00edas' : '\ud83d\udcc5 Sin intervalo'); } catch(e){}
 }
 
@@ -19221,7 +19222,7 @@ function cambiarPrecioEspecial(cid, pid){
   if(ya) ya.precio = nuevo;
   else clientes[i].preciosPersonalizados.push({ pid: pid, precio: nuevo });
   SS('ncl', clientes);
-  try { pintarPanelCliente(cid); } catch(e){}
+  try { repintarCuentaCliente(cid); } catch(e){}
   try { avisoChico('\ud83c\udff7\ufe0f ' + String(prod.nombre).slice(0, 18) + ': $' + fmtNum(nuevo)); } catch(e){}
 }
 
@@ -19239,7 +19240,7 @@ function quitarPrecioEspecial(cid, pid){
     return String(x.pid) !== String(pid);
   });
   SS('ncl', clientes);
-  try { pintarPanelCliente(cid); } catch(e){}
+  try { repintarCuentaCliente(cid); } catch(e){}
   try { avisoChico('\ud83c\udff7\ufe0f Precio especial quitado'); } catch(e){}
 }
 
@@ -19292,8 +19293,59 @@ function cambiarSinServicioDesdeCuenta(cid){
   if(!confirm(msg)) return;
   clientes[i].sinServicio = !ahora;
   SS('ncl', clientes);
-  try { pintarPanelCliente(cid); } catch(e){}
+  try { repintarCuentaCliente(cid); } catch(e){}
   try { avisoChico(clientes[i].sinServicio ? '\u23f8\ufe0f Sin servicio' : '\u2705 Con servicio'); } catch(e){}
+}
+
+
+// ── ✏️🗑️ CORREGIR UN PAGO DESDE LA CUENTA DEL CLIENTE  (15 ago 2026)
+//
+// 🔑 SENSEI: "cuando entro a la sección de pagos del cliente NO ME DEJA EDITAR
+// los pagos, ¿no arreglaste eso, por qué?". Tenía razón: ese renglón se quedó
+// de solo mirar. Ahora cada pago tiene su ✏️ y su 🗑️, y al terminar vuelve
+// a la cuenta del cliente, no a otra pantalla.
+function editarPagoDesdeCuenta(vid, pidx, cid){
+  window._pagoVuelveACuenta = cid;
+  window._pagoVuelveAFactura = null;
+  try { abrirEditorPago(vid, pidx); }
+  catch(e){ alert('No se pudo abrir el pago.'); }
+}
+
+function borrarPagoDesdeCuenta(vid, pidx, cid){
+  ventas = LS('nv', []);
+  var v = ventas.find(function(x){ return String(x.id) === String(vid); });
+  if(!v || !v.pagosFactura || v.pagosFactura[pidx] === undefined){
+    alert('No se encontr\u00f3 el pago.'); return;
+  }
+  var p = v.pagosFactura[pidx];
+  if(!confirm('\u00bfBorrar este pago de $' + fmtNum(parseFloat(p.monto) || 0) + '?\n\n'
+      + 'Factura ' + (v.numFactura || String(v.id).slice(-4)) + ' del ' + (v.fecha || '') + '\n\n'
+      + 'La deuda de este cliente va a SUBIR ese mismo monto.\nEsto no se puede deshacer.')) return;
+  v.pagosFactura.splice(pidx, 1);
+  SS('nv', ventas);
+  try { repintarCuentaCliente(cid); } catch(e){}
+  try { renderCxC(''); } catch(e){}
+  try { avisoChico('\ud83d\uddd1\ufe0f Pago borrado'); } catch(e){}
+}
+
+
+// 🔄 REPINTAR LA CUENTA ENTERA, cabecera incluida  (15 ago 2026)
+//
+// 🔴 `pintarPanelCliente` solo repinta la LISTA de renglones — el COMPRÓ / DEBE /
+// TE DEJA de la cabecera lo pinta `verCl`. Así que al corregir un pago, la lista
+// se actualizaba pero el DEBE de arriba se quedaba con el número viejo.
+// Lo destapó una mutación. Ahora todo lo que toca dinero llama aquí.
+function repintarCuentaCliente(cid){
+  if(cid === null || cid === undefined) return;
+  try {
+    // Guardar qué renglón tenía abierto para no cerrárselo
+    var abiertoAntes = _panelAbierto;
+    verCl(cid);
+    _panelAbierto = abiertoAntes;
+    pintarPanelCliente(cid);
+  } catch(e){
+    try { pintarPanelCliente(cid); } catch(e2){}
+  }
 }
 
 function pintarPanelCliente(cid){
@@ -19593,11 +19645,12 @@ function pintarPanelCliente(cid){
   // Sensei: "tampoco veo un récord de pagos que pudiera tenerlo también y no lo tiene".
   var _pagos = [];
   (D.activas || []).forEach(function(v){
-    (v.pagosFactura || []).forEach(function(p){
+    (v.pagosFactura || []).forEach(function(p, i){
       if(p.esDevolucion) return;
       var monto = parseFloat(p.monto) || 0;
       if(monto <= 0.005) return;
       _pagos.push({
+        vid: v.id, idx: i,
         fecha: p.fecha || v.fecha, monto: monto,
         factura: v.numFactura || String(v.id).slice(-4),
         totalFactura: parseFloat(v.total) || 0,
@@ -19609,7 +19662,8 @@ function pintarPanelCliente(cid){
     });
     // Una venta al contado sin pagos apuntados: el pago fue el día de la venta
     if(v.tipo === 'contado' && !(v.pagosFactura || []).length && !v.modificada && !v.ajustadaPorDevolucion){
-      _pagos.push({ fecha: v.fecha, monto: parseFloat(v.total) || 0,
+      _pagos.push({ vid: v.id, idx: null,
+                    fecha: v.fecha, monto: parseFloat(v.total) || 0,
                     factura: v.numFactura || String(v.id).slice(-4),
                     totalFactura: parseFloat(v.total) || 0,
                     metodo: '', nota: 'Pag\u00f3 al momento' });
@@ -19640,7 +19694,19 @@ function pintarPanelCliente(cid){
             +   '</div>'
             + '</div>'
             + '<div style="font-size:13.5px;font-weight:900;color:var(--nbs-green-text);flex-shrink:0">+$'
-            +   fmtNum(p.monto) + '</div></div>';
+            +   fmtNum(p.monto) + '</div>'
+            // ✏️ y 🗑️ para corregir el pago desde aquí mismo. -15 ago-
+            + (p.idx !== null && p.idx !== undefined
+                ? '<button onclick="event.stopPropagation();editarPagoDesdeCuenta(' + _arg(p.vid) + ',' + p.idx + ',' + _arg(K.cliente.id) + ')" '
+                  + 'style="background:#FFF8E1;border:1px solid #F9A825;border-radius:7px;padding:6px 9px;'
+                  + 'font-size:12px;cursor:pointer;flex-shrink:0" title="Corregir este pago">\u270f\ufe0f</button>'
+                  + '<button onclick="event.stopPropagation();borrarPagoDesdeCuenta(' + _arg(p.vid) + ',' + p.idx + ',' + _arg(K.cliente.id) + ')" '
+                  + 'style="background:#FFEBEE;border:1px solid #C62828;border-radius:7px;padding:6px 9px;'
+                  + 'font-size:12px;cursor:pointer;flex-shrink:0" title="Borrar este pago">\ud83d\uddd1\ufe0f</button>'
+                : '<button onclick="event.stopPropagation();verFacturaProfesional(' + _arg(p.vid) + ')" '
+                  + 'style="background:#EEE;border:1px solid #DDD;border-radius:7px;padding:6px 9px;'
+                  + 'font-size:12px;cursor:pointer;flex-shrink:0" title="Ver la factura">\ud83d\udc41\ufe0f</button>')
+            + '</div>';
         }).join('')
       + (_pagos.length > 30
           ? '<div style="font-size:10.5px;color:var(--nbs-muted);text-align:center;padding:6px">y '
@@ -22667,7 +22733,13 @@ function guardarEditorPago(vid, pidx){
   cerrarEditorPago();
   // Si se abrió desde el editor de la factura, volver AHÍ. Una factura saldada no
   // sale en Cuentas por Cobrar, así que abrirAbono dejaría la pantalla vacía. -15 ago-
-  if(window._pagoVuelveAFactura){
+  if(window._pagoVuelveACuenta){
+    // Si se abrió desde la cuenta del cliente, volver AHÍ. -15 ago-
+    var _vc = window._pagoVuelveACuenta;
+    window._pagoVuelveACuenta = null;
+    try { repintarCuentaCliente(_vc); } catch(e){}
+    try { renderCxC(''); } catch(e){}
+  } else if(window._pagoVuelveAFactura){
     var _vf = window._pagoVuelveAFactura;
     window._pagoVuelveAFactura = null;
     try { pintarPagosEnEditorFactura(_vf); } catch(e){}
