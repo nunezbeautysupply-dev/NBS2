@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260815j-OFICIAL-V2.0">
+<meta name="app-version" content="20260815k-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15604,10 +15604,12 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260815j';
+var NOVEDADES_VERSION = '20260815k';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'El boton de Ya lo vi de los avisos NO ESTABA FUNCIONANDO. Culpa mia: el boton mandaba un texto con saltos de linea y el navegador lo rechazaba, asi que no hacia nada. Ya esta arreglado: tocalo y el aviso se marca leido, desaparece y se va al historial.',
+  'Y ahora doce de los quince renglones de la cuenta del cliente tienen su lapiz de editar a la vista. Los tres que no lo tienen son cuentas, no datos: lo que mas compra, las facturas canceladas y lo que te deja. Ponerles un lapiz seria mentirte porque no hay nada que editar ahi.',
   'Lo que me acabas de decir: en la seccion de Sus pagos de cada cliente ahora cada pago tiene su lapiz y su papelera. Lo corriges o lo borras ahi mismo, y el DEBE de arriba se actualiza al momento.',
   'Primero, el fallo que me mandaste en la foto. Cuando tocabas el lapiz de un pago decia: no se encontro el pago. Era culpa mia: el boton pasaba el numero de la factura como texto y la app lo comparaba como numero, asi que nunca coincidian. Ya esta arreglado, y de paso arregle otras veinticuatro funciones que tenian el mismo problema esperando a pasar.',
   'Segundo, los lapices. Tenias razon: yo los habia puesto DENTRO de cada renglon, y habia que abrirlo para verlos. Ahora cada renglon que se puede editar tiene su lapiz A LA VISTA, sin abrir nada. Credito a favor, notas, cada cuanto visitarlo, precios especiales y sus datos.',
@@ -16404,10 +16406,12 @@ function _cajaAsis(rot, val, col){
 
 // Una tarjeta de aviso, con SU botón para resolverlo
 // Marcarlo leído: se va al historial y deja de contar en el puntito. -15 ago-
-function verYMarcarLeido(json){
+function verYMarcarLeido(clave, titulo, nivel, icono){
+  // 🔑 Sin JSON: los saltos de línea dentro del onclick reventaban el botón y
+  // por eso no hacía nada. Se pasan los cuatro datos sueltos. -15 ago-
   try {
-    var a = (typeof json === 'string') ? JSON.parse(json) : json;
-    marcarAvisoLeido(a);
+    marcarAvisoLeido({ clave: clave || '', titulo: titulo || '',
+                       nivel: nivel || '', icono: icono || '' });
     try { abrirAsistente(); } catch(e){}
     try { avisoChico('\u2713 Le\u00eddo \u00b7 est\u00e1 en el historial'); } catch(e){}
   } catch(e){}
@@ -16432,10 +16436,11 @@ function _tarjetaAviso(a){
     +   '</div>'
     + '</div>'
     + _botonesDelAviso(a, c)
-    + '<button onclick="verYMarcarLeido(' + _arg(JSON.stringify({ clave: a.clave || '', titulo: a.titulo || '', detalle: a.detalle || '', nivel: a.nivel || '', icono: a.icono || '' })) + ')" '
-    +   'style="width:100%;margin-top:7px;padding:8px;background:#F4F4F8;border:1px solid #DDD;'
-    +   'color:var(--nbs-muted);border-radius:8px;font-size:11px;font-weight:800;cursor:pointer">'
-    +   '\u2713 Ya lo vi</button>'
+    + '<button onclick="verYMarcarLeido(' + _arg(a.clave || '') + ',' + _arg(a.titulo || '') + ','
+    +   _arg(a.nivel || '') + ',' + _arg(a.icono || '') + ')" '
+    +   'style="width:100%;margin-top:7px;padding:9px;background:#F4F4F8;border:1px solid #DDD;'
+    +   'color:var(--nbs-muted);border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">'
+    +   '\u2713 Ya lo vi'
     + '</div>';
   return h;
 }
@@ -19348,6 +19353,13 @@ function repintarCuentaCliente(cid){
   }
 }
 
+// Llevarlo al programa de fidelidad de ese cliente. -15 ago-
+function irAFidelidadCliente(cid){
+  try { ir('p-fidelidad'); } catch(e){
+    try { togglePanelCl('fidelidad'); } catch(e2){}
+  }
+}
+
 function pintarPanelCliente(cid){
   var el = document.getElementById('cl-panel-completo');
   if(!el) return;
@@ -19476,7 +19488,7 @@ function pintarPanelCliente(cid){
 
   h += _filaPanel('datos', '\ud83d\udcc7', 'Sus datos',
     _tel ? escaparHtml(_tel.length > 15 ? _tel.slice(0, 15) : _tel) : (c.negocio ? 'ver ficha' : ''),
-    null, contDatos);
+    null, contDatos, 'editarCl(' + _arg(cid) + ')');
 
   // ── ⭐ PROGRAMA VIP ──
   if(c.vipActivo){
@@ -19503,7 +19515,7 @@ function pintarPanelCliente(cid){
       }).join('');
       h += _filaPanel('vip', '\u2b50', 'Programa VIP',
         keys.length + ' grupo' + (keys.length>1?'s':'') + (listos ? ' \u00b7 ' + listos + ' \ud83c\udf81' : ''),
-        listos ? '#AD1457' : null, cont);
+        listos ? '#AD1457' : null, cont, 'editarCl(' + _arg(cid) + ')');
     }
   }
 
@@ -19638,7 +19650,7 @@ function pintarPanelCliente(cid){
     + 'style="width:100%;margin-top:6px;padding:9px;background:#1a237e;color:#fff;border:none;border-radius:8px;'
     + 'font-size:11.5px;font-weight:800;cursor:pointer">\ud83d\udccb Ver historial completo</button>';
     h += _filaPanel('facturas', '\ud83d\udcc4', 'Sus facturas',
-      String(D.activas.length) + (D.canceladas ? ' + ' + D.canceladas + ' canc.' : ''), null, contF);
+      String(D.activas.length) + (D.canceladas ? ' + ' + D.canceladas + ' canc.' : ''), null, contF, 'verHistorialCliente(' + _arg(cid) + ')');
   }
 
   // ── 💵 SUS PAGOS — el récord de todo lo que te ha pagado. -15 ago-
@@ -19713,7 +19725,7 @@ function pintarPanelCliente(cid){
             + (_pagos.length - 30) + ' pago(s) m\u00e1s</div>' : '')
     );
     h += _filaPanel('pagos', '\ud83d\udcb5', 'Sus pagos',
-      String(_pagos.length) + ' \u00b7 $' + fmtNum(_totalPagado), null, contPagos);
+      String(_pagos.length) + ' \u00b7 $' + fmtNum(_totalPagado), null, contPagos, 'irACobrarCliente(' + _arg(cid) + ')');
   }
 
   // ── 🏦 LOS RENGLONES NUEVOS DE LA CUENTA (15 ago) ──
@@ -19739,7 +19751,7 @@ function pintarPanelCliente(cid){
     + 'font-size:11.5px;font-weight:800;cursor:pointer">\ud83d\udccd Marcar visita de hoy</button>'
   );
   h += _filaPanel('visitas', '\ud83d\udccd', 'Visitas',
-    c.ultimaVisitaNegocio ? escaparHtml(String(c.ultimaVisitaNegocio).slice(0,10)) : 'ninguna', null, visitasCont);
+    c.ultimaVisitaNegocio ? escaparHtml(String(c.ultimaVisitaNegocio).slice(0,10)) : 'ninguna', null, visitasCont, 'abrirBitacora()');
 
   // ── 🎁 PROGRAMA DE FIDELIDAD (el de los $400) ──
   var fid = null;
@@ -19768,7 +19780,7 @@ function pintarPanelCliente(cid){
       + (listoF ? '' : ' (a\u00fan no llega a la meta)') + '</button>'
     );
     h += _filaPanel('fidelidad', '\ud83c\udf81', 'Programa de Fidelidad',
-      '$' + fmtNum(fid.total) + ' / $' + fmtNum(fid.meta), 'var(--nbs-gold-dark)', contFid);
+      '$' + fmtNum(fid.total) + ' / $' + fmtNum(fid.meta), 'var(--nbs-gold-dark)', contFid, 'irAFidelidadCliente(' + _arg(cid) + ')');
   }
 
   // ── ⚙️ AJUSTES DE ESTE CLIENTE ──
@@ -19795,7 +19807,7 @@ function pintarPanelCliente(cid){
     + btn('\ud83d\udcb2 Precios especiales de este cliente', 'abrirPreciosPersonalizados(' + cid + ')', '#00695C')
     + btn('\ud83d\udcb0 Agregar balance inicial', 'agregarBalanceInicial(' + cid + ')', '#6A1B9A')
     + btn('\ud83d\uddd1\ufe0f Eliminar cliente', 'eliminarCl(' + cid + ')', '#fff', '#B71C1C', '1px solid #B71C1C');
-  h += _filaPanel('ajustes', '\u2699\ufe0f', 'Ajustes', '', null, contAj);
+  h += _filaPanel('ajustes', '\u2699\ufe0f', 'Ajustes', '', null, contAj, 'editarCl(' + _arg(cid) + ')');
 
   // ── 💵 LO QUE TE DEJA ──
   if(D.comprado > 0){
