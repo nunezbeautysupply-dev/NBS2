@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260816a-OFICIAL-V2.0">
+<meta name="app-version" content="20260816b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15860,7 +15860,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260816a';
+var NOVEDADES_VERSION = '20260816b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -16715,7 +16715,7 @@ function _tarjetaAviso(a){
     +   _arg(a.nivel || '') + ',' + _arg(a.icono || '') + ')" '
     +   'style="width:100%;margin-top:7px;padding:9px;background:#F4F4F8;border:1px solid #DDD;'
     +   'color:var(--nbs-muted);border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">'
-    +   '\u2713 Ya lo vi'
+    +   '\u2713 Ya lo vi</button>'
     + '</div>';
   return h;
 }
@@ -17242,7 +17242,7 @@ function analizarNegocio(){
         titulo: pr.fidelidad.length === 1
           ? pr.fidelidad[0].nombre + ' lleg\u00f3 a los $400'
           : pr.fidelidad.length + ' clientes llegaron a los $400',
-        texto: 'Se ganaron el regalo sorpresa: '
+        detalle: 'Se ganaron el regalo sorpresa: '
           + pr.fidelidad.slice(0, 4).map(function(x){
               return x.nombre + ' ($' + fmtNum(x.total) + ')'; }).join(' \u00b7 ')
           + (pr.fidelidad.length > 4 ? ' y ' + (pr.fidelidad.length - 4) + ' m\u00e1s' : ''),
@@ -17255,7 +17255,7 @@ function analizarNegocio(){
         titulo: pr.vip.length === 1
           ? pr.vip[0].nombre + ' se gan\u00f3 un producto GRATIS'
           : pr.vip.length + ' clientes se ganaron un producto GRATIS',
-        texto: pr.vip.slice(0, 4).map(function(x){
+        detalle: pr.vip.slice(0, 4).map(function(x){
             return x.nombre + ': ' + String(x.producto).slice(0, 24) + ' (' + x.cant + ')'; }).join(' \u00b7 '),
         accion: { txt: '\u2b50 Ver a qui\u00e9nes', fn: 'irACl' }
       });
@@ -17264,7 +17264,7 @@ function analizarNegocio(){
       avisos.push({
         nivel: 'azul', clave: 'cercafid', icono: '\ud83d\udcc8',
         titulo: pr.cercaFidelidad.length + ' cliente(s) cerca de los $400',
-        texto: pr.cercaFidelidad.slice(0, 4).map(function(x){
+        detalle: pr.cercaFidelidad.slice(0, 4).map(function(x){
             return x.nombre + ' (le faltan $' + fmtNum(x.falta) + ')'; }).join(' \u00b7 '),
         accion: null
       });
