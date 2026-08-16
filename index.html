@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260815k-OFICIAL-V2.0">
+<meta name="app-version" content="20260815l-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15604,7 +15604,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260815k';
+var NOVEDADES_VERSION = '20260815l';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -16287,6 +16287,19 @@ function cerrarAsistente(){
 }
 
 // ═══ EL PANEL ═══
+
+// 📥 LO QUE TODAVÍA NO HA VISTO  (15 ago 2026)
+//
+// 🔑 Sensei: "ya se borran los anuncios pero sigue diciendo que tiene 5 cosas que
+// decir; después de desaparecer las cosas que tenía que decirme ya no debería
+// repetirlo". Tenía razón: el saludo y la voz contaban TODOS los avisos, no solo
+// los que le faltan por ver. Ahora todo lo que cuenta o habla pasa por aquí.
+function avisosPendientes(){
+  try {
+    return analizarNegocio().filter(function(a){ return !estaLeido(a); });
+  } catch(e){ return []; }
+}
+
 function abrirAsistente(){
   cerrarAsistente();
   _asistenteAbierto = true;
@@ -16302,7 +16315,8 @@ function abrirAsistente(){
     + 'border-radius:18px 18px 0 0;padding:0 0 14px';
 
   var avisos = [];
-  try { avisos = analizarNegocio(); } catch(e){}
+  // 📥 Solo lo que TODAVÍA no ha visto. Si ya lo archivó, no se le repite. -15 ago-
+  try { avisos = avisosPendientes(); } catch(e){}
   var hoy = { facturas: 0, vendido: 0, cobrado: 0 };
   try { hoy = comoMeFueHoy(); } catch(e){}
 
@@ -16365,15 +16379,19 @@ function abrirAsistente(){
     }
     h += '</div>';
 
-    // 📥 EL HISTORIAL
-    var cuantosLeidos = avisosLeidos().length;
-    if(cuantosLeidos){
-      h += '<div style="padding:0 12px 10px">'
-        + '<button onclick="abrirHistorialAvisos()" '
-        +   'style="width:100%;padding:11px;background:#F4F4F8;border:1px solid #DDD;'
-        +   'color:var(--nbs-muted);border-radius:9px;font-size:12px;font-weight:800;cursor:pointer">'
-        +   '\ud83d\udce5 Ver los ' + cuantosLeidos + ' aviso(s) que ya le\u00edste</button></div>';
-    }
+  }
+
+  // 📥 EL HISTORIAL
+  var cuantosLeidos = avisosLeidos().length;
+  if(cuantosLeidos){
+    h += '<div style="padding:0 12px 10px">'
+    + '<button onclick="abrirHistorialAvisos()" '
+    +   'style="width:100%;padding:11px;background:#F4F4F8;border:1px solid #DDD;'
+    +   'color:var(--nbs-muted);border-radius:9px;font-size:12px;font-weight:800;cursor:pointer">'
+    +   '\ud83d\udce5 Ver los ' + cuantosLeidos + ' aviso(s) que ya le\u00edste</button></div>';
+  }
+
+  if(false){
   }
 
   // El micrófono
