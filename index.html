@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260815g-OFICIAL-V2.0">
+<meta name="app-version" content="20260815h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -14627,6 +14627,27 @@ function respaldoDesdeInicio(){
   setTimeout(renderInicio, 400);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  ⚡ LAS SUGERENCIAS, DETRÁS DE UN BOTÓN  (15 ago 2026)
+//
+//  🔑 SENSEI: "en pedidos rápidos el cuadro para cada cliente se hizo muy
+//  grande agregando lo que más se está vendiendo... creo que eso deberías
+//  quitarlo y ponerlo en un lugar que yo pueda tocar un botón y que se
+//  abra en la misma pantalla".
+//
+//  ⚠️ NO SE QUITA, SE ESCONDE. Se midieron sus datos: lo que un cliente
+//  ya compró antes solo cubre el 20% de lo que va a pedir hoy. Quitar
+//  "lo que más vendes" le costaría aciertos. Detrás del botón se tiene
+//  todo sin que el cuadro estorbe.
+// ═══════════════════════════════════════════════════════════════════
+var _sugerenciasAbiertas = {};
+
+function toggleSugerencias(idx){
+  _sugerenciasAbiertas[idx] = !_sugerenciasAbiertas[idx];
+  try { renderPedidosMultiples(); } catch(e){}
+}
+
 function renderPedidosMultiples(){
   var el = document.getElementById('ped-multi-lista');
   if(!el) return;
@@ -14652,6 +14673,11 @@ function renderPedidosMultiples(){
     var prodSel = pidSel ? productos.find(function(x){ return String(x.id)===String(pidSel); }) : null;
     var cantSel = pedMultiCant[idx] || 1;
     var col = p.color || COLORES_BARBERO[idx % COLORES_BARBERO.length];
+    // 💰 SU BALANCE, siempre a la vista — también después de guardar el pedido.
+    // Sensei: "a veces los clientes me preguntan cuánto me deben y ya tengo el
+    // balance de lo que me deben ahí". -15 ago-
+    var _debe = 0;
+    try { _debe = cuentaDeCliente(p.cliente.id).dinero.debe; } catch(eD){}
 
     var card = document.createElement('div');
     card.style.cssText = 'background:white;border-radius:12px;margin-bottom:14px;border:0.5px solid var(--nbs-line);border-left:5px solid '+col.fuerte+';overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)';
@@ -14730,7 +14756,42 @@ function renderPedidosMultiples(){
     // habituales del cliente solo aciertan el 20% de lo que va a pedir hoy; lo que
     // MÁS VENDE en general acierta mucho más. Se saltan los que ya están en el
     // pedido y los que ya salen en sus habituales, para no repetir botones.
+    // 💰 SU BALANCE, debajo del nombre
+    if(_debe > 0.005){
+      html += '<div style="padding:8px 12px;background:var(--nbs-red-bg);'
+        + 'display:flex;align-items:center;justify-content:space-between;gap:8px">'
+        + '<span style="font-size:13px;font-weight:900;color:var(--nbs-red-text)">'
+        +   '\ud83d\udcb0 Te debe $' + fmtNum(_debe) + '</span>'
+        + '</div>';
+    } else {
+      html += '<div style="padding:6px 12px;background:var(--nbs-green-bg)">'
+        + '<span style="font-size:11.5px;font-weight:800;color:var(--nbs-green-text)">'
+        +   '\u2705 No te debe nada</span></div>';
+    }
+
+    // ⚡ EL BOTÓN QUE ABRE LAS SUGERENCIAS. Así el cuadro no estorba. -15 ago-
+    var _abierto = !!_sugerenciasAbiertas[idx];
     if(!p._guardado){
+      var _cuantasSug = 0;
+      try {
+        _cuantasSug = masVendidos(8).filter(function(x){
+          return !(p.items || []).some(function(it){ return String(it.pid) === String(x.prod.id); });
+        }).slice(0, 6).length + (p._habituales || []).length;
+      } catch(e){}
+      if(_cuantasSug){
+        html += '<div style="padding:8px 12px 2px">'
+          + '<button onclick="event.stopPropagation();toggleSugerencias(' + idx + ')" '
+          +   'style="width:100%;padding:10px;background:' + (_abierto ? col.fuerte : '#fff')
+          +   ';color:' + (_abierto ? '#fff' : col.fuerte)
+          +   ';border:1.5px solid ' + col.fuerte + ';border-radius:9px;font-size:12.5px;'
+          +   'font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">'
+          +   '\u26a1 Sugerencias (' + _cuantasSug + ')'
+          +   '<span style="font-size:10px">' + (_abierto ? '\u25b2' : '\u25bc') + '</span>'
+          + '</button></div>';
+      }
+    }
+
+    if(!p._guardado && _abierto){
       var _mv = masVendidos(8).filter(function(x){
         var yaEnPedido = (p.items || []).some(function(it){ return String(it.pid) === String(x.prod.id); });
         var yaEnHabituales = (p._habituales || []).some(function(h){ return String(h.prod.id) === String(x.prod.id); });
@@ -14743,7 +14804,7 @@ function renderPedidosMultiples(){
       }
     }
 
-    if(p._habituales.length && !p._guardado){
+    if(p._habituales.length && !p._guardado && _abierto){
       html += '<div style="padding:9px 12px 2px">'
         +'<div style="font-size:12px;font-weight:700;color:'+col.fuerte+';margin-bottom:6px">\u26A1 LO QUE M\u00c1S COMPRA</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:8px">';
@@ -15543,10 +15604,15 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260815g';
+var NOVEDADES_VERSION = '20260815h';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Uno. En pedidos rapidos ahora ves lo que cada barbero te debe, debajo de su nombre, y sigue ahi despues de guardar el pedido.',
+  'Dos. El cuadro de cada barbero se hizo mas chico. Lo que mas vendes y lo que mas compra el cliente ahora estan detras de un boton que dice Sugerencias, y se abren ahi mismo cuando lo toques.',
+  'Tres. El boton del asistente ahora lo puedes mover. Dejalo apretado un momento y arrastralo donde tu quieras. Ahi se queda.',
+  'Cuatro. Los avisos del asistente funcionan como un correo. Cuando toques Ya lo vi, se marca leido y se va a un historial donde lo puedes volver a ver o borrarlo. El puntito rojo solo cuenta los nuevos.',
+  'Y cinco. Las facturas de cada cliente ahora salen siempre en orden: la mas nueva arriba y la mas vieja abajo.',
   'Lo mas grande: la cuenta del cliente. Cuando entras a un cliente ahora dice CUENTA DE y su nombre, y ahi esta absolutamente todo lo suyo: sus facturas, incluidas las canceladas que antes ni se veian, cada pago que te hizo, sus pedidos pendientes, sus devoluciones, sus visitas, su credito a favor, sus precios especiales y sus notas. Y todo se puede editar ahi mismo, sin salir.',
   'Y algo que te va a ahorrar mucho tiempo: la app ahora se revisa sola una vez al dia. Si el dinero no cuadra, si hay una factura pagada de mas, o si algo esta raro, TE LO DICE ELLA antes de que lo descubras tu. Si todo esta bien, no te molesta.',
   'Tambien los nombres de los clientes ahora se ven mas grandes en todas las pantallas.',
@@ -16081,18 +16147,108 @@ function saludoAsistente(){
 }
 
 // El botón redondo, abajo a la derecha
+
+// ═══════════════════════════════════════════════════════════════════
+//  📍 MOVER EL BOTÓN DEL ASISTENTE  (15 ago 2026)
+//
+//  Se deja apretado un momento y se arrastra donde uno quiera.
+//  Donde lo suelte queda guardado. Un toque normal lo abre igual.
+// ═══════════════════════════════════════════════════════════════════
+function hacerArrastrableAsistente(b){
+  var arrastrando = false, movio = false;
+  var x0 = 0, y0 = 0, r0 = 0, ab0 = 0;
+  var timer = null;
+
+  var empezar = function(e){
+    var t = e.touches ? e.touches[0] : e;
+    x0 = t.clientX; y0 = t.clientY;
+    var cs = getComputedStyle(b);
+    r0 = parseFloat(cs.right) || 16;
+    ab0 = parseFloat(cs.bottom) || 82;
+    movio = false;
+    // Hay que dejarlo apretado medio segundo: así un toque normal lo abre
+    timer = setTimeout(function(){
+      arrastrando = true;
+      b.style.transform = 'scale(1.12)';
+      b.style.opacity = '.85';
+      try { if(navigator.vibrate) navigator.vibrate(25); } catch(err){}
+    }, 400);
+  };
+
+  var mover = function(e){
+    if(!arrastrando) {
+      // Si movió el dedo antes de los 400 ms, no era un arrastre
+      var t0 = e.touches ? e.touches[0] : e;
+      if(Math.abs(t0.clientX - x0) > 8 || Math.abs(t0.clientY - y0) > 8){
+        clearTimeout(timer);
+      }
+      return;
+    }
+    e.preventDefault();
+    var t = e.touches ? e.touches[0] : e;
+    movio = true;
+    var nr = r0 - (t.clientX - x0);
+    var nb = ab0 - (t.clientY - y0);
+    // Que no se salga de la pantalla
+    nr = Math.max(6, Math.min(window.innerWidth - 64, nr));
+    nb = Math.max(6, Math.min(window.innerHeight - 64, nb));
+    b.style.right = nr + 'px';
+    b.style.bottom = nb + 'px';
+  };
+
+  var soltar = function(){
+    clearTimeout(timer);
+    if(arrastrando){
+      arrastrando = false;
+      b.style.transform = '';
+      b.style.opacity = '';
+      var cs = getComputedStyle(b);
+      SS('nbs_asis_pos', { right: Math.round(parseFloat(cs.right) || 16),
+                           bottom: Math.round(parseFloat(cs.bottom) || 82) });
+      try { avisoChico('\ud83d\udccd Ah\u00ed queda el asistente'); } catch(e){}
+    }
+  };
+
+  b.addEventListener('touchstart', empezar, { passive: true });
+  b.addEventListener('touchmove', mover, { passive: false });
+  b.addEventListener('touchend', soltar);
+  b.addEventListener('mousedown', empezar);
+  document.addEventListener('mousemove', mover);
+  document.addEventListener('mouseup', soltar);
+
+  // Si lo arrastró, el toque NO debe abrir el panel
+  var abrirOriginal = b.onclick;
+  b.onclick = function(ev){
+    if(movio){ movio = false; ev.preventDefault(); ev.stopPropagation(); return; }
+    abrirAsistente();
+  };
+}
+
+// Devolverlo a su sitio de siempre
+function devolverBotonAsistente(){
+  try { localStorage.removeItem('nbs_asis_pos'); } catch(e){}
+  var b = document.getElementById('btn-asistente');
+  if(b){ b.style.right = '16px'; b.style.bottom = '82px'; }
+  try { avisoChico('\ud83d\udccd El asistente volvi\u00f3 a su sitio'); } catch(e){}
+}
+
 function ponerBotonAsistente(){
   if(document.getElementById('btn-asistente')) return;
   var b = document.createElement('button');
   b.id = 'btn-asistente';
   b.setAttribute('aria-label', 'Asistente');
   b.onclick = function(){ abrirAsistente(); };
-  b.style.cssText = 'position:fixed;right:16px;bottom:82px;width:58px;height:58px;border-radius:50%;'
+  // 📍 DONDE ÉL LO DEJÓ LA ÚLTIMA VEZ. Sensei: "el botón del asistente a veces me
+  // estorba, ¿puedes ponerlo que yo lo pueda mover?". -15 ago-
+  var pos = LS('nbs_asis_pos', null) || { right: 16, bottom: 82 };
+  b.style.cssText = 'position:fixed;right:' + pos.right + 'px;bottom:' + pos.bottom + 'px;'
+    + 'width:58px;height:58px;border-radius:50%;'
     + 'background:linear-gradient(135deg,#1a237e,#3949AB);color:#fff;border:none;font-size:25px;'
     + 'box-shadow:0 4px 14px rgba(26,35,126,.45);cursor:pointer;z-index:99990;'
-    + 'display:flex;align-items:center;justify-content:center;padding:0';
+    + 'display:flex;align-items:center;justify-content:center;padding:0;touch-action:none';
   b.innerHTML = '\ud83e\udd16';
   document.body.appendChild(b);
+  hacerArrastrableAsistente(b);
   pintarPuntoAsistente();
 }
 
@@ -16104,7 +16260,8 @@ function pintarPuntoAsistente(){
   if(viejo && viejo.parentNode) viejo.parentNode.removeChild(viejo);
   var n = 0;
   try {
-    n = analizarNegocio().filter(function(a){ return a.nivel === 'rojo' || a.nivel === 'amarillo'; }).length;
+    // 📥 Solo los que NO ha leído — como el puntito de un correo. -15 ago-
+    n = analizarNegocio().filter(function(a){ return (a.nivel === 'rojo' || a.nivel === 'amarillo') && !estaLeido(a); }).length;
   } catch(e){}
   if(!n) return;
   var p = document.createElement('span');
@@ -16188,11 +16345,30 @@ function abrirAsistente(){
     h += '<div style="padding:20px 16px;text-align:center;color:var(--nbs-muted);font-size:13px">'
       + '\u2705 No veo nada que te est\u00e9 costando dinero ahora mismo.</div>';
   } else {
+    // 📥 COMO UN CORREO: solo los NUEVOS. Los leídos se van al historial. -15 ago-
+    var nuevos = avisos.filter(function(a){ return !estaLeido(a); });
     h += '<div style="padding:12px">';
-    avisos.forEach(function(a){
-      h += _tarjetaAviso(a);
-    });
+    if(!nuevos.length){
+      h += '<div style="background:var(--nbs-green-bg);border-radius:10px;padding:16px;text-align:center">'
+        + '<div style="font-size:24px">\u2705</div>'
+        + '<div style="font-size:13px;font-weight:800;color:var(--nbs-green-text);margin-top:5px">'
+        +   'Ya viste todo</div>'
+        + '<div style="font-size:11px;color:var(--nbs-muted);margin-top:3px">'
+        +   'No hay avisos nuevos.</div></div>';
+    } else {
+      nuevos.forEach(function(a){ h += _tarjetaAviso(a); });
+    }
     h += '</div>';
+
+    // 📥 EL HISTORIAL
+    var cuantosLeidos = avisosLeidos().length;
+    if(cuantosLeidos){
+      h += '<div style="padding:0 12px 10px">'
+        + '<button onclick="abrirHistorialAvisos()" '
+        +   'style="width:100%;padding:11px;background:#F4F4F8;border:1px solid #DDD;'
+        +   'color:var(--nbs-muted);border-radius:9px;font-size:12px;font-weight:800;cursor:pointer">'
+        +   '\ud83d\udce5 Ver los ' + cuantosLeidos + ' aviso(s) que ya le\u00edste</button></div>';
+    }
   }
 
   // El micrófono
@@ -16224,6 +16400,16 @@ function _cajaAsis(rot, val, col){
 }
 
 // Una tarjeta de aviso, con SU botón para resolverlo
+// Marcarlo leído: se va al historial y deja de contar en el puntito. -15 ago-
+function verYMarcarLeido(json){
+  try {
+    var a = (typeof json === 'string') ? JSON.parse(json) : json;
+    marcarAvisoLeido(a);
+    try { abrirAsistente(); } catch(e){}
+    try { avisoChico('\u2713 Le\u00eddo \u00b7 est\u00e1 en el historial'); } catch(e){}
+  } catch(e){}
+}
+
 function _tarjetaAviso(a){
   var colores = {
     rojo:     { borde: '#C62828', fondo: 'var(--nbs-red-bg)',   texto: 'var(--nbs-red-text)' },
@@ -16243,6 +16429,10 @@ function _tarjetaAviso(a){
     +   '</div>'
     + '</div>'
     + _botonesDelAviso(a, c)
+    + '<button onclick="verYMarcarLeido(' + _arg(JSON.stringify({ clave: a.clave || '', titulo: a.titulo || '', detalle: a.detalle || '', nivel: a.nivel || '', icono: a.icono || '' })) + ')" '
+    +   'style="width:100%;margin-top:7px;padding:8px;background:#F4F4F8;border:1px solid #DDD;'
+    +   'color:var(--nbs-muted);border-radius:8px;font-size:11px;font-weight:800;cursor:pointer">'
+    +   '\u2713 Ya lo vi</button>'
     + '</div>';
   return h;
 }
@@ -16476,6 +16666,144 @@ function comoMeFueHoy(){
 
 // ═══ TODO JUNTO: LO QUE EL ASISTENTE TIENE QUE DECIRLE ═══
 // Devuelve los avisos ordenados por lo que más le importa al bolsillo.
+
+// ═══════════════════════════════════════════════════════════════════
+//  📥 LA BANDEJA DE AVISOS — como un correo
+//
+//  Los avisos NUEVOS salen arriba. Al tocarlos se marcan LEÍDOS y se
+//  van al historial, donde él los puede volver a ver o borrar.
+//  El puntito rojo solo cuenta los NUEVOS.
+// ═══════════════════════════════════════════════════════════════════
+var LEIDOS = 'nbs_avisos_leidos';
+
+function avisosLeidos(){
+  try {
+    var l = LS(LEIDOS, []);
+    return Array.isArray(l) ? l : [];
+  } catch(e){ return []; }
+}
+
+// Cada aviso se reconoce por su clave + lo que dice, para que si el número
+// cambia (de 5 agotados a 7) vuelva a salir como nuevo. -15 ago-
+function huellaDeAviso(a){
+  return String(a.clave || '') + '|' + String(a.titulo || '').slice(0, 60);
+}
+
+function estaLeido(a){
+  var h = huellaDeAviso(a);
+  return avisosLeidos().some(function(x){ return x.huella === h; });
+}
+
+function marcarAvisoLeido(a){
+  try {
+    var l = avisosLeidos();
+    var h = huellaDeAviso(a);
+    if(l.some(function(x){ return x.huella === h; })) return;
+    l.unshift({
+      huella: h, clave: a.clave || '', titulo: a.titulo || '',
+      detalle: a.detalle || a.texto || '', nivel: a.nivel || '',
+      icono: a.icono || '\ud83d\udcac', cuando: fechaHoy(), hora: horaAhora12()
+    });
+    if(l.length > 120) l = l.slice(0, 120);
+    SS(LEIDOS, l);
+    try { pintarPuntoAsistente(); } catch(e){}
+  } catch(e){}
+}
+
+function borrarDelHistorial(huella){
+  try {
+    var l = avisosLeidos().filter(function(x){ return x.huella !== huella; });
+    SS(LEIDOS, l);
+    renderHistorialAvisos();
+    try { avisoChico('\ud83d\uddd1\ufe0f Borrado'); } catch(e){}
+  } catch(e){}
+}
+
+function borrarTodoElHistorial(){
+  if(!confirm('\u00bfBorrar TODO el historial de avisos?\n\n'
+      + 'Son ' + avisosLeidos().length + ' aviso(s) que ya leíste.\n'
+      + 'Esto no toca ning\u00fan dato de tu negocio.')) return;
+  SS(LEIDOS, []);
+  renderHistorialAvisos();
+  try { avisoChico('\ud83d\uddd1\ufe0f Historial vac\u00edo'); } catch(e){}
+}
+
+// Volver a poner un aviso como NUEVO
+function marcarComoNoLeido(huella){
+  try {
+    var l = avisosLeidos().filter(function(x){ return x.huella !== huella; });
+    SS(LEIDOS, l);
+    renderHistorialAvisos();
+    try { pintarPuntoAsistente(); } catch(e){}
+    try { avisoChico('\ud83d\udce5 Vuelve a salir como nuevo'); } catch(e){}
+  } catch(e){}
+}
+
+// ── EL HISTORIAL ──
+function abrirHistorialAvisos(){
+  var ov = document.getElementById('hist-avisos-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'hist-avisos-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99992;'
+    + 'display:flex;align-items:flex-end;justify-content:center';
+  ov.innerHTML = '<div id="hist-avisos-caja" style="background:#fff;border-radius:16px 16px 0 0;'
+    + 'width:100%;max-width:440px;max-height:82vh;overflow:auto"></div>';
+  renderHistorialAvisos();
+}
+
+function cerrarHistorialAvisos(){
+  var ov = document.getElementById('hist-avisos-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function renderHistorialAvisos(){
+  var caja = document.getElementById('hist-avisos-caja');
+  if(!caja) return;
+  var l = avisosLeidos();
+  var h = '<div style="position:sticky;top:0;background:#fff;padding:14px 14px 10px;'
+    + 'border-bottom:1px solid #EEE;display:flex;align-items:center;justify-content:space-between;gap:8px">'
+    + '<div><div style="font-size:15.5px;font-weight:900;color:var(--nbs-ink)">\ud83d\udce5 Avisos le\u00eddos</div>'
+    +   '<div style="font-size:11px;color:var(--nbs-muted)">' + l.length + ' en el historial</div></div>'
+    + '<button onclick="cerrarHistorialAvisos()" style="background:#EEE;border:none;border-radius:9px;'
+    +   'padding:8px 12px;font-size:14px;cursor:pointer">\u2715</button></div>';
+
+  h += '<div style="padding:12px 14px">';
+  if(!l.length){
+    h += '<div style="text-align:center;padding:26px 12px;color:var(--nbs-muted);font-size:12.5px;line-height:1.6">'
+      + 'Todav\u00eda no has le\u00eddo ning\u00fan aviso.<br><br>'
+      + 'Cuando toques un aviso del asistente, se marca le\u00eddo y viene a parar aqu\u00ed.</div>';
+  } else {
+    l.forEach(function(x){
+      h += '<div style="background:#F7F7FB;border-radius:10px;padding:10px;margin-bottom:8px">'
+        + '<div style="display:flex;align-items:flex-start;gap:8px">'
+        +   '<span style="font-size:17px;flex-shrink:0">' + (x.icono || '\ud83d\udcac') + '</span>'
+        +   '<div style="flex:1;min-width:0">'
+        +     '<div style="font-size:12.5px;font-weight:800;color:var(--nbs-ink);line-height:1.35">'
+        +       escaparHtml(String(x.titulo || '')) + '</div>'
+        +     '<div style="font-size:10.5px;color:var(--nbs-muted);margin-top:2px">'
+        +       escaparHtml(String(x.cuando || '')) + ' \u00b7 ' + escaparHtml(String(x.hora || '')) + '</div>'
+        +   '</div>'
+        + '</div>'
+        + '<div style="display:flex;gap:6px;margin-top:8px">'
+        +   '<button onclick="marcarComoNoLeido(' + _arg(x.huella) + ')" '
+        +     'style="flex:1;padding:7px;background:#fff;border:1px solid #BBB;color:var(--nbs-ink);'
+        +     'border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">\ud83d\udce5 Que vuelva a salir</button>'
+        +   '<button onclick="borrarDelHistorial(' + _arg(x.huella) + ')" '
+        +     'style="padding:7px 12px;background:#FFEBEE;border:1px solid #C62828;color:#C62828;'
+        +     'border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">\ud83d\uddd1\ufe0f</button>'
+        + '</div></div>';
+    });
+    h += '<button onclick="borrarTodoElHistorial()" class="btn" '
+      + 'style="width:100%;margin-top:6px;background:#fff;border:1.5px solid #C62828;color:#C62828">'
+      + '\ud83d\uddd1\ufe0f Borrar todo el historial</button>';
+  }
+  h += '</div>';
+  caja.innerHTML = h;
+}
+
 function analizarNegocio(){
   var avisos = [];
 
@@ -22019,7 +22347,11 @@ function abrirAbono(cid){
   // Las canceladas van AL FINAL de la lista, para que no se confundan con las que
   // de verdad debe. Se siguen viendo -para poder consultarlas- pero marcadas. -1 ago-
   facturasCredito.sort(function(a, b){
-    return (a.cancelada ? 1 : 0) - (b.cancelada ? 1 : 0);
+    // Las canceladas al final; el resto por fecha, la MÁS NUEVA ARRIBA. -15 ago-
+    var c = (a.cancelada ? 1 : 0) - (b.cancelada ? 1 : 0);
+    if(c !== 0) return c;
+    var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
+    return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
   });
 
 
