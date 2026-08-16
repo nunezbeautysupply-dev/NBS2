@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260815l-OFICIAL-V2.0">
+<meta name="app-version" content="20260816a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5219,7 +5219,12 @@ function verificarVIPdespuesDeVenta(cid, itemsVendidos){
   if(!cid) return;
   clientes=LS('ncl',[]);
   var cl=clientes.find(function(c){ return String(c.id)===String(cid); });
-  if(!cl||!cl.vipActivo) return;
+  // 🎁 EL VIP CUENTA PARA TODOS. Antes exigía `vipActivo` encendido a mano y NINGÚN
+  // cliente lo tenía, así que el aviso del producto gratis nunca saltaba — Eric Young
+  // llevaba 12 y Sensei no se enteró. Ahora entran todos menos consignación y
+  // sin servicio, que es lo que decide clienteCuentaVIP. -15 ago-
+  if(!cl) return;
+  if(!clienteCuentaVIP(cl)) return;
   loadProds();
   var vip=calcVIP(cid);
   var alertas=[];
@@ -13113,7 +13118,8 @@ function pedirFirmaCliente(){
     +'<canvas id="firma-canvas" width="400" height="130" style="width:100%;height:130px;border:2px dashed #bbb;border-radius:10px;background:#FAFAFA;touch-action:none;display:block"></canvas>'
     +'<div style="display:flex;gap:8px;margin-top:12px">'
     +'<button onclick="limpiarFirma()" style="flex:1;padding:11px;background:#FFF3E0;color:#E65100;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🔄 Borrar</button>'
-    +'<button onclick="cancelarFirma()" style="flex:1;padding:11px;background:#F0F0F5;color:#333;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>'
+    +'<button onclick="venderSinFirma()" style="flex:1.2;padding:11px;background:#fff;color:#00695C;border:1.5px solid #00695C;border-radius:8px;font-size:12.5px;font-weight:800;cursor:pointer">\u2713 No hace falta firma</button>'
+    +'<button onclick="cancelarFirma()" style="flex:.8;padding:11px;background:#F0F0F5;color:#333;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer">Cancelar</button>'
     +'<button onclick="guardarFirmaYVenta()" style="flex:1.4;padding:11px;background:#2E7D32;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✓ Firmar y guardar</button>'
     +'</div>'
     +'</div>';
@@ -13267,6 +13273,23 @@ function cancelarFirma(){
   var o = document.getElementById('firma-canvas-overlay');
   if(o) o.style.display = 'none';
   // No guarda nada; el usuario puede volver a darle a Registrar venta
+}
+
+
+// ✅ CERRAR LA VENTA SIN FIRMA  (15 ago 2026)
+//
+// 🔑 SENSEI: "no quiero que sea obligatoria porque ahora mismo no me deja cerrar
+// una venta si no se pone una firma... sí quiero que pida la firma siempre, pero
+// si yo digo que no es necesario que AHÍ MISMO se haga la venta".
+//
+// Antes, "Cancelar" solo cerraba el recuadro y había que empezar la venta de nuevo.
+// Ahora hay un botón que la cierra en el momento, sin firma.
+function venderSinFirma(){
+  var o = document.getElementById('firma-canvas-overlay');
+  if(o) o.style.display = 'none';
+  window._firmaVentaActual = null;
+  window._firmaFechaActual = null;
+  try { saveV(); } catch(e){ alert('No se pudo registrar la venta.'); }
 }
 
 function guardarFirmaYVenta(){
@@ -14648,6 +14671,235 @@ function toggleSugerencias(idx){
   try { renderPedidosMultiples(); } catch(e){}
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  💵 COBRARLE DESDE PEDIDOS RÁPIDOS
+//
+//  ⚠️ ESTO NO ESCRIBE PAGOS POR SU CUENTA. Usa `facturasQueDebenDe`
+//  (que ya ordena de la más vieja a la más nueva) y reparte con la
+//  misma regla de `planDeReparto`, que lleva funcionando desde julio.
+// ═══════════════════════════════════════════════════════════════════
+function cobrarDesdePedidos(cid){
+  clientes = LS('ncl', []);
+  var cl = clientes.find(function(c){ return String(c.id) === String(cid); });
+  if(!cl){ alert('No encontr\u00e9 ese cliente.'); return; }
+
+  var K = cuentaDeCliente(cid);
+  var debe = K.dinero.debe;
+  if(debe <= 0.005){ avisoGrande('\u2705 ' + nombreCl(cl) + ' no te debe nada.'); return; }
+
+  // Sus facturas, de la MÁS VIEJA a la más nueva — la misma función de siempre
+  var pendientes = facturasQueDebenDe(cid, null);
+
+  var h = '<div style="padding:16px">';
+  h += '<div style="font-size:10px;font-weight:900;color:var(--nbs-muted);letter-spacing:1px">COBRARLE A</div>';
+  h += '<div style="font-size:19px;font-weight:900;color:var(--nbs-ink);line-height:1.2;margin-bottom:2px">'
+    + escaparHtml(nombreCl(cl)) + '</div>';
+  if(cl.negocio) h += '<div style="font-size:11.5px;color:var(--nbs-muted);margin-bottom:12px">\ud83c\udfea '
+    + escaparHtml(cl.negocio) + '</div>';
+
+  h += '<div style="background:var(--nbs-red-bg);border-radius:11px;padding:12px;margin-bottom:13px;text-align:center">'
+    + '<div style="font-size:10.5px;font-weight:800;color:var(--nbs-muted);letter-spacing:.5px">TE DEBE</div>'
+    + '<div style="font-size:27px;font-weight:900;color:var(--nbs-red-text);line-height:1.1">$'
+    +   fmtNum(debe) + '</div>'
+    + '<div style="font-size:11px;color:var(--nbs-muted);margin-top:2px">'
+    +   pendientes.length + ' factura(s) sin saldar</div>'
+    + '</div>';
+
+  // Las facturas, de la más vieja a la más nueva
+  h += '<div style="font-size:10.5px;font-weight:900;color:var(--nbs-muted);margin-bottom:6px;letter-spacing:.5px">'
+    + 'SE VA A APLICAR EN ESTE ORDEN (la m\u00e1s vieja primero)</div>';
+  h += '<div id="cobped-facturas" style="margin-bottom:13px">';
+  pendientes.slice(0, 8).forEach(function(f, i){
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;'
+      + 'padding:8px 10px;background:#F7F7FB;border-radius:8px;margin-bottom:5px">'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:12px;font-weight:800;color:var(--nbs-ink)">'
+      +     (i + 1) + '. ' + escaparHtml(String(f.fecha || '')) + '</div>'
+      +   '<div style="font-size:10px;color:var(--nbs-muted)">factura ' + escaparHtml(String(f.nf || '')) + '</div>'
+      + '</div>'
+      + '<div id="cobped-f-' + f.id + '" style="font-size:13px;font-weight:900;color:var(--nbs-red-text)">$'
+      +   fmtNum(f.saldo) + '</div></div>';
+  });
+  if(pendientes.length > 8){
+    h += '<div style="font-size:10.5px;color:var(--nbs-muted);text-align:center">y '
+      + (pendientes.length - 8) + ' m\u00e1s</div>';
+  }
+  h += '</div>';
+
+  // Cuánto le paga
+  h += '<label class="lbl">\u00bfCU\u00c1NTO TE EST\u00c1 PAGANDO?</label>';
+  h += '<input class="inp" id="cobped-monto" type="number" inputmode="decimal" step="0.01" '
+    + 'placeholder="0.00" oninput="previewCobroPedidos(' + _arg(cid) + ')" '
+    + 'style="font-size:22px;font-weight:900;text-align:center;padding:14px">';
+
+  // Los botones rápidos
+  h += '<div style="display:flex;gap:6px;margin:8px 0 12px">'
+    + '<button onclick="ponerMontoCobro(' + _arg(cid) + ',' + debe + ')" class="btn" '
+    +   'style="flex:1;margin:0;padding:10px;background:#00695C;color:#fff;font-size:12px">'
+    +   'Todo ($' + fmtNum(debe) + ')</button>';
+  if(pendientes.length){
+    h += '<button onclick="ponerMontoCobro(' + _arg(cid) + ',' + pendientes[0].saldo + ')" class="btn" '
+      + 'style="flex:1;margin:0;padding:10px;background:#fff;border:1.5px solid #00695C;color:#00695C;font-size:12px">'
+      + 'La m\u00e1s vieja ($' + fmtNum(pendientes[0].saldo) + ')</button>';
+  }
+  h += '</div>';
+
+  // La forma de pago
+  h += '<label class="lbl">\u00bfC\u00d3MO TE PAG\u00d3?</label>';
+  h += '<select class="inp" id="cobped-metodo">'
+    + '<option value="efectivo">\ud83d\udcb5 Efectivo</option>'
+    + '<option value="cashapp">\ud83d\udcf1 CashApp</option>'
+    + '<option value="zelle">\ud83c\udfe6 Zelle</option>'
+    + '</select>';
+
+  // Lo que va a pasar
+  h += '<div id="cobped-preview" style="margin:12px 0"></div>';
+
+  h += '<div style="display:flex;gap:8px;margin-top:6px">'
+    + '<button onclick="cerrarCobroPedidos()" class="btn" '
+    +   'style="flex:.8;margin:0;background:#F0F0F5;color:#333">Cancelar</button>'
+    + '<button onclick="aplicarCobroPedidos(' + _arg(cid) + ')" class="btn" '
+    +   'style="flex:1.4;margin:0;background:#00695C;color:#fff;font-weight:900">'
+    +   '\u2713 Registrar el pago</button>'
+    + '</div>';
+  h += '</div>';
+
+  var ov = document.getElementById('cobped-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'cobped-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99993;'
+    + 'display:flex;align-items:flex-end;justify-content:center;overflow:auto';
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:440px;'
+    + 'max-height:92vh;overflow:auto">' + h + '</div>';
+  setTimeout(function(){
+    var i = document.getElementById('cobped-monto');
+    if(i) i.focus();
+  }, 250);
+}
+
+function cerrarCobroPedidos(){
+  var ov = document.getElementById('cobped-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function ponerMontoCobro(cid, monto){
+  var i = document.getElementById('cobped-monto');
+  if(i){ i.value = (Math.round(monto * 100) / 100).toFixed(2); }
+  previewCobroPedidos(cid);
+}
+
+// Le enseña EXACTAMENTE a qué facturas va a parar el pago, antes de tocarlo.
+function previewCobroPedidos(cid){
+  var caja = document.getElementById('cobped-preview');
+  if(!caja) return;
+  var monto = parseFloat((document.getElementById('cobped-monto') || {}).value) || 0;
+  if(monto <= 0.005){ caja.innerHTML = ''; return; }
+
+  var pendientes = facturasQueDebenDe(cid, null);
+  if(!pendientes.length){ caja.innerHTML = ''; return; }
+
+  // La MISMA regla de planDeReparto: la más vieja primero
+  var sobra = monto;
+  var reparto = [];
+  pendientes.forEach(function(f){
+    if(sobra <= 0.005) return;
+    var usar = Math.min(sobra, f.saldo);
+    reparto.push({ nf: f.nf, fecha: f.fecha, usar: usar,
+                   queda: Math.round((f.saldo - usar) * 100) / 100 });
+    sobra = Math.round((sobra - usar) * 100) / 100;
+  });
+
+  var h = '<div style="background:var(--nbs-green-bg);border-radius:10px;padding:11px">';
+  h += '<div style="font-size:11px;font-weight:900;color:var(--nbs-green-text);margin-bottom:7px">'
+    + '\u2713 AS\u00cd SE VA A APLICAR</div>';
+  reparto.forEach(function(r){
+    h += '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px;'
+      + 'padding:4px 0;border-bottom:1px solid rgba(0,0,0,.06)">'
+      + '<span style="color:var(--nbs-ink)">' + escaparHtml(String(r.fecha || '')) + ' \u00b7 '
+      +   escaparHtml(String(r.nf || '')) + '</span>'
+      + '<span style="font-weight:800;color:var(--nbs-green-text)">$' + fmtNum(r.usar)
+      +   (r.queda > 0.005 ? ' <span style="color:var(--nbs-muted);font-weight:600">(le queda $'
+          + fmtNum(r.queda) + ')</span>' : ' <span style="color:var(--nbs-muted);font-weight:600">(saldada)</span>')
+      + '</span></div>';
+  });
+  if(sobra > 0.005){
+    h += '<div style="margin-top:8px;padding:8px;background:var(--nbs-gold-bg);border-radius:7px;'
+      + 'font-size:11.5px;font-weight:800;color:var(--nbs-gold-dark)">'
+      + '\ud83d\udcb0 Sobran $' + fmtNum(sobra) + ' \u2014 le quedan a favor para su pr\u00f3xima compra</div>';
+  }
+  h += '</div>';
+  caja.innerHTML = h;
+}
+
+// Aplicar el pago. Escribe con la MISMA forma que confirmarPagoMultiple. -15 ago-
+function aplicarCobroPedidos(cid){
+  var monto = parseFloat((document.getElementById('cobped-monto') || {}).value) || 0;
+  if(monto <= 0.005){ alert('Escribe cu\u00e1nto te est\u00e1 pagando.'); return; }
+  var metodo = (document.getElementById('cobped-metodo') || {}).value || 'efectivo';
+
+  clientes = LS('ncl', []);
+  var cl = clientes.find(function(c){ return String(c.id) === String(cid); });
+  var pendientes = facturasQueDebenDe(cid, null);
+  if(!pendientes.length){ alert('Este cliente no tiene facturas sin saldar.'); return; }
+
+  // El reparto, con la regla de siempre
+  var sobra = monto;
+  var plan = [];
+  pendientes.forEach(function(f){
+    if(sobra <= 0.005) return;
+    var usar = Math.min(sobra, f.saldo);
+    plan.push({ id: f.id, monto: Math.round(usar * 100) / 100, nf: f.nf, fecha: f.fecha });
+    sobra = Math.round((sobra - usar) * 100) / 100;
+  });
+
+  var resumen = plan.map(function(p){
+    return '\u00b7 ' + p.fecha + ' (' + p.nf + '): $' + fmtNum(p.monto);
+  }).join('\n');
+  if(!confirm('\u00bfRegistrar el pago de $' + fmtNum(monto) + ' de '
+      + nombreCl(cl) + '?\n\n' + resumen
+      + (sobra > 0.005 ? '\n\n\ud83d\udcb0 Y $' + fmtNum(sobra) + ' le quedan a favor.' : ''))) return;
+
+  var hoy = fechaHoy();
+  ventas = LS('nv', []);
+  plan.forEach(function(p){
+    var v = ventas.find(function(x){ return String(x.id) === String(p.id); });
+    if(!v) return;
+    if(!v.pagosFactura) v.pagosFactura = [];
+    v.pagosFactura.push({
+      monto: p.monto, fecha: hoy, metodo: metodo,
+      metodos: [{ tipo: metodo, monto: p.monto }],
+      nota: 'Cobrado en la ruta'
+    });
+  });
+  SS('nv', ventas);
+
+  // Lo que sobre, a favor del cliente — igual que en Cuentas por Cobrar
+  if(sobra > 0.005){
+    var i = clientes.findIndex(function(c){ return String(c.id) === String(cid); });
+    if(i >= 0){
+      clientes[i].creditoAFavor = Math.round(((clientes[i].creditoAFavor || 0) + sobra) * 100) / 100;
+      SS('ncl', clientes);
+    }
+  }
+
+  cerrarCobroPedidos();
+  try { renderPedidosMultiples(); } catch(e){}
+  try { renderCxC(''); } catch(e){}
+  try { marcarPendienteDeSubir('nv'); } catch(e){}
+
+  var K = cuentaDeCliente(cid);
+  avisoGrande('\u2705 Cobrado $' + fmtNum(monto) + '\n\n'
+    + plan.length + ' factura(s) abonada(s).\n'
+    + (K.dinero.debe > 0.005
+        ? 'Le queda debiendo $' + fmtNum(K.dinero.debe) + '.'
+        : '\ud83c\udf89 Ya no te debe nada.')
+    + (sobra > 0.005 ? '\n\n\ud83d\udcb0 $' + fmtNum(sobra) + ' le quedaron a favor.' : ''));
+}
+
 function renderPedidosMultiples(){
   var el = document.getElementById('ped-multi-lista');
   if(!el) return;
@@ -14762,6 +15014,10 @@ function renderPedidosMultiples(){
         + 'display:flex;align-items:center;justify-content:space-between;gap:8px">'
         + '<span style="font-size:13px;font-weight:900;color:var(--nbs-red-text)">'
         +   '\ud83d\udcb0 Te debe $' + fmtNum(_debe) + '</span>'
+        // 💵 COBRARLE SIN SALIR DE PEDIDOS RÁPIDOS. -15 ago-
+        + '<button onclick="event.stopPropagation();cobrarDesdePedidos(' + _arg(p.cliente.id) + ')" '
+        +   'style="background:#00695C;color:#fff;border:none;border-radius:8px;padding:8px 13px;'
+        +   'font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0">\ud83d\udcb5 Cobrarle</button>'
         + '</div>';
     } else {
       html += '<div style="padding:6px 12px;background:var(--nbs-green-bg)">'
@@ -15604,10 +15860,11 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260815l';
+var NOVEDADES_VERSION = '20260816a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Lo mas importante: ahora puedes cobrarle a un cliente SIN SALIR de pedidos rapidos. Debajo de su nombre, donde dice lo que te debe, hay un boton verde que dice Cobrarle. Le pones cuanto te pago y la app lo reparte sola: primero la factura mas vieja, despues la que sigue, y asi. Y te lo ensena ANTES de tocar nada, para que veas exactamente a donde va cada peso. Si te paga de mas, lo que sobra le queda a favor.',
   'El boton de Ya lo vi de los avisos NO ESTABA FUNCIONANDO. Culpa mia: el boton mandaba un texto con saltos de linea y el navegador lo rechazaba, asi que no hacia nada. Ya esta arreglado: tocalo y el aviso se marca leido, desaparece y se va al historial.',
   'Y ahora doce de los quince renglones de la cuenta del cliente tienen su lapiz de editar a la vista. Los tres que no lo tienen son cuentas, no datos: lo que mas compra, las facturas canceladas y lo que te deja. Ponerles un lapiz seria mentirte porque no hay nada que editar ahi.',
   'Lo que me acabas de decir: en la seccion de Sus pagos de cada cliente ahora cada pago tiene su lapiz y su papelera. Lo corriges o lo borras ahi mismo, y el DEBE de arriba se actualiza al momento.',
@@ -16830,6 +17087,64 @@ function renderHistorialAvisos(){
   caja.innerHTML = h;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  🎁 QUIÉNES SE GANARON UN PREMIO  (15 ago 2026)
+//
+//  🔑 SENSEI: el VIP es "cuando lleguen a 10 productos del mismo tipo que
+//  cuesten 10 dólares, los voy a recompensar con uno gratis". Y el de
+//  Fidelidad, "cuando lleguen al total comprado de $400 les voy a dar un
+//  regalo sorpresa". Los dos son importantes.
+//
+//  📊 MEDIDO EN SUS DATOS: 6 clientes ya llegaron a los $400 y 1 ya tiene
+//  12 de un producto de $10 — y NUNCA se le avisó, porque el aviso del VIP
+//  exigía un interruptor que ningún cliente tenía encendido.
+//
+//  Ahora el asistente se lo dice.
+// ═══════════════════════════════════════════════════════════════════
+function premiosPendientes(){
+  var r = { vip: [], fidelidad: [], cercaFidelidad: [] };
+  try {
+    clientes = LS('ncl', []);
+    ventas = LS('nv', []);
+    clientes.forEach(function(c){
+      if(!clienteCuentaVIP(c)) return;
+      // ── El VIP por producto ──
+      try {
+        // calcVIP devuelve un OBJETO por grupo: { "MARCA · CATEGORÍA": {puntos, gratis...} }
+        var v = calcVIP(c.id);
+        if(v){
+          Object.keys(v).forEach(function(k){
+            var g = v[k];
+            if(!g) return;
+            var gratis = parseInt(g.gratis || 0, 10) || 0;
+            if(gratis > 0){
+              r.vip.push({ cid: c.id, nombre: nombreCl(c), producto: k,
+                           cant: g.puntos || g.total || 0, gratis: gratis });
+            }
+          });
+        }
+      } catch(e){}
+      // ── Los $400 ──
+      try {
+        var suyas = ventas.filter(function(x){
+          return String(x.cid) === String(c.id) && !x.cancelada && !esBalanceInicial(x);
+        });
+        var f = calcularFidelidad(c, suyas);
+        if(f){
+          if((f.total || 0) >= (f.meta || 400) && !f.yaCanjeado){
+            r.fidelidad.push({ cid: c.id, nombre: nombreCl(c), total: f.total });
+          } else if((f.total || 0) >= (f.meta || 400) * 0.75){
+            r.cercaFidelidad.push({ cid: c.id, nombre: nombreCl(c), total: f.total,
+                                    falta: Math.round(((f.meta || 400) - f.total) * 100) / 100 });
+          }
+        }
+      } catch(e){}
+    });
+  } catch(e){}
+  return r;
+}
+
 function analizarNegocio(){
   var avisos = [];
 
@@ -16917,6 +17232,44 @@ function analizarNegocio(){
       datos: flojos
     });
   }
+
+  // 🎁 LOS PREMIOS QUE SE GANARON Y NO LES HA DADO. -15 ago-
+  try {
+    var pr = premiosPendientes();
+    if(pr.fidelidad.length){
+      avisos.push({
+        nivel: 'amarillo', clave: 'fidelidad', icono: '\ud83c\udf81',
+        titulo: pr.fidelidad.length === 1
+          ? pr.fidelidad[0].nombre + ' lleg\u00f3 a los $400'
+          : pr.fidelidad.length + ' clientes llegaron a los $400',
+        texto: 'Se ganaron el regalo sorpresa: '
+          + pr.fidelidad.slice(0, 4).map(function(x){
+              return x.nombre + ' ($' + fmtNum(x.total) + ')'; }).join(' \u00b7 ')
+          + (pr.fidelidad.length > 4 ? ' y ' + (pr.fidelidad.length - 4) + ' m\u00e1s' : ''),
+        accion: { txt: '\ud83c\udf81 Ver a qui\u00e9nes', fn: 'irACl' }
+      });
+    }
+    if(pr.vip.length){
+      avisos.push({
+        nivel: 'amarillo', clave: 'vip', icono: '\u2b50',
+        titulo: pr.vip.length === 1
+          ? pr.vip[0].nombre + ' se gan\u00f3 un producto GRATIS'
+          : pr.vip.length + ' clientes se ganaron un producto GRATIS',
+        texto: pr.vip.slice(0, 4).map(function(x){
+            return x.nombre + ': ' + String(x.producto).slice(0, 24) + ' (' + x.cant + ')'; }).join(' \u00b7 '),
+        accion: { txt: '\u2b50 Ver a qui\u00e9nes', fn: 'irACl' }
+      });
+    }
+    if(pr.cercaFidelidad.length){
+      avisos.push({
+        nivel: 'azul', clave: 'cercafid', icono: '\ud83d\udcc8',
+        titulo: pr.cercaFidelidad.length + ' cliente(s) cerca de los $400',
+        texto: pr.cercaFidelidad.slice(0, 4).map(function(x){
+            return x.nombre + ' (le faltan $' + fmtNum(x.falta) + ')'; }).join(' \u00b7 '),
+        accion: null
+      });
+    }
+  } catch(ePr){}
 
   return avisos;
 }
@@ -19753,7 +20106,7 @@ function pintarPanelCliente(cid){
   try { h += _renglonCredito(K); } catch(e){}
   try { h += _renglonNotas(K); } catch(e){}
   try { h += _renglonIntervalo(K); } catch(e){}
-  try { h += _renglonPrecios(K); } catch(e){}
+  // (los precios especiales se quitaron: Sensei no los usa — 15 ago)
   try { h += _renglonAjustesCuenta(K); } catch(e){}
 
   // ── 📍 VISITAS ──
@@ -21206,7 +21559,7 @@ function editarCl(id){
     +'<input type="file" id="ecl-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoCliente(this)">'
     +'<input type="file" id="ecl-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoCliente(this)">'
     +'<input type="hidden" id="ecl-foto-data" value="'+(c.foto||'')+'">'
-    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
+    +'<div style="display:none">'+'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
     +'<div id="ecl-foto-preview" onclick="abrirOpcionesFotoCliente()" style="width:64px;height:64px;border-radius:12px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden;'+(c.foto?'background:#f0f0f0':'background:var(--nbs-gold-bg);border:2px dashed var(--nbs-gold)')+'">'+(c.foto?'<img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover">':'📷')+'</div>'
     +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--nbs-ink)">Foto del cliente</div>'
     +'<div style="font-size:11px;color:#888">Toca la foto para tomar una o elegir de la galería'+(c.foto?', o quitarla':'')+'</div></div>'
@@ -21215,6 +21568,7 @@ function editarCl(id){
     +'<div><label class="lbl">Nombre *</label><input class="inp" id="ecl-n" type="text" value="'+( c.nombre||'')+'" onblur="capitalizarFinal(this)"></div>'
     +'<div><label class="lbl">Apellido *</label><input class="inp" id="ecl-a" type="text" value="'+(c.apellido||'')+'" onblur="capitalizarFinal(this)"></div>'
     +'<label class="lbl">Apodo / Como lo conoces 🔒 (uso interno)</label><input class="inp" id="ecl-apodo" type="text" value="'+(c.apodo||'')+'" placeholder="Ej: El Flaco, Cano..." onblur="capitalizarFinal(this)">'
+    +'</div>'
     +'</div>'
     +'<label class="lbl">Tipo de negocio</label>'
     +'<select class="inp" id="ecl-tipo" onchange="toggleSubtipoTienda(\'ecl-tipo\',\'ecl-subtipo-wrap\');toggleIntervaloVisita(\'ecl-tipo\',\'ecl-intervalo-wrap\')">'
