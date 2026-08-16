@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260815e-OFICIAL-V2.0">
+<meta name="app-version" content="20260815g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -8293,7 +8293,7 @@ function renderCl(q){
     var d=document.createElement('div');d.className='clrow';
     var direccionCorta = [c.dir, c.ciudad].filter(Boolean).join(', ');
     d.innerHTML=(c.foto ? '<div style="width:44px;height:44px;border-radius:50%;overflow:hidden;flex-shrink:0"><img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover"></div>' : '<div class="av">'+ini(c.nombre,c.apellido)+'</div>')
-      +'<div style="flex:1"><div style="font-size:16px;font-weight:700;color:var(--nbs-ink)">'+escaparHtml(((c.nombre||'')+' '+(c.apellido||'')).replace(/\s+/g,' ').trim())+(c.apodo?' <span style="color:var(--nbs-gold-dark);font-weight:700">"'+escaparHtml(c.apodo)+'"</span>':'')+(c.vipActivo?' <span style="color:var(--nbs-red-text);font-size:13px">★</span>':'')+'</div>'
+      +'<div style="flex:1"><div style="font-size:18px;font-weight:900;color:var(--nbs-ink)">'+escaparHtml(((c.nombre||'')+' '+(c.apellido||'')).replace(/\s+/g,' ').trim())+(c.apodo?' <span style="color:var(--nbs-gold-dark);font-weight:700">"'+escaparHtml(c.apodo)+'"</span>':'')+(c.vipActivo?' <span style="color:var(--nbs-red-text);font-size:13px">★</span>':'')+'</div>'
       +'<div style="font-size:12px;color:var(--nbs-muted)">'+escaparHtml(c.negocio||'Cliente')+' · '+escaparHtml(c.tel||'Sin tel.')+'</div>'
       +(direccionCorta ? '<div style="font-size:11px;color:var(--nbs-muted-2);margin-top:1px">📍 '+escaparHtml(direccionCorta)+'</div>' : '')
       +(balance>0.01 ? '<div style="font-size:12px;font-weight:700;margin-top:2px;color:var(--nbs-red-text)">Balance: $'+fmtNum(balance)+'</div>' : '')
@@ -14286,7 +14286,7 @@ function renderBarberiasInicio(q){
         +(seleccionado?'<span style="color:white;font-size:16px;font-weight:900">✓</span>':'')
         +'</div>'
         +'<div style="width:34px;height:34px;border-radius:8px;background:var(--nbs-gold-bg);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--nbs-gold-dark);flex-shrink:0">'+c.nombre[0]+'</div>'
-        +'<div style="font-size:15px;font-weight:'+(seleccionado?'800':'600')+';color:var(--nbs-ink);flex:1">'+escaparHtml(nombreCompleto)+'</div>'
+        +'<div style="font-size:18px;font-weight:'+(seleccionado?'900':'800')+';color:var(--nbs-ink);flex:1;line-height:1.2">'+escaparHtml(nombreCompleto)+'</div>'
         +(seleccionado?'<div style="font-size:13px;color:var(--nbs-gold-dark);font-weight:800">✓</div>':'');
 
       btn.onclick = (function(cliente, barberia, id){
@@ -15543,10 +15543,13 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260815e';
+var NOVEDADES_VERSION = '20260815g';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Lo mas grande: la cuenta del cliente. Cuando entras a un cliente ahora dice CUENTA DE y su nombre, y ahi esta absolutamente todo lo suyo: sus facturas, incluidas las canceladas que antes ni se veian, cada pago que te hizo, sus pedidos pendientes, sus devoluciones, sus visitas, su credito a favor, sus precios especiales y sus notas. Y todo se puede editar ahi mismo, sin salir.',
+  'Y algo que te va a ahorrar mucho tiempo: la app ahora se revisa sola una vez al dia. Si el dinero no cuadra, si hay una factura pagada de mas, o si algo esta raro, TE LO DICE ELLA antes de que lo descubras tu. Si todo esta bien, no te molesta.',
+  'Tambien los nombres de los clientes ahora se ven mas grandes en todas las pantallas.',
   'Uno. El dinero escondido. En la ficha de un cliente el DEBE decia treinta y cinco dolares y eran cuarenta y cinco. La app daba por sentado que toda factura de contado estaba pagada completa, y si una se modificaba y quedaba debiendo, ese dinero no lo contaba nadie. Ya esta arreglado en las ocho pantallas donde pasaba.',
   'Dos. Esa factura tampoco se podia cobrar. No aparecia en la pantalla de recibir pago. Ahora si aparece.',
   'Tres. El vuelto. Si te pagan de mas, lo que sobra ahora abona las facturas viejas del cliente, de la mas vieja a la mas nueva. Y si todavia sobra, queda a su favor. Antes ese dinero se quedaba colgado.',
@@ -15554,6 +15557,7 @@ var NOVEDADES = [
   'Cinco. La ruta se marca sola cuando vendes. Antes el dia de la semana estaba corrido y marcaba en el dia equivocado. Ya esta bien.',
   'Seis. En pedidos rapidos, cuando guardas un barbero la tarjeta ahora se cierra sola.',
   'Y siete. Hay una bitacora nueva de visitas, en Reportes, donde ves todo lo que paso con cada cliente: la hora, si te compro y que se llevo.',
+  'Nueve. Y ahora puedes corregir un pago desde la factura. Si le pusiste el monto equivocado y la factura se saldo, entra a la factura y ahi salen los pagos con un lapiz para corregirlos y una papelera para borrarlos. Antes solo se podia desde Cuentas por Cobrar, y una factura saldada no sale ahi.',
   'Ocho. En la ficha del cliente hay un renglon nuevo que dice Sus pagos, donde ves todo lo que ese cliente te ha pagado, con la fecha y de que factura salio.',
   'Eso es todo. Todo esto se probo quinientas setenta y tres veces, dos vueltas completas, y el dinero cuadra.'
 ];
@@ -16765,7 +16769,7 @@ function renderPedidosPendientes(){
     var card = document.createElement('div');
     card.style.cssText = 'background:white;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;border:0.5px solid var(--nbs-line);box-shadow:var(--nbs-shadow-card);display:flex;justify-content:space-between;align-items:center';
     card.innerHTML = '<div>'
-      +'<div style="font-size:15px;font-weight:600;color:var(--nbs-ink)">'+escaparHtml(p.nombre)+'</div>'
+      +'<div style="font-size:18px;font-weight:900;color:var(--nbs-ink)">'+escaparHtml(p.nombre)+'</div>'
       +'<div style="font-size:12px;color:var(--nbs-muted)">'+(p.barberia||'')+'</div>'
       +'<div style="font-size:12px;color:var(--nbs-gold-dark);margin-top:2px;font-weight:500">'+(p.items || []).length+' producto(s) · $'+fmtNum(totalMonto)+'</div>'
       +'</div>'
@@ -18034,6 +18038,413 @@ function cobradoYDebeDe(v){
   return { cobrado: r2(pg), debe: r2(t - pg) };
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  🏦 LA CUENTA DEL CLIENTE — UNA SOLA VERDAD
+//
+//  Todo lo que la app sabe de un cliente, calculado UNA vez con UNA
+//  regla. Cualquier pantalla que quiera un número de un cliente pide
+//  aquí. Así es imposible que dos pantallas se contradigan.
+//
+//  Devuelve:
+//    .cliente     el cliente tal cual está guardado
+//    .facturas    TODAS, activas y canceladas
+//    .activas     las que cuentan
+//    .canceladas  las anuladas (antes ni se veían)
+//    .pagos       cada pago con su factura, fecha y forma
+//    .pedidos     los pendientes de ese cliente
+//    .devoluciones  las facturas que le ajustaste
+//    .modificadas   las facturas que tocaste después
+//    .conFirma      las que tienen su firma
+//    .visitas     compró / no compró, con fechas
+//    .dinero      comprado, pagado, debe, ganancia, margen, crédito
+//    .ritmo       última compra, días desde, cada cuánto compra
+//    .top         lo que más compra
+// ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+//  🔔 LA REVISIÓN DIARIA — la app se revisa sola y te avisa
+//
+//  Corre una vez al día, calladita. Si todo cuadra, NO molesta.
+//  Si algo no cuadra, te lo dice ANTES de que lo descubras tú.
+// ═══════════════════════════════════════════════════════════════════
+function revisionDiaria(){
+  var hallazgos = [];
+  var r2 = function(x){ return Math.round((x || 0) * 100) / 100; };
+
+  try {
+    ventas = LS('nv', []);
+    clientes = LS('ncl', []);
+    var activas = ventas.filter(function(v){ return !v.cancelada; });
+
+    // ── 1. LA LEY DEL DINERO: vendido = cobrado + por cobrar ──
+    var vendido = 0, cobrado = 0, porCobrar = 0;
+    activas.forEach(function(v){
+      vendido += parseFloat(v.total) || 0;
+      var cd = cobradoYDebeDe(v);
+      cobrado += cd.cobrado;
+      porCobrar += cd.debe;
+    });
+    var descuadre = r2(vendido - (cobrado + porCobrar));
+    if(Math.abs(descuadre) > 0.02){
+      hallazgos.push({
+        grave: true,
+        titulo: 'El dinero no cuadra por $' + fmtNum(Math.abs(descuadre)),
+        detalle: 'Vendiste $' + fmtNum(vendido) + ' pero cobrado m\u00e1s por cobrar da $'
+                 + fmtNum(cobrado + porCobrar) + '.',
+        accion: 'Revisi\u00f3n de Integridad', fn: 'irARevisionIntegridad'
+      });
+    }
+
+    // ── 2. FACTURAS PAGADAS DE MÁS ──
+    var deMas = [];
+    activas.forEach(function(v){
+      var pg = 0;
+      (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
+      var saldo = r2((parseFloat(v.total) || 0) - pg);
+      if(saldo < -0.005) deMas.push({ v: v, sobra: r2(-saldo) });
+    });
+    if(deMas.length){
+      var totalDeMas = r2(deMas.reduce(function(a, x){ return a + x.sobra; }, 0));
+      hallazgos.push({
+        grave: true,
+        titulo: deMas.length + ' factura(s) pagada(s) de M\u00c1S por $' + fmtNum(totalDeMas),
+        detalle: deMas.slice(0, 3).map(function(x){
+          var cl = clientes.find(function(c){ return String(c.id) === String(x.v.cid); });
+          return (cl ? nombreCl(cl) : '?') + ' \u00b7 $' + fmtNum(x.sobra);
+        }).join(' \u00b7 '),
+        accion: 'Arreglarlas', fn: 'arreglarPagadasDeMas'
+      });
+    }
+
+    // ── 3. FACTURAS DE CONTADO CON SALDO (el dinero escondido) ──
+    var contadoDebe = activas.filter(function(v){
+      return v.tipo === 'contado' && cobradoYDebeDe(v).debe > 0.005;
+    });
+    if(contadoDebe.length){
+      var m = r2(contadoDebe.reduce(function(a, v){ return a + cobradoYDebeDe(v).debe; }, 0));
+      hallazgos.push({
+        grave: false,
+        titulo: contadoDebe.length + ' venta(s) de contado que quedaron debiendo $' + fmtNum(m),
+        detalle: 'Son ventas al contado que se modificaron despu\u00e9s. Ese dinero SÍ te lo deben.',
+        accion: 'Ver en Cuentas por Cobrar', fn: 'irACuentasPorCobrar'
+      });
+    }
+
+    // ── 4. VENTAS SIN CLIENTE ──
+    var huerfanas = activas.filter(function(v){
+      if(!v.cid) return false;
+      return !clientes.some(function(c){ return String(c.id) === String(v.cid); });
+    });
+    if(huerfanas.length){
+      hallazgos.push({
+        grave: true,
+        titulo: huerfanas.length + ' factura(s) de un cliente que ya no existe',
+        detalle: 'Ese dinero no se le est\u00e1 sumando a nadie.',
+        accion: null, fn: null
+      });
+    }
+
+    // ── 5. PRODUCTOS EN NEGATIVO ──
+    loadProds();
+    var negativos = productos.filter(function(p){ return (parseFloat(p.stock) || 0) < 0; });
+    if(negativos.length >= 5){
+      hallazgos.push({
+        grave: false,
+        titulo: negativos.length + ' productos con existencia en negativo',
+        detalle: 'Vendiste m\u00e1s de lo que ten\u00edas apuntado. Conviene hacer inventario.',
+        accion: 'Ir al Cat\u00e1logo', fn: 'irACatalogo'
+      });
+    }
+
+    // ── 6. DEUDAS MUY VIEJAS ──
+    try {
+      var viejas = deudasViejas(60);
+      if(viejas.length){
+        var mv = r2(viejas.reduce(function(a, x){ return a + (x.saldo || x.debe || 0); }, 0));
+        if(mv > 0.005){
+          hallazgos.push({
+            grave: false,
+            titulo: '$' + fmtNum(mv) + ' en deudas de m\u00e1s de 60 d\u00edas',
+            detalle: viejas.length + ' cliente(s). Mientras m\u00e1s viejo, m\u00e1s cuesta cobrarlo.',
+            accion: 'Ver a qui\u00e9nes', fn: 'irACuentasPorCobrar'
+          });
+        }
+      }
+    } catch(e){}
+
+  } catch(e){
+    return { error: String(e).slice(0, 90), hallazgos: [] };
+  }
+
+  return { hallazgos: hallazgos, cuando: fechaHoy() };
+}
+
+// Corre una vez al día. Si todo cuadra, NO molesta. -15 ago-
+function correrRevisionDiaria(){
+  try {
+    var hoy = fechaHoy();
+    if(LS('nbs_revision_dia', '') === hoy) return;
+    SS('nbs_revision_dia', hoy);
+    var r = revisionDiaria();
+    SS('nbs_revision_resultado', r);
+    var graves = (r.hallazgos || []).filter(function(x){ return x.grave; });
+    if(!(r.hallazgos || []).length) return;      // todo cuadra: callado
+    // Solo interrumpe si hay algo GRAVE; lo demás espera en el asistente
+    if(graves.length) setTimeout(function(){ mostrarRevisionDiaria(); }, 2500);
+  } catch(e){}
+}
+
+function mostrarRevisionDiaria(){
+  var r = LS('nbs_revision_resultado', null);
+  if(!r) r = revisionDiaria();
+  var hall = r.hallazgos || [];
+  var h = '<div style="padding:14px">';
+  h += '<div style="font-size:16px;font-weight:900;color:var(--nbs-ink);margin-bottom:3px">'
+    + '\ud83d\udd14 Revisi\u00f3n de hoy</div>';
+  h += '<div style="font-size:11px;color:var(--nbs-muted);margin-bottom:12px">'
+    + 'La app se revisa sola una vez al d\u00eda</div>';
+
+  if(!hall.length){
+    h += '<div style="background:var(--nbs-green-bg);border-radius:10px;padding:16px;text-align:center">'
+      + '<div style="font-size:26px">\u2705</div>'
+      + '<div style="font-size:13.5px;font-weight:800;color:var(--nbs-green-text);margin-top:5px">'
+      + 'Todo cuadra</div>'
+      + '<div style="font-size:11.5px;color:var(--nbs-muted);margin-top:4px;line-height:1.5">'
+      + 'El dinero est\u00e1 bien, ninguna factura est\u00e1 pagada de m\u00e1s y no hay nada raro.</div></div>';
+  } else {
+    hall.forEach(function(x){
+      var col = x.grave ? 'var(--nbs-red-text)' : 'var(--nbs-gold-dark)';
+      var bg  = x.grave ? 'var(--nbs-red-bg)'   : 'var(--nbs-gold-bg)';
+      h += '<div style="background:' + bg + ';border-radius:10px;padding:11px;margin-bottom:9px">'
+        + '<div style="font-size:13px;font-weight:900;color:' + col + ';line-height:1.3">'
+        +   (x.grave ? '\ud83d\udd34 ' : '\u26a0\ufe0f ') + escaparHtml(x.titulo) + '</div>'
+        + '<div style="font-size:11.5px;color:var(--nbs-ink);margin-top:4px;line-height:1.5">'
+        +   escaparHtml(x.detalle) + '</div>'
+        + (x.accion && x.fn
+            ? '<button onclick="cerrarRevisionDiaria();' + x.fn + '()" '
+              + 'style="width:100%;margin-top:8px;padding:9px;background:#fff;border:1.5px solid ' + col
+              + ';color:' + col + ';border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">'
+              + escaparHtml(x.accion) + '</button>'
+            : '')
+        + '</div>';
+    });
+  }
+  h += '<button onclick="cerrarRevisionDiaria()" class="btn" '
+    + 'style="width:100%;margin-top:6px;background:var(--nbs-ink);color:#fff">Entendido</button>';
+  h += '</div>';
+
+  var ov = document.getElementById('revision-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'revision-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99990;'
+    + 'display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:400px;width:100%;'
+    + 'max-height:85vh;overflow:auto">' + h + '</div>';
+}
+
+function cerrarRevisionDiaria(){
+  var ov = document.getElementById('revision-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function irARevisionIntegridad(){ try { ir('p-integridad'); } catch(e){ try { ir('p-ajustes'); } catch(e2){} } }
+function irACuentasPorCobrar(){ try { ir('p-cxc'); renderCxC(''); } catch(e){} }
+function irACatalogo(){ try { ir('p-inv'); } catch(e){ try { ir('p-cat'); } catch(e2){} } }
+
+// Arreglar las facturas pagadas de más: el sobrante se le deja a favor. -15 ago-
+function arreglarPagadasDeMas(){
+  ventas = LS('nv', []);
+  clientes = LS('ncl', []);
+  var r2 = function(x){ return Math.round((x || 0) * 100) / 100; };
+  var arreglos = [];
+  ventas.forEach(function(v){
+    if(v.cancelada) return;
+    var pg = 0;
+    (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
+    var sobra = r2(pg - (parseFloat(v.total) || 0));
+    if(sobra > 0.005) arreglos.push({ v: v, sobra: sobra });
+  });
+  if(!arreglos.length){ avisoGrande('\u2705 No hay ninguna factura pagada de m\u00e1s.'); return; }
+  var total = r2(arreglos.reduce(function(a, x){ return a + x.sobra; }, 0));
+  if(!confirm('\u00bfArreglar ' + arreglos.length + ' factura(s) pagada(s) de m\u00e1s?\n\n'
+      + 'Se les recortan los pagos a lo que de verdad vale la factura, y los $'
+      + fmtNum(total) + ' que sobran quedan A FAVOR de cada cliente para su pr\u00f3xima compra.\n\n'
+      + 'Ning\u00fan peso se pierde.')) return;
+
+  arreglos.forEach(function(x){
+    var v = x.v;
+    var queda = parseFloat(v.total) || 0;
+    var nuevos = [];
+    (v.pagosFactura || []).forEach(function(p){
+      if(p.esDevolucion){ nuevos.push(p); return; }
+      if(queda <= 0.005) return;
+      var usar = Math.min(parseFloat(p.monto) || 0, queda);
+      nuevos.push(Object.assign({}, p, { monto: r2(usar) }));
+      queda = r2(queda - usar);
+    });
+    v.pagosFactura = nuevos;
+    var i = clientes.findIndex(function(c){ return String(c.id) === String(v.cid); });
+    if(i >= 0) clientes[i].creditoAFavor = r2((clientes[i].creditoAFavor || 0) + x.sobra);
+  });
+  SS('nv', ventas);
+  SS('ncl', clientes);
+  avisoGrande('\u2705 ' + arreglos.length + ' factura(s) arreglada(s).\n\n$' + fmtNum(total)
+    + ' quedaron a favor de sus clientes.');
+  try { renderCxC(''); } catch(e){}
+}
+
+function cuentaDeCliente(cid){
+  var r2 = function(x){ return Math.round((x || 0) * 100) / 100; };
+  var vacio = {
+    cliente: null, facturas: [], activas: [], canceladas: [], pagos: [],
+    pedidos: [], devoluciones: [], modificadas: [], conFirma: [],
+    visitas: { compro: [], noCompro: [], total: 0, pct: 0 },
+    dinero: { comprado: 0, pagado: 0, debe: 0, ganancia: 0, margen: 0, credito: 0 },
+    ritmo: { ultima: null, diasDesde: null, cadaCuanto: null },
+    top: []
+  };
+  if(cid === null || cid === undefined) return vacio;
+
+  clientes = LS('ncl', []);
+  ventas = LS('nv', []);
+  var cl = clientes.find(function(c){ return String(c.id) === String(cid); });
+  if(!cl) return vacio;
+
+  // ── SUS FACTURAS ──
+  var suyas = ventas.filter(function(v){ return String(v.cid) === String(cid); });
+  var activas = suyas.filter(function(v){ return !v.cancelada; });
+  var canceladas = suyas.filter(function(v){ return !!v.cancelada; });
+
+  // ── EL DINERO, con la regla única ──
+  var comprado = 0, pagado = 0, debe = 0, ganancia = 0;
+  activas.forEach(function(v){
+    comprado += parseFloat(v.total) || 0;
+    ganancia += parseFloat(v.ganancia) || 0;
+    var cd = cobradoYDebeDe(v);
+    pagado += cd.cobrado;
+    debe   += cd.debe;
+  });
+
+  // ── CADA PAGO, uno por uno ──
+  var pagos = [];
+  activas.forEach(function(v){
+    (v.pagosFactura || []).forEach(function(p, i){
+      if(p.esDevolucion) return;
+      var monto = parseFloat(p.monto) || 0;
+      if(monto <= 0.005) return;
+      pagos.push({
+        vid: v.id, idx: i,
+        factura: v.numFactura || String(v.id).slice(-4),
+        totalFactura: parseFloat(v.total) || 0,
+        fecha: p.fecha || v.fecha, monto: monto,
+        metodo: (p.metodos && p.metodos.length)
+          ? p.metodos.map(function(m){ return m.tipo || ''; }).filter(Boolean).join(' + ')
+          : (p.metodo || ''),
+        nota: p.nota || ''
+      });
+    });
+    // Una venta al contado que nunca tocaron: pagó el día de la venta
+    if(v.tipo === 'contado' && !(v.pagosFactura || []).length
+       && !v.modificada && !v.ajustadaPorDevolucion){
+      pagos.push({
+        vid: v.id, idx: null,
+        factura: v.numFactura || String(v.id).slice(-4),
+        totalFactura: parseFloat(v.total) || 0,
+        fecha: v.fecha, monto: parseFloat(v.total) || 0,
+        metodo: '', nota: 'Pag\u00f3 al momento'
+      });
+    }
+  });
+  pagos.sort(function(a, b){
+    var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
+    return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
+  });
+
+  // ── SUS PEDIDOS PENDIENTES ──
+  var pedidosSuyos = [];
+  try {
+    pedidosSuyos = LS('npedidos', []).filter(function(p){
+      return String(p.cid) === String(cid);
+    });
+  } catch(e){}
+
+  // ── DEVOLUCIONES, MODIFICADAS Y FIRMAS ──
+  var devs = activas.filter(function(v){ return !!v.ajustadaPorDevolucion; });
+  var mods = activas.filter(function(v){ return !!v.modificada; });
+  var firmadas = activas.filter(function(v){ return !!v.firma; });
+
+  // ── SUS VISITAS ──
+  var vis = { compro: [], noCompro: [], total: 0, pct: 0 };
+  try {
+    var mapa = LS('nvisitas_barberos', {}) || {};
+    var mio = mapa[String(cid)] || {};
+    vis.compro = (mio.compro || []).slice();
+    vis.noCompro = (mio.noCompro || []).slice();
+    vis.total = vis.compro.length + vis.noCompro.length;
+    vis.pct = vis.total ? Math.round(vis.compro.length / vis.total * 100) : 0;
+  } catch(e){}
+
+  // ── SU RITMO ──
+  var fechas = [];
+  activas.forEach(function(v){
+    var f = parsearFechaVenta(v.fecha);
+    if(f) fechas.push(f.getTime());
+  });
+  fechas.sort(function(a, b){ return a - b; });
+  var ultima = fechas.length ? new Date(fechas[fechas.length - 1]) : null;
+  var diasDesde = ultima ? Math.floor((Date.now() - ultima.getTime()) / 86400000) : null;
+  var cadaCuanto = null;
+  if(fechas.length >= 2){
+    var suma = 0;
+    for(var i = 1; i < fechas.length; i++) suma += (fechas[i] - fechas[i-1]);
+    cadaCuanto = Math.round(suma / (fechas.length - 1) / 86400000);
+  }
+
+  // ── LO QUE MÁS COMPRA ──
+  var cuenta = {};
+  activas.forEach(function(v){
+    (v.items || []).forEach(function(it){
+      var k = String(it.nombre || '');
+      if(!k) return;
+      cuenta[k] = (cuenta[k] || 0) + (parseFloat(it.cant) || 0);
+    });
+  });
+  var top = Object.keys(cuenta).map(function(k){ return { nombre: k, cant: cuenta[k] }; })
+    .sort(function(a, b){ return b.cant - a.cant; }).slice(0, 10);
+
+  return {
+    cliente: cl,
+    facturas: suyas, activas: activas, canceladas: canceladas,
+    pagos: pagos, pedidos: pedidosSuyos,
+    devoluciones: devs, modificadas: mods, conFirma: firmadas,
+    visitas: vis,
+    dinero: {
+      comprado: r2(comprado), pagado: r2(pagado), debe: r2(debe),
+      ganancia: r2(ganancia),
+      margen: comprado > 0 ? Math.round(ganancia / comprado * 1000) / 10 : 0,
+      credito: r2(cl.creditoAFavor || 0),
+      totalPagos: pagos.length
+    },
+    ritmo: { ultima: ultima, diasDesde: diasDesde, cadaCuanto: cadaCuanto },
+    top: top
+  };
+}
+
+// El nombre del cliente como Sensei quiere verlo: GRANDE y completo.
+// Él lo pidió: "los nombres de los clientes tienen que ser más visibles
+// en todas partes". -15 ago-
+function nombreGrande(cl){
+  if(!cl) return '';
+  try {
+    var n = nombreCl(cl);
+    return n || '';
+  } catch(e){ return String(cl.nombre || ''); }
+}
+
 function datosDelCliente(cid){
   ventas = LS('nv', []);
   var suyas = ventas.filter(function(v){ return String(v.cid) === String(cid); });
@@ -18201,6 +18612,347 @@ function _sub(inner){
 }
 
 // ═══ EL PANEL COMPLETO ═══
+
+// ═══════════════════════════════════════════════════════════════════
+//  🏦 LOS RENGLONES NUEVOS DE LA CUENTA
+//  Todo sale de cuentaDeCliente(cid) — una sola verdad.
+// ═══════════════════════════════════════════════════════════════════
+
+// ── 🚫 SUS FACTURAS CANCELADAS — antes ni se veían ──
+function _renglonCanceladas(K){
+  if(!K.canceladas.length) return '';
+  var monto = K.canceladas.reduce(function(a, v){ return a + (parseFloat(v.total) || 0); }, 0);
+  var cont = _sub(
+    '<div style="font-size:11px;color:var(--nbs-muted);margin-bottom:8px;line-height:1.5">'
+    + 'Estas facturas est\u00e1n ANULADAS: no cuentan en lo que compr\u00f3 ni en lo que debe. '
+    + 'Se guardan para que quede el rastro.</div>'
+    + K.canceladas.slice(0, 20).map(function(v){
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;'
+          + 'padding:8px 0;border-bottom:1px solid #F4F4F8;opacity:.75">'
+          + '<div style="flex:1;min-width:0">'
+          +   '<div style="font-size:12.5px;font-weight:700;color:var(--nbs-ink);text-decoration:line-through">'
+          +     escaparHtml(String(v.fecha || '')) + ' \u00b7 #' + escaparHtml(String(v.numFactura || String(v.id).slice(-4))) + '</div>'
+          +   '<div style="font-size:10.5px;color:var(--nbs-muted)">'
+          +     ((v.items || []).length) + ' producto(s)</div>'
+          + '</div>'
+          + '<div style="font-size:13px;font-weight:800;color:var(--nbs-muted);text-decoration:line-through">$'
+          +   fmtNum(parseFloat(v.total) || 0) + '</div>'
+          + '<button onclick="event.stopPropagation();verFacturaProfesional(' + _arg(v.id) + ')" '
+          +   'style="background:#EEE;border:1px solid #DDD;border-radius:7px;padding:6px 9px;'
+          +   'font-size:12px;cursor:pointer;flex-shrink:0">\ud83d\udc41\ufe0f</button>'
+          + '</div>';
+      }).join('')
+  );
+  return _filaPanel('canceladas', '\ud83d\udeab', 'Facturas canceladas',
+    String(K.canceladas.length) + ' \u00b7 $' + fmtNum(monto), null, cont);
+}
+
+// ── ⚡ SUS PEDIDOS PENDIENTES ──
+function _renglonPedidos(K){
+  if(!K.pedidos.length) return '';
+  var monto = K.pedidos.reduce(function(a, p){
+    return a + (p.items || []).reduce(function(x, it){ return x + ((it.cant||0) * (it.precio||0)); }, 0);
+  }, 0);
+  var cont = _sub(
+    K.pedidos.map(function(p, i){
+      var t = (p.items || []).reduce(function(x, it){ return x + ((it.cant||0) * (it.precio||0)); }, 0);
+      return '<div style="padding:9px 0;border-bottom:1px solid #F4F4F8">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+        +   '<span style="font-size:12.5px;font-weight:800;color:var(--nbs-ink)">'
+        +     ((p.items || []).length) + ' producto(s)</span>'
+        +   '<span style="font-size:13px;font-weight:900;color:var(--nbs-gold-dark)">$' + fmtNum(t) + '</span>'
+        + '</div>'
+        + '<div style="margin-top:4px">'
+        +   (p.items || []).slice(0, 6).map(function(it){
+              return '<div style="font-size:11px;color:var(--nbs-ink)">\u00b7 '
+                + (it.cant || 0) + ' \u00d7 ' + escaparHtml(String(it.nombre || '').slice(0, 30)) + '</div>';
+            }).join('')
+        + '</div>'
+        + '<button onclick="event.stopPropagation();ir(\'p-ped\')" '
+        +   'style="width:100%;margin-top:7px;padding:8px;background:var(--nbs-gold);color:#fff;'
+        +   'border:none;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">'
+        +   '\u26a1 Ir a Pedidos Pendientes</button>'
+        + '</div>';
+    }).join('')
+  );
+  return _filaPanel('pedidos', '\u26a1', 'Sus pedidos pendientes',
+    String(K.pedidos.length) + ' \u00b7 $' + fmtNum(monto), null, cont);
+}
+
+// ── 💰 CRÉDITO A FAVOR, editable ──
+function _renglonCredito(K){
+  var c = K.dinero.credito;
+  var cont = _sub(
+    '<div style="font-size:11.5px;color:var(--nbs-muted);line-height:1.6;margin-bottom:9px">'
+    + (c > 0.005
+        ? 'Este cliente tiene <b>$' + fmtNum(c) + '</b> a su favor. Se le descuenta solo en su pr\u00f3xima compra.'
+        : 'Este cliente no tiene cr\u00e9dito a favor. Le queda a favor cuando te paga de m\u00e1s o cuando devuelve algo que ya hab\u00eda pagado.')
+    + '</div>'
+    + '<button onclick="event.stopPropagation();cambiarCreditoAFavor(' + _arg(K.cliente.id) + ')" '
+    +   'style="width:100%;padding:10px;background:#fff;border:1.5px solid var(--nbs-gold);'
+    +   'color:var(--nbs-gold-dark);border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">'
+    +   '\u270f\ufe0f Corregir el cr\u00e9dito a favor</button>'
+  );
+  return _filaPanel('credito', '\ud83d\udcb0', 'Cr\u00e9dito a favor',
+    '$' + fmtNum(c), c > 0.005 ? 'var(--nbs-gold-dark)' : null, cont);
+}
+
+function cambiarCreditoAFavor(cid){
+  clientes = LS('ncl', []);
+  var i = clientes.findIndex(function(c){ return String(c.id) === String(cid); });
+  if(i < 0) return;
+  var actual = parseFloat(clientes[i].creditoAFavor || 0) || 0;
+  var txt = prompt('Cr\u00e9dito a favor de ' + nombreCl(clientes[i]) + '\n\n'
+    + 'Ahora tiene: $' + fmtNum(actual) + '\n\n'
+    + 'Escribe el monto correcto (0 para quitarlo):', String(actual));
+  if(txt === null) return;
+  var nuevo = parseFloat(String(txt).replace(/[^0-9.\-]/g, ''));
+  if(isNaN(nuevo) || nuevo < 0){ alert('Escribe un n\u00famero de cero para arriba.'); return; }
+  nuevo = Math.round(nuevo * 100) / 100;
+  if(Math.abs(nuevo - actual) < 0.005) return;
+  if(!confirm('\u00bfDejar el cr\u00e9dito a favor en $' + fmtNum(nuevo) + '?\n\n'
+      + 'Antes ten\u00eda $' + fmtNum(actual) + '.')) return;
+  clientes[i].creditoAFavor = nuevo;
+  SS('ncl', clientes);
+  try { pintarPanelCliente(cid); } catch(e){}
+  try { avisoChico('\ud83d\udcb0 Cr\u00e9dito a favor: $' + fmtNum(nuevo)); } catch(e){}
+}
+
+// ── 📝 NOTAS DEL CLIENTE ──
+function _renglonNotas(K){
+  var nota = String(K.cliente.nota || '');
+  var cont = _sub(
+    (nota
+      ? '<div style="font-size:12.5px;color:var(--nbs-ink);line-height:1.6;white-space:pre-wrap;'
+        + 'background:#FFFDE7;padding:10px;border-radius:8px;margin-bottom:9px">'
+        + escaparHtml(nota) + '</div>'
+      : '<div style="font-size:11.5px;color:var(--nbs-muted);margin-bottom:9px">'
+        + 'Aqu\u00ed puedes apuntar lo que necesites de este cliente: c\u00f3mo le gusta que le lleves las cosas, '
+        + 'qui\u00e9n recibe, a qu\u00e9 hora abre, lo que sea.</div>')
+    + '<button onclick="event.stopPropagation();editarNotaCliente(' + _arg(K.cliente.id) + ')" '
+    +   'style="width:100%;padding:10px;background:#fff;border:1.5px solid var(--nbs-ink);'
+    +   'color:var(--nbs-ink);border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">'
+    +   '\u270f\ufe0f ' + (nota ? 'Cambiar la nota' : 'Escribir una nota') + '</button>'
+  );
+  return _filaPanel('notas', '\ud83d\udcdd', 'Notas',
+    nota ? String(nota).slice(0, 22) + (nota.length > 22 ? '\u2026' : '') : 'ninguna', null, cont);
+}
+
+function editarNotaCliente(cid){
+  clientes = LS('ncl', []);
+  var i = clientes.findIndex(function(c){ return String(c.id) === String(cid); });
+  if(i < 0) return;
+  var txt = prompt('Nota sobre ' + nombreCl(clientes[i]) + ':\n\n(deja vac\u00edo para borrarla)',
+                   String(clientes[i].nota || ''));
+  if(txt === null) return;
+  clientes[i].nota = String(txt).trim();
+  SS('ncl', clientes);
+  try { pintarPanelCliente(cid); } catch(e){}
+  try { avisoChico(clientes[i].nota ? '\ud83d\udcdd Nota guardada' : '\ud83d\udcdd Nota borrada'); } catch(e){}
+}
+
+// ── 📅 CADA CUÁNTO VISITARLO, editable ──
+function _renglonIntervalo(K){
+  var puesto = parseInt(K.cliente.intervaloVisitaDias || 0, 10) || 0;
+  var real = K.ritmo.cadaCuanto;
+  var cont = _sub(
+    '<div style="font-size:12.5px;color:var(--nbs-ink);line-height:1.8">'
+    + (real !== null
+        ? 'Te compra <b>cada ' + real + ' d\u00edas</b> en promedio.<br>'
+        : 'Todav\u00eda no hay compras suficientes para saber su ritmo.<br>')
+    + (K.ritmo.diasDesde !== null
+        ? 'La \u00faltima vez fue hace <b>' + K.ritmo.diasDesde + ' d\u00edas</b>.<br>' : '')
+    + (puesto ? 'T\u00fa lo tienes puesto para visitarlo <b>cada ' + puesto + ' d\u00edas</b>.'
+              : 'No le has puesto cada cu\u00e1nto visitarlo.')
+    + '</div>'
+    + '<button onclick="event.stopPropagation();cambiarIntervaloVisita(' + _arg(K.cliente.id) + ')" '
+    +   'style="width:100%;margin-top:9px;padding:10px;background:#fff;border:1.5px solid #1a237e;'
+    +   'color:#1a237e;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">'
+    +   '\u270f\ufe0f Cambiar cada cu\u00e1nto visitarlo</button>'
+  );
+  return _filaPanel('ritmo', '\ud83d\udcc5', 'Cada cu\u00e1nto compra',
+    (real !== null ? real + ' d\u00edas' : 'sin datos'), null, cont);
+}
+
+function cambiarIntervaloVisita(cid){
+  clientes = LS('ncl', []);
+  var i = clientes.findIndex(function(c){ return String(c.id) === String(cid); });
+  if(i < 0) return;
+  var actual = parseInt(clientes[i].intervaloVisitaDias || 0, 10) || 0;
+  var txt = prompt('\u00bfCada cu\u00e1ntos d\u00edas quieres visitar a ' + nombreCl(clientes[i]) + '?\n\n'
+    + '(deja 0 para no ponerle ninguno)', String(actual));
+  if(txt === null) return;
+  var n = parseInt(String(txt).replace(/[^0-9]/g, ''), 10);
+  if(isNaN(n) || n < 0){ alert('Escribe un n\u00famero de d\u00edas.'); return; }
+  clientes[i].intervaloVisitaDias = n;
+  SS('ncl', clientes);
+  try { pintarPanelCliente(cid); } catch(e){}
+  try { avisoChico(n ? '\ud83d\udcc5 Cada ' + n + ' d\u00edas' : '\ud83d\udcc5 Sin intervalo'); } catch(e){}
+}
+
+
+// ── 🏷️ SUS PRECIOS ESPECIALES, editables desde su cuenta ──
+function _renglonPrecios(K){
+  var pp = K.cliente.preciosPersonalizados || [];
+  loadProds();
+  var cont = _sub(
+    (pp.length
+      ? pp.map(function(x, i){
+          var prod = productos.find(function(q){ return String(q.id) === String(x.pid); });
+          var nombre = prod ? prod.nombre : ('producto #' + x.pid);
+          var normal = prod ? (parseFloat(prod.precio) || 0) : 0;
+          var suyo = parseFloat(x.precio) || 0;
+          var dif = normal ? Math.round((normal - suyo) * 100) / 100 : 0;
+          return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #F4F4F8">'
+            + '<div style="flex:1;min-width:0">'
+            +   '<div style="font-size:12.5px;font-weight:700;color:var(--nbs-ink);overflow:hidden;'
+            +     'text-overflow:ellipsis;white-space:nowrap">' + escaparHtml(String(nombre).slice(0, 34)) + '</div>'
+            +   '<div style="font-size:10.5px;color:var(--nbs-muted)">normal $' + fmtNum(normal)
+            +     (dif > 0.005 ? ' \u00b7 le rebajas $' + fmtNum(dif) : '') + '</div>'
+            + '</div>'
+            + '<div style="font-size:13.5px;font-weight:900;color:var(--nbs-gold-dark);flex-shrink:0">$'
+            +   fmtNum(suyo) + '</div>'
+            + '<button onclick="event.stopPropagation();cambiarPrecioEspecial(' + _arg(K.cliente.id) + ',' + _arg(x.pid) + ')" '
+            +   'style="background:#FFF8E1;border:1px solid #F9A825;border-radius:7px;padding:6px 9px;'
+            +   'font-size:12px;cursor:pointer;flex-shrink:0">\u270f\ufe0f</button>'
+            + '<button onclick="event.stopPropagation();quitarPrecioEspecial(' + _arg(K.cliente.id) + ',' + _arg(x.pid) + ')" '
+            +   'style="background:#FFEBEE;border:1px solid #C62828;border-radius:7px;padding:6px 9px;'
+            +   'font-size:12px;cursor:pointer;flex-shrink:0">\ud83d\uddd1\ufe0f</button>'
+            + '</div>';
+        }).join('')
+      : '<div style="font-size:11.5px;color:var(--nbs-muted);margin-bottom:9px;line-height:1.6">'
+        + 'Este cliente paga los precios normales. Si le das un precio especial en alg\u00fan producto, '
+        + 'la app se lo aplica sola cada vez que le vendas ese producto.</div>')
+    + '<button onclick="event.stopPropagation();agregarPrecioEspecial(' + _arg(K.cliente.id) + ')" '
+    +   'style="width:100%;margin-top:9px;padding:10px;background:#fff;border:1.5px solid var(--nbs-gold);'
+    +   'color:var(--nbs-gold-dark);border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">'
+    +   '\u2795 Ponerle un precio especial</button>'
+  );
+  return _filaPanel('precios', '\ud83c\udff7\ufe0f', 'Sus precios especiales',
+    pp.length ? String(pp.length) + ' producto(s)' : 'ninguno', null, cont);
+}
+
+function agregarPrecioEspecial(cid){
+  loadProds();
+  var q = prompt('\u00bfA qu\u00e9 producto le quieres poner precio especial?\n\nEscribe parte del nombre:');
+  if(!q) return;
+  var qn = normalizarTextoBusqueda(q);
+  var hallados = productos.filter(function(p){
+    return normalizarTextoBusqueda(String(p.nombre || '')).indexOf(qn) >= 0;
+  }).slice(0, 8);
+  if(!hallados.length){ alert('No encontr\u00e9 ning\u00fan producto con "' + q + '".'); return; }
+  var lista = hallados.map(function(p, i){
+    return (i + 1) + '. ' + String(p.nombre).slice(0, 34) + '  $' + fmtNum(parseFloat(p.precio) || 0);
+  }).join('\n');
+  var cual = prompt('\u00bfCu\u00e1l de estos?\n\n' + lista + '\n\nEscribe el n\u00famero:');
+  if(!cual) return;
+  var idx = parseInt(cual, 10) - 1;
+  if(isNaN(idx) || idx < 0 || idx >= hallados.length) return;
+  cambiarPrecioEspecial(cid, hallados[idx].id);
+}
+
+function cambiarPrecioEspecial(cid, pid){
+  loadProds();
+  clientes = LS('ncl', []);
+  var i = clientes.findIndex(function(c){ return String(c.id) === String(cid); });
+  if(i < 0) return;
+  var prod = productos.find(function(p){ return String(p.id) === String(pid); });
+  if(!prod){ alert('No encontr\u00e9 ese producto.'); return; }
+  var normal = parseFloat(prod.precio) || 0;
+  if(!clientes[i].preciosPersonalizados) clientes[i].preciosPersonalizados = [];
+  var ya = clientes[i].preciosPersonalizados.find(function(x){ return String(x.pid) === String(pid); });
+  var actual = ya ? (parseFloat(ya.precio) || 0) : normal;
+  var txt = prompt(String(prod.nombre).slice(0, 40) + '\n\n'
+    + 'Precio normal: $' + fmtNum(normal) + '\n'
+    + (ya ? 'Precio suyo ahora: $' + fmtNum(actual) + '\n' : '')
+    + '\n\u00bfQu\u00e9 precio le pones a ' + nombreCl(clientes[i]) + '?', String(actual));
+  if(txt === null) return;
+  var nuevo = parseFloat(String(txt).replace(/[^0-9.]/g, ''));
+  if(isNaN(nuevo) || nuevo < 0){ alert('Escribe un precio v\u00e1lido.'); return; }
+  nuevo = Math.round(nuevo * 100) / 100;
+  var costo = parseFloat(prod.costo) || 0;
+  if(costo > 0 && nuevo < costo){
+    if(!confirm('\u26a0\ufe0f OJO: $' + fmtNum(nuevo) + ' est\u00e1 POR DEBAJO de lo que te cuesta ($'
+        + fmtNum(costo) + ').\n\nCada vez que le vendas este producto vas a PERDER $'
+        + fmtNum(costo - nuevo) + '.\n\n\u00bfSeguro?')) return;
+  }
+  if(ya) ya.precio = nuevo;
+  else clientes[i].preciosPersonalizados.push({ pid: pid, precio: nuevo });
+  SS('ncl', clientes);
+  try { pintarPanelCliente(cid); } catch(e){}
+  try { avisoChico('\ud83c\udff7\ufe0f ' + String(prod.nombre).slice(0, 18) + ': $' + fmtNum(nuevo)); } catch(e){}
+}
+
+function quitarPrecioEspecial(cid, pid){
+  clientes = LS('ncl', []);
+  var i = clientes.findIndex(function(c){ return String(c.id) === String(cid); });
+  if(i < 0 || !clientes[i].preciosPersonalizados) return;
+  loadProds();
+  var prod = productos.find(function(p){ return String(p.id) === String(pid); });
+  var normal = prod ? (parseFloat(prod.precio) || 0) : 0;
+  if(!confirm('\u00bfQuitarle el precio especial?\n\n'
+      + (prod ? String(prod.nombre).slice(0, 36) + '\n\n' : '')
+      + 'A partir de ahora le vas a cobrar el precio normal de $' + fmtNum(normal) + '.')) return;
+  clientes[i].preciosPersonalizados = clientes[i].preciosPersonalizados.filter(function(x){
+    return String(x.pid) !== String(pid);
+  });
+  SS('ncl', clientes);
+  try { pintarPanelCliente(cid); } catch(e){}
+  try { avisoChico('\ud83c\udff7\ufe0f Precio especial quitado'); } catch(e){}
+}
+
+// ── ⚙️ AJUSTES DE SU CUENTA: editar sus datos, sin servicio, borrarlo ──
+function _renglonAjustesCuenta(K){
+  var sinServ = !!K.cliente.sinServicio;
+  var cont = _sub(
+    '<button onclick="event.stopPropagation();editarCl(' + _arg(K.cliente.id) + ')" '
+    +   'style="width:100%;padding:12px;background:var(--nbs-ink);color:#fff;border:none;'
+    +   'border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;margin-bottom:8px">'
+    +   '\u270f\ufe0f Editar todos sus datos</button>'
+    + '<div style="font-size:10.5px;color:var(--nbs-muted);margin-bottom:12px;line-height:1.5">'
+    +   'Nombre, apodo, barber\u00eda, tel\u00e9fono, direcci\u00f3n, la persona que atiende, la foto.</div>'
+
+    + '<button onclick="event.stopPropagation();cambiarSinServicioDesdeCuenta(' + _arg(K.cliente.id) + ')" '
+    +   'style="width:100%;padding:11px;background:#fff;border:1.5px solid '
+    +   (sinServ ? 'var(--nbs-green-text);color:var(--nbs-green-text)' : '#F9A825;color:#F57F17')
+    +   ';border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer;margin-bottom:8px">'
+    +   (sinServ ? '\u2705 Volver a darle servicio' : '\u23f8\ufe0f Marcarlo SIN SERVICIO') + '</button>'
+    + '<div style="font-size:10.5px;color:var(--nbs-muted);margin-bottom:12px;line-height:1.5">'
+    +   (sinServ
+        ? 'Ahora mismo NO te sale en pedidos ni en la ruta. Sus facturas y su deuda siguen ah\u00ed.'
+        : 'Si lo marcas, deja de salirte en pedidos y en la ruta, pero NO se borra nada: '
+          + 'sus facturas y lo que te debe se quedan igual.') + '</div>'
+
+    + '<button onclick="event.stopPropagation();eliminarCl(' + _arg(K.cliente.id) + ')" '
+    +   'style="width:100%;padding:11px;background:#fff;border:1.5px solid #C62828;color:#C62828;'
+    +   'border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">'
+    +   '\ud83d\uddd1\ufe0f Borrar este cliente</button>'
+    + '<div style="font-size:10.5px;color:var(--nbs-muted);margin-top:6px;line-height:1.5">'
+    +   (K.activas.length
+        ? '\u26a0\ufe0f Tiene ' + K.activas.length + ' factura(s). Piensa bien antes de borrarlo \u2014 '
+          + 'si solo quieres que deje de salirte, m\u00e1rcalo sin servicio.'
+        : 'No tiene facturas, se puede borrar sin problema.') + '</div>'
+  );
+  return _filaPanel('ajustescta', '\u2699\ufe0f', 'Ajustes de su cuenta',
+    sinServ ? 'sin servicio' : '', sinServ ? 'var(--nbs-gold-dark)' : null, cont);
+}
+
+function cambiarSinServicioDesdeCuenta(cid){
+  clientes = LS('ncl', []);
+  var i = clientes.findIndex(function(c){ return String(c.id) === String(cid); });
+  if(i < 0) return;
+  var ahora = !!clientes[i].sinServicio;
+  var msg = ahora
+    ? '\u00bfVolver a darle servicio a ' + nombreCl(clientes[i]) + '?\n\nVa a volver a salirte en pedidos y en la ruta.'
+    : '\u00bfMarcar a ' + nombreCl(clientes[i]) + ' SIN SERVICIO?\n\n'
+      + 'Deja de salirte en pedidos y en la ruta.\n\u26a0\ufe0f NO se borra nada: sus facturas y su deuda se quedan.';
+  if(!confirm(msg)) return;
+  clientes[i].sinServicio = !ahora;
+  SS('ncl', clientes);
+  try { pintarPanelCliente(cid); } catch(e){}
+  try { avisoChico(clientes[i].sinServicio ? '\u23f8\ufe0f Sin servicio' : '\u2705 Con servicio'); } catch(e){}
+}
+
 function pintarPanelCliente(cid){
   var el = document.getElementById('cl-panel-completo');
   if(!el) return;
@@ -18208,6 +18960,8 @@ function pintarPanelCliente(cid){
   var c = clientes.find(function(x){ return String(x.id) === String(cid); });
   if(!c) return;
   var D = datosDelCliente(cid);
+  // 🏦 LA CUENTA COMPLETA — una sola verdad para todos los renglones. -15 ago-
+  var K = cuentaDeCliente(cid);
   var h = '';
 
   // ── 📇 SUS DATOS ── (va PRIMERO: es lo que más necesita a mano)
@@ -18436,8 +19190,8 @@ function pintarPanelCliente(cid){
       + (D.canceladas ? ' (y ' + D.canceladas + ' cancelada' + (D.canceladas===1?'':'s') + ')' : '')
       + '</div>'
     );
-    h += _filaPanel('ritmo', '\ud83d\udcc5', 'Cada cu\u00e1nto compra',
-      D.cadaCuanto ? D.cadaCuanto + ' d\u00edas' : 'hace ' + D.diasDesde + ' d', null, contC);
+    // (este renglón lo reemplazó el nuevo, que además se edita — 15 ago)
+
   }
 
   // ── 💰 CRÉDITO A FAVOR ──
@@ -18449,8 +19203,8 @@ function pintarPanelCliente(cid){
       + 'Se le puede aplicar a cualquier factura que deba, desde <b>\ud83d\udcb5 Cobrar</b>.'
       + '</div>'
     );
-    h += _filaPanel('credito', '\ud83d\udcb0', 'Cr\u00e9dito a favor',
-      '$' + fmtNum(cred), 'var(--nbs-gold-dark)', contCr);
+    // (este renglón lo reemplazó el nuevo, que además se edita — 15 ago)
+
   }
 
   // ── 📄 SUS FACTURAS ──
@@ -18552,6 +19306,16 @@ function pintarPanelCliente(cid){
     h += _filaPanel('pagos', '\ud83d\udcb5', 'Sus pagos',
       String(_pagos.length) + ' \u00b7 $' + fmtNum(_totalPagado), null, contPagos);
   }
+
+  // ── 🏦 LOS RENGLONES NUEVOS DE LA CUENTA (15 ago) ──
+  // Todo lo que envuelve al cliente, visible y editable desde aquí.
+  try { h += _renglonCanceladas(K); } catch(e){}
+  try { h += _renglonPedidos(K); } catch(e){}
+  try { h += _renglonCredito(K); } catch(e){}
+  try { h += _renglonNotas(K); } catch(e){}
+  try { h += _renglonIntervalo(K); } catch(e){}
+  try { h += _renglonPrecios(K); } catch(e){}
+  try { h += _renglonAjustesCuenta(K); } catch(e){}
 
   // ── 📍 VISITAS ──
   var visitasCont = _sub(
@@ -18667,7 +19431,9 @@ function verCl(id){
     +   'display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;flex-shrink:0">'
     +   escaparHtml(ini) + '</div>'
     + '<div style="flex:1;min-width:0">'
-    +   '<div style="font-size:17px;font-weight:800;color:var(--nbs-ink);line-height:1.2;overflow:hidden;text-overflow:ellipsis">'
+    +   '<div style="font-size:9.5px;font-weight:900;color:var(--nbs-muted);letter-spacing:1.2px;'
+    +     'margin-bottom:1px">CUENTA DE</div>'
+    +   '<div style="font-size:21px;font-weight:900;color:var(--nbs-ink);line-height:1.15;overflow:hidden;text-overflow:ellipsis">'
     +     escaparHtml(nombreCl(c)) + '</div>'
     +   '<div style="font-size:12px;color:var(--nbs-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
     +     (c.negocio ? '\ud83c\udfea ' + escaparHtml(c.negocio) : etiquetaTipoNegocio(c)) + '</div>'
@@ -21050,7 +21816,7 @@ function renderCxC(q){
       +'<div style="width:38px;height:38px;border-radius:10px;background:var(--nbs-gold-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
       +'<span style="font-size:13px;font-weight:700;color:var(--nbs-gold-dark)">'+(cl?ini(cl.nombre,cl.apellido):'?')+'</span>'
       +'</div>'
-      +'<div><div style="font-size:16px;font-weight:700;color:var(--nbs-ink)">'+escaparHtml(cl?nombreCl(cl):c.cn)+'</div>'
+      +'<div><div style="font-size:18px;font-weight:900;color:var(--nbs-ink)">'+escaparHtml(cl?nombreCl(cl):c.cn)+'</div>'
       +(negocio ? '<div style="font-size:12px;color:var(--nbs-muted);margin-top:1px;display:flex;align-items:center;gap:4px">🏪'+escaparHtml(negocio)+'</div>' : '')
       +'<div style="font-size:11px;color:var(--nbs-muted-2);margin-top:3px">'+(c.total>0?'Total facturado: $'+fmtNum(c.total):'Sin facturas abiertas')+'</div></div>'
       +'</div>'
@@ -21546,8 +22312,17 @@ function guardarEditorPago(vid, pidx){
   }
   SS('nv', ventas);
   cerrarEditorPago();
-  abrirAbono(cxcClienteId); // recalcula el saldo y refresca la pantalla
-  alert('✅ Pago corregido. El saldo se actualizó.');
+  // Si se abrió desde el editor de la factura, volver AHÍ. Una factura saldada no
+  // sale en Cuentas por Cobrar, así que abrirAbono dejaría la pantalla vacía. -15 ago-
+  if(window._pagoVuelveAFactura){
+    var _vf = window._pagoVuelveAFactura;
+    window._pagoVuelveAFactura = null;
+    try { pintarPagosEnEditorFactura(_vf); } catch(e){}
+    try { renderCxC(''); } catch(e){}
+  } else {
+    abrirAbono(cxcClienteId); // recalcula el saldo y refresca la pantalla
+  }
+  alert('\u2705 Pago corregido. El saldo se actualiz\u00f3.');
 }
 
 function borrarPagoDesdeEditor(vid, pidx){
@@ -22980,6 +23755,107 @@ function compartirFactura(vid){
   });
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  💵 LOS PAGOS, DENTRO DE LA FACTURA  (15 ago 2026)
+//
+//  🔑 SENSEI: "no encuentro la forma de editar un pago que me hicieron
+//  y que por error puse la cantidad completa y la factura se saldó, y
+//  como está saldada NO APARECE EN CUENTAS POR COBRAR, que era por
+//  donde se podía entrar para editar el pago... necesito que se pueda
+//  editar desde donde se entra a la factura".
+//
+//  Tenía razón: editar un pago solo se podía desde Cuentas por Cobrar
+//  -y una factura SALDADA no sale ahí- o buscándola en el historial.
+//  Si se equivocaba en el monto, la factura quedaba trancada.
+//
+//  Ahora los pagos salen DENTRO del editor de la factura, con su
+//  lápiz y su papelera, usando el editor que ya existía.
+// ═══════════════════════════════════════════════════════════════════
+function pintarPagosEnEditorFactura(vid){
+  var caja = document.getElementById('fact-edit-pagos');
+  if(!caja) return;
+  ventas = LS('nv', []);
+  var v = ventas.find(function(x){ return String(x.id) === String(vid); });
+  if(!v){ caja.innerHTML = ''; return; }
+
+  var pagos = v.pagosFactura || [];
+  var total = parseFloat(v.total) || 0;
+  var pagado = 0;
+  pagos.forEach(function(p){ if(!p.esDevolucion) pagado += parseFloat(p.monto) || 0; });
+  pagado = Math.round(pagado * 100) / 100;
+  var saldo = Math.round((total - pagado) * 100) / 100;
+
+  var h = '<div style="border-top:1px solid #E8E8EF;padding-top:12px;margin-bottom:14px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">'
+    +   '<span style="font-size:12.5px;font-weight:900;color:var(--nbs-ink)">\ud83d\udcb5 PAGOS APLICADOS</span>'
+    +   '<span style="font-size:13px;font-weight:900;color:var(--nbs-green-text)">$' + fmtNum(pagado) + '</span>'
+    + '</div>';
+
+  if(!pagos.length){
+    h += '<div style="font-size:11.5px;color:var(--nbs-muted);padding:8px 0">'
+      + (v.tipo === 'contado'
+          ? 'Esta venta fue al contado y no tiene pagos apuntados por separado.'
+          : 'Todav\u00eda no le has aplicado ning\u00fan pago a esta factura.')
+      + '</div>';
+  } else {
+    pagos.forEach(function(p, i){
+      if(p.esDevolucion) return;
+      var metodo = (p.metodos && p.metodos.length)
+        ? p.metodos.map(function(m){ return m.tipo || ''; }).filter(Boolean).join(' + ')
+        : (p.metodo || '');
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #F4F4F8">'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:12.5px;font-weight:700;color:var(--nbs-ink)">'
+        +     escaparHtml(String(p.fecha || v.fecha || '')) + '</div>'
+        +   '<div style="font-size:10.5px;color:var(--nbs-muted)">'
+        +     (metodo ? escaparHtml(metodo) : 'sin forma de pago')
+        +     (p.nota ? ' \u00b7 ' + escaparHtml(String(p.nota).slice(0, 26)) : '') + '</div>'
+        + '</div>'
+        + '<div style="font-size:13.5px;font-weight:900;color:var(--nbs-green-text);flex-shrink:0">+$'
+        +   fmtNum(parseFloat(p.monto) || 0) + '</div>'
+        + '<button onclick="editarPagoDesdeFactura(' + _arg(vid) + ',' + i + ')" '
+        +   'style="background:#FFF8E1;border:1px solid #F9A825;border-radius:7px;padding:6px 9px;'
+        +   'font-size:13px;cursor:pointer;flex-shrink:0" title="Corregir este pago">\u270f\ufe0f</button>'
+        + '<button onclick="borrarPagoDesdeFactura(' + _arg(vid) + ',' + i + ')" '
+        +   'style="background:#FFEBEE;border:1px solid #C62828;border-radius:7px;padding:6px 9px;'
+        +   'font-size:13px;cursor:pointer;flex-shrink:0" title="Borrar este pago">\ud83d\uddd1\ufe0f</button>'
+        + '</div>';
+    });
+  }
+
+  // Cómo queda la factura
+  var col = saldo > 0.005 ? 'var(--nbs-red-text)' : 'var(--nbs-green-text)';
+  var txt = saldo > 0.005 ? 'Le queda debiendo $' + fmtNum(saldo)
+          : (saldo < -0.005 ? '\u26a0\ufe0f Est\u00e1 pagada de M\u00c1S por $' + fmtNum(-saldo)
+                            : '\u2705 Esta factura est\u00e1 SALDADA');
+  h += '<div style="margin-top:9px;padding:9px;background:' + (saldo > 0.005 ? 'var(--nbs-red-bg)' : 'var(--nbs-green-bg)')
+    + ';border-radius:8px;text-align:center;font-size:12px;font-weight:800;color:' + col + '">'
+    + txt + '</div>';
+  h += '</div>';
+  caja.innerHTML = h;
+}
+
+// Corregir un pago desde la factura. Usa el editor que ya existía. -15 ago-
+function editarPagoDesdeFactura(vid, pidx){
+  window._pagoVuelveAFactura = vid;
+  try { abrirEditorPago(vid, pidx); } catch(e){ alert('No se pudo abrir el pago.'); }
+}
+
+function borrarPagoDesdeFactura(vid, pidx){
+  ventas = LS('nv', []);
+  var v = ventas.find(function(x){ return String(x.id) === String(vid); });
+  if(!v || !v.pagosFactura || v.pagosFactura[pidx] === undefined) return;
+  var p = v.pagosFactura[pidx];
+  if(!confirm('\u00bfBorrar este pago de $' + fmtNum(parseFloat(p.monto) || 0) + '?\n\n'
+      + 'La deuda del cliente va a SUBIR ese mismo monto.\n\nEsto no se puede deshacer.')) return;
+  v.pagosFactura.splice(pidx, 1);
+  SS('nv', ventas);
+  try { pintarPagosEnEditorFactura(vid); } catch(e){}
+  try { renderCxC(''); } catch(e){}
+  try { avisoChico('\ud83d\uddd1\ufe0f Pago borrado'); } catch(e){}
+}
+
 function editarFactura(vid){
   ventas = LS('nv', []);
   var v = ventas.find(function(x){ return String(x.id)===String(vid); });
@@ -23069,6 +23945,11 @@ function editarFactura(vid){
   totalBox.style.cssText = 'border-top:2px solid var(--nbs-ink);padding-top:10px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center';
   wrap.appendChild(totalBox);
 
+  // 💵 LOS PAGOS DE ESTA FACTURA, con su lápiz y su papelera. -15 ago-
+  var pagosBox = document.createElement('div');
+  pagosBox.id = 'fact-edit-pagos';
+  wrap.appendChild(pagosBox);
+
   // Botones
   var btnsRow = document.createElement('div');
   btnsRow.style.cssText = 'display:flex;gap:8px;margin-top:8px';
@@ -23117,6 +23998,9 @@ function renderItemsFacturaEdit(){
     var totalNuevo = items.reduce(function(s,it){ return s+(it.cant*it.precio); }, 0);
     totalBox.innerHTML = '<span style="font-size:14px;font-weight:500;color:var(--nbs-ink)">TOTAL</span><span style="font-size:18px;font-weight:500;color:var(--nbs-ink)">$'+fmtNum(totalNuevo)+'</span>';
   }
+
+  // 💵 Y los pagos de esta factura, con su lápiz y su papelera. -15 ago-
+  try { pintarPagosEnEditorFactura(window._facturaEditVid); } catch(e){}
 }
 
 function actualizarItemFacturaEdit(i, campo, valor){
@@ -24249,6 +25133,8 @@ function iniciarAppDespuesDeLogin(){
   // 🤖 LOS AUTOMATISMOS: al arrancar y cada 10 minutos. -14 ago-
   try {
     setTimeout(function(){ correrAutomatismos(); }, 4000);
+    // 🔔 LA REVISIÓN DIARIA: la app se revisa sola y avisa. -15 ago-
+    setTimeout(function(){ correrRevisionDiaria(); }, 6000);
     setInterval(function(){ correrAutomatismos(); }, 600000);
   } catch(eAuto){}         // copia completa cada 2 horas + aviso si algo se borro
   repararDatosIncompletos();
