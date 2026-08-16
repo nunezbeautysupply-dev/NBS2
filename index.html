@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260815h-OFICIAL-V2.0">
+<meta name="app-version" content="20260815i-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5997,7 +5997,7 @@ function guardarEdicionGasto(id){
   }
 
   var gastos = LS('ngastos', []);
-  var idx = gastos.findIndex(function(g){ return g.id === id; });
+  var idx = gastos.findIndex(function(g){ return String(g.id) === String(id); });
   if(idx === -1){ alert('Gasto no encontrado'); return; }
   gastos[idx].cat = cat;
   gastos[idx].monto = monto;
@@ -6828,7 +6828,7 @@ function renderCXP(){
 // ---- Formulario para agregar/editar una tarjeta de credito ----
 function abrirFormTarjeta(id){
   var tarjetas = LS('ntarjetas', []);
-  var t = id ? tarjetas.find(function(x){ return x.id===id; }) : null;
+  var t = id ? tarjetas.find(function(x){ return String(x.id) === String(id); }) : null;
 
   var overlay = document.getElementById('cxp-form-overlay');
   if(!overlay){
@@ -6862,7 +6862,7 @@ function guardarTarjeta(id){
 
   var tarjetas = LS('ntarjetas', []);
   if(id){
-    var t = tarjetas.find(function(x){ return x.id===id; });
+    var t = tarjetas.find(function(x){ return String(x.id) === String(id); });
     if(t){ t.nombre=nombre; t.banco=banco; t.balance=balance; t.limite=limite; }
   } else {
     tarjetas.push({ id: Date.now(), nombre: nombre, banco: banco, balance: balance, limite: limite, historial: [] });
@@ -6893,7 +6893,7 @@ function verificarSobrepago(balanceActual, montoNum){
 
 function registrarMovimientoTarjeta(id, tipo){
   var tarjetas = LS('ntarjetas', []);
-  var t = tarjetas.find(function(x){ return x.id===id; });
+  var t = tarjetas.find(function(x){ return String(x.id) === String(id); });
   if(!t) return;
   var texto = tipo==='pago' ? '¿Cuánto vas a pagar a esta tarjeta?' : '¿Cuánto fue el cargo/compra a esta tarjeta?';
   var monto = prompt(texto, '0');
@@ -6911,7 +6911,7 @@ function registrarMovimientoTarjeta(id, tipo){
 // ---- Formulario para agregar/editar otra deuda ----
 function abrirFormOtraDeuda(id){
   var deudas = LS('notrasdeudas', []);
-  var d = id ? deudas.find(function(x){ return x.id===id; }) : null;
+  var d = id ? deudas.find(function(x){ return String(x.id) === String(id); }) : null;
 
   var overlay = document.getElementById('cxp-form-overlay');
   if(!overlay){
@@ -6946,7 +6946,7 @@ function guardarOtraDeuda(id){
 
   var deudas = LS('notrasdeudas', []);
   if(id){
-    var d = deudas.find(function(x){ return x.id===id; });
+    var d = deudas.find(function(x){ return String(x.id) === String(id); });
     if(d){ d.nombre=nombre; d.tipo=tipo; d.balance=balance; d.notas=notas; }
   } else {
     deudas.push({ id: Date.now(), nombre: nombre, tipo: tipo, balance: balance, notas: notas, historial: [] });
@@ -6967,7 +6967,7 @@ function eliminarOtraDeuda(id){
 
 function registrarMovimientoOtraDeuda(id, tipo){
   var deudas = LS('notrasdeudas', []);
-  var d = deudas.find(function(x){ return x.id===id; });
+  var d = deudas.find(function(x){ return String(x.id) === String(id); });
   if(!d) return;
   var texto = tipo==='pago' ? '¿Cuánto vas a pagar de esta deuda?' : '¿Cuánto aumentó esta deuda?';
   var monto = prompt(texto, '0');
@@ -7073,7 +7073,7 @@ function renderSup(q){
 
 function agregarBalanceInicialSuplidor(id){
   suplidores = LS('nsup', []);
-  var s = suplidores.find(function(x){ return x.id===id; });
+  var s = suplidores.find(function(x){ return String(x.id) === String(id); });
   if(!s) return;
 
   var el = document.getElementById('sup-perfil-contenido');
@@ -7106,7 +7106,7 @@ function agregarBalanceInicialSuplidor(id){
 
 function guardarBalanceInicialSuplidor(id){
   suplidores = LS('nsup', []);
-  var s = suplidores.find(function(x){ return x.id===id; });
+  var s = suplidores.find(function(x){ return String(x.id) === String(id); });
   if(!s) return;
 
   var monto = parseFloat(document.getElementById('bis-monto').value) || 0;
@@ -7449,7 +7449,7 @@ function verFacturaCompra(c, sid){
       if(!confirm('\u00bfPagar TODA la factura de $'+fmtNum(saldo)+' con '+metodoLabel+'?')) return;
       protegerConHuella(function(){
         compras = LS('nc', []);
-        var compraReal = compras.find(function(x){ return x.id===c.id; });
+        var compraReal = compras.find(function(x){ return String(x.id) === String(c).id; });
         if(!compraReal) return;
         if(!compraReal.pagosFactura) compraReal.pagosFactura = [];
         compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: saldo, fecha: fechaHoy(), metodo: metodo });
@@ -7466,7 +7466,7 @@ function verFacturaCompra(c, sid){
       if(monto <= 0){ alert('Ingresa un monto valido'); return; }
       if(monto > saldo){ if(!confirm('El monto es mayor al saldo. ¿Continuar?')) return; monto = saldo; }
       compras = LS('nc', []);
-      var compraReal = compras.find(function(x){ return x.id===c.id; });
+      var compraReal = compras.find(function(x){ return String(x.id) === String(c).id; });
       if(!compraReal) return;
       if(!compraReal.pagosFactura) compraReal.pagosFactura = [];
       compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy() });
@@ -7925,7 +7925,7 @@ function toggleNuevoClienteVIP(){
 
 function marcarVisitaNegocio(id){
   clientes = LS('ncl', []);
-  var c = clientes.find(function(x){ return x.id===id; });
+  var c = clientes.find(function(x){ return String(x.id) === String(id); });
   if(!c) return;
   c.ultimaVisitaNegocio = fechaHoy();
   SS('ncl', clientes);
@@ -10030,7 +10030,7 @@ function copiarAhoraManual(){
 
 function pedirRestaurar(idCopia){
   listarCopias().then(function(copias){
-    var c = copias.find(function(x){ return x.id === idCopia; });
+    var c = copias.find(function(x){ return String(x.id) === String(idCopia); });
     if(!c) return;
     var d = c.datos;
     var cn = d.conteo || {};
@@ -13297,7 +13297,7 @@ function guardarFirmaYVenta(){
 function verificarStockSuficiente(items){
   var faltantes = [];
   items.forEach(function(it){
-    var p = productos.find(function(x){ return x.id===it.pid; });
+    var p = productos.find(function(x){ return String(x.id) === String(it).pid; });
     if(p && it.cant > (p.stock||0)){
       faltantes.push({ nombre: p.nombre, stock: p.stock||0, cant: it.cant });
     }
@@ -13374,7 +13374,7 @@ function saveV(){
   // está al día y no se le puede bloquear una venta de verdad por eso.
   try { if(!avisarSiNoAlcanza(iV)) return; } catch(eInv){}
   var cid = parseInt(document.getElementById('vcl').value)||null;
-  var cl = cid ? clientes.find(function(c){ return c.id===cid; }) : null;
+  var cl = cid ? clientes.find(function(c){ return String(c.id) === String(cid); }) : null;
   var cn = cl ? nombreCl(cl) : 'Cliente general';
   var tipo = document.getElementById('vtipo').value;
   var metodosPagoV = (window._pagoMetodos && window._pagoMetodos['vini']) ? window._pagoMetodos['vini'].filter(function(m){ return m.monto>0; }) : [];
@@ -13399,7 +13399,7 @@ function saveV(){
 
   var subtot=0, gan=0;
   iV.forEach(function(it){
-    var p=productos.find(function(x){return x.id===it.pid;});
+    var p=productos.find(function(x){return String(x.id) === String(it).pid;});
     if(p) p.stock = Math.max(0, (p.stock||0) - it.cant);
     subtot += it.cant*it.precio;
     gan += it.cant*(it.precio-it.costo);
@@ -13471,7 +13471,7 @@ function saveV(){
   var _aFavor = 0;
   if(_sobra > 0.005 && cid){
     clientes = LS('ncl', []);
-    var _iCl = clientes.findIndex(function(c){ return c.id === cid; });
+    var _iCl = clientes.findIndex(function(c){ return String(c.id) === String(cid); });
     if(_iCl >= 0){
       clientes[_iCl].creditoAFavor = Math.round(((clientes[_iCl].creditoAFavor || 0) + _sobra) * 100) / 100;
       SS('ncl', clientes);
@@ -13486,7 +13486,7 @@ function saveV(){
   var metodoCredito = metodosPagoV.find(function(m){ return m.tipo === 'credito_cliente'; });
   if(cid && metodoCredito && metodoCredito.monto > 0){
     clientes = LS('ncl', []);
-    var clIdxCredito = clientes.findIndex(function(c){ return c.id===cid; });
+    var clIdxCredito = clientes.findIndex(function(c){ return String(c.id) === String(cid); });
     if(clIdxCredito >= 0){
       var creditoDisp = clientes[clIdxCredito].creditoAFavor||0;
       var montoUsar = Math.min(creditoDisp, metodoCredito.monto);
@@ -13582,7 +13582,7 @@ function saveV(){
     // Si esta venta vino de convertir un pedido, AHORA SI se borra el pedido -ya se completo de verdad-
     if(destino.tipo === 'pedido' && destino.pedidoId !== undefined){
       var pedidosActuales = LS('npedidos', []);
-      var idxABorrar = pedidosActuales.findIndex(function(pp){ return pp.id === destino.pedidoId; });
+      var idxABorrar = pedidosActuales.findIndex(function(pp){ return String(pp.id) === String(destino).pedidoId; });
       if(idxABorrar >= 0){ pedidosActuales.splice(idxABorrar, 1); SS('npedidos', pedidosActuales); }
     }
     var btnCancelarConv2 = document.getElementById('btn-cancelar-conversion-pedido');
@@ -13927,7 +13927,7 @@ function saveCC(){
   var sid = parseInt(document.getElementById('ccsup').value) || null;
   if(!sid){ alert('Selecciona un suplidor'); return; }
   suplidores = LS('nsup', []);
-  var sup = suplidores.find(function(s){ return s.id===sid; });
+  var sup = suplidores.find(function(s){ return String(s.id) === String(sid); });
   var sn = sup ? sup.nombre : 'Suplidor';
   var tipo = document.getElementById('cctipo').value;
   var metodosPago = (window._pagoMetodos && window._pagoMetodos['ccini']) ? window._pagoMetodos['ccini'].filter(function(m){ return m.monto>0; }) : [];
@@ -15604,10 +15604,12 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260815h';
+var NOVEDADES_VERSION = '20260815i';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Primero, el fallo que me mandaste en la foto. Cuando tocabas el lapiz de un pago decia: no se encontro el pago. Era culpa mia: el boton pasaba el numero de la factura como texto y la app lo comparaba como numero, asi que nunca coincidian. Ya esta arreglado, y de paso arregle otras veinticuatro funciones que tenian el mismo problema esperando a pasar.',
+  'Segundo, los lapices. Tenias razon: yo los habia puesto DENTRO de cada renglon, y habia que abrirlo para verlos. Ahora cada renglon que se puede editar tiene su lapiz A LA VISTA, sin abrir nada. Credito a favor, notas, cada cuanto visitarlo, precios especiales y sus datos.',
   'Uno. En pedidos rapidos ahora ves lo que cada barbero te debe, debajo de su nombre, y sigue ahi despues de guardar el pedido.',
   'Dos. El cuadro de cada barbero se hizo mas chico. Lo que mas vendes y lo que mas compra el cliente ahora estan detras de un boton que dice Sugerencias, y se abren ahi mismo cuando lo toques.',
   'Tres. El boton del asistente ahora lo puedes mover. Dejalo apretado un momento y arrastralo donde tu quieras. Ahi se queda.',
@@ -17615,7 +17617,7 @@ function actualizarTotalPedGeneral(){
 
 function irAVenderCliente(id){
   clientes = LS('ncl', []);
-  var cl = clientes.find(function(c){ return c.id===id; });
+  var cl = clientes.find(function(c){ return String(c.id) === String(id); });
   window._vendiendoDesde = { tipo:'cliente', cid:id };
   ir('p-v');
   if(cl){
@@ -17651,7 +17653,7 @@ function irACobrarCliente(id){
 
 function irAPedidoCliente(id){
   clientes = LS('ncl', []);
-  var cl = clientes.find(function(c){ return c.id===id; });
+  var cl = clientes.find(function(c){ return String(c.id) === String(id); });
   if(!cl) return;
   pedBarberoCid = cl.id;
   pedBarberoNombre = nombreCl(cl);
@@ -18903,7 +18905,7 @@ function _arg(v){
   return "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
 }
 
-function _filaPanel(clave, icono, texto, detalle, colorDet, contenido){
+function _filaPanel(clave, icono, texto, detalle, colorDet, contenido, editar){
   var abierto = (_panelAbierto === clave);
   // 🔤 EL TITULO EN NEGRITA Y LA FLECHA BIEN VISIBLE. Sensei lo pidio el 11 ago:
   // "el titulo de la barra desplegable creo que deberia ser en negrita para saber de
@@ -18922,6 +18924,14 @@ function _filaPanel(clave, icono, texto, detalle, colorDet, contenido){
     + '<span style="font-size:12px;font-weight:800;flex-shrink:0;'
     +   'color:' + (abierto ? 'rgba(255,255,255,.85)' : (colorDet || 'var(--nbs-muted)')) + '">'
     +   (detalle || '') + '</span>'
+    + (editar
+        ? '<span onclick="event.stopPropagation();' + editar + '" '
+          + 'style="flex-shrink:0;width:30px;height:30px;border-radius:8px;'
+          + 'background:' + (abierto ? 'rgba(255,255,255,.2)' : '#FFF8E1') + ';'
+          + 'border:1px solid ' + (abierto ? 'rgba(255,255,255,.35)' : '#F9A825') + ';'
+          + 'display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer">'
+          + '\u270f\ufe0f</span>'
+        : '')
     + '<span style="flex-shrink:0;width:24px;height:24px;border-radius:50%;'
     +   'display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;'
     +   'background:' + (abierto ? 'rgba(255,255,255,.22)' : '#EEEEF5') + ';'
@@ -19022,7 +19032,8 @@ function _renglonCredito(K){
     +   '\u270f\ufe0f Corregir el cr\u00e9dito a favor</button>'
   );
   return _filaPanel('credito', '\ud83d\udcb0', 'Cr\u00e9dito a favor',
-    '$' + fmtNum(c), c > 0.005 ? 'var(--nbs-gold-dark)' : null, cont);
+    '$' + fmtNum(c), c > 0.005 ? 'var(--nbs-gold-dark)' : null, cont,
+    'cambiarCreditoAFavor(' + _arg(K.cliente.id) + ')');
 }
 
 function cambiarCreditoAFavor(cid){
@@ -19063,7 +19074,8 @@ function _renglonNotas(K){
     +   '\u270f\ufe0f ' + (nota ? 'Cambiar la nota' : 'Escribir una nota') + '</button>'
   );
   return _filaPanel('notas', '\ud83d\udcdd', 'Notas',
-    nota ? String(nota).slice(0, 22) + (nota.length > 22 ? '\u2026' : '') : 'ninguna', null, cont);
+    nota ? String(nota).slice(0, 22) + (nota.length > 22 ? '\u2026' : '') : 'ninguna', null, cont,
+    'editarNotaCliente(' + _arg(K.cliente.id) + ')');
 }
 
 function editarNotaCliente(cid){
@@ -19099,7 +19111,8 @@ function _renglonIntervalo(K){
     +   '\u270f\ufe0f Cambiar cada cu\u00e1nto visitarlo</button>'
   );
   return _filaPanel('ritmo', '\ud83d\udcc5', 'Cada cu\u00e1nto compra',
-    (real !== null ? real + ' d\u00edas' : 'sin datos'), null, cont);
+    (real !== null ? real + ' d\u00edas' : 'sin datos'), null, cont,
+    'cambiarIntervaloVisita(' + _arg(K.cliente.id) + ')');
 }
 
 function cambiarIntervaloVisita(cid){
@@ -19157,7 +19170,8 @@ function _renglonPrecios(K){
     +   '\u2795 Ponerle un precio especial</button>'
   );
   return _filaPanel('precios', '\ud83c\udff7\ufe0f', 'Sus precios especiales',
-    pp.length ? String(pp.length) + ' producto(s)' : 'ninguno', null, cont);
+    pp.length ? String(pp.length) + ' producto(s)' : 'ninguno', null, cont,
+    'agregarPrecioEspecial(' + _arg(K.cliente.id) + ')');
 }
 
 function agregarPrecioEspecial(cid){
@@ -19262,7 +19276,8 @@ function _renglonAjustesCuenta(K){
         : 'No tiene facturas, se puede borrar sin problema.') + '</div>'
   );
   return _filaPanel('ajustescta', '\u2699\ufe0f', 'Ajustes de su cuenta',
-    sinServ ? 'sin servicio' : '', sinServ ? 'var(--nbs-gold-dark)' : null, cont);
+    sinServ ? 'sin servicio' : '', sinServ ? 'var(--nbs-gold-dark)' : null, cont,
+    'editarCl(' + _arg(K.cliente.id) + ')');
 }
 
 function cambiarSinServicioDesdeCuenta(cid){
@@ -19879,7 +19894,7 @@ function verFactura(v){
       btnRapido.onclick = function(){
         if(!confirm('¿Registrar el pago COMPLETO de $'+fmtNum(saldoFac)+' en efectivo?')) return;
         ventas = LS('nv', []);
-        var vr = ventas.find(function(x){ return x.id===vid; });
+        var vr = ventas.find(function(x){ return String(x.id) === String(vid); });
         if(!vr) return;
         if(!vr.pagosFactura) vr.pagosFactura = [];
         vr.pagosFactura.push({ pid: nuevoPagoId(), monto: saldoFac, fecha: fechaHoy(), metodos:[{tipo:'efectivo', monto:saldoFac}] });
@@ -19895,7 +19910,7 @@ function verFactura(v){
       if(monto <= 0){ alert('Ingresa un monto valido'); return; }
       if(monto > saldo){ if(!confirm('El monto es mayor al saldo. ¿Continuar?')) return; monto = saldo; }
       ventas = LS('nv', []);
-      var ventaReal = ventas.find(function(x){ return x.id===v.id; });
+      var ventaReal = ventas.find(function(x){ return String(x.id) === String(v).id; });
       if(!ventaReal) return;
       if(!ventaReal.pagosFactura) ventaReal.pagosFactura = [];
       ventaReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy() });
@@ -20873,7 +20888,7 @@ function cancelarFactura(v){
     if(!confirm('¿Cancelar esta factura de $'+fmtNum(v.total)+'?\n\nEl stock de los productos será restaurado.\nLa factura quedará marcada como CANCELADA en el historial.')) return;
     loadProds();
     ventas = LS('nv', []);
-    var ventaReal = ventas.find(function(x){ return x.id===v.id; });
+    var ventaReal = ventas.find(function(x){ return String(x.id) === String(v).id; });
     if(!ventaReal) return;
     ventaReal.cancelada = true;
     ventaReal.fechaCancelacion = fechaHoy();
@@ -20967,7 +20982,7 @@ window.guardarModificacionFactura = function(vid){
   // -confirmacion redundante quitada, el boton de Guardar ya es la confirmacion-
   loadProds();
   ventas = LS('nv', []);
-  var ventaReal = ventas.find(function(x){ return x.id===vid; });
+  var ventaReal = ventas.find(function(x){ return String(x.id) === String(vid); });
   if(!ventaReal) return;
 
   // Restaurar stock original y aplicar nuevo
@@ -21006,7 +21021,7 @@ window.guardarModificacionFactura = function(vid){
 
 function agregarBalanceInicial(id){
   clientes = LS('ncl', []);
-  var cl = clientes.find(function(x){ return x.id===id; });
+  var cl = clientes.find(function(x){ return String(x.id) === String(id); });
   if(!cl) return;
 
   var el = document.getElementById('cl-perfil-contenido');
@@ -21040,7 +21055,7 @@ function agregarBalanceInicial(id){
 
 function guardarBalanceInicial(id){
   clientes = LS('ncl', []);
-  var cl = clientes.find(function(x){ return x.id===id; });
+  var cl = clientes.find(function(x){ return String(x.id) === String(id); });
   if(!cl) return;
 
   var monto = parseFloat(document.getElementById('bi-monto').value) || 0;
@@ -21077,7 +21092,7 @@ function guardarBalanceInicial(id){
 
 function editarCl(id){
   clientes = LS('ncl', []);
-  var c = clientes.find(function(x){ return x.id===id; });
+  var c = clientes.find(function(x){ return String(x.id) === String(id); });
   if(!c) return;
 
   var el = document.getElementById('cl-perfil-contenido');
@@ -21148,7 +21163,7 @@ function editarCl(id){
 
 function guardarEdicionCl(id){
   clientes = LS('ncl', []);
-  var idx = clientes.findIndex(function(x){ return x.id===id; });
+  var idx = clientes.findIndex(function(x){ return String(x.id) === String(id); });
   if(idx === -1) return;
   var nombre = limpiarTexto(document.getElementById('ecl-n').value.trim());
   var apellido = limpiarTexto(document.getElementById('ecl-a').value.trim());
@@ -22443,7 +22458,7 @@ function abrirAbono(cid){
           btnDel.onclick = (function(vid, pi, pm){ return function(){
             if(!confirm('¿Borrar este abono de $'+fmtNum(pm)+'?')) return;
             ventas = LS('nv',[]);
-            var vf = ventas.find(function(x){ return x.id===vid; });
+            var vf = ventas.find(function(x){ return String(x.id) === String(vid); });
             if(vf && vf.pagosFactura){
               vf.pagosFactura.splice(pi, 1);
               SS('nv', ventas);
@@ -22516,7 +22531,10 @@ function fechaISOaUSA(iso){
 // Abre el formulario para corregir un pago. vid = id de la venta/factura, pidx = índice del pago.
 function abrirEditorPago(vid, pidx){
   ventas = LS('nv', []);
-  var vf = ventas.find(function(x){ return x.id === vid; });
+  // 🔴 Comparar como TEXTO en los dos lados: los botones pasan el id como texto
+  // (con _arg) y aquí se comparaba con === estricto contra un número, así que
+  // nunca encontraba el pago. Sensei lo cazó con una foto. -15 ago-
+  var vf = ventas.find(function(x){ return String(x.id) === String(vid); });
   if(!vf || !vf.pagosFactura || vf.pagosFactura[pidx] === undefined){ alert('No se encontró el pago.'); return; }
   var pago = vf.pagosFactura[pidx];
 
@@ -22628,7 +22646,10 @@ function guardarEditorPago(vid, pidx){
   if(montoTotal <= 0){ alert('El monto total debe ser mayor a cero.'); return; }
 
   ventas = LS('nv', []);
-  var vf = ventas.find(function(x){ return x.id === vid; });
+  // 🔴 Comparar como TEXTO en los dos lados: los botones pasan el id como texto
+  // (con _arg) y aquí se comparaba con === estricto contra un número, así que
+  // nunca encontraba el pago. Sensei lo cazó con una foto. -15 ago-
+  var vf = ventas.find(function(x){ return String(x.id) === String(vid); });
   if(!vf || !vf.pagosFactura || vf.pagosFactura[pidx] === undefined){ alert('No se encontró el pago.'); return; }
 
   vf.pagosFactura[pidx].monto = montoTotal;
@@ -22659,14 +22680,17 @@ function guardarEditorPago(vid, pidx){
 
 function borrarPagoDesdeEditor(vid, pidx){
   ventas = LS('nv', []);
-  var vf = ventas.find(function(x){ return x.id === vid; });
+  // 🔴 Comparar como TEXTO en los dos lados: los botones pasan el id como texto
+  // (con _arg) y aquí se comparaba con === estricto contra un número, así que
+  // nunca encontraba el pago. Sensei lo cazó con una foto. -15 ago-
+  var vf = ventas.find(function(x){ return String(x.id) === String(vid); });
   if(!vf || !vf.pagosFactura || vf.pagosFactura[pidx] === undefined){ alert('No se encontró el pago.'); return; }
   var monto = vf.pagosFactura[pidx].monto || 0;
   if(!confirm('¿Borrar este pago de $'+fmtNum(monto)+'? El saldo del cliente volverá a subir por ese monto.')) return;
   // Borrar un pago toca el dinero del cliente: se pide la huella antes de hacerlo.
   protegerConHuella(function(){
     ventas = LS('nv', []);
-    var vf2 = ventas.find(function(x){ return x.id === vid; });
+    var vf2 = ventas.find(function(x){ return String(x.id) === String(vid); });
     if(!vf2 || !vf2.pagosFactura || vf2.pagosFactura[pidx] === undefined){ alert('No se encontró el pago.'); return; }
     vf2.pagosFactura.splice(pidx, 1);
     SS('nv', ventas);
@@ -22767,7 +22791,7 @@ function facturasQueDebenDe(cid, excluirVid){
   todas.forEach(function(v){
     if(v.cancelada) return;
     if(String(v.cid) !== String(cid)) return;
-    if(v.id === excluirVid) return;
+    if(String(v.id) === String(excluirVid)) return;
     var pagado = (v.pagosFactura || []).reduce(function(s,p){
       return s + (typeof p.monto === 'number' ? p.monto : 0);
     }, 0);
@@ -22902,7 +22926,7 @@ function confirmarPagoMultiple(vid, saldo){
   var fechaPago = fechaHoy();
   var aplicados = 0;
   r.plan.forEach(function(p){
-    var v = ventas.find(function(x){ return x.id === p.id; });
+    var v = ventas.find(function(x){ return String(x.id) === String(p).id; });
     if(!v) return;
     if(!v.pagosFactura) v.pagosFactura = [];
     var monto = p.monto;
@@ -23017,7 +23041,7 @@ function eliminarDuplicadosClientes(){
     unicos.push(principal);
     // Reasignar ventas
     g.forEach(function(dup){
-      if(dup.id === principal.id) return;
+      if(String(dup.id) === String(principal).id) return;
       ventas.forEach(function(v){
         if(String(v.cid)===String(dup.id)){
           v.cid = principal.id;
@@ -26624,7 +26648,7 @@ function abrirConfigImpresora(){
     SS('impresoras_lista', impresoras);
   }
   var config = LS('printer_config', null);
-  if(!config || !config.activa_id || !impresoras.find(function(i){return i.id===config.activa_id;})){
+  if(!config || !config.activa_id || !impresoras.find(function(i){return String(i.id) === String(config).activa_id;})){
     // Si nunca se eligio una activa (o la que tenia guardada ya no existe), usar la primera de la lista
     config = { activa_id: impresoras[0].id, nombre: impresoras[0].nombre };
     SS('printer_config', config);
@@ -31516,7 +31540,7 @@ function abrirPreciosPersonalizados(cid){
 
 function deshacerDevolucion(devId){
   var devoluciones = LS('ndevoluciones', []);
-  var idx = devoluciones.findIndex(function(d){ return d.id === devId; });
+  var idx = devoluciones.findIndex(function(d){ return String(d.id) === String(devId); });
   if(idx < 0){ alert('No se encontró esa devolución -puede que ya se haya deshecho-.'); return; }
   var d = devoluciones[idx];
 
