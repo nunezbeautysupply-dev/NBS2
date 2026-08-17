@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260816e-OFICIAL-V2.0">
+<meta name="app-version" content="20260817a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -7479,7 +7479,7 @@ function verFacturaCompra(c, sid){
       if(!confirm('\u00bfPagar TODA la factura de $'+fmtNum(saldo)+' con '+metodoLabel+'?')) return;
       protegerConHuella(function(){
         compras = LS('nc', []);
-        var compraReal = compras.find(function(x){ return String(x.id) === String(c).id; });
+        var compraReal = compras.find(function(x){ return String(x.id) === String(c.id); });
         if(!compraReal) return;
         if(!compraReal.pagosFactura) compraReal.pagosFactura = [];
         compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: saldo, fecha: fechaHoy(), metodo: metodo });
@@ -7496,7 +7496,7 @@ function verFacturaCompra(c, sid){
       if(monto <= 0){ alert('Ingresa un monto valido'); return; }
       if(monto > saldo){ if(!confirm('El monto es mayor al saldo. ¿Continuar?')) return; monto = saldo; }
       compras = LS('nc', []);
-      var compraReal = compras.find(function(x){ return String(x.id) === String(c).id; });
+      var compraReal = compras.find(function(x){ return String(x.id) === String(c.id); });
       if(!compraReal) return;
       if(!compraReal.pagosFactura) compraReal.pagosFactura = [];
       compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy() });
@@ -13345,7 +13345,7 @@ function guardarFirmaYVenta(){
 function verificarStockSuficiente(items){
   var faltantes = [];
   items.forEach(function(it){
-    var p = productos.find(function(x){ return String(x.id) === String(it).pid; });
+    var p = productos.find(function(x){ return String(x.id) === String(it.pid); });
     if(p && it.cant > (p.stock||0)){
       faltantes.push({ nombre: p.nombre, stock: p.stock||0, cant: it.cant });
     }
@@ -13447,7 +13447,7 @@ function saveV(){
 
   var subtot=0, gan=0;
   iV.forEach(function(it){
-    var p=productos.find(function(x){return String(x.id) === String(it).pid;});
+    var p=productos.find(function(x){return String(x.id) === String(it.pid);});
     if(p) p.stock = Math.max(0, (p.stock||0) - it.cant);
     subtot += it.cant*it.precio;
     gan += it.cant*(it.precio-it.costo);
@@ -13630,7 +13630,7 @@ function saveV(){
     // Si esta venta vino de convertir un pedido, AHORA SI se borra el pedido -ya se completo de verdad-
     if(destino.tipo === 'pedido' && destino.pedidoId !== undefined){
       var pedidosActuales = LS('npedidos', []);
-      var idxABorrar = pedidosActuales.findIndex(function(pp){ return String(pp.id) === String(destino).pedidoId; });
+      var idxABorrar = pedidosActuales.findIndex(function(pp){ return String(pp.id) === String(destino.pedidoId); });
       if(idxABorrar >= 0){ pedidosActuales.splice(idxABorrar, 1); SS('npedidos', pedidosActuales); }
     }
     var btnCancelarConv2 = document.getElementById('btn-cancelar-conversion-pedido');
@@ -14508,10 +14508,11 @@ function calcularBalancesClientes(){
     // 🔴 ANTES se saltaba TODAS las de contado. Pero una de contado MODIFICADA
     // puede quedar debiendo, y ese dinero no se contaba. -15 ago-
     if(v.tipo !== 'credito' && cobradoYDebeDe(v).debe <= 0.005) return;
-    var pagado = (v.pagosFactura || []).reduce(function(s,p){
-      return s + (typeof p.monto === 'number' ? p.monto : 0);
-    }, 0);
-    var saldo = (v.total || 0) - pagado;
+    // 🔑 LA REGLA ÚNICA. Antes era `total - pagado` a secas y las ventas al CONTADO
+    // parecían deber todo. Lo cazaron las leyes del dinero. -17 ago-
+    var _cd = cobradoYDebeDe(v);
+    var pagado = _cd.cobrado;
+    var saldo = _cd.debe;
     if(saldo > 0.01){
       var k = String(v.cid);
       total[k] = (total[k] || 0) + saldo;
@@ -14925,6 +14926,50 @@ function aplicarCobroPedidos(cid){
     + (sobra > 0.005 ? '\n\n\ud83d\udcb0 $' + fmtNum(sobra) + ' le quedaron a favor.' : ''));
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  🚫🚪 LOS DOS MOTIVOS DE NO COMPRAR  (16 ago 2026)
+//
+//  🔑 SENSEI: "que sea porque no quiere productos y también que sea
+//  porque en ese momento el cliente NO ESTÁ en la barbería, o sea que
+//  yo pueda decir NO COMPRÓ o NO ESTÁ, que son cosas muy distintas
+//  para su récord".
+//
+//  Los dos cuentan como VISITA -él gastó el viaje-, pero el "no estaba"
+//  NO cuenta contra su porcentaje de compra.
+// ═══════════════════════════════════════════════════════════════════
+function marcarNoQuisoNada(idx){
+  _marcarBarberoSinCompra(idx, 'noCompro',
+    '\ud83d\udeab No quiso nada', 'estaba pero no quiso nada');
+}
+
+function marcarNoEstaba(idx){
+  _marcarBarberoSinCompra(idx, 'noEstaba',
+    '\ud83d\udeaa No estaba', 'no estaba en la barber\u00eda');
+}
+
+function _marcarBarberoSinCompra(idx, estado, titulo, nota){
+  var p = pedidosMultiTemp[idx];
+  if(!p || !p.cliente) return;
+  var nom = nombreCl(p.cliente);
+  if(!confirm(titulo + '\n\n' + nom + '\n\n'
+      + 'Se le apunta la visita de hoy con ese motivo.'
+      + (estado === 'noEstaba'
+          ? '\n\n\u2139\ufe0f La visita cuenta -fuiste hasta all\u00e1-, pero NO le baja su '
+            + 'porcentaje de compra, porque no fue culpa suya.'
+          : ''))) return;
+
+  try { apuntarVisitaDeUnBarbero(p.cliente.id, estado); } catch(e){}
+  // Y a la bitácora, con la nota de por qué
+  try { apuntarEnBitacora(p.cliente.id, false, { como: 'mano', nota: nota }); } catch(e){}
+
+  // Se saca del cuadro: ya quedó resuelto
+  pedidosMultiTemp.splice(idx, 1);
+  try { guardarPedidoEnProceso(); } catch(e){}
+  try { renderPedidosMultiples(); } catch(e){}
+  try { avisoChico(titulo + ' \u00b7 ' + String(nom).slice(0, 18)); } catch(e){}
+}
+
 function renderPedidosMultiples(){
   var el = document.getElementById('ped-multi-lista');
   if(!el) return;
@@ -15048,6 +15093,20 @@ function renderPedidosMultiples(){
       html += '<div style="padding:6px 12px;background:var(--nbs-green-bg)">'
         + '<span style="font-size:11.5px;font-weight:800;color:var(--nbs-green-text)">'
         +   '\u2705 No te debe nada</span></div>';
+    }
+
+    // 🚫🚪 SI HOY NO TE COMPRA — dos motivos MUY distintos. -16 ago-
+    if(!p._guardado && !(p.items || []).length){
+      html += '<div style="padding:7px 12px 2px;display:flex;gap:6px">'
+        + '<button onclick="event.stopPropagation();marcarNoQuisoNada(' + idx + ')" '
+        +   'style="flex:1;padding:9px 6px;background:#fff;border:1.5px solid #F9A825;'
+        +   'color:#F57F17;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">'
+        +   '\ud83d\udeab No quiso nada</button>'
+        + '<button onclick="event.stopPropagation();marcarNoEstaba(' + idx + ')" '
+        +   'style="flex:1;padding:9px 6px;background:#fff;border:1.5px solid #78909C;'
+        +   'color:#455A64;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">'
+        +   '\ud83d\udeaa No estaba</button>'
+        + '</div>';
     }
 
     // ⚡ EL BOTÓN QUE ABRE LAS SUGERENCIAS. Así el cuadro no estorba. -15 ago-
@@ -15895,10 +15954,13 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260816e';
+var NOVEDADES_VERSION = '20260817a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Lo mas importante de esta version es un fallo de dinero que estaba escondido hace meses. Cuando un cliente te pagaba mas de lo que debia una factura, el sobrante se repartia a las demas, pero la app no miraba si esas otras eran de contado. Una venta al contado ya esta pagada, asi que el sobrante se iba a facturas que ya estaban saldadas y la deuda del cliente no bajaba todo lo que habia pagado. Ya esta arreglado.',
+  'Lo encontro una prueba nueva que se llama las leyes del dinero. En vez de probar casos que se me ocurren a mi, le puse ocho reglas que nunca se pueden romper y la maquina inventa cientos de negocios buscando donde fallan. Es la prueba mas fuerte que existe para esto.',
+  'En pedidos rapidos, cuando un cliente no te compra, ahora hay dos botones porque son cosas muy distintas: No quiso nada, y No estaba. Las dos cuentan como visita porque tu fuiste hasta alla, pero el No estaba NO le baja su porcentaje de compra, porque no fue culpa suya. En su ficha ves los tres numeros separados.',
   'Lo mas importante: las visitas. Habia dos records que nunca se hablaban. Cuando marcabas una barberia en la ruta, eso se quedaba solo en la ruta y la ficha del cliente no se enteraba nunca. Por eso en Visitas no te salia nada. Ya estan conectados: marcas la barberia y a todos sus barberos les queda la visita apuntada, y si despues les vendes cambia solo de no compro a compro.',
   'Y hay un listado nuevo de clientes. En la pantalla de Clientes, boton Listado completo. Puedes ordenarlos por codigo, por nombre, por lo que te deben, por lo que te compran o por lo que te dejan. Y filtrarlos: solo los que te deben, los que estan al dia, los que dejaron de venir, los sin servicio, o los de una sola barberia. Y lo imprimes o lo compartes.',
   'Cada cliente ahora tiene su codigo de registro, del cero cero uno al ciento cuarenta y siete, en el orden en que tu los registraste. Lo ves en su cuenta al lado de donde dice CUENTA DE, y en la lista de clientes. El codigo se pone una sola vez y no cambia nunca: si entra un cliente nuevo le toca el ciento cuarenta y ocho.',
@@ -19344,7 +19406,7 @@ function cuentaDeCliente(cid){
   var vacio = {
     cliente: null, facturas: [], activas: [], canceladas: [], pagos: [],
     pedidos: [], devoluciones: [], modificadas: [], conFirma: [],
-    visitas: { compro: [], noCompro: [], total: 0, pct: 0 },
+    visitas: { compro: [], noCompro: [], noEstaba: [], total: 0, pct: 0 },
     dinero: { comprado: 0, pagado: 0, debe: 0, ganancia: 0, margen: 0, credito: 0 },
     ritmo: { ultima: null, diasDesde: null, cadaCuanto: null },
     top: []
@@ -19420,14 +19482,19 @@ function cuentaDeCliente(cid){
   var firmadas = activas.filter(function(v){ return !!v.firma; });
 
   // ── SUS VISITAS ──
-  var vis = { compro: [], noCompro: [], total: 0, pct: 0 };
+  var vis = { compro: [], noCompro: [], noEstaba: [], total: 0, pct: 0 };
   try {
     var mapa = LS('nvisitas_barberos', {}) || {};
     var mio = mapa[String(cid)] || {};
     vis.compro = (mio.compro || []).slice();
     vis.noCompro = (mio.noCompro || []).slice();
-    vis.total = vis.compro.length + vis.noCompro.length;
-    vis.pct = vis.total ? Math.round(vis.compro.length / vis.total * 100) : 0;
+    vis.noEstaba = (mio.noEstaba || []).slice();
+    // 🔑 La visita cuenta SIEMPRE -él gastó el viaje-, incluidas las que el
+    // barbero no estaba. Pero el porcentaje de compra solo mira las veces que
+    // SÍ estuvo: no es culpa suya no haber estado. -16 ago-
+    vis.total = vis.compro.length + vis.noCompro.length + vis.noEstaba.length;
+    var conEl = vis.compro.length + vis.noCompro.length;
+    vis.pct = conEl ? Math.round(vis.compro.length / conEl * 100) : 0;
   } catch(e){}
 
   // ── SU RITMO ──
@@ -20599,11 +20666,17 @@ function pintarPanelCliente(cid){
           return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
         })[0];
         var comproUlt = vv.compro.indexOf(ult) >= 0;
+        var noEst = (vv.noEstaba || []).length;
+        var estabaUlt = (vv.noEstaba || []).indexOf(ult) < 0;
         return '<b>' + vv.total + ' visita(s)</b> apuntada(s)<br>'
-          + 'Te compr\u00f3 en <b>' + vv.compro.length + '</b> de ellas ('
-          + vv.pct + '%)<br>'
+          + '\u2705 Te compr\u00f3 en <b>' + vv.compro.length + '</b><br>'
+          + '\ud83d\udeab No quiso nada en <b>' + vv.noCompro.length + '</b><br>'
+          + (noEst ? '\ud83d\udeaa No estaba en <b>' + noEst + '</b><br>' : '')
+          + '<span style="color:var(--nbs-muted)">De las veces que S\u00cd estaba, '
+          + 'te compr\u00f3 el <b>' + vv.pct + '%</b></span><br>'
           + '\u00daltima: <b>' + escaparHtml(String(ult)) + '</b> '
-          + (comproUlt ? '\u2705 compr\u00f3' : '\u2014 no compr\u00f3');
+          + (comproUlt ? '\u2705 compr\u00f3'
+              : (estabaUlt ? '\ud83d\udeab no quiso nada' : '\ud83d\udeaa no estaba'));
       })()
     + (c.intervaloVisitaDias ? '<br>Lo visitas cada <b>' + c.intervaloVisitaDias + ' d\u00edas</b>' : '')
     + '</div>'
@@ -20858,7 +20931,7 @@ function verFactura(v){
       if(monto <= 0){ alert('Ingresa un monto valido'); return; }
       if(monto > saldo){ if(!confirm('El monto es mayor al saldo. ¿Continuar?')) return; monto = saldo; }
       ventas = LS('nv', []);
-      var ventaReal = ventas.find(function(x){ return String(x.id) === String(v).id; });
+      var ventaReal = ventas.find(function(x){ return String(x.id) === String(v.id); });
       if(!ventaReal) return;
       if(!ventaReal.pagosFactura) ventaReal.pagosFactura = [];
       ventaReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy() });
@@ -21836,7 +21909,7 @@ function cancelarFactura(v){
     if(!confirm('¿Cancelar esta factura de $'+fmtNum(v.total)+'?\n\nEl stock de los productos será restaurado.\nLa factura quedará marcada como CANCELADA en el historial.')) return;
     loadProds();
     ventas = LS('nv', []);
-    var ventaReal = ventas.find(function(x){ return String(x.id) === String(v).id; });
+    var ventaReal = ventas.find(function(x){ return String(x.id) === String(v.id); });
     if(!ventaReal) return;
     ventaReal.cancelada = true;
     ventaReal.fechaCancelacion = fechaHoy();
@@ -23747,10 +23820,11 @@ function facturasQueDebenDe(cid, excluirVid){
     if(v.cancelada) return;
     if(String(v.cid) !== String(cid)) return;
     if(String(v.id) === String(excluirVid)) return;
-    var pagado = (v.pagosFactura || []).reduce(function(s,p){
-      return s + (typeof p.monto === 'number' ? p.monto : 0);
-    }, 0);
-    var saldo = (v.total || 0) - pagado;
+    // 🔑 LA REGLA ÚNICA. Antes era `total - pagado` a secas y las ventas al CONTADO
+    // parecían deber todo. Lo cazaron las leyes del dinero. -17 ago-
+    var _cd = cobradoYDebeDe(v);
+    var pagado = _cd.cobrado;
+    var saldo = _cd.debe;
     if(saldo > 0.01){
       lista.push({ id: v.id, nf: v.numFactura || String(v.id).slice(-4), fecha: v.fecha || '', saldo: saldo, cuando: parsearFechaVenta(v.fecha) });
     }
@@ -23881,7 +23955,7 @@ function confirmarPagoMultiple(vid, saldo){
   var fechaPago = fechaHoy();
   var aplicados = 0;
   r.plan.forEach(function(p){
-    var v = ventas.find(function(x){ return String(x.id) === String(p).id; });
+    var v = ventas.find(function(x){ return String(x.id) === String(p.id); });
     if(!v) return;
     if(!v.pagosFactura) v.pagosFactura = [];
     var monto = p.monto;
@@ -23996,7 +24070,7 @@ function eliminarDuplicadosClientes(){
     unicos.push(principal);
     // Reasignar ventas
     g.forEach(function(dup){
-      if(String(dup.id) === String(principal).id) return;
+      if(String(dup.id) === String(principal.id)) return;
       ventas.forEach(function(v){
         if(String(v.cid)===String(dup.id)){
           v.cid = principal.id;
@@ -27605,7 +27679,7 @@ function abrirConfigImpresora(){
     SS('impresoras_lista', impresoras);
   }
   var config = LS('printer_config', null);
-  if(!config || !config.activa_id || !impresoras.find(function(i){return String(i.id) === String(config).activa_id;})){
+  if(!config || !config.activa_id || !impresoras.find(function(i){return String(i.id) === String(config.activa_id);})){
     // Si nunca se eligio una activa (o la que tenia guardada ya no existe), usar la primera de la lista
     config = { activa_id: impresoras[0].id, nombre: impresoras[0].nombre };
     SS('printer_config', config);
@@ -31630,8 +31704,19 @@ setTimeout(revisarRecordatoriosVisita, 8000);
 //
 //  Ahora TODO pasa por aquí y se apunta en los dos.
 // ═══════════════════════════════════════════════════════════════════
-function apuntarVisitaDeBarberia(negocio, compro){
+// 🚪 LOS TRES ESTADOS DE UNA VISITA (Sensei, 16 ago):
+//    'compro'    → le compró
+//    'noCompro'  → estaba, pero no quiso nada
+//    'noEstaba'  → él fue, pero el barbero no estaba
+//
+// La visita cuenta SIEMPRE -él gastó el viaje-, pero el "no estaba" NO
+// cuenta contra su porcentaje de compra: no es culpa suya no haber estado.
+function apuntarVisitaDeBarberia(negocio, estado){
   if(!negocio) return 0;
+  // Se sigue aceptando true/false de antes, para no romper lo que ya llama
+  if(estado === true) estado = 'compro';
+  else if(estado === false || !estado) estado = 'noCompro';
+
   clientes = LS('ncl', []);
   var hoy = fechaHoy();
   var visitas = LS('nvisitas_barberos', {});
@@ -31640,23 +31725,7 @@ function apuntarVisitaDeBarberia(negocio, compro){
   clientes.forEach(function(c){
     if(String(c.negocio || '') !== String(negocio)) return;
     if(c.sinServicio) return;
-    var k = String(c.id);
-    if(!visitas[k]) visitas[k] = { compro: [], noCompro: [] };
-    if(!visitas[k].compro) visitas[k].compro = [];
-    if(!visitas[k].noCompro) visitas[k].noCompro = [];
-    // Si ya se le apuntó hoy, no se duplica
-    if(visitas[k].compro.indexOf(hoy) >= 0 || visitas[k].noCompro.indexOf(hoy) >= 0){
-      // Si hoy figuraba como "no compró" y ahora SÍ compró, se corrige
-      if(compro && visitas[k].noCompro.indexOf(hoy) >= 0){
-        visitas[k].noCompro = visitas[k].noCompro.filter(function(f){ return f !== hoy; });
-        visitas[k].compro.push(hoy);
-        cuantos++;
-      }
-      return;
-    }
-    if(compro) visitas[k].compro.push(hoy);
-    else visitas[k].noCompro.push(hoy);
-    cuantos++;
+    cuantos += _apuntarVisitaAUno(visitas, c.id, hoy, estado) ? 1 : 0;
   });
 
   if(cuantos){
@@ -31664,6 +31733,54 @@ function apuntarVisitaDeBarberia(negocio, compro){
     try { marcarPendienteDeSubir('nvisitas_barberos'); } catch(e){}
   }
   return cuantos;
+}
+
+// A un solo cliente. Devuelve true si cambió algo.
+function _apuntarVisitaAUno(visitas, cid, hoy, estado){
+  var k = String(cid);
+  if(!visitas[k]) visitas[k] = { compro: [], noCompro: [], noEstaba: [] };
+  if(!visitas[k].compro) visitas[k].compro = [];
+  if(!visitas[k].noCompro) visitas[k].noCompro = [];
+  if(!visitas[k].noEstaba) visitas[k].noEstaba = [];
+
+  var yaC = visitas[k].compro.indexOf(hoy) >= 0;
+  var yaN = visitas[k].noCompro.indexOf(hoy) >= 0;
+  var yaE = visitas[k].noEstaba.indexOf(hoy) >= 0;
+
+  // 🔑 EL ORDEN MANDA: comprar gana sobre todo. Y si no estaba pero después
+  // apareció y no quiso nada, vale el "no quiso nada".
+  if(estado === 'compro'){
+    if(yaC) return false;
+    visitas[k].noCompro = visitas[k].noCompro.filter(function(f){ return f !== hoy; });
+    visitas[k].noEstaba = visitas[k].noEstaba.filter(function(f){ return f !== hoy; });
+    visitas[k].compro.push(hoy);
+    return true;
+  }
+  if(estado === 'noEstaba'){
+    if(yaC || yaN || yaE) return false;   // ya hay algo mejor apuntado hoy
+    visitas[k].noEstaba.push(hoy);
+    return true;
+  }
+  // noCompro
+  if(yaC || yaN) return false;
+  visitas[k].noEstaba = visitas[k].noEstaba.filter(function(f){ return f !== hoy; });
+  visitas[k].noCompro.push(hoy);
+  return true;
+}
+
+// A UN SOLO BARBERO, no a toda la barbería. Es lo que usan los botones
+// de Pedidos Rápidos: ahí él decide barbero por barbero. -16 ago-
+function apuntarVisitaDeUnBarbero(cid, estado){
+  if(!cid) return false;
+  if(estado === true) estado = 'compro';
+  else if(estado === false || !estado) estado = 'noCompro';
+  var visitas = LS('nvisitas_barberos', {});
+  var cambio = _apuntarVisitaAUno(visitas, cid, fechaHoy(), estado);
+  if(cambio){
+    SS('nvisitas_barberos', visitas);
+    try { marcarPendienteDeSubir('nvisitas_barberos'); } catch(e){}
+  }
+  return cambio;
 }
 
 function toggleVisita(diaKey, neg){
