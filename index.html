@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260816b-OFICIAL-V2.0">
+<meta name="app-version" content="20260816c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4812,6 +4812,30 @@ function claveGrupoVIP(it, prod){
 
   var tipo = tipoVIPdeNombre(it.nombre, marca);
   if(!tipo) tipo = 'OTROS';   // nunca se cae un producto de $10 por no reconocerle el tipo
+
+  // 🔑 LOS TIPOS QUE SE JUNTAN SIN IMPORTAR LA MARCA (Sensei, 16 ago).
+  // Solo estos tres: colonia, wax y el cuidado de cuchilla. Todo lo demás sigue
+  // agrupándose por marca + tipo, como siempre, para no destapar líos donde no los hay.
+  var _n = normVIP(it.nombre);
+  var _porTipo = null;
+
+  // "cool care" y "blade care" son LO MISMO — él lo dijo así. Ojo: hay que separarlos
+  // de las NAVAJAS de verdad, que sí van por marca. La diferencia es la palabra "care".
+  if(_n.indexOf('care') >= 0
+     && (_n.indexOf('blade') >= 0 || _n.indexOf('cool') >= 0 || _n.indexOf('clipper') >= 0)){
+    _porTipo = 'CUIDADO DE CUCHILLA';
+  } else if(_n.indexOf('colonia') >= 0 || _n.indexOf('cologne') >= 0){
+    _porTipo = 'COLONIA';
+  } else if(_n.indexOf('wax') >= 0 || _n.indexOf('cera') >= 0){
+    _porTipo = 'WAX';
+  }
+
+  if(_porTipo){
+    // Se guarda la marca aparte para poder enseñársela, pero NO entra en la clave:
+    // así todos los wax de todas las marcas suman al mismo grupo.
+    return { clave: _porTipo, nombre: _porTipo, mitad: false,
+             porTipo: true, marca: marca.toUpperCase() };
+  }
 
   var nom = marca.toUpperCase() + ' \u00b7 ' + tipo;
   return { clave: nom, nombre: nom, mitad: false };
@@ -15860,10 +15884,12 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260816b';
+var NOVEDADES_VERSION = '20260816c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'El programa VIP ahora agrupa por TIPO de producto. Todas las colonias cuentan juntas aunque sean de marcas distintas, todos los wax igual, y el cool care con el blade care porque es lo mismo. Las navajas siguen contando por marca, como pediste. Con esto tus clientes llegan a los diez mucho mas rapido.',
+  'Y ahora puedes mandarle a cada cliente sus puntos por WhatsApp. En su cuenta, en el renglon del Programa VIP, hay un lapiz. Lo tocas, ves el mensaje, y lo mandas. Le llega su primer nombre, cuantos lleva de cada tipo, el agradecimiento y un empujon para que llegue a los diez.',
   'Lo mas importante: ahora puedes cobrarle a un cliente SIN SALIR de pedidos rapidos. Debajo de su nombre, donde dice lo que te debe, hay un boton verde que dice Cobrarle. Le pones cuanto te pago y la app lo reparte sola: primero la factura mas vieja, despues la que sigue, y asi. Y te lo ensena ANTES de tocar nada, para que veas exactamente a donde va cada peso. Si te paga de mas, lo que sobra le queda a favor.',
   'El boton de Ya lo vi de los avisos NO ESTABA FUNCIONANDO. Culpa mia: el boton mandaba un texto con saltos de linea y el navegador lo rechazaba, asi que no hacia nada. Ya esta arreglado: tocalo y el aviso se marca leido, desaparece y se va al historial.',
   'Y ahora doce de los quince renglones de la cuenta del cliente tienen su lapiz de editar a la vista. Los tres que no lo tienen son cuentas, no datos: lo que mas compra, las facturas canceladas y lo que te deja. Ponerles un lapiz seria mentirte porque no hay nada que editar ahi.',
@@ -19731,6 +19757,149 @@ function irAFidelidadCliente(cid){
   }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  📱 SUS PUNTOS POR WHATSAPP
+//
+//  Corto y motivador, como lo pidió: su primer nombre, cuántos lleva
+//  de cada grupo, el gracias, y el empujón para llegar a los 10.
+// ═══════════════════════════════════════════════════════════════════
+var VIP_ANIMOS = [
+  'Ya casi lo tienes. \u00a1Dale que el pr\u00f3ximo puede ser el bueno!',
+  '\u00a1Est\u00e1s cerquita! Un empuj\u00f3n m\u00e1s y ese producto es tuyo.',
+  'Vas muy bien. Cada compra te acerca a tu producto gratis.',
+  '\u00a1Sigue as\u00ed! Los 10 se llegan m\u00e1s r\u00e1pido de lo que crees.'
+];
+
+// El primer nombre nada más, como pidió.
+function primerNombreDe(cl){
+  if(!cl) return '';
+  var n = String(cl.nombre || '').trim().split(/\s+/)[0] || '';
+  return n ? (n.charAt(0).toUpperCase() + n.slice(1).toLowerCase()) : '';
+}
+
+function armarMensajeVIP(cid){
+  clientes = LS('ncl', []);
+  var cl = clientes.find(function(c){ return String(c.id) === String(cid); });
+  if(!cl) return null;
+
+  var v = {};
+  try { v = calcVIP(cid) || {}; } catch(e){ return null; }
+
+  // Solo los grupos donde de verdad lleva algo
+  var grupos = [];
+  Object.keys(v).forEach(function(k){
+    var g = v[k];
+    if(!g) return;
+    var pts = parseInt(g.puntos || g.total || 0, 10) || 0;
+    if(pts <= 0) return;
+    grupos.push({ nombre: k, pts: pts, gratis: parseInt(g.gratis || 0, 10) || 0,
+                  falta: Math.max(0, VIP_META - (pts % VIP_META)) });
+  });
+  if(!grupos.length) return null;
+  grupos.sort(function(a, b){ return b.pts - a.pts; });
+
+  var nom = primerNombreDe(cl) || 'Amigo';
+  var m = '\u00a1Hola ' + nom + '! \ud83d\udc4b\n\n';
+  m += '\ud83c\udfc6 *TUS PUNTOS NBS*\n\n';
+
+  var yaGano = false;
+  grupos.forEach(function(g){
+    var enCurso = g.pts % VIP_META;
+    if(g.gratis > 0){
+      yaGano = true;
+      m += '\u2b50 *' + g.nombre + '*\n';
+      m += '   \ud83c\udf89 \u00a1YA TE GANASTE ' + (g.gratis > 1 ? g.gratis + ' GRATIS' : '1 GRATIS') + '!\n';
+      if(enCurso > 0) m += '   y llevas ' + enCurso + ' de 10 para el siguiente\n';
+    } else {
+      m += '\u2b50 *' + g.nombre + '*\n';
+      m += '   ' + g.pts + ' de 10';
+      if(g.falta <= 2) m += '   \ud83d\udd25 \u00a1te falta' + (g.falta === 1 ? ' 1' : 'n ' + g.falta) + '!';
+      else m += '   (te faltan ' + g.falta + ')';
+      m += '\n';
+    }
+    m += '\n';
+  });
+
+  // El empujón
+  var cerca = grupos.filter(function(g){ return g.gratis === 0 && g.falta <= 3; });
+  if(yaGano){
+    m += '\ud83c\udf81 *\u00a1Pasa por tu producto gratis!*\n';
+    m += 'Te lo tengo apartado para tu pr\u00f3xima visita.\n\n';
+  } else if(cerca.length){
+    var g0 = cerca[0];
+    m += '\ud83d\udd25 *' + VIP_ANIMOS[Math.floor(Math.random() * VIP_ANIMOS.length)] + '*\n';
+    m += 'Con ' + g0.falta + ' m\u00e1s de *' + g0.nombre + '* te ganas UNO GRATIS.\n\n';
+  } else {
+    m += '\ud83d\udcaa *' + VIP_ANIMOS[Math.floor(Math.random() * VIP_ANIMOS.length)] + '*\n';
+    m += 'Cada 10 productos de $10 del mismo tipo = *1 GRATIS*.\n\n';
+  }
+
+  m += 'Gracias por formar parte del *Programa VIP de Nunez Beauty Supply*. '
+    + '\u00a1Contigo seguimos creciendo! \ud83d\ude4c';
+
+  return { texto: m, cliente: cl, grupos: grupos, yaGano: yaGano };
+}
+
+// Se lo manda por WhatsApp
+function mandarPuntosPorWhatsApp(cid){
+  var r = armarMensajeVIP(cid);
+  if(!r){
+    avisoGrande('Este cliente todav\u00eda no tiene puntos que mandarle.');
+    return;
+  }
+  var tel = String(r.cliente.tel || r.cliente.telefono || '').replace(/[^0-9]/g, '');
+  if(tel.length === 10) tel = '1' + tel;
+  if(!tel){
+    alert('Este cliente no tiene tel\u00e9fono guardado.\n\n'
+      + 'P\u00f3nselo en Sus datos y vuelve a intentarlo.');
+    return;
+  }
+  var url = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(r.texto);
+  try { window.open(url, '_blank'); }
+  catch(e){ location.href = url; }
+}
+
+// Verlo antes de mandarlo
+function verMensajeVIP(cid){
+  var r = armarMensajeVIP(cid);
+  if(!r){
+    avisoGrande('Este cliente todav\u00eda no tiene puntos que mandarle.');
+    return;
+  }
+  var h = '<div style="padding:16px">';
+  h += '<div style="font-size:15px;font-weight:900;color:var(--nbs-ink);margin-bottom:3px">'
+    + '\ud83d\udcf1 Mensaje para ' + escaparHtml(primerNombreDe(r.cliente)) + '</div>';
+  h += '<div style="font-size:11px;color:var(--nbs-muted);margin-bottom:11px">'
+    + 'As\u00ed le va a llegar por WhatsApp</div>';
+  h += '<div style="background:#DCF8C6;border-radius:12px;padding:13px;font-size:13px;'
+    + 'line-height:1.65;white-space:pre-wrap;color:#111;margin-bottom:13px">'
+    + escaparHtml(r.texto).replace(/\*([^*]+)\*/g, '<b>$1</b>') + '</div>';
+  h += '<div style="display:flex;gap:8px">'
+    + '<button onclick="cerrarMensajeVIP()" class="btn" '
+    +   'style="flex:.8;margin:0;background:#F0F0F5;color:#333">Cerrar</button>'
+    + '<button onclick="cerrarMensajeVIP();mandarPuntosPorWhatsApp(' + _arg(cid) + ')" class="btn" '
+    +   'style="flex:1.4;margin:0;background:#25D366;color:#fff;font-weight:900">'
+    +   '\ud83d\udcf1 Mandar por WhatsApp</button>'
+    + '</div></div>';
+
+  var ov = document.getElementById('msgvip-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'msgvip-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99994;'
+    + 'display:flex;align-items:center;justify-content:center;padding:14px';
+  ov.innerHTML = '<div style="background:#fff;border-radius:15px;max-width:420px;width:100%;'
+    + 'max-height:88vh;overflow:auto">' + h + '</div>';
+}
+
+function cerrarMensajeVIP(){
+  var ov = document.getElementById('msgvip-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
 function pintarPanelCliente(cid){
   var el = document.getElementById('cl-panel-completo');
   if(!el) return;
@@ -19886,7 +20055,7 @@ function pintarPanelCliente(cid){
       }).join('');
       h += _filaPanel('vip', '\u2b50', 'Programa VIP',
         keys.length + ' grupo' + (keys.length>1?'s':'') + (listos ? ' \u00b7 ' + listos + ' \ud83c\udf81' : ''),
-        listos ? '#AD1457' : null, cont, 'editarCl(' + _arg(cid) + ')');
+        listos ? '#AD1457' : null, cont, 'editarCl(' + _arg(cid) + ')', 'verMensajeVIP(' + _arg(cid) + ')');
     }
   }
 
