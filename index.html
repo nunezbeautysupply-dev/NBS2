@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260816c-OFICIAL-V2.0">
+<meta name="app-version" content="20260816d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15884,10 +15884,11 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260816c';
+var NOVEDADES_VERSION = '20260816d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Cada cliente ahora tiene su codigo de registro, del cero cero uno al ciento cuarenta y siete, en el orden en que tu los registraste. Lo ves en su cuenta al lado de donde dice CUENTA DE, y en la lista de clientes. El codigo se pone una sola vez y no cambia nunca: si entra un cliente nuevo le toca el ciento cuarenta y ocho.',
   'El programa VIP ahora agrupa por TIPO de producto. Todas las colonias cuentan juntas aunque sean de marcas distintas, todos los wax igual, y el cool care con el blade care porque es lo mismo. Las navajas siguen contando por marca, como pediste. Con esto tus clientes llegan a los diez mucho mas rapido.',
   'Y ahora puedes mandarle a cada cliente sus puntos por WhatsApp. En su cuenta, en el renglon del Programa VIP, hay un lapiz. Lo tocas, ves el mensaje, y lo mandas. Le llega su primer nombre, cuantos lleva de cada tipo, el agradecimiento y un empujon para que llegue a los diez.',
   'Lo mas importante: ahora puedes cobrarle a un cliente SIN SALIR de pedidos rapidos. Debajo de su nombre, donde dice lo que te debe, hay un boton verde que dice Cobrarle. Le pones cuanto te pago y la app lo reparte sola: primero la factura mas vieja, despues la que sigue, y asi. Y te lo ensena ANTES de tocar nada, para que veas exactamente a donde va cada peso. Si te paga de mas, lo que sobra le queda a favor.',
@@ -19030,6 +19031,83 @@ function arreglarPagadasDeMas(){
   try { renderCxC(''); } catch(e){}
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  🔢 EL CÓDIGO DE REGISTRO — por antigüedad de primera compra
+//
+//  🔴 SE ASIGNA UNA VEZ Y NO CAMBIA NUNCA MÁS. Se guarda en
+//  `cl.codigoRegistro`. Si un cliente se borra, su número queda
+//  vacío para siempre — eso es correcto: renumerar haría que el
+//  001 de hoy fuera otro mañana.
+// ═══════════════════════════════════════════════════════════════════
+
+// La fecha de su primera compra. Los balances iniciales cuentan:
+// son deuda que traía de antes, o sea que ya era cliente.
+function primeraCompraDe(cid){
+  ventas = LS('nv', []);
+  var mas = null;
+  ventas.forEach(function(v){
+    if(v.cancelada || String(v.cid) !== String(cid)) return;
+    var f = parsearFechaVenta(v.fecha);
+    if(!f) return;
+    if(mas === null || f.getTime() < mas.getTime()) mas = f;
+  });
+  return mas;
+}
+
+// Reparte los códigos a los que todavía no tienen. NO toca los ya puestos.
+function asignarCodigosDeRegistro(){
+  clientes = LS('ncl', []);
+  ventas = LS('nv', []);
+
+  // El número más alto que ya se dio
+  var mayor = 0;
+  clientes.forEach(function(c){
+    var n = parseInt(c.codigoRegistro || 0, 10) || 0;
+    if(n > mayor) mayor = n;
+  });
+
+  // Los que no tienen código, EN EL ORDEN EN QUE LOS REGISTRÓ.
+  // El `id` del cliente es la marca de tiempo de cuando lo creó, así que ordenar
+  // por id ES ordenar por cuándo lo metió en la app. -16 ago-
+  var sinCodigo = [];
+  clientes.forEach(function(c){
+    if(c.codigoRegistro) return;
+    sinCodigo.push({ cliente: c, cuando: parseFloat(c.id) || 0 });
+  });
+  if(!sinCodigo.length) return 0;
+
+  sinCodigo.sort(function(a, b){ return a.cuando - b.cuando; });
+
+  sinCodigo.forEach(function(x){
+    mayor++;
+    var i = clientes.findIndex(function(c){ return String(c.id) === String(x.cliente.id); });
+    if(i >= 0) clientes[i].codigoRegistro = mayor;
+  });
+  SS('ncl', clientes);
+  try { marcarPendienteDeSubir('ncl'); } catch(e){}
+  return sinCodigo.length;
+}
+
+// Cómo se ve: 001, 042, 147...
+function codigoDeCliente(cl){
+  if(!cl) return '';
+  var n = parseInt(cl.codigoRegistro || 0, 10) || 0;
+  if(!n) return '';
+  return (n < 1000) ? ('00' + n).slice(-3) : String(n);
+}
+
+// La etiquetita para poner al lado del nombre
+function etiquetaCodigo(cl, chico){
+  var c = codigoDeCliente(cl);
+  if(!c) return '';
+  return '<span style="display:inline-block;background:#EEF0F8;color:#3949AB;'
+    + 'border-radius:5px;padding:' + (chico ? '1px 5px' : '2px 6px') + ';'
+    + 'font-size:' + (chico ? '9.5' : '10.5') + 'px;font-weight:900;'
+    + 'letter-spacing:.5px;margin-right:5px;vertical-align:middle">'
+    + c + '</span>';
+}
+
 function cuentaDeCliente(cid){
   var r2 = function(x){ return Math.round((x || 0) * 100) / 100; };
   var vacio = {
@@ -20392,8 +20470,14 @@ function verCl(id){
     +   'display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;flex-shrink:0">'
     +   escaparHtml(ini) + '</div>'
     + '<div style="flex:1;min-width:0">'
-    +   '<div style="font-size:9.5px;font-weight:900;color:var(--nbs-muted);letter-spacing:1.2px;'
-    +     'margin-bottom:1px">CUENTA DE</div>'
+    +   '<div style="display:flex;align-items:center;gap:5px;margin-bottom:1px">'
+    +     (codigoDeCliente(c)
+        ? '<span style="background:#3949AB;color:#fff;border-radius:5px;padding:2px 7px;'
+          + 'font-size:10.5px;font-weight:900;letter-spacing:.5px">'
+          + codigoDeCliente(c) + '</span>' : '')
+    +     '<span style="font-size:9.5px;font-weight:900;color:var(--nbs-muted);letter-spacing:1.2px">'
+    +       'CUENTA DE</span>'
+    +   '</div>'
     +   '<div style="font-size:21px;font-weight:900;color:var(--nbs-ink);line-height:1.15;overflow:hidden;text-overflow:ellipsis">'
     +     escaparHtml(nombreCl(c)) + '</div>'
     +   '<div style="font-size:12px;color:var(--nbs-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
@@ -26116,6 +26200,8 @@ function iniciarAppDespuesDeLogin(){
     setTimeout(function(){ correrAutomatismos(); }, 4000);
     // 🔔 LA REVISIÓN DIARIA: la app se revisa sola y avisa. -15 ago-
     setTimeout(function(){ correrRevisionDiaria(); }, 6000);
+    // 🔢 Repartir los códigos de registro que falten. -16 ago-
+    try { asignarCodigosDeRegistro(); } catch(eCod){}
     setInterval(function(){ correrAutomatismos(); }, 600000);
   } catch(eAuto){}         // copia completa cada 2 horas + aviso si algo se borro
   repararDatosIncompletos();
