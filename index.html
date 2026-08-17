@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260817h-OFICIAL-V2.0">
+<meta name="app-version" content="20260817j-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -824,7 +824,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
         <input type="file" id="ep-sku-foto" accept="image/*" capture="environment" style="display:none" onchange="leerBarcodeDeFoto(this)">
       </div>
       <div class="r2">
-        <div><label class="lbl">Costo ($)</label><input class="inp" id="ep-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
+        <div><label class="lbl">Costo ($)</label><input class="inp" id="ep-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoMoneda(this);formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
         <div><label class="lbl">Precio ($)</label><input class="inp" id="ep-precio" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)"></div>
       </div>
       <div class="r2">
@@ -14921,8 +14921,8 @@ function cobrarDesdePedidos(cid){
 
   // Cuánto le paga
   h += '<label class="lbl">\u00bfCU\u00c1NTO TE EST\u00c1 PAGANDO?</label>';
-  h += '<input class="inp" id="cobped-monto" type="number" inputmode="decimal" step="0.01" '
-    + 'placeholder="0.00" oninput="previewCobroPedidos(' + _arg(cid) + ')" '
+  h += '<input class="inp" id="cobped-monto" type="text" inputmode="numeric" '
+    + 'placeholder="0.00" oninput="formatoMoneda(this);previewCobroPedidos(' + _arg(cid) + ')" '
     + 'style="font-size:22px;font-weight:900;text-align:center;padding:14px">';
 
   // Los botones rápidos
@@ -14980,6 +14980,7 @@ function cerrarCobroPedidos(){
 
 function ponerMontoCobro(cid, monto){
   var i = document.getElementById('cobped-monto');
+  // 🔑 Ya con el punto puesto: la casilla es de modo calculadora. -17 ago-
   if(i){ i.value = (Math.round(monto * 100) / 100).toFixed(2); }
   previewCobroPedidos(cid);
 }
@@ -16120,10 +16121,12 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260817h';
+var NOVEDADES_VERSION = '20260817j';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Ahora TODAS las casillas donde se escribe dinero tienen el modo calculadora. El punto se pone solo en los dos ultimos numeros: escribes cuatro mil y quedan cuarenta dolares. La app ya lo tenia en veintiocho casillas pero le faltaba en siete, entre ellas el costo en compras y todas las del cuadre de caja. Por eso te fallo justo ahi. Ya son treinta y seis, y le puse una prueba que revisa toda la app para que nunca se quede ninguna sin el.',
+  'Arregle algo que te tenia que estar molestando mucho: despues de que yo te decia en voz alta lo que tenia que decirte, decia no te entendi y te leia una lista larga. La razon es que el microfono se quedaba encendido mientras yo hablaba, se oia a si mismo, y como eso no era una pregunta contestaba no te entendi. Ya no. Mientras hablo el microfono se apaga, y si aun asi oye mi propia voz la descarta. Pero cuando tu me preguntes algo de verdad, te contesto igual.',
   'Arregle el boton de Ya lo vi que no funcionaba con Eric Young. La causa era el apodo: cuando un cliente tiene su apodo entre comillas, esas comillas rompian el boton por dentro y no hacia nada. Y eso le pasaba a todos tus clientes con apodo, no solo a Eric. Ya esta arreglado de raiz, en los sesenta y cuatro botones de la app que pasan un texto.',
   'Tienes una Cuadre de Caja nueva, en el menu. Es como una hoja de calculo: pones cuantos billetes de cada denominacion tienes y ella suma sola. Escoges que dias quieres cuadrar, un dia o varios o una semana, como tu decidas, y te compara lo que contaste con lo que la app dice que cobraste. Te dice si cuadra, si falta o si sobra. Y cada cuadre queda guardado, lo puedes volver a ver y editarlo cuando quieras.',
   'Muy importante: la Cuadre de Caja SOLO LEE lo que cobraste. No toca ni una venta, ni un cliente, ni un producto. Esta comprobado con una prueba que revisa catorce cosas de la app antes y despues de hacer un cuadre completo, y ninguna cambia.',
@@ -16230,6 +16233,11 @@ function hablarAsistente(texto){
   if(!asistenteHablaEncendido()) return;
   var synth = window.speechSynthesis;
   if(!synth) return;
+  // 🔇 MIENTRAS HABLA, EL MICRÓFONO SE APAGA. Si no, se oye a sí mismo, no se
+  // entiende, y contesta "No te entendí" con toda la lista. Sensei lo cazó. -17 ago-
+  window._asistenteHablando = true;
+  try { if(window._micAsistente) window._micAsistente.abort(); } catch(eM){}
+  window._loQueAcaboDeDecir = String(texto || '').toLowerCase();
   try {
     synth.cancel();
     var limpio = String(texto || '')
@@ -16263,6 +16271,12 @@ function hablarAsistente(texto){
         var voz = (typeof acaElegirVoz === 'function') ? acaElegirVoz() : null;
         if(voz) u.voice = voz;
       } catch(e){}
+      // 🔇 Al terminar de hablar, se puede volver a escuchar. -17 ago-
+      try {
+        u.onend = function(){
+          setTimeout(function(){ window._asistenteHablando = false; }, 600);
+        };
+      } catch(eE){ window._asistenteHablando = false; }
       synth.speak(u);
     });
   } catch(e){}
@@ -16592,8 +16606,19 @@ function hablarleAlAsistente(){
   r.interimResults = false;
   r.maxAlternatives = 1;
   if(btn){ btn.innerHTML = '<span style="font-size:19px">\ud83d\udd34</span> Te escucho...'; btn.style.background = '#FFEBEE'; }
+  window._micAsistente = r;   // guardado para poder apagarlo cuando él habla
   r.onresult = function(e){
     var txt = e.results[0][0].transcript;
+    // 🔇 Si el asistente estaba HABLANDO, esto es su propia voz. Se descarta. -17 ago-
+    if(window._asistenteHablando) return;
+    // Y por si acaso: si lo que se oyó se parece mucho a lo que él acaba de decir
+    // en voz alta, tampoco es una pregunta.
+    try {
+      var dicho = String(window._loQueAcaboDeDecir || '').toLowerCase();
+      var oido = String(txt || '').toLowerCase().trim();
+      if(oido.length > 12 && dicho.length > 12 && dicho.indexOf(oido.slice(0, 18)) >= 0) return;
+    } catch(eC){}
+    if(!String(txt || '').trim()) return;   // silencio: no contestar nada
     contestarAsistente(txt);
   };
   r.onerror = function(){
@@ -19793,9 +19818,9 @@ function pintarConteoCuadre(){
     .forEach(function(x){
       h += '<div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">'
         + '<span style="flex:1;font-size:13px;font-weight:700">' + x[1] + '</span>'
-        + '<input class="inp" type="number" inputmode="decimal" step="0.01" id="cuadre-' + x[0] + '" '
-        +   'value="' + (C[x[0]] || '') + '" placeholder="0.00" '
-        +   'oninput="cambiarOtroCuadre(\'' + x[0] + '\', this.value)" '
+        + '<input class="inp" type="text" inputmode="numeric" id="cuadre-' + x[0] + '" '
+        +   'value="' + (C[x[0]] ? C[x[0]].toFixed(2) : '') + '" placeholder="0.00" '
+        +   'oninput="formatoMoneda(this);cambiarOtroCuadre(\'' + x[0] + '\', this.value)" '
         +   'style="flex:0 0 118px;margin:0;text-align:right;font-weight:800;padding:9px"></div>';
     });
 
@@ -19805,9 +19830,9 @@ function pintarConteoCuadre(){
     +   'margin-bottom:3px">\ud83c\udfe6 FONDO FIJO</div>'
     + '<div style="font-size:11px;color:var(--nbs-muted);margin-bottom:7px">'
     +   'Lo que dejas siempre en la caja para dar cambio. Se descuenta porque no es de las ventas.</div>'
-    + '<input class="inp" type="number" inputmode="decimal" step="0.01" id="cuadre-fondo" '
-    +   'value="' + (C.fondo || '') + '" placeholder="0.00" '
-    +   'oninput="cambiarOtroCuadre(\'fondo\', this.value)" '
+    + '<input class="inp" type="text" inputmode="numeric" id="cuadre-fondo" '
+    +   'value="' + (C.fondo ? C.fondo.toFixed(2) : '') + '" placeholder="0.00" '
+    +   'oninput="formatoMoneda(this);cambiarOtroCuadre(\'fondo\', this.value)" '
     +   'style="margin:0;text-align:right;font-weight:800"></div>';
 
   // ── LA COMPARACIÓN ──
@@ -20064,6 +20089,7 @@ function borrarCuadre(id){
   verRecordCuadres();
   try { avisoChico('\ud83d\uddd1\ufe0f Cuadre borrado'); } catch(e){}
 }
+
 
 function cuentaDeCliente(cid){
   var r2 = function(x){ return Math.round((x || 0) * 100) / 100; };
@@ -33676,7 +33702,7 @@ function verHistorialCliente(cid, modo){
       <label class="lbl">Nombre del producto *</label><input class="inp" id="vnp-nombre" type="text" placeholder="Ej: Roja Cortada, Colonia Venom" autocomplete="off" oninput="onNombreProductoInput('vnp-nombre')" onblur="ocultarDropdown('vnp-nombre')">
       <label class="lbl">Categoría</label><input class="inp" id="vnp-cat" type="text" placeholder="Ej: Pomadas, Navajas..." autocomplete="off" oninput="onCategoriaInput('vnp-cat')" onblur="ocultarDropdown('vnp-cat')">
       <div class="r2">
-        <div><label class="lbl">Costo ($)</label><input class="inp" id="vnp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
+        <div><label class="lbl">Costo ($)</label><input class="inp" id="vnp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoMoneda(this);formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
         <div><label class="lbl">Precio ($)</label><input class="inp" id="vnp-precio" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)"></div>
       </div>
       <label class="lbl">Stock inicial</label><input class="inp" id="vnp-stock" type="number" value="0" min="0">
@@ -33816,7 +33842,7 @@ function verHistorialCliente(cid, modo){
         <label class="lbl">Nombre del producto *</label><input class="inp" id="pednp-nombre" type="text" placeholder="Ej: Roja Cortada, Colonia Venom" autocomplete="off" oninput="onNombreProductoInput('pednp-nombre')" onblur="ocultarDropdown('pednp-nombre')">
         <label class="lbl">Categoría</label><input class="inp" id="pednp-cat" type="text" placeholder="Ej: Pomadas, Navajas..." autocomplete="off" oninput="onCategoriaInput('pednp-cat')" onblur="ocultarDropdown('pednp-cat')">
         <div class="r2">
-          <div><label class="lbl">Costo ($)</label><input class="inp" id="pednp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
+          <div><label class="lbl">Costo ($)</label><input class="inp" id="pednp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoMoneda(this);formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
           <div><label class="lbl">Precio ($)</label><input class="inp" id="pednp-precio" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)"></div>
         </div>
         <label class="lbl">Stock inicial</label><input class="inp" id="pednp-stock" type="number" value="0" min="0">
@@ -33901,7 +33927,7 @@ function verHistorialCliente(cid, modo){
     </div>
     <div style="display:grid;grid-template-columns:0.7fr 1fr 1fr;gap:8px">
       <div><label class="lbl">Cant.</label><input class="inp" id="cccant" type="number" value="1" min="1" style="text-align:center;padding:10px 4px"></div>
-      <div><label class="lbl">Costo ($)</label><input class="inp" id="cccosto" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)" style="text-align:center;padding:10px 4px"></div>
+      <div><label class="lbl">Costo ($)</label><input class="inp" id="cccosto" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoMoneda(this);formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)" style="text-align:center;padding:10px 4px"></div>
       <div><label class="lbl">Precio venta ($)</label><input class="inp" id="ccprecio" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)" style="text-align:center;padding:10px 4px"></div>
     </div>
     <p style="font-size:11px;color:#aaa;margin:-4px 0 8px">El precio de venta solo aplica si es producto nuevo.</p>
