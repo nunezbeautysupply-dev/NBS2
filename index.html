@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260817a-OFICIAL-V2.0">
+<meta name="app-version" content="20260817c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4795,9 +4795,15 @@ function detalleProdsVIP(p, chico){
 function claveGrupoVIP(it, prod){
   var precio = parseFloat(it.precio) || 0;
 
-  if(esNavajaCortadaVIP(it.nombre, precio)){
+  // 🔑 EL NOMBRE DE HOY, no el de la factura vieja. Sensei corrige nombres de
+  // productos -por ejemplo para que un wax diga "wax"- y esa corrección tiene que
+  // contar también en las compras que ya hizo el cliente. La FACTURA sigue diciendo
+  // lo que decía; lo único que cambia es cómo se AGRUPA para los puntos. -18 ago-
+  var _nomHoy = (prod && prod.nombre) ? String(prod.nombre) : String(_nomHoy || '');
+
+  if(esNavajaCortadaVIP(_nomHoy, precio)){
     return { clave: 'NAV|' + String(it.pid),
-             nombre: String(it.nombre || 'Navajas cortadas'), mitad: true };
+             nombre: String(_nomHoy || 'Navajas cortadas'), mitad: true };
   }
 
   var esDiez = VIP_PRECIOS.some(function(p){ return Math.abs(precio - p) < 0.02; });
@@ -4807,17 +4813,17 @@ function claveGrupoVIP(it, prod){
   if(!marca){
     // Sin marca en la ficha: se usa la PRIMERA palabra del nombre, que casi siempre
     // es la marca. Asi un producto al que se le olvido la marca no se queda fuera.
-    marca = String(it.nombre || '').trim().split(/\s+/)[0] || '';
+    marca = String(_nomHoy || '').trim().split(/\s+/)[0] || '';
   }
   if(!marca) return null;
 
-  var tipo = tipoVIPdeNombre(it.nombre, marca);
+  var tipo = tipoVIPdeNombre(_nomHoy, marca);
   if(!tipo) tipo = 'OTROS';   // nunca se cae un producto de $10 por no reconocerle el tipo
 
   // 🔑 LOS TIPOS QUE SE JUNTAN SIN IMPORTAR LA MARCA (Sensei, 16 ago).
   // Solo estos tres: colonia, wax y el cuidado de cuchilla. Todo lo demás sigue
   // agrupándose por marca + tipo, como siempre, para no destapar líos donde no los hay.
-  var _n = normVIP(it.nombre);
+  var _n = normVIP(_nomHoy);
   var _porTipo = null;
 
   // "cool care" y "blade care" son LO MISMO — él lo dijo así. Ojo: hay que separarlos
@@ -6086,6 +6092,62 @@ function flash(id){
 
 // ===== MANUAL DE USUARIO =====
 var MANUAL_SECCIONES = [
+    { g:"INFORMES", t:"\ud83d\udcca Informe del 16 y 17 de agosto 2026", c:[
+    "## LO PRIMERO, Y LO MAS IMPORTANTE",
+    "Tus datos estan limpios. Te preocupaba haberle dado mal el balance a algun cliente. Se reviso tu informacion factura por factura y no hay ni un centavo fuera de sitio.",
+    "[[ Vendido        $23,009.59\nCobrado        $15,262.59\nPor cobrar     $7,747.00\nDescuadre  $0.00 ]]",
+    "Y los 11 repartos de pago que tienes con clientes reales -Jhoan Cabrera, Alexis Barillas, Alberto Rosa, Braily Moya, Argenis Castillo, Wilmer Cepeda, Daniel- estan todos correctos, con su fecha y su monto.",
+    "Ningun cliente tuyo tiene el balance mal.",
+    "## RESUMEN EN NUMEROS",
+    "[[ 8      entregas\n14     cosas nuevas\n16     fallos arreglados\n755    pruebas\n$0.00  descuadre ]]",
+    "## LOS DOS FALLOS GRAVES DE DINERO",
+    "!!1) El sobrante se iba a facturas ya pagadas",
+    "Llevaba MESES escondido y ninguna de las 755 pruebas lo habia visto.",
+    "Cuando un cliente te pagaba mas de lo que debia una factura, el sobrante se repartia a las demas. Pero la app no miraba si esas otras eran de CONTADO.",
+    "Una venta al contado ya esta pagada, pero como no lleva pagos apuntados, la app creia que debia todo. El sobrante se iba a facturas ya saldadas y la deuda del cliente no bajaba lo que habia pagado.",
+    "EL CASO QUE LO DESTAPO: el cliente debia $525.19 y pago $289.63.",
+    "[[ $193.04  a una de credito  correcto\n$96.59   a una de CONTADO  ya estaba pagada ]]",
+    "Su deuda solo bajo $193.04 en vez de $289.63.",
+    "Estaba en dos funciones. Las dos arregladas.",
+    "!!2) Diez parentesis mal puestos",
+    "Con franqueza: ese lo meti yo. El 15 de agosto por la tarde, arreglando otra cosa, mi patron de busqueda dejo un parentesis fuera de sitio en 10 lugares.",
+    "Los dos peores: el reparto de pagos, y el que DESCUENTA DEL INVENTARIO.",
+    "Se verifico version por version: vivio menos de 48 horas y tus datos NO se afectaron, porque todos tus repartos de pago son anteriores.",
+    "## LO QUE SE CONSTRUYO EL DOMINGO 16",
+    "Cobrar desde Pedidos Rapidos. Le cobras al barbero sin salir de la pantalla. Te ensena el reparto ANTES de tocar nada.",
+    "El VIP por tipo de producto. Todas las colonias cuentan juntas aunque sean de marcas distintas. Igual los wax y el cuidado de cuchilla. Las navajas siguen por marca. De 107 grupos a 24.",
+    "Los puntos por WhatsApp. Le mandas a cada cliente sus puntos con su primer nombre y un empujon para llegar a los 10.",
+    "El codigo de registro. Del 001 al 147, en el orden en que los registraste. Se asigna una vez y no cambia nunca.",
+    "El listado completo. Ordenas por codigo, nombre, deuda, lo que compran o lo que dejan. Y filtras. Y lo imprimes.",
+    "Las visitas conectadas. Marcas la barberia en la ruta y a todos sus barberos les queda la visita apuntada.",
+    "No quiso nada vs No estaba. Dos motivos distintos. Las dos cuentan como visita, pero el no estaba NO le baja su porcentaje de compra.",
+    "## LO QUE SE CONSTRUYO EL LUNES 17",
+    "Las leyes del dinero. La prueba mas fuerte que existe. En vez de probar casos que se me ocurren a mi, se le ponen 8 reglas que nunca se pueden romper y la maquina inventa cientos de negocios buscando donde fallan. Fue la que encontro el fallo grande.",
+    "Cobertura del dinero al 100%. De 35 funciones que tocan plata, 14 no tenian ninguna prueba. Ahora todas la tienen.",
+    "## COMO CRECIO LA VIGILANCIA",
+    "[[ 15 ago  693 pruebas\n16 ago  727 pruebas\n17 ago  755 pruebas ]]",
+    "COBERTURA DE LAS FUNCIONES DE DINERO:",
+    "[[ Antes  21 de 35  60%\nAhora  35 de 35  100% ]]",
+    "> Los dos fallos de dinero vivian justo en ese 40% sin vigilancia.",
+    "## LAS 8 LEYES DEL DINERO",
+    "Reglas que nunca se pueden romper. Todas se cumplen.",
+    "1. Vendido = cobrado + por cobrar. Siempre.",
+    "2. Ninguna factura queda pagada de mas.",
+    "3. Ni un centavo se pierde ni se inventa.",
+    "4. El reparto empieza siempre por la mas vieja.",
+    "5. La deuda de un cliente nunca es negativa.",
+    "6. Borrar un pago sube la deuda ese mismo monto.",
+    "7. El inventario baja al vender lo justo.",
+    "8. La ganancia nunca pasa de lo vendido.",
+    "## LAS 8 ENTREGAS",
+    "[[ 20260816a  Cobrar desde Pedidos Rapidos\n20260816b  Los avisos vuelven a ensenar su detalle\n20260816c  VIP por tipo + puntos por WhatsApp\n20260816d  El codigo de registro 001-147\n20260816e  Visitas conectadas + listado con filtros\n20260816f  No quiso nada vs No estaba\n20260817a  Las 8 leyes + los 2 fallos arreglados ]]",
+    "## LO QUE QUEDA PENDIENTE",
+    "1. Verificar el candado de dominio de Firebase y las reglas de la base de datos.",
+    "2. Tus gastos reales para el plan de duplicar ventas -de julio solo hay $926.55 apuntados contra $10,130.60 vendidos, y eso no puede ser todo.",
+    "3. Actualizar el Registro de Cambios en PDF con todo lo de estos dos dias.",
+    "## Y UNA RECOMENDACION",
+    "> La app crecio mucho en pocos dias, y los dos fallos de hoy aparecieron justo por eso. Si paramos de agregar cosas nuevas por dos semanas y solo probamos y arreglamos, vas a tener una app mucho mas tranquila."
+  ]},
   { g:"VENDER", t:"💵 Vender — hacer una venta", c:[
     "## ¿PARA QUÉ SIRVE?",
     "Para registrar una venta a un cliente: al contado o a crédito.",
@@ -8323,7 +8385,13 @@ function renderCl(q){
     var d=document.createElement('div');d.className='clrow';
     var direccionCorta = [c.dir, c.ciudad].filter(Boolean).join(', ');
     d.innerHTML=(c.foto ? '<div style="width:44px;height:44px;border-radius:50%;overflow:hidden;flex-shrink:0"><img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover"></div>' : '<div class="av">'+ini(c.nombre,c.apellido)+'</div>')
-      +'<div style="flex:1"><div style="font-size:18px;font-weight:900;color:var(--nbs-ink)">'+escaparHtml(((c.nombre||'')+' '+(c.apellido||'')).replace(/\s+/g,' ').trim())+(c.apodo?' <span style="color:var(--nbs-gold-dark);font-weight:700">"'+escaparHtml(c.apodo)+'"</span>':'')+(c.vipActivo?' <span style="color:var(--nbs-red-text);font-size:13px">★</span>':'')+'</div>'
+      +'<div style="flex:1">'
+      // 🔢 EL CÓDIGO DEL CLIENTE, ARRIBA DEL NOMBRE. -17 ago-
+      +(codigoDeCliente(c)
+          ? '<div style="font-size:10px;font-weight:900;color:#3949AB;letter-spacing:1.2px;'
+            + 'line-height:1;margin-bottom:2px">CLIENTE ' + codigoDeCliente(c) + '</div>'
+          : '')
+      +'<div style="font-size:18px;font-weight:900;color:var(--nbs-ink)">'+escaparHtml(((c.nombre||'')+' '+(c.apellido||'')).replace(/\s+/g,' ').trim())+(c.apodo?' <span style="color:var(--nbs-gold-dark);font-weight:700">"'+escaparHtml(c.apodo)+'"</span>':'')+(c.vipActivo?' <span style="color:var(--nbs-red-text);font-size:13px">★</span>':'')+'</div>'
       +'<div style="font-size:12px;color:var(--nbs-muted)">'+escaparHtml(c.negocio||'Cliente')+' · '+escaparHtml(c.tel||'Sin tel.')+'</div>'
       +(direccionCorta ? '<div style="font-size:11px;color:var(--nbs-muted-2);margin-top:1px">📍 '+escaparHtml(direccionCorta)+'</div>' : '')
       +(balance>0.01 ? '<div style="font-size:12px;font-weight:700;margin-top:2px;color:var(--nbs-red-text)">Balance: $'+fmtNum(balance)+'</div>' : '')
@@ -15954,10 +16022,13 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260817a';
+var NOVEDADES_VERSION = '20260817c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Cuando corriges el nombre de un producto, ese arreglo ahora SI cuenta en los puntos VIP de las compras que el cliente ya hizo. Antes no, porque la factura guarda el nombre del momento de la venta. La factura sigue diciendo lo mismo, eso no se toca, pero los puntos se cuentan con el nombre de hoy.',
+  'Y en la lista de clientes ahora sale su codigo arriba del nombre, donde dice CLIENTE cero cero uno.',
+  'Y ahora tienes el informe completo DENTRO de la app, para leerlo en el telefono cuando quieras. Esta en el Manual de Usuario, de primero, donde dice Informe del dieciseis y diecisiete de agosto. Trae todo: tus numeros, los dos fallos de dinero que se arreglaron, lo que se construyo dia por dia, y lo que queda pendiente.',
   'Lo mas importante de esta version es un fallo de dinero que estaba escondido hace meses. Cuando un cliente te pagaba mas de lo que debia una factura, el sobrante se repartia a las demas, pero la app no miraba si esas otras eran de contado. Una venta al contado ya esta pagada, asi que el sobrante se iba a facturas que ya estaban saldadas y la deuda del cliente no bajaba todo lo que habia pagado. Ya esta arreglado.',
   'Lo encontro una prueba nueva que se llama las leyes del dinero. En vez de probar casos que se me ocurren a mi, le puse ocho reglas que nunca se pueden romper y la maquina inventa cientos de negocios buscando donde fallan. Es la prueba mas fuerte que existe para esto.',
   'En pedidos rapidos, cuando un cliente no te compra, ahora hay dos botones porque son cosas muy distintas: No quiso nada, y No estaba. Las dos cuentan como visita porque tu fuiste hasta alla, pero el No estaba NO le baja su porcentaje de compra, porque no fue culpa suya. En su ficha ves los tres numeros separados.',
