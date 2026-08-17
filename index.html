@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260817e-OFICIAL-V2.0">
+<meta name="app-version" content="20260817g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -584,7 +584,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
 
   <button onclick="abrirCajaCuadre()" class="ini-btn" style="--c:#00695C;--cb:#E0F2F1">
     <span class="ini-ico">🧮</span>
-    <span class="ini-txt"><b>Caja de Cuadre</b><i>Cuenta tu dinero y cuádralo</i></span>
+    <span class="ini-txt"><b>Cuadre de Caja</b><i>Cuenta tu dinero y cuádralo</i></span>
     <span class="ini-fl">›</span>
   </button>
 
@@ -10194,6 +10194,10 @@ var _van = null;
 // ═══════════════════════════════════════════════════════════════════════════
 function baseAyudaNBS(){
   return [
+    { t:'\ud83e\uddee Cuadre de Caja \u2014 contar el dinero, el fondo fijo y el cierre del d\u00eda',
+      k:'cuadre de caja cuadrar cuadro cuadre diario contar el dinero contar billetes denominaciones efectivo billetes monedas comparar lo que cobre me falta dinero me sobra dinero falto sobro cuanto tengo en la caja fondo fijo que es el fondo fijo dar cambio vuelto hoja de calculo calculadora excel record de cuadres arqueo cierre de caja cerrar la caja cierre del dia cerrar el dia fin del dia al final del dia terminar la ruta descuadre no me cuadra',
+      r:'Est\u00e1 en la pantalla de INICIO, donde dice \ud83e\uddee Cuadre de Caja.\n\nPASO 1 \u2014 ESCOGES QU\u00c9 CUADRAR\n  \u2022 Hoy \u00b7 Ayer \u00b7 Esta semana\n  \u2022 O tocas DESDE y HASTA y sale el calendario\n\nY te dice cu\u00e1nto dice la app que cobraste en esos d\u00edas. Puedes cuadrar un solo d\u00eda, tres d\u00edas juntos o una semana \u2014 como t\u00fa quieras.\n\nPASO 2 \u2014 CUENTAS TU DINERO\n  Escribes cu\u00e1ntos billetes tienes de cada uno y \u00e9l suma solo:\n     12 \u00d7 $20.00 = $240.00\n  Tambi\u00e9n pones CashApp, Zelle y cheques.\n  Y el FONDO FIJO (lo que dejas siempre en la caja para dar cambio), que se descuenta porque no es de las ventas.\n\nY te dice al momento:\n  \u2705 CUADRA PERFECTO\n  \ud83d\udd34 FALTA $X\n  \u26a0\ufe0f SOBRA $X\n\nPASO 3 \u2014 TU R\u00c9CORD\n  Cada cuadre queda guardado con sus billetes contados. Lo puedes volver a ver, editarlo con el \u270f\ufe0f o borrarlo con el \ud83d\uddd1\ufe0f.\n\n\ud83d\udd12 IMPORTANTE: el Cuadre de Caja SOLO LEE lo que cobraste. No toca ninguna venta, ni un cliente, ni un producto. Y tus cuadres entran en el backup.' },
+
     { t:'\ud83d\udcb5 Cobrarle a un barbero SIN salir de Pedidos R\u00e1pidos',
       k:'cobrar en la ruta cobrarle pedidos rapidos sin salir pago rapido recibir dinero en la calle me pago el barbero cobro rapido aplicar pago ruta reparto mas vieja antiguedad',
       r:'En Pedidos R\u00e1pidos, debajo del nombre de cada barbero, sale lo que te debe y un bot\u00f3n verde \ud83d\udcb5 Cobrarle.\n\nLe pones cu\u00e1nto te pag\u00f3 y la app lo reparte sola: primero la factura M\u00c1S VIEJA, despu\u00e9s la que sigue, y as\u00ed.\n\nY te ENSE\u00d1A el reparto ANTES de tocar nada, para que veas exactamente a d\u00f3nde va cada peso. Si te paga de m\u00e1s, lo que sobra le queda a favor para su pr\u00f3xima compra.\n\nBotones r\u00e1pidos: "Todo" (lo que debe completo) y "La m\u00e1s vieja".' },
@@ -16116,12 +16120,12 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260817e';
+var NOVEDADES_VERSION = '20260817g';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
-  'Tienes una Caja de Cuadre nueva, en el menu. Es como una hoja de calculo: pones cuantos billetes de cada denominacion tienes y ella suma sola. Escoges que dias quieres cuadrar, un dia o varios o una semana, como tu decidas, y te compara lo que contaste con lo que la app dice que cobraste. Te dice si cuadra, si falta o si sobra. Y cada cuadre queda guardado, lo puedes volver a ver y editarlo cuando quieras.',
-  'Muy importante: la Caja de Cuadre SOLO LEE lo que cobraste. No toca ni una venta, ni un cliente, ni un producto. Esta comprobado con una prueba que revisa catorce cosas de la app antes y despues de hacer un cuadre completo, y ninguna cambia.',
+  'Tienes una Cuadre de Caja nueva, en el menu. Es como una hoja de calculo: pones cuantos billetes de cada denominacion tienes y ella suma sola. Escoges que dias quieres cuadrar, un dia o varios o una semana, como tu decidas, y te compara lo que contaste con lo que la app dice que cobraste. Te dice si cuadra, si falta o si sobra. Y cada cuadre queda guardado, lo puedes volver a ver y editarlo cuando quieras.',
+  'Muy importante: la Cuadre de Caja SOLO LEE lo que cobraste. No toca ni una venta, ni un cliente, ni un producto. Esta comprobado con una prueba que revisa catorce cosas de la app antes y despues de hacer un cuadre completo, y ninguna cambia.',
   'El boton de Ayuda esta al dia. Ahora tiene cuarenta y dos temas, con todo lo de estas dos semanas, y entiende las palabras que tu usas de verdad. Le puedes preguntar cosas como: me equivoque en un pago, cuantos puntos lleva un cliente, el robot me estorba, no quiero que firmen todos, que se me esta acabando. Y te lleva derecho a la respuesta.',
   'Cuando corriges el nombre de un producto, ese arreglo ahora SI cuenta en los puntos VIP de las compras que el cliente ya hizo. Antes no, porque la factura guarda el nombre del momento de la venta. La factura sigue diciendo lo mismo, eso no se toca, pero los puntos se cuentan con el nombre de hoy.',
   'Y en la lista de clientes ahora sale su codigo arriba del nombre, donde dice CLIENTE cero cero uno.',
@@ -19613,6 +19617,28 @@ function cobradoEntre(desde, hasta){
 }
 
 // ── LA PANTALLA 1: escoger qué cuadrar ──
+
+// ── Del calendario (AAAA-MM-DD) a una fecha de verdad, sin líos de zona horaria ──
+function fechaDesdeISO(txt){
+  var t = String(txt || '').trim();
+  if(!t) return null;
+  var p = t.split('-');
+  if(p.length === 3){
+    var a = parseInt(p[0], 10), m = parseInt(p[1], 10), dd = parseInt(p[2], 10);
+    if(a && m && dd) return new Date(a, m - 1, dd);
+  }
+  // Por si viene en MM/DD/AAAA
+  return parsearFechaVenta(t);
+}
+
+// Y al revés: de MM/DD/AAAA a AAAA-MM-DD, que es lo que entiende el calendario
+function fechaAISO(txt){
+  var f = parsearFechaVenta(txt);
+  if(!f) return '';
+  return f.getFullYear() + '-' + ('0' + (f.getMonth()+1)).slice(-2)
+       + '-' + ('0' + f.getDate()).slice(-2);
+}
+
 function abrirCajaCuadre(){
   ir('p-cuadre');
   pintarElegirDiasCuadre();
@@ -19644,13 +19670,16 @@ function pintarElegirDiasCuadre(){
 
   h += '<div style="font-size:10.5px;font-weight:900;color:var(--nbs-muted);letter-spacing:.6px;'
     + 'margin-bottom:6px">O ESCOGE T\u00da LOS D\u00cdAS</div>';
+  // 🔑 type="date" para que se abra el CALENDARIO del teléfono, como en el resto
+  // de la app. Devuelve AAAA-MM-DD. -17 ago-
+  var hoyISO = fechaAISO(hoy);
   h += '<div style="display:flex;gap:7px;margin-bottom:8px">'
     + '<div style="flex:1"><label class="lbl" style="margin:0 0 3px">DESDE</label>'
-    +   '<input class="inp" id="cuadre-desde" type="text" inputmode="numeric" '
-    +   'placeholder="MM/DD/AAAA" value="' + hoy + '" style="margin:0"></div>'
+    +   '<input class="inp" id="cuadre-desde" type="date" '
+    +   'value="' + hoyISO + '" style="margin:0"></div>'
     + '<div style="flex:1"><label class="lbl" style="margin:0 0 3px">HASTA</label>'
-    +   '<input class="inp" id="cuadre-hasta" type="text" inputmode="numeric" '
-    +   'placeholder="MM/DD/AAAA" value="' + hoy + '" style="margin:0"></div></div>';
+    +   '<input class="inp" id="cuadre-hasta" type="date" '
+    +   'value="' + hoyISO + '" style="margin:0"></div></div>';
   h += '<button onclick="cuadreRango(\'manual\')" class="btn" style="width:100%;margin:0 0 14px;'
     + 'background:#00695C;color:#fff;font-weight:900">\ud83d\udd0d Ver estos d\u00edas</button>';
 
@@ -19687,9 +19716,9 @@ function cuadreRango(cual){
     h2 = new Date(hoy);
   }
   else {
-    d = parsearFechaVenta((document.getElementById('cuadre-desde') || {}).value);
-    h2 = parsearFechaVenta((document.getElementById('cuadre-hasta') || {}).value);
-    if(!d || !h2){ alert('Escribe las dos fechas as\u00ed: MM/DD/AAAA'); return; }
+    d = fechaDesdeISO((document.getElementById('cuadre-desde') || {}).value);
+    h2 = fechaDesdeISO((document.getElementById('cuadre-hasta') || {}).value);
+    if(!d || !h2){ alert('Escoge las dos fechas en el calendario.'); return; }
     if(d.getTime() > h2.getTime()){ alert('La fecha DESDE no puede ser despu\u00e9s que la HASTA.'); return; }
   }
   h2.setHours(23,59,59,999);
@@ -34254,7 +34283,7 @@ function verHistorialCliente(cid, modo){
 
 <div id="p-cuadre" class="pg">
   <div style="display:flex;gap:8px;margin-bottom:14px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
-  <h2 style="font-size:20px;font-weight:900;color:var(--nbs-ink);margin-bottom:2px;text-align:center">🧮 Caja de Cuadre</h2>
+  <h2 style="font-size:20px;font-weight:900;color:var(--nbs-ink);margin-bottom:2px;text-align:center">🧮 Cuadre de Caja</h2>
   <div style="font-size:11.5px;color:var(--nbs-muted);text-align:center;margin-bottom:14px">Cuenta tu dinero y compáralo con lo que dice la app</div>
   <div id="cuadre-cuerpo"></div>
 </div>
