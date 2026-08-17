@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260817g-OFICIAL-V2.0">
+<meta name="app-version" content="20260817h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16120,10 +16120,11 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260817g';
+var NOVEDADES_VERSION = '20260817h';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Arregle el boton de Ya lo vi que no funcionaba con Eric Young. La causa era el apodo: cuando un cliente tiene su apodo entre comillas, esas comillas rompian el boton por dentro y no hacia nada. Y eso le pasaba a todos tus clientes con apodo, no solo a Eric. Ya esta arreglado de raiz, en los sesenta y cuatro botones de la app que pasan un texto.',
   'Tienes una Cuadre de Caja nueva, en el menu. Es como una hoja de calculo: pones cuantos billetes de cada denominacion tienes y ella suma sola. Escoges que dias quieres cuadrar, un dia o varios o una semana, como tu decidas, y te compara lo que contaste con lo que la app dice que cobraste. Te dice si cuadra, si falta o si sobra. Y cada cuadre queda guardado, lo puedes volver a ver y editarlo cuando quieras.',
   'Muy importante: la Cuadre de Caja SOLO LEE lo que cobraste. No toca ni una venta, ni un cliente, ni un producto. Esta comprobado con una prueba que revisa catorce cosas de la app antes y despues de hacer un cuadre completo, y ninguna cambia.',
   'El boton de Ayuda esta al dia. Ahora tiene cuarenta y dos temas, con todo lo de estas dos semanas, y entiende las palabras que tu usas de verdad. Le puedes preguntar cosas como: me equivoque en un pago, cuantos puntos lleva un cliente, el robot me estorba, no quiero que firmen todos, que se me esta acabando. Y te lleva derecho a la respuesta.',
@@ -20344,7 +20345,15 @@ function _linkWhatsApp(telLimpio){
 }
 
 function _arg(v){
-  return "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+  // 🔑 Las comillas DOBLES hay que escaparlas también: estos textos van dentro de
+  // onclick="...", así que una comilla doble cierra el atributo y rompe el botón.
+  // Le pasó con "Eric Young "ERIC"" y ningún cliente con apodo funcionaba. -17 ago-
+  return "'" + String(v)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '&quot;')
+    .replace(/\n/g, ' ')
+    .replace(/\r/g, '') + "'";
 }
 
 function _filaPanel(clave, icono, texto, detalle, colorDet, contenido, editar){
