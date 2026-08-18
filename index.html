@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260817l-OFICIAL-V2.0">
+<meta name="app-version" content="20260817m-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16121,10 +16121,12 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260817l';
+var NOVEDADES_VERSION = '20260817m';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Ahora soy mucho mas inteligente. Antes solo entendia nueve preguntas y todo lo demas me hacia decir no te entendi. Ahora entiendo veintiseis temas y no busco frases exactas sino ideas, asi que me da igual como me lo escribas. Preguntame cosas como: cuales son los clientes que mas dinero me deben, a quien tengo que cobrarle, cuanto vale mi inventario, que es lo que mas vendo, cuanto llevo en el mes, cuantos puntos tiene Eric, o cuanto me debe Luis. Y si de verdad no te entiendo, en vez de darte una lista fria te adivino lo que quisiste decir y te lo ofrezco en botones.',
+  'Y arregle algo que te molestaba: si yo estoy hablando y tu tocas el boton de hablame, ahora me callo en seco, como cuando uno interrumpe a alguien.',
   'Se construyo la simulacion determinista, que es lo mas fuerte que existe: simula un ano completo de tu negocio con el reloj congelado y con tropiezos metidos a proposito, como que el guardado falle o que la app se cierre a media venta. Trescientos dias, mas de novecientos tropiezos, y el dinero cuadro en cero.',
   'Y esa simulacion encontro un hueco en las leyes que teniamos: si un pago se guardaba con un centavo de menos, ninguna de las ocho leyes lo veia, porque el centavo no desaparecia, se quedaba como deuda del cliente. Por eso ahora hay una LEY NUEVE que compara lo que el cliente pago de verdad con lo que la app apunto. Ni un centavo se pierde entre las dos cosas.',
   'Se construyeron los tres sistemas de auditoria mas fuertes que existen hoy. El primero inventa secuencias absurdas de operaciones, como vender, cancelar, cobrar, devolver y borrar un pago en orden al azar, y revisa las ocho leyes del dinero despues de cada paso. El segundo compara la app de hoy con la de ayer usando los mismos datos: si un numero cambia, avisa. Y el tercero lee las treinta y dos mil lineas buscando patrones peligrosos sin ejecutar nada. Los tres estan metidos en el guion obligatorio, asi que corren solos antes de cada entrega.',
@@ -16438,6 +16440,37 @@ function contestarAsistente(texto){
 }
 
 function _contestarAsistenteTexto(texto){
+  // 🧠 EL CEREBRO NUEVO PRUEBA PRIMERO. Entiende IDEAS, no frases exactas.
+  // Si no reconoce nada, le deja el turno al de antes, que sigue igual. -17 ago-
+  try {
+    var _idea = entenderIdea(texto);
+    if(_idea){
+      var _resp = responderIdea(_idea, texto);
+      if(_resp){
+        var _el = document.getElementById('asis-respuesta');
+        if(_el){
+          var _c = '<div style="background:#fff;border-radius:12px;padding:14px;'
+            + 'border:1px solid var(--nbs-line)">';
+          _c += '<div style="font-size:15px;font-weight:900;color:var(--nbs-ink);'
+            + 'margin-bottom:9px;line-height:1.3">' + _resp.titulo + '</div>';
+          (_resp.lineas || []).forEach(function(l){
+            _c += '<div style="font-size:13px;color:var(--nbs-ink);margin:4px 0;'
+              + 'line-height:1.5">' + l + '</div>';
+          });
+          if(_resp.boton){
+            _c += '<button onclick="' + _resp.boton[1] + '" class="btn" '
+              + 'style="width:100%;margin:12px 0 0;background:var(--nbs-gold);'
+              + 'color:#fff;font-weight:900;font-size:13px;padding:11px">'
+              + _resp.boton[0] + '</button>';
+          }
+          _c += '</div>';
+          _el.innerHTML = _c;
+        }
+        return { tipo: _idea.idea, porElCerebroNuevo: true };
+      }
+    }
+  } catch(eIA){ /* si algo falla, sigue el camino de siempre */ }
+
   var q = entenderLoQueDijo(texto);
   var el = document.getElementById('asis-respuesta');
   if(!el) return q;
@@ -16580,6 +16613,24 @@ function _contestarAsistenteTexto(texto){
     return q;
   }
 
+  // 🔑 NO ENTENDÍ — pero en vez de la lista fría, ADIVINO lo más parecido
+  // a lo que quiso decir y se lo ofrezco en botones. -17 ago-
+  var _sug = [];
+  try { _sug = adivinarLoQueQuiso(texto) || []; } catch(eS){}
+  if(_sug.length){
+    el.innerHTML = caja(
+      linea('No estoy seguro de qu\u00e9 me pediste \ud83e\udd14', true)
+      + linea('\u00bfSer\u00e1 alguna de estas?')
+      + _sug.map(function(t){
+          return '<button onclick="contestarAsistente(' + _arg(t) + ')" '
+            + 'style="width:100%;text-align:left;margin:5px 0;padding:11px 13px;'
+            + 'background:var(--nbs-gold-bg);border:1px solid var(--nbs-gold);'
+            + 'border-radius:9px;font-size:13px;font-weight:700;color:var(--nbs-ink);'
+            + 'cursor:pointer">' + escaparHtml(t) + '</button>';
+        }).join(''));
+    return q;
+  }
+
   // No entendió
   el.innerHTML = caja(
     linea('No te entend\u00ed \ud83d\ude45', true)
@@ -16596,6 +16647,13 @@ function _contestarAsistenteTexto(texto){
 
 // ═══ EL MICRÓFONO ═══
 function hablarleAlAsistente(){
+  // 🔑 SI ÉL VA A HABLAR, YO ME CALLO. Al tocar el micrófono se corta la voz
+  // en seco, como cuando uno interrumpe a alguien. -17 ago-
+  try {
+    if(window.speechSynthesis) window.speechSynthesis.cancel();
+    window._asistenteHablando = false;
+    window._loQueAcaboDeDecir = '';
+  } catch(eV){}
   var btn = document.getElementById('asis-mic');
   var Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!Rec){
@@ -20093,6 +20151,635 @@ function borrarCuadre(id){
   try { avisoChico('\ud83d\uddd1\ufe0f Cuadre borrado'); } catch(e){}
 }
 
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  🧠 EL CEREBRO DEL ASISTENTE
+//
+//  No busca frases exactas: busca IDEAS. Saca las palabras clave de
+//  lo que Sensei dijo y decide qué le está preguntando.
+//
+//  Así entiende "quién me debe más", "cuál cliente me debe más
+//  dinero", "los que más me deben", "quiénes tienen más deuda" —
+//  todas la misma pregunta, escritas de forma distinta.
+// ═══════════════════════════════════════════════════════════════════
+
+// Quitar acentos y dejar todo parejo para poder comparar
+function _limpiar(t){
+  return String(t || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[¿?¡!.,;:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// ── LAS IDEAS QUE SABE RECONOCER ──
+// Cada una tiene palabras que la delatan. Si aparecen varias, gana.
+var IDEAS_ASISTENTE = [
+  { id: 'quienDebeMas',
+    debe: [['quien','quienes','cual','cuales','lista','clientes','cliente','los que','a quien','dime']],
+    y:    [['debe','deben','debiendo','deuda','deudas','deudor','deudores','por cobrar',
+            'tengo que cobrar','cobrarle','hay que cobrar','debo cobrar','falta cobrar','me deben']] },
+
+  { id: 'cuantoDebeUno',
+    debe: [['cuanto','que tanto','cuanta','cual es']],
+    y:    [['debe','deuda','debiendo','me debe','su balance','su deuda']] },
+
+  { id: 'totalPorCobrar',
+    debe: [['cuanto','total','todo']],
+    y:    [['me deben','por cobrar','en la calle','deben en total','deuda total']] },
+
+  { id: 'quienCompraMas',
+    debe: [['quien','quienes','cual','cuales','lista','mejores','mejor']],
+    y:    [['compra','compran','compro','mas me compra','mejor cliente','mas dinero deja','deja mas','mas gasta']] },
+
+  { id: 'quienDejaMas',
+    debe: [['quien','cual','cuales','quienes']],
+    y:    [['ganancia','deja mas ganancia','mas ganancia','mejor margen','mas margen']] },
+
+  { id: 'comoMeFue',
+    debe: [['como','cuanto','que tal']],
+    y:    [['me fue','vendi hoy','voy hoy','va hoy','fue hoy','del dia','hoy']],
+    ni:   ['mes','semana','ano'] },
+
+  { id: 'esteMes',
+    debe: [['cuanto','como','que tal','llevo','voy','vendi']],
+    y:    [['mes','este mes','del mes','mensual','en el mes','llevo en el mes']] },
+
+  { id: 'estaSemana',
+    debe: [['cuanto','como','que tal']],
+    y:    [['semana','esta semana','de la semana']] },
+
+  { id: 'callados',
+    debe: [['quien','quienes','cual','cuales','clientes']],
+    y:    [['no viene','no ha venido','no compra','perdido','perdidos','callado','callados','dejo de comprar','no me compra','desaparecido','dormido','dormidos']] },
+
+  { id: 'seAcaba',
+    debe: [['que','cual','cuales','cuanto']],
+    y:    [['se acaba','acabando','falta','agotado','agotados','tengo que comprar','necesito comprar','reponer','relleno','queda poco','sin stock']] },
+
+  { id: 'cuantoTengoDe',
+    debe: [['cuanto','cuantos','cuantas','tengo']],
+    y:    [['tengo de','me queda','me quedan','quedan de','hay de','existencia','inventario de']] },
+
+  { id: 'valorInventario',
+    debe: [['cuanto','valor','vale']],
+    y:    [['inventario','mercancia','en la van','productos tengo','todo el inventario']] },
+
+  { id: 'yoDebo',
+    debe: [['cuanto','que','a quien']],
+    y:    [['yo debo','le debo','debo yo','suplidor','suplidores','por pagar','tengo que pagar']] },
+
+  { id: 'ganancia',
+    debe: [['cuanto','que']],
+    y:    [['ganancia','gane','he ganado','margen','beneficio','utilidad']] },
+
+  { id: 'gastos',
+    debe: [['cuanto','que']],
+    y:    [['gaste','gastos','gastado','he gastado']] },
+
+  { id: 'vipQuienGano',
+    debe: [['quien','quienes','cual','cuales','hay']],
+    y:    [['vip','punto','puntos','gratis','premio','premios','se gano','regalo']] },
+
+  { id: 'cuantosPuntos',
+    debe: [['cuanto','cuantos','que']],
+    y:    [['puntos tiene','puntos lleva','puntos de','vip de']] },
+
+  { id: 'aQuienVisito',
+    debe: [['a quien','quien','cuales','que','donde']],
+    y:    [['visito','visitar','toca hoy','voy hoy','ruta de hoy','ruta','me toca']] },
+
+  { id: 'noVisitado',
+    debe: [['quien','quienes','cual','cuales','falta']],
+    y:    [['no he visitado','sin visitar','falta visitar','no visite','hace tiempo que no']] },
+
+  { id: 'ultimaCompra',
+    debe: [['cuando','que dia']],
+    y:    [['compro','me compro','ultima compra','vino','la ultima vez']] },
+
+  { id: 'masVendido',
+    debe: [['que','cual','cuales']],
+    y:    [['mas vendo','mas se vende','mas vendido','mejor producto','mas sale','producto estrella']] },
+
+  { id: 'menosVendido',
+    debe: [['que','cual','cuales']],
+    y:    [['menos vendo','no se vende','menos sale','no sale','parado','estancado']] },
+
+  { id: 'facturasCliente',
+    debe: [['cuales','que','cuantas','ver']],
+    y:    [['facturas de','facturas tiene','sus facturas','le vendi']] },
+
+  { id: 'reporte',
+    debe: [['reporte','informe','resumen','dame','hazme']],
+    y:    [['reporte','informe','resumen']] },
+
+  { id: 'abrirPedido',
+    debe: [['prepara','abre','empieza','hazme','arma']],
+    y:    [['pedido','orden']] },
+
+  { id: 'cuadre',
+    debe: [['cuadrar','cuadre','contar','cuanto']],
+    y:    [['caja','cuadre','efectivo','dinero de hoy','cuanto cobre hoy']] }
+];
+
+// 🔑 EL QUE DECIDE — cuenta cuántas palabras del tema aparecen y gana la que
+// más tenga. NO exige que estén todas: la gente escribe como le sale. -17 ago-
+function entenderIdea(texto){
+  var q = _limpiar(texto);
+  if(!q) return null;
+  var mejor = null, mejorPunto = 0;
+
+  IDEAS_ASISTENTE.forEach(function(idea){
+    // Si trae una palabra que la descarta, se salta
+    if(idea.ni && idea.ni.some(function(x){ return q.indexOf(_limpiar(x)) >= 0; })) return;
+
+    var puntoDebe = 0, puntoY = 0;
+    (idea.debe || []).forEach(function(grupo){
+      grupo.forEach(function(p){
+        var lp = _limpiar(p);
+        if(!lp) return;
+        if(q.indexOf(lp) >= 0) puntoDebe = Math.max(puntoDebe, lp.split(' ').length > 1 ? 2 : 1);
+      });
+    });
+    (idea.y || []).forEach(function(grupo){
+      grupo.forEach(function(p){
+        var lp = _limpiar(p);
+        if(!lp) return;
+        // Las frases largas valen mucho más que una palabra suelta
+        if(q.indexOf(lp) >= 0) puntoY += (lp.split(' ').length > 1 ? 6 : 3);
+      });
+    });
+
+      // 🔑 Hace falta que aparezca ALGO del tema (el grupo "y"). El "debe" suma.
+    if(puntoY <= 0) return;
+    var total = puntoY + puntoDebe;
+    if(total > mejorPunto){ mejorPunto = total; mejor = idea.id; }
+  });
+
+  // 🔑 SI NOMBRÓ A UN CLIENTE DE VERDAD, la pregunta es SOBRE ÉL.
+  // ⚠️ Pero solo si el nombre es FUERTE: "los que mas me deben" no lleva nombre,
+  // y una palabra suelta no puede convertir la pregunta. -17 ago-
+  // ⚠️ Si la pregunta es en PLURAL o pide una LISTA, es de TODOS aunque
+  // aparezca una palabra que se parezca a un nombre. -17 ago-
+  var _esDeTodos = /\b(los que|las que|quienes|cuales|lista|todos|mas me deben|mis clientes|top)\b/.test(q);
+  var _cl = _esDeTodos ? null : _clienteMencionado(q);
+  if(_cl){
+    if(mejor === 'quienDebeMas') mejor = 'cuantoDebeUno';
+    if(mejor === 'quienCompraMas') mejor = 'facturasCliente';
+  }
+
+  return mejor ? { idea: mejor, punto: mejorPunto, texto: q } : null;
+}
+
+// ── Buscar a un cliente dentro de lo que dijo ──
+function _clienteMencionado(q){
+  var cls = LS('ncl', []);
+  var lq = ' ' + _limpiar(q) + ' ';
+  var mejor = null, puntos = 0;
+  // ⚠️ Se busca por PALABRAS, no por el nombre entero: el cliente es
+  // "Luis A. Medina" y él dice "Luis Medina" — la inicial rompía todo. -17 ago-
+  cls.forEach(function(c){
+    var p = 0;
+    [c.nombre, c.apellido, c.apodo, c.negocio].forEach(function(campo){
+      if(!campo) return;
+      _limpiar(campo).split(' ').forEach(function(w){
+        if(w.length < 3) return;               // "a", "de", "la" no cuentan
+        if(lq.indexOf(' ' + w + ' ') >= 0) p += (w.length > 5 ? 3 : 2);
+      });
+    });
+    if(p > puntos){ puntos = p; mejor = c; }
+  });
+  // Hace falta al menos una palabra buena, para no confundirse
+  return puntos >= 2 ? mejor : null;
+}
+
+// ── Buscar un producto dentro de lo que dijo ──
+function _productoMencionado(q){
+  loadProds();
+  var lq = _limpiar(q);
+  var mejor = null, largo = 0;
+  productos.forEach(function(p){
+    var lp = _limpiar(p.nombre);
+    // Por palabras, para que "cuanto tengo de cool care" encuentre el producto
+    var pal = lp.split(' ').filter(function(x){ return x.length > 3; });
+    var cuantas = pal.filter(function(x){ return lq.indexOf(x) >= 0; }).length;
+    if(cuantas >= 2 && cuantas > largo){ mejor = p; largo = cuantas; }
+    else if(lq.indexOf(lp) >= 0 && lp.length > largo){ mejor = p; largo = lp.length; }
+  });
+  return mejor;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  LAS RESPUESTAS — todas salen de SUS datos reales
+// ═══════════════════════════════════════════════════════════════════
+function responderIdea(r, textoOriginal){
+  var q = r.texto;
+
+  // ── QUIÉNES ME DEBEN MÁS ──
+  if(r.idea === 'quienDebeMas'){
+    var lista = [];
+    LS('ncl', []).forEach(function(c){
+      var d = cuentaDeCliente(c.id).dinero.debe;
+      if(d > 0.005) lista.push({ nombre: nombreCl(c), debe: d, cid: c.id });
+    });
+    lista.sort(function(a, b){ return b.debe - a.debe; });
+    if(!lista.length) return { titulo: '\u2705 Nadie te debe nada', lineas: ['Todos tus clientes est\u00e1n al d\u00eda.'] };
+    var total = lista.reduce(function(a, x){ return a + x.debe; }, 0);
+    return {
+      titulo: '\ud83d\udcb0 Los que m\u00e1s te deben',
+      lineas: lista.slice(0, 10).map(function(x, i){
+        return (i + 1) + '. <b>' + escaparHtml(x.nombre) + '</b> \u2014 $' + fmtNum(x.debe);
+      }).concat(['', '<b>' + lista.length + ' clientes te deben $' + fmtNum(total) + ' en total</b>']),
+      boton: ['\ud83d\udcb0 Ir a Cuentas por Cobrar', "cerrarAsistente();ir('p-cxc')"]
+    };
+  }
+
+  // ── CUÁNTO ME DEBEN EN TOTAL ──
+  if(r.idea === 'totalPorCobrar'){
+    var t = 0, n = 0;
+    LS('ncl', []).forEach(function(c){
+      var d = cuentaDeCliente(c.id).dinero.debe;
+      if(d > 0.005){ t += d; n++; }
+    });
+    return { titulo: '\ud83d\udcb0 Te deben $' + fmtNum(t),
+             lineas: ['Repartido entre <b>' + n + ' cliente(s)</b>.'],
+             boton: ['\ud83d\udcb0 Ver el detalle', "cerrarAsistente();ir('p-cxc')"] };
+  }
+
+  // ── QUIÉN ME COMPRA MÁS ──
+  if(r.idea === 'quienCompraMas'){
+    var l2 = [];
+    LS('ncl', []).forEach(function(c){
+      var d = cuentaDeCliente(c.id).dinero;
+      if(d.comprado > 0.005) l2.push({ nombre: nombreCl(c), c: d.comprado, g: d.ganancia });
+    });
+    l2.sort(function(a, b){ return b.c - a.c; });
+    if(!l2.length) return { titulo: '\ud83e\udd14 Todav\u00eda no hay compras', lineas: [] };
+    return { titulo: '\ud83c\udfc6 Los que m\u00e1s te compran',
+             lineas: l2.slice(0, 10).map(function(x, i){
+               return (i + 1) + '. <b>' + escaparHtml(x.nombre) + '</b> \u2014 $' + fmtNum(x.c)
+                 + ' <span style="color:var(--nbs-muted);font-size:12px">(te dej\u00f3 $' + fmtNum(x.g) + ')</span>';
+             }) };
+  }
+
+  // ── QUIÉN ME DEJA MÁS GANANCIA ──
+  if(r.idea === 'quienDejaMas'){
+    var l3 = [];
+    LS('ncl', []).forEach(function(c){
+      var d = cuentaDeCliente(c.id).dinero;
+      if(d.ganancia > 0.005) l3.push({ nombre: nombreCl(c), g: d.ganancia, c: d.comprado });
+    });
+    l3.sort(function(a, b){ return b.g - a.g; });
+    if(!l3.length) return { titulo: '\ud83e\udd14 Todav\u00eda no hay ganancias', lineas: [] };
+    return { titulo: '\ud83d\udcb5 Los que m\u00e1s ganancia te dejan',
+             lineas: l3.slice(0, 10).map(function(x, i){
+               return (i + 1) + '. <b>' + escaparHtml(x.nombre) + '</b> \u2014 $' + fmtNum(x.g)
+                 + ' <span style="color:var(--nbs-muted);font-size:12px">de $' + fmtNum(x.c) + '</span>';
+             }) };
+  }
+
+  // ── LA SEMANA ──
+  if(r.idea === 'estaSemana'){
+    var hoy = new Date(); hoy.setHours(23,59,59,999);
+    var lun = new Date(); lun.setHours(0,0,0,0);
+    var dw = lun.getDay(); lun.setDate(lun.getDate() - (dw === 0 ? 6 : dw - 1));
+    var vend = 0, gan = 0, cob = 0, cuantas = 0;
+    LS('nv', []).forEach(function(v){
+      if(v.cancelada) return;
+      var f = parsearFechaVenta(v.fecha);
+      if(!f || f < lun || f > hoy) return;
+      vend += parseFloat(v.total) || 0;
+      gan += parseFloat(v.ganancia) || 0;
+      cuantas++;
+    });
+    LS('nv', []).forEach(function(v){
+      (v.pagosFactura || []).forEach(function(p){
+        if(p.esDevolucion) return;
+        var f = parsearFechaVenta(p.fecha || v.fecha);
+        if(f && f >= lun && f <= hoy) cob += parseFloat(p.monto) || 0;
+      });
+    });
+    return { titulo: '\ud83d\udcc5 Esta semana',
+             lineas: ['Vendiste <b>$' + fmtNum(vend) + '</b> en ' + cuantas + ' factura(s).',
+                      'Cobraste <b>$' + fmtNum(cob) + '</b>.',
+                      'Te dej\u00f3 <b>$' + fmtNum(gan) + '</b> de ganancia.'] };
+  }
+
+  // ── CUÁNTO TENGO DE UN PRODUCTO ──
+  if(r.idea === 'cuantoTengoDe'){
+    var p = _productoMencionado(q);
+    if(!p) return { titulo: '\ud83e\udd14 \u00bfDe cu\u00e1l producto?',
+                    lineas: ['Dime el nombre, por ejemplo: <i>"cu\u00e1nto tengo de cool care"</i>'] };
+    var st = parseFloat(p.stock) || 0;
+    return { titulo: (st <= 0 ? '\ud83d\udd34 ' : '\ud83d\udce6 ') + escaparHtml(p.nombre),
+             lineas: ['Te quedan <b>' + st + '</b> unidad(es).',
+                      'Se vende a $' + fmtNum(p.precio) + ' y te cuesta $' + fmtNum(p.costo) + '.',
+                      st <= 0 ? '\u26a0\ufe0f <b>Se te acab\u00f3.</b>' : ''] .filter(Boolean) };
+  }
+
+  // ── EL VALOR DEL INVENTARIO ──
+  if(r.idea === 'valorInventario'){
+    loadProds();
+    var costoT = 0, ventaT = 0, unid = 0, agot = 0;
+    productos.forEach(function(p){
+      var st = parseFloat(p.stock) || 0;
+      if(st <= 0){ agot++; return; }
+      unid += st;
+      costoT += st * (parseFloat(p.costo) || 0);
+      ventaT += st * (parseFloat(p.precio) || 0);
+    });
+    return { titulo: '\ud83d\udce6 Tu inventario',
+             lineas: ['<b>' + unid + '</b> unidades de ' + productos.length + ' productos.',
+                      'Te cost\u00f3 <b>$' + fmtNum(costoT) + '</b>.',
+                      'Vale <b>$' + fmtNum(ventaT) + '</b> a precio de venta.',
+                      'Si lo vendes todo ganar\u00edas <b>$' + fmtNum(ventaT - costoT) + '</b>.',
+                      agot ? '\u26a0\ufe0f Tienes <b>' + agot + '</b> producto(s) agotado(s).' : ''].filter(Boolean) };
+  }
+
+  // ── CUÁNTO DEBO YO ──
+  if(r.idea === 'yoDebo'){
+    var deb = 0;
+    try { deb = calcularTotalPorPagar(); } catch(e){}
+    return { titulo: '\ud83c\udfea Le debes $' + fmtNum(deb),
+             lineas: ['Eso es lo que le debes a tus suplidores, tarjetas y otras deudas.'],
+             boton: ['\ud83c\udfea Ver Cuentas por Pagar', "cerrarAsistente();ir('p-cxp')"] };
+  }
+
+  // ── LA GANANCIA ──
+  if(r.idea === 'ganancia'){
+    var g = 0, v2 = 0;
+    LS('nv', []).forEach(function(v){
+      if(v.cancelada) return;
+      g += parseFloat(v.ganancia) || 0;
+      v2 += parseFloat(v.total) || 0;
+    });
+    var margen = v2 > 0 ? Math.round(g / v2 * 1000) / 10 : 0;
+    return { titulo: '\ud83d\udcb5 Has ganado $' + fmtNum(g),
+             lineas: ['De <b>$' + fmtNum(v2) + '</b> vendidos.',
+                      'Eso es un margen del <b>' + margen + '%</b>.'] };
+  }
+
+  // ── LOS GASTOS ──
+  if(r.idea === 'gastos'){
+    var gs = LS('ngastos', []);
+    var tg = 0;
+    gs.forEach(function(x){ tg += parseFloat(x.monto) || 0; });
+    return { titulo: '\ud83d\udcb8 Has gastado $' + fmtNum(tg),
+             lineas: ['En <b>' + gs.length + '</b> gasto(s) apuntado(s).'],
+             boton: ['\ud83d\udcb8 Ver los gastos', "cerrarAsistente();ir('p-gastos')"] };
+  }
+
+  // ── QUIÉN SE GANÓ UN PREMIO ──
+  if(r.idea === 'vipQuienGano'){
+    var pr = [];
+    try { pr = premiosPendientes() || []; } catch(e){}
+    if(!pr.length) return { titulo: '\u2b50 Nadie tiene premios pendientes',
+                            lineas: ['Cuando alguien llegue a 10 productos del mismo tipo, te aviso.'] };
+    return { titulo: '\ud83c\udf81 ' + pr.length + ' premio(s) por entregar',
+             lineas: pr.slice(0, 10).map(function(x){
+               return '\u2b50 <b>' + escaparHtml(x.nombre || '') + '</b> \u2014 ' + escaparHtml(x.detalle || x.texto || '');
+             }) };
+  }
+
+  // ── LOS PUNTOS DE UN CLIENTE ──
+  if(r.idea === 'cuantosPuntos'){
+    var cl = _clienteMencionado(q);
+    if(!cl) return { titulo: '\ud83e\udd14 \u00bfDe cu\u00e1l cliente?',
+                     lineas: ['Dime su nombre, por ejemplo: <i>"cu\u00e1ntos puntos tiene Luis"</i>'] };
+    var gr = {};
+    try { gr = calcVIP(cl.id) || {}; } catch(e){}
+    var ks = Object.keys(gr);
+    if(!ks.length) return { titulo: '\u2b50 ' + nombreCl(cl),
+                            lineas: ['Todav\u00eda no tiene puntos VIP.'] };
+    return { titulo: '\u2b50 Puntos de ' + nombreCl(cl),
+             lineas: ks.map(function(k){
+               var g2 = gr[k];
+               return '<b>' + escaparHtml(k) + '</b> \u2014 ' + g2.puntos + ' de 10'
+                 + (g2.gratis ? '  \ud83c\udf81 <b>' + g2.gratis + ' gratis ganado(s)</b>' : '');
+             }) };
+  }
+
+  // ── A QUIÉN VISITO HOY ──
+  if(r.idea === 'aQuienVisito'){
+    var dia = '';
+    try { dia = getDiaHoy(); } catch(e){}
+    var rutas = LS('rutas_por_dia', {});
+    var hoyR = (rutas && rutas[dia]) || [];
+    if(!hoyR.length) return { titulo: '\ud83d\uddfa\ufe0f No tienes ruta para hoy',
+                              lineas: ['Puedes armarla en la pantalla de Rutas.'],
+                              boton: ['\ud83d\uddfa\ufe0f Ir a Rutas', "cerrarAsistente();ir('p-rutas')"] };
+    return { titulo: '\ud83d\uddfa\ufe0f Hoy te tocan ' + hoyR.length + ' barber\u00eda(s)',
+             lineas: hoyR.slice(0, 15).map(function(b, i){ return (i + 1) + '. ' + escaparHtml(b); }),
+             boton: ['\ud83d\uddfa\ufe0f Ver la ruta', "cerrarAsistente();ir('p-rutas')"] };
+  }
+
+  // ── LA ÚLTIMA COMPRA DE ALGUIEN ──
+  if(r.idea === 'ultimaCompra'){
+    var cl2 = _clienteMencionado(q);
+    if(!cl2) return { titulo: '\ud83e\udd14 \u00bfDe cu\u00e1l cliente?',
+                      lineas: ['Dime su nombre, por ejemplo: <i>"cu\u00e1ndo compr\u00f3 Luis"</i>'] };
+    var cta = cuentaDeCliente(cl2.id);
+    if(!cta.activas.length) return { titulo: '\ud83d\udcc5 ' + nombreCl(cl2),
+                                     lineas: ['Nunca te ha comprado.'] };
+    var ult = cta.activas.slice().sort(function(a, b){
+      var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
+      return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
+    })[0];
+    return { titulo: '\ud83d\udcc5 ' + nombreCl(cl2),
+             lineas: ['Su \u00faltima compra fue el <b>' + escaparHtml(ult.fecha) + '</b>.',
+                      'Fue de <b>$' + fmtNum(ult.total) + '</b>.',
+                      'Te ha comprado <b>$' + fmtNum(cta.dinero.comprado) + '</b> en total.'],
+             boton: ['\ud83d\udc64 Ver su cuenta', "cerrarAsistente();verCl(" + _arg(cl2.id) + ")"] };
+  }
+
+  // ── LO QUE MÁS VENDO ──
+  if(r.idea === 'masVendido' || r.idea === 'menosVendido'){
+    var cuenta = {};
+    LS('nv', []).forEach(function(v){
+      if(v.cancelada) return;
+      (v.items || []).forEach(function(it){
+        var k = it.nombre || '?';
+        if(!cuenta[k]) cuenta[k] = { cant: 0, plata: 0 };
+        cuenta[k].cant += parseFloat(it.cant) || 0;
+        cuenta[k].plata += (parseFloat(it.cant) || 0) * (parseFloat(it.precio) || 0);
+      });
+    });
+    var arr = Object.keys(cuenta).map(function(k){
+      return { n: k, cant: cuenta[k].cant, plata: cuenta[k].plata };
+    });
+    if(!arr.length) return { titulo: '\ud83e\udd14 Todav\u00eda no hay ventas', lineas: [] };
+    var masVend = r.idea === 'masVendido';
+    arr.sort(function(a, b){ return masVend ? b.cant - a.cant : a.cant - b.cant; });
+    return { titulo: masVend ? '\ud83d\udd25 Lo que m\u00e1s vendes' : '\ud83d\udc0c Lo que menos sale',
+             lineas: arr.slice(0, 10).map(function(x, i){
+               return (i + 1) + '. <b>' + escaparHtml(x.n) + '</b> \u2014 ' + x.cant + ' unidad(es)'
+                 + ' <span style="color:var(--nbs-muted);font-size:12px">($' + fmtNum(x.plata) + ')</span>';
+             }) };
+  }
+
+  // ── LAS FACTURAS DE UN CLIENTE ──
+  if(r.idea === 'facturasCliente'){
+    var cl3 = _clienteMencionado(q);
+    if(!cl3) return { titulo: '\ud83e\udd14 \u00bfDe cu\u00e1l cliente?', lineas: ['Dime su nombre.'] };
+    var ct = cuentaDeCliente(cl3.id);
+    return { titulo: '\ud83d\udcc4 Facturas de ' + nombreCl(cl3),
+             lineas: ['Tiene <b>' + ct.activas.length + '</b> factura(s) activa(s)'
+                      + (ct.canceladas.length ? ' y ' + ct.canceladas.length + ' cancelada(s)' : '') + '.',
+                      'Te compr\u00f3 <b>$' + fmtNum(ct.dinero.comprado) + '</b> y debe <b>$' + fmtNum(ct.dinero.debe) + '</b>.'],
+             boton: ['\ud83d\udc64 Ver su cuenta', "cerrarAsistente();verCl(" + _arg(cl3.id) + ")"] };
+  }
+
+  // ── EL CUADRE ──
+  if(r.idea === 'cuadre'){
+    var hoyF = fechaHoy();
+    var cobHoy = 0;
+    LS('nv', []).forEach(function(v){
+      (v.pagosFactura || []).forEach(function(p){
+        if(!p.esDevolucion && (p.fecha === hoyF)) cobHoy += parseFloat(p.monto) || 0;
+      });
+    });
+    return { titulo: '\ud83e\uddee Hoy cobraste $' + fmtNum(cobHoy),
+             lineas: ['Puedes contar tu dinero y compararlo en el Cuadre de Caja.'],
+             boton: ['\ud83e\uddee Ir al Cuadre de Caja', "cerrarAsistente();abrirCajaCuadre()"] };
+  }
+
+  // ── LOS QUE NO HE VISITADO ──
+  if(r.idea === 'noVisitado'){
+    var hoy2 = new Date();
+    var lista2 = [];
+    LS('ncl', []).forEach(function(c){
+      var ct2 = cuentaDeCliente(c.id);
+      if(!ct2.activas.length) return;
+      var ult2 = ct2.activas.slice().sort(function(a, b){
+        var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
+        return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
+      })[0];
+      var f2 = parsearFechaVenta(ult2.fecha);
+      if(!f2) return;
+      var dias = Math.floor((hoy2 - f2) / 86400000);
+      if(dias >= 20) lista2.push({ nombre: nombreCl(c), dias: dias, cid: c.id });
+    });
+    lista2.sort(function(a, b){ return b.dias - a.dias; });
+    if(!lista2.length) return { titulo: '\u2705 Est\u00e1s al d\u00eda con todos',
+                                lineas: ['Nadie lleva m\u00e1s de 20 d\u00edas sin comprarte.'] };
+    return { titulo: '\u23f0 ' + lista2.length + ' cliente(s) llevan tiempo sin comprarte',
+             lineas: lista2.slice(0, 12).map(function(x){
+               return '<b>' + escaparHtml(x.nombre) + '</b> \u2014 hace ' + x.dias + ' d\u00edas';
+             }) };
+  }
+
+  // ── CUÁNTO ME DEBE UN CLIENTE ──
+  if(r.idea === 'cuantoDebeUno'){
+    var clD = _clienteMencionado(q);
+    if(!clD) return { titulo: '\ud83e\udd14 \u00bfDe cu\u00e1l cliente?',
+                      lineas: ['Dime su nombre, por ejemplo: <i>"cu\u00e1nto me debe Luis"</i>'] };
+    var ctD = cuentaDeCliente(clD.id);
+    var lin = [];
+    if(ctD.dinero.debe <= 0.005){
+      lin.push('<b>No te debe nada.</b> Est\u00e1 al d\u00eda. \u2705');
+    } else {
+      lin.push('Te debe <b>$' + fmtNum(ctD.dinero.debe) + '</b>.');
+      var pend = ctD.activas.filter(function(v){ return cobradoYDebeDe(v).debe > 0.005; });
+      lin.push('En <b>' + pend.length + '</b> factura(s) sin saldar.');
+      if(pend.length){
+        var vieja = pend.slice().sort(function(a, b){
+          var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
+          return (fa ? fa.getTime() : 0) - (fb ? fb.getTime() : 0);
+        })[0];
+        var fV = parsearFechaVenta(vieja.fecha);
+        var diasV = fV ? Math.floor((new Date() - fV) / 86400000) : null;
+        lin.push('La m\u00e1s vieja es del <b>' + escaparHtml(vieja.fecha) + '</b>'
+          + (diasV !== null ? ' \u2014 hace <b>' + diasV + ' d\u00edas</b>' : '') + '.');
+      }
+    }
+    if(ctD.dinero.credito > 0.005) lin.push('Y tiene <b>$' + fmtNum(ctD.dinero.credito) + '</b> a favor.');
+    lin.push('Te ha comprado <b>$' + fmtNum(ctD.dinero.comprado) + '</b> en total.');
+    return { titulo: '\ud83d\udc64 ' + nombreCl(clD), lineas: lin,
+             boton: ['\ud83d\udc64 Ver su cuenta', "cerrarAsistente();verCl(" + _arg(clD.id) + ")"] };
+  }
+
+  // ── CÓMO ME FUE HOY ──
+  if(r.idea === 'comoMeFue'){
+    var hoyF2 = fechaHoy();
+    var vH = 0, gH = 0, nH = 0, cH = 0;
+    LS('nv', []).forEach(function(v){
+      if(!v.cancelada && v.fecha === hoyF2){
+        vH += parseFloat(v.total) || 0; gH += parseFloat(v.ganancia) || 0; nH++;
+      }
+      (v.pagosFactura || []).forEach(function(p){
+        if(!p.esDevolucion && p.fecha === hoyF2) cH += parseFloat(p.monto) || 0;
+      });
+    });
+    if(!nH && cH <= 0.005) return { titulo: '\ud83d\udcc5 Hoy todav\u00eda no hay nada',
+                                    lineas: ['Ni ventas ni cobros apuntados hoy.'] };
+    return { titulo: '\ud83d\udcc5 As\u00ed va el d\u00eda',
+             lineas: ['Vendiste <b>$' + fmtNum(vH) + '</b> en ' + nH + ' factura(s).',
+                      'Cobraste <b>$' + fmtNum(cH) + '</b>.',
+                      'Te dej\u00f3 <b>$' + fmtNum(gH) + '</b> de ganancia.'] };
+  }
+
+  // ── ESTE MES ──
+  if(r.idea === 'esteMes'){
+    var ah = new Date();
+    var vM = 0, gM = 0, nM = 0, cM = 0;
+    LS('nv', []).forEach(function(v){
+      var f = parsearFechaVenta(v.fecha);
+      if(!v.cancelada && f && f.getMonth() === ah.getMonth() && f.getFullYear() === ah.getFullYear()){
+        vM += parseFloat(v.total) || 0; gM += parseFloat(v.ganancia) || 0; nM++;
+      }
+      (v.pagosFactura || []).forEach(function(p){
+        if(p.esDevolucion) return;
+        var fp = parsearFechaVenta(p.fecha || v.fecha);
+        if(fp && fp.getMonth() === ah.getMonth() && fp.getFullYear() === ah.getFullYear()){
+          cM += parseFloat(p.monto) || 0;
+        }
+      });
+    });
+    var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio',
+                 'agosto','septiembre','octubre','noviembre','diciembre'];
+    return { titulo: '\ud83d\udcc6 En ' + MESES[ah.getMonth()],
+             lineas: ['Vendiste <b>$' + fmtNum(vM) + '</b> en ' + nM + ' factura(s).',
+                      'Cobraste <b>$' + fmtNum(cM) + '</b>.',
+                      'Te dej\u00f3 <b>$' + fmtNum(gM) + '</b> de ganancia.'] };
+  }
+
+  return null;   // esta idea la contesta el código viejo
+}
+
+// 🔑 CUANDO NO ENTIENDE: en vez de la lista fría, ADIVINA lo más parecido
+function adivinarLoQueQuiso(texto){
+  var q = _limpiar(texto);
+  if(!q) return [];
+  var palabras = q.split(' ').filter(function(x){ return x.length > 3; });
+  var puntos = [];
+  var EJEMPLOS = [
+    ['\u00bfqui\u00e9nes me deben m\u00e1s?', 'quienes me deben mas dinero deuda clientes'],
+    ['\u00bfcu\u00e1nto me deben en total?', 'cuanto me deben total por cobrar calle'],
+    ['\u00bfqui\u00e9n me compra m\u00e1s?', 'quien me compra mas mejor cliente'],
+    ['\u00bfc\u00f3mo me fue hoy?', 'como me fue hoy vendi dia'],
+    ['\u00bfcu\u00e1nto llevo este mes?', 'cuanto llevo este mes vendido mensual'],
+    ['\u00bfqu\u00e9 se me est\u00e1 acabando?', 'que se me esta acabando agotado comprar reponer'],
+    ['\u00bfcu\u00e1nto vale mi inventario?', 'cuanto vale inventario mercancia van'],
+    ['\u00bfcu\u00e1nto le debo a los suplidores?', 'cuanto debo yo suplidores pagar'],
+    ['\u00bfqui\u00e9n se gan\u00f3 un premio?', 'quien gano premio vip puntos gratis'],
+    ['\u00bfa qui\u00e9n visito hoy?', 'a quien visito hoy ruta toca'],
+    ['\u00bfqui\u00e9nes no vienen hace tiempo?', 'quienes no vienen callados perdidos dormidos'],
+    ['\u00bfqu\u00e9 es lo que m\u00e1s vendo?', 'que mas vendo producto estrella sale'],
+    ['\u00bfcu\u00e1nto me debe Luis?', 'cuanto me debe cliente nombre'],
+    ['\u00bfcu\u00e1ntos puntos tiene Luis?', 'cuantos puntos tiene vip cliente'],
+    ['\u00bfcu\u00e1nto he ganado?', 'cuanto he ganado ganancia margen'],
+    ['prepara un pedido para Luis', 'prepara pedido para cliente']
+  ];
+  EJEMPLOS.forEach(function(e){
+    var p = 0;
+    palabras.forEach(function(w){ if(e[1].indexOf(w) >= 0) p++; });
+    if(p > 0) puntos.push({ texto: e[0], p: p });
+  });
+  puntos.sort(function(a, b){ return b.p - a.p; });
+  return puntos.slice(0, 4).map(function(x){ return x.texto; });
+}
 
 function cuentaDeCliente(cid){
   var r2 = function(x){ return Math.round((x || 0) * 100) / 100; };
