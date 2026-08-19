@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260819g-OFICIAL-V2.0">
+<meta name="app-version" content="20260819h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -828,7 +828,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
         <input type="file" id="ep-sku-foto" accept="image/*" capture="environment" style="display:none" onchange="leerBarcodeDeFoto(this)">
       </div>
       <div class="r2">
-        <div><label class="lbl">Costo ($)</label><input class="inp" id="ep-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoMoneda(this);formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
+        <div><label class="lbl">Costo ($)</label><input class="inp" id="ep-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
         <div><label class="lbl">Precio ($)</label><input class="inp" id="ep-precio" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)"></div>
       </div>
       <div class="r2">
@@ -12006,6 +12006,16 @@ function formatoMoneda(input){
 // o hasta dolares en facturas con muchas unidades. Se escribe el punto decimal normal, como en
 // una calculadora de verdad -no como los demas campos de dinero de la app, que autoinsertan el
 // punto-.
+// Ensena un costo respetando los decimales que traiga: 4.00 se ve "4.00" y 4.4589 se ve
+// "4.4589". Antes se usaba .toFixed(2) a secas y en pantalla se perdian los decimales de mas
+// -aunque por dentro estuvieran bien-, asi que al corregir a mano se guardaba el redondeado.
+function costoBonito(n){
+  var v = Number(n);
+  if(!isFinite(v)) v = 0;
+  var d = String(v).split('.')[1];
+  return (d && d.length > 2) ? String(v) : v.toFixed(2);
+}
+
 function formatoCostoPreciso(input, event){
   // Si el usuario teclea el punto decimal el mismo -precision especifica, como 4.0985-, o si
   // pega/rellena un valor de una vez que ya trae un punto -en vez de escribirlo letra por
@@ -16977,7 +16987,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260819g';
+var NOVEDADES_VERSION = '20260819h';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -32775,7 +32785,15 @@ function pintarRevisionFactura(){
       + '<div style="flex:1"><div style="font-size:10px;color:#999;font-weight:700">CANTIDAD</div>'
       + '<input type="number" inputmode="numeric" value="' + it.cant + '" onchange="cambiarNumeroFactura(' + i + ',\'cant\',this.value)" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13.5px;font-weight:700"></div>'
       + '<div style="flex:1"><div style="font-size:10px;color:#999;font-weight:700">COSTO</div>'
-      + '<input type="number" step="0.01" inputmode="decimal" value="' + it.costo.toFixed(2) + '" onchange="cambiarNumeroFactura(' + i + ',\'costo\',this.value)" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13.5px;font-weight:700"></div>'
+      // 🔑 MODO CALCULADORA + DECIMALES DE VERDAD -19 ago, lo pidio Sensei-. Antes era un
+      // type="number" con step 0.01: ni ponia el punto solo ni dejaba escribir 4.4589. Ahora
+      // se comporta igual que los demas campos de costo de la app: escribes 400 y queda 4.00,
+      // y si escribes el punto tu mismo se respeta hasta 4 decimales.
+      + '<input type="text" inputmode="decimal" value="' + costoBonito(it.costo) + '"'
+      + ' onfocus="this.select();this.dataset.modoPreciso=\'\'"'
+      + ' oninput="formatoCostoPreciso(this, event)"'
+      + ' onblur="finalizarCostoPreciso(this);cambiarNumeroFactura(' + i + ',\'costo\',this.value)"'
+      + ' style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13.5px;font-weight:700"></div>'
       + '<div style="flex:1"><div style="font-size:10px;color:#999;font-weight:700">TOTAL</div>'
       + '<div style="padding:7px;font-size:13.5px;font-weight:900;color:' + (cuadraLinea ? '#2E7D32' : '#E65100') + '">'
       + (cuadraLinea ? '✓ ' : '⚠️ ') + '$' + fmtNum(it.cant * it.costo) + '</div></div>'
@@ -35569,7 +35587,7 @@ function verHistorialCliente(cid, modo){
       <label class="lbl">Nombre del producto *</label><input class="inp" id="vnp-nombre" type="text" placeholder="Ej: Roja Cortada, Colonia Venom" autocomplete="off" oninput="onNombreProductoInput('vnp-nombre')" onblur="ocultarDropdown('vnp-nombre')">
       <label class="lbl">Categoría</label><input class="inp" id="vnp-cat" type="text" placeholder="Ej: Pomadas, Navajas..." autocomplete="off" oninput="onCategoriaInput('vnp-cat')" onblur="ocultarDropdown('vnp-cat')">
       <div class="r2">
-        <div><label class="lbl">Costo ($)</label><input class="inp" id="vnp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoMoneda(this);formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
+        <div><label class="lbl">Costo ($)</label><input class="inp" id="vnp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
         <div><label class="lbl">Precio ($)</label><input class="inp" id="vnp-precio" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)"></div>
       </div>
       <label class="lbl">Stock inicial</label><input class="inp" id="vnp-stock" type="number" value="0" min="0">
@@ -35709,7 +35727,7 @@ function verHistorialCliente(cid, modo){
         <label class="lbl">Nombre del producto *</label><input class="inp" id="pednp-nombre" type="text" placeholder="Ej: Roja Cortada, Colonia Venom" autocomplete="off" oninput="onNombreProductoInput('pednp-nombre')" onblur="ocultarDropdown('pednp-nombre')">
         <label class="lbl">Categoría</label><input class="inp" id="pednp-cat" type="text" placeholder="Ej: Pomadas, Navajas..." autocomplete="off" oninput="onCategoriaInput('pednp-cat')" onblur="ocultarDropdown('pednp-cat')">
         <div class="r2">
-          <div><label class="lbl">Costo ($)</label><input class="inp" id="pednp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoMoneda(this);formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
+          <div><label class="lbl">Costo ($)</label><input class="inp" id="pednp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
           <div><label class="lbl">Precio ($)</label><input class="inp" id="pednp-precio" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)"></div>
         </div>
         <label class="lbl">Stock inicial</label><input class="inp" id="pednp-stock" type="number" value="0" min="0">
@@ -35794,7 +35812,7 @@ function verHistorialCliente(cid, modo){
     </div>
     <div style="display:grid;grid-template-columns:0.7fr 1fr 1fr;gap:8px">
       <div><label class="lbl">Cant.</label><input class="inp" id="cccant" type="number" value="1" min="1" style="text-align:center;padding:10px 4px"></div>
-      <div><label class="lbl">Costo ($)</label><input class="inp" id="cccosto" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoMoneda(this);formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)" style="text-align:center;padding:10px 4px"></div>
+      <div><label class="lbl">Costo ($)</label><input class="inp" id="cccosto" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)" style="text-align:center;padding:10px 4px"></div>
       <div><label class="lbl">Precio venta ($)</label><input class="inp" id="ccprecio" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)" style="text-align:center;padding:10px 4px"></div>
     </div>
     <p style="font-size:11px;color:#aaa;margin:-4px 0 8px">El precio de venta solo aplica si es producto nuevo.</p>
