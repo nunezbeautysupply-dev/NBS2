@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260819c-OFICIAL-V2.0">
+<meta name="app-version" content="20260819d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -748,6 +748,8 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     </div>
     <button class="btn" style="background:#2E7D32;color:white" onclick="nuevoProductoCatalogo()">+ Nuevo producto</button>
     <button class="btn" style="background:var(--nbs-gold);color:white" onclick="abrirEditarPorMarca()">✏️ Editar toda una marca</button>
+  <button class="btn" style="background:#00695C;color:white" onclick="abrirUnificarMarcas()">🔤 Unificar marcas repetidas</button>
+  <button class="btn" style="background:#3949AB;color:white" onclick="abrirArreglarMayusculas()">🔤 Marcas con mayúscula solo al principio</button>
     <button class="btn" style="background:#546E7A;color:white" onclick="redondearPrecios()">⬆️ Redondear precios al entero</button>
     <button class="btn" style="background:#6A1B9A;color:white" onclick="eliminarDuplicados()">🔍 Detectar y eliminar duplicados</button>
     <button class="btn" style="background:#00838F;color:white" onclick="exportarCatalogoParaPedidos()">📲 Generar página de pedidos por SMS para clientes</button>
@@ -9724,6 +9726,63 @@ function normalizarTextoBusqueda(txt){
     .trim();
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  🔍 LA BÚSQUEDA INTELIGENTE Y EL NOMBRE BONITO DE LAS MARCAS
+//
+//  🔑 SENSEI, 19 ago: hizo una venta del Gummy 700ml el día 12, y al ir a
+//  entrar la factura de compra NO LO ENCONTRABA. La causa: la app tenía 23
+//  cajas de búsqueda y **casi ninguna** usaba `normalizarTextoBusqueda`.
+//  Buscaban a lo bruto, así que "gummy" no encontraba "GUMMY".
+//
+//  Y las marcas salían TODAS EN MAYÚSCULAS en los menús, porque así están
+//  escritas en sus datos.
+// ═══════════════════════════════════════════════════════════════════
+
+// 🔑 BUSCA POR PALABRAS SUELTAS, en cualquier orden.
+// Así "gel 700" encuentra "Gummy hair gel maximum hold roja 700ml",
+// y "700 gel" también. Y da igual mayúsculas, acentos o símbolos.
+function coincideBusquedaPalabras(texto, loQueBusca){
+  var q = normalizarTextoBusqueda(loQueBusca);
+  if(!q) return true;                       // sin nada escrito, todo coincide
+  var t = normalizarTextoBusqueda(texto);
+  if(!t) return false;
+  // Cada palabra que escribió tiene que estar en alguna parte
+  var palabras = q.split(' ').filter(function(p){ return p.length > 0; });
+  return palabras.every(function(p){ return t.indexOf(p) >= 0; });
+}
+
+// La misma, pero mirando varios campos de un producto a la vez
+function productoCoincide(p, loQueBusca){
+  if(!p) return false;
+  var todo = [p.nombre, p.marca, p.cat, p.categoria, p.sku, p.codigo]
+    .filter(Boolean).join(' ');
+  return coincideBusquedaPalabras(todo, loQueBusca);
+}
+
+// Y para clientes
+function clienteCoincide(c, loQueBusca){
+  if(!c) return false;
+  var todo = [c.nombre, c.apellido, c.apodo, c.negocio, c.telefono, c.direccion]
+    .filter(Boolean).join(' ');
+  return coincideBusquedaPalabras(todo, loQueBusca);
+}
+
+// 🔤 EL NOMBRE BONITO DE UNA MARCA — solo la primera letra en mayúscula.
+// Sensei: "no entiendo por qué salen en letras mayúsculas todas". Salen así
+// porque así están guardadas; esto solo cambia CÓMO SE VEN, no el dato. -19 ago-
+function marcaBonita(m){
+  var t = String(m == null ? '' : m).trim();
+  if(!t) return '';
+  // Palabra por palabra, para que "cool care" quede "Cool Care"
+  return t.split(/\s+/).map(function(p){
+    if(!p) return p;
+    // Las de 2 letras o menos que ya vienen en mayúscula se dejan (KG, ML, 3D...)
+    if(p.length <= 2 && p === p.toUpperCase() && /[A-Z]/.test(p)) return p;
+    return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+  }).join(' ');
+}
+
+
 // Cuenta cuantos cambios hacen falta para convertir una palabra en otra -para aguantar faltas-
 function distanciaTexto(a, b){
   if(a === b) return 0;
@@ -9777,10 +9836,125 @@ function apareceComoPalabra(texto, palabra){
   return texto.indexOf(palabra) >= 0;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  📖 EL DICCIONARIO DE PALABRAS
+//
+//  🔑 Sensei buscó "gelatina" y no encontró el "Gummy hair gel 700ml",
+//  porque el producto dice GEL y él dice GELATINA. Aquí se traducen sus
+//  palabras a las que de verdad están escritas en los nombres.
+//
+//  ⚠️ ESTA LISTA CRECE. Cuando Sensei diga más palabras, se agregan aquí
+//  y funcionan al momento en TODAS las búsquedas de productos.
+// ═══════════════════════════════════════════════════════════════════
+var PALABRAS_PRODUCTOS = [
+  // lo que él dice          →  lo que está en el nombre
+  ['gelatina',                 'gel'],
+  ['jalea',                    'gel'],
+  ['cera',                     'wax'],
+  ['pomada',                   'wax pomade'],
+  ['perfume',                  'colonia cologne'],
+  ['locion',                   'colonia cologne lotion'],
+  ['fragancia',                'colonia cologne'],
+  ['cuchilla',                 'blade navaja'],
+  ['cuchillas',                'blade navaja'],
+  ['hojilla',                  'blade navaja'],
+  ['hojillas',                 'blade navaja'],
+  ['maquina',                  'clipper trimmer machine'],
+  ['maquinas',                 'clipper trimmer machine'],
+  ['peluquera',                'clipper trimmer'],
+  ['recortadora',              'trimmer'],
+  ['afeitadora',               'shaver razor'],
+  ['espuma',                   'mousse foam'],
+  ['talco',                    'powder'],
+  ['polvo',                    'powder'],
+  ['champu',                   'shampoo'],
+  ['champo',                   'shampoo'],
+  ['acondicionador',           'conditioner'],
+  ['tinte',                    'tint color dye'],
+  ['pintura',                  'tint color dye'],
+  ['aceite',                   'oil'],
+  ['spray',                    'spray splash'],
+  ['refrescante',              'cool care'],
+  ['enfriador',                'cool care'],
+  ['limpiador',                'cleaner clean'],
+  ['desinfectante',            'sanitizer disinfect'],
+  ['crema',                    'cream'],
+  ['barba',                    'beard'],
+  ['bigote',                   'mustache beard'],
+  ['tijera',                   'scissor shear'],
+  ['tijeras',                  'scissor shear'],
+  ['peine',                    'comb'],
+  ['cepillo',                  'brush'],
+  ['capa',                     'cape'],
+  ['bata',                     'cape'],
+  ['toalla',                   'towel'],
+  ['guante',                   'glove'],
+  ['guantes',                  'glove'],
+  ['cuello',                   'neck strip'],
+  ['papel de cuello',          'neck strip'],
+  ['secadora',                 'dryer'],
+  ['gorro',                    'cap'],
+  ['tratamiento',              'treatment'],
+  ['mascarilla',               'mask'],
+  ['sal marina',               'sea salt'],
+  ['agua',                     'water'],
+  ['brillo',                   'shine gloss'],
+  ['fijador',                  'hold fixative'],
+  ['trenza',                   'braid'],
+  ['rasuradora',               'shaver razor']
+];
+
+// 🔑 CAMBIA SU PALABRA POR LA EQUIVALENTE, DENTRO DE LA MISMA FRASE.
+// Así "gelatina 700" se prueba también como "gel 700" — sin perder el 700.
+// ⚠️ Antes reemplazaba la frase entera y "gelatina 700" daba 182 resultados. -19 ago-
+function ampliarBusqueda(consulta){
+  var q = normalizarTextoBusqueda(consulta);
+  if(!q) return q;
+  var versiones = [];
+  for(var i = 0; i < PALABRAS_PRODUCTOS.length; i++){
+    var suya = normalizarTextoBusqueda(PALABRAS_PRODUCTOS[i][0]);
+    var equiv = normalizarTextoBusqueda(PALABRAS_PRODUCTOS[i][1]);
+    if(!suya || !equiv) continue;
+    var re = new RegExp('(^| )' + suya.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '( |$)');
+    if(!re.test(q)) continue;
+    // 🔑 Cada equivalente, puesto EN EL SITIO de su palabra
+    equiv.split(' ').forEach(function(e){
+      if(!e) return;
+      versiones.push(q.replace(re, ' ' + e + ' ').replace(/\s+/g, ' ').trim());
+    });
+  }
+  if(!versiones.length) return q;
+  return { original: q, equivalentes: versiones };
+}
+
 function puntajeBusqueda(textoProducto, consulta){
   var normProd = normalizarTextoBusqueda(textoProducto);
   var normCons = normalizarTextoBusqueda(consulta);
   if(!normCons) return 0; // sin busqueda: todo pasa
+
+  // 📖 SI USÓ UNA PALABRA SUYA -"gelatina" en vez de "gel"-, se prueba también
+  // con la equivalente y se queda con el mejor puntaje de las dos. Si no hay
+  // equivalencia, todo sigue EXACTAMENTE igual que antes. -19 ago-
+  try {
+    var _amp = ampliarBusqueda(consulta);
+    if(_amp && _amp.equivalentes && _amp.equivalentes.length){
+      var _mejor = _puntajeBusquedaBase(normProd, normCons);
+      for(var _k = 0; _k < _amp.equivalentes.length; _k++){
+        var _p = _puntajeBusquedaBase(normProd, _amp.equivalentes[_k]);
+        if(_p > _mejor) _mejor = _p;
+      }
+      return _mejor;
+    }
+  } catch(eAmp){ /* si algo falla, sigue el camino normal */ }
+
+  return _puntajeBusquedaBase(normProd, normCons);
+}
+
+// La cuenta de siempre, tal cual estaba. Solo se le cambió el nombre para
+// que `puntajeBusqueda` la pueda llamar varias veces. -19 ago-
+function _puntajeBusquedaBase(normProd, normCons){
+  if(!normCons) return 0;
   // El "calza tal cual" solo aplica si la busqueda completa tiene mas de 2
   // letras -si no, una busqueda de 2 letras encontraria de todo por subcadena-.
   if(normCons.length > 2 && normProd.indexOf(normCons) >= 0) return 100;
@@ -12418,6 +12592,9 @@ function verProductoCatalogo(p){
   if(barraEp) barraEp.style.display = 'block';
   window.scrollTo(0, 0);
   // Si el producto ya tiene marca separada, usarla. Si no, separar de la primera palabra del nombre (compatibilidad con productos antiguos)
+  // 🏷️ Apuntar cómo se llama AHORA, para poder corregir las facturas viejas
+  // si él le cambia el nombre. -19 ago-
+  window._nombreAntesDeEditar = String(p.nombre || '');
   if(p.marca){
     document.getElementById('ep-marca').value = p.marca;
     document.getElementById('ep-nombre').value = p.nombreCorto || p.nombre || '';
@@ -12762,6 +12939,99 @@ function avisarNombreActualizado(r){
   } catch(e){}
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  🏷️ EL NOMBRE CORREGIDO, TAMBIÉN EN LAS FACTURAS VIEJAS
+//
+//  🔑 Sensei, 19 ago: "si cambio el nombre de un producto que ya vendí en
+//  el pasado, que también cambie el nombre en la factura vieja".
+//
+//  🔒 EL PRECIO NUNCA SE TOCA. Eso es lo que le cobró al cliente y no puede
+//  cambiar. Solo el nombre, que es una etiqueta.
+//
+//  ⚠️ Y SE LE PREGUNTA ANTES: si algún día reusa un producto para otra cosa
+//  distinta, las facturas viejas dirían algo que nunca vendió.
+// ═══════════════════════════════════════════════════════════════════
+
+// ¿En cuántas facturas está este producto con el nombre viejo?
+function dondeApareceElProducto(pid, nombreViejo){
+  var V = LS('nv', []);
+  var C = LS('nc', []);
+  var enVentas = 0, enCompras = 0, facturas = [];
+  V.forEach(function(v){
+    var hay = (v.items || []).some(function(it){
+      return String(it.pid) === String(pid) && String(it.nombre || '') === String(nombreViejo);
+    });
+    if(hay){ enVentas++; if(facturas.length < 4) facturas.push(v.numFactura || v.id); }
+  });
+  C.forEach(function(c){
+    var hay = (c.items || []).some(function(it){
+      return String(it.pid) === String(pid) && String(it.nombre || '') === String(nombreViejo);
+    });
+    if(hay) enCompras++;
+  });
+  return { ventas: enVentas, compras: enCompras, ejemplos: facturas };
+}
+
+// 🔑 Cambiar el nombre en las facturas viejas. SOLO el nombre.
+function renombrarEnFacturasViejas(pid, nombreViejo, nombreNuevo){
+  var tocadas = 0;
+
+  // ── LAS VENTAS ──
+  var V = LS('nv', []);
+  V.forEach(function(v){
+    var cambio = false;
+    (v.items || []).forEach(function(it){
+      if(String(it.pid) !== String(pid)) return;
+      if(String(it.nombre || '') !== String(nombreViejo)) return;
+      // 🔒 SOLO el nombre. El precio, el costo y la cantidad NO se tocan.
+      it.nombre = nombreNuevo;
+      cambio = true;
+    });
+    if(cambio) tocadas++;
+  });
+  if(tocadas){ SS('nv', V); ventas = LS('nv', []); try { marcarPendienteDeSubir('nv'); } catch(e){} }
+
+  // ── LAS COMPRAS ──
+  var C = LS('nc', []);
+  var tocadasC = 0;
+  C.forEach(function(c){
+    var cambio = false;
+    (c.items || []).forEach(function(it){
+      if(String(it.pid) !== String(pid)) return;
+      if(String(it.nombre || '') !== String(nombreViejo)) return;
+      it.nombre = nombreNuevo;
+      cambio = true;
+    });
+    if(cambio) tocadasC++;
+  });
+  if(tocadasC){ SS('nc', C); try { marcarPendienteDeSubir('nc'); } catch(e){} }
+
+  return { ventas: tocadas, compras: tocadasC };
+}
+
+// La pregunta que se le hace
+function preguntarRenombrarViejas(pid, nombreViejo, nombreNuevo){
+  if(!pid || !nombreViejo || !nombreNuevo) return;
+  if(String(nombreViejo) === String(nombreNuevo)) return;
+  var d = dondeApareceElProducto(pid, nombreViejo);
+  if(!d.ventas && !d.compras) return;   // no está en ninguna factura vieja
+
+  var msj = '\u{1F3F7}\u{FE0F} Le cambiaste el nombre a este producto.\n\n'
+    + 'De:  "' + nombreViejo + '"\n'
+    + 'A:   "' + nombreNuevo + '"\n\n'
+    + 'Est\u00e1 en ' + d.ventas + ' factura(s) de venta'
+    + (d.compras ? ' y ' + d.compras + ' de compra' : '') + ' que ya hiciste.\n\n'
+    + '\u00bfCorregir el nombre tambi\u00e9n en esas facturas?\n\n'
+    + '\u{1F512} Los precios NO se tocan \u2014 solo el nombre.';
+
+  if(!confirm(msj)) return;
+  var r = renombrarEnFacturasViejas(pid, nombreViejo, nombreNuevo);
+  avisoGrande('\u2705 Nombre corregido en ' + r.ventas + ' factura(s) de venta'
+    + (r.compras ? ' y ' + r.compras + ' de compra' : '') + '.\n\n'
+    + 'Ning\u00fan precio se toc\u00f3.');
+}
+
 function guardarEdicionProducto(){
   var marca = limpiarTexto(document.getElementById('ep-marca').value.trim());
   if(!marca){ alert('La marca es requerida'); return; }
@@ -12819,7 +13089,18 @@ function guardarEdicionProducto(){
     registrarCambioPrecio(nombreCompleto, precioAntes, precio);
   }
   var idProductoEditado = productoEditandoId;
+  var _nombreAntes = window._nombreAntesDeEditar || null;
   SS('np', productos);
+  // 🏷️ Si le cambió el nombre y el producto está en facturas viejas, se le
+  // pregunta si quiere corregirlas también. -19 ago-
+  try {
+    if(idProductoEditado !== null && _nombreAntes && _nombreAntes !== nombreCompleto){
+      setTimeout(function(){
+        preguntarRenombrarViejas(idProductoEditado, _nombreAntes, nombreCompleto);
+      }, 350);
+    }
+  } catch(eRen){}
+  window._nombreAntesDeEditar = null;
   flash('mk-ep');
   // 🔄 Aplicar los nombres corregidos a TODO lo pendiente. -15 ago-
   try {
@@ -14272,7 +14553,7 @@ function renderBarberias(q){
     // Filtrar por nombre de barbería O por nombre de barbero
     keys = keys.filter(function(k){
       // Coincide con nombre de barbería
-      if(k.toLowerCase().indexOf(qLower) >= 0) return true;
+      if(coincideBusquedaPalabras(k, qLower)) return true;
       // Coincide con nombre de algún barbero de esa barbería
       return barberias[k].some(function(c){
         return (c.nombre+' '+c.apellido+' '+(c.apodo||'')+' '+(c.tel||'')+' '+(c.dir||'')+' '+(c.ciudad||'')+' '+(c.contacto||'')+' '+(c.contactoApodo||'')+' '+(c.contactoTel||'')).toLowerCase().indexOf(qLower) >= 0;
@@ -14309,7 +14590,7 @@ function diagnosticoBarberias(nombreBuscar){
   var msg = '=== DIAGNÓSTICO BARBERÍAS ===\n\n';
   var q = (nombreBuscar||'').toLowerCase();
   var encontrados = clientes.filter(function(c){
-    return (c.nombre+' '+c.apellido).toLowerCase().indexOf(q) >= 0;
+    return coincideBusquedaPalabras((c.nombre||'') + ' ' + (c.apellido||''), q);
   });
   if(!encontrados.length){
     msg += 'No se encontró ningún cliente con ese nombre.\n';
@@ -14404,7 +14685,7 @@ function renderBarberiasInicio(q){
   if(q && q.trim()){
     var ql = q.toLowerCase();
     keys = keys.filter(function(k){
-      if(k.toLowerCase().indexOf(ql) >= 0) return true;
+      if(coincideBusquedaPalabras(k, ql)) return true;
       return barberias[k].some(function(c){
         return (c.nombre+' '+c.apellido+' '+(c.apodo||'')+' '+(c.tel||'')+' '+(c.dir||'')+' '+(c.ciudad||'')+' '+(c.contacto||'')+' '+(c.contactoApodo||'')+' '+(c.contactoTel||'')).toLowerCase().indexOf(ql) >= 0;
       });
@@ -16115,10 +16396,14 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260819c';
+var NOVEDADES_VERSION = '20260819d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Ya se por que el Gummy gel de setecientos no te aparecia. No era la busqueda: tenias DOS marcas que son la misma, GUMMY en mayusculas y Gummy normal, y ese producto estaba en el grupo chiquito. Y al medir tus datos encontre catorce marcas partidas asi, no solo esa. Babyliss, Level3, Nishman, Wahl y diez mas.',
+  'En el Catalogo tienes dos botones nuevos: Unificar marcas repetidas, que las junta, y Marcas con mayuscula solo al principio. Los dos te ensenan ANTES lo que van a hacer, y no tocan ningun precio ni ninguna factura.',
+  'Tambien le puse un diccionario de tus palabras a la busqueda: si escribes gelatina te encuentra los gel, si escribes cera te encuentra los wax, cuchilla te encuentra las navajas, y asi con cincuenta y cuatro palabras mas.',
+  'Y lo ultimo que pediste: si le cambias el nombre a un producto que ya vendiste, te pregunto si quieres corregir tambien el nombre en las facturas viejas. Los precios NUNCA se tocan, solo el nombre.',
   'La firma quedo como tu la querias: te pregunto UNA sola vez y tu decides SI o NO en cada venta. Dos botones, nada mas. Le habia agregado un aviso extra que salia despues de guardar y un cuadrito de no me preguntes mas, y las dos cosas sobraban, porque tu ya me habias explicado que hay ordenes que necesitan firma y otras que no, y eso lo manejas tu a discrecion. Ya lo quite todo.',
   'Arregle lo de la firma, y encontre la causa de verdad. Habia TRES sitios que te pedian firma, no uno. Se arreglo el segundo hace unos dias, pero quedaba un tercero escondido dentro de guardar la venta: un aviso que salia menos de un segundo DESPUES de haberla guardado. La venta ya estaba guardada, pero como el aviso aparecia justo despues, parecia que no se habia cerrado.',
   'Ya no sale. Y ahora en la pregunta de la firma tienes un cuadrito que dice: no me preguntes mas por la firma, guarda directo. Si lo marcas, no te vuelvo a preguntar nunca mas y las ventas se guardan de una vez.',
@@ -24424,7 +24709,7 @@ function renderFacturasSaldadas(q){
     saldadas = saldadas.filter(function(v){
       var cl = clientes.find(function(c){ return String(c.id)===String(v.cid); });
       var extra = cl ? ((cl.apodo||'')+' '+(cl.negocio||'')+' '+(cl.tel||'')+' '+(cl.dir||'')+' '+(cl.ciudad||'')+' '+(cl.contacto||'')+' '+(cl.contactoApodo||'')+' '+(cl.contactoTel||'')) : '';
-      return ((v.cn||'')+' '+extra+' '+(v.numFactura||'')).toLowerCase().indexOf(ql) >= 0;
+      return coincideBusquedaPalabras((v.cn||'') + ' ' + extra + ' ' + (v.numFactura||''), ql);
     });
   }
 
@@ -25391,6 +25676,230 @@ function confirmarPagoMultiple(vid, saldo){
 // se detectaban como el mismo-. Ahora usa la MISMA normalizacion que ya usa el buscador
 // -quita acentos, simbolos, espacios de mas- y TAMBIEN junta a cualquiera que comparta
 // el mismo telefono, aunque el nombre este escrito distinto.
+
+// ═══════════════════════════════════════════════════════════════════
+//  🔤 UNIFICAR LAS MARCAS
+//
+//  🔑 Sensei, 19 ago: el "Gummy hair gel 700ml" no le aparecía. La causa
+//  no era la búsqueda: tenía DOS marcas que son la misma —GUMMY y Gummy—
+//  y el producto estaba en el grupo chiquito.
+//
+//  Al medir sus datos salieron 14 marcas partidas así.
+//
+//  🔒 ESTO NO TOCA NINGÚN PRECIO NI NINGUNA FACTURA. Solo corrige cómo
+//  está escrita la marca de cada producto.
+// ═══════════════════════════════════════════════════════════════════
+
+// Junta las marcas que son la misma escrita distinto
+function agruparMarcasParecidas(){
+  loadProds();
+  var grupos = {};
+  productos.forEach(function(p){
+    var m = String(p.marca || '').trim();
+    if(!m) return;
+    var clave = m.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if(!clave) return;
+    if(!grupos[clave]) grupos[clave] = { formas: {}, total: 0 };
+    grupos[clave].formas[m] = (grupos[clave].formas[m] || 0) + 1;
+    grupos[clave].total++;
+  });
+  // Solo los que están partidos
+  var partidos = [];
+  Object.keys(grupos).forEach(function(k){
+    var formas = Object.keys(grupos[k].formas);
+    if(formas.length < 2) return;
+    partidos.push({
+      clave: k,
+      formas: formas.map(function(f){ return { texto: f, cuantos: grupos[k].formas[f] }; })
+                    .sort(function(a, b){ return b.cuantos - a.cuantos; }),
+      total: grupos[k].total,
+      // 🔑 Cómo va a quedar: primera letra en mayúscula
+      quedaComo: marcaBonita(formas.sort(function(a, b){
+        return grupos[k].formas[b] - grupos[k].formas[a];
+      })[0])
+    });
+  });
+  return partidos.sort(function(a, b){ return b.total - a.total; });
+}
+
+// LA PANTALLA — le enseña qué va a pasar ANTES de tocar nada
+function abrirUnificarMarcas(){
+  var partidos = agruparMarcasParecidas();
+  var ov = document.getElementById('unif-marcas-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'unif-marcas-ov';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99997;'
+    + 'overflow-y:auto;padding:18px 14px';
+
+  var h = '<div style="max-width:460px;margin:0 auto;background:#fff;border-radius:14px;'
+    + 'padding:18px">';
+  h += '<div style="font-size:18px;font-weight:900;color:var(--nbs-ink);margin-bottom:4px">'
+    + '\u{1F524} Unificar marcas</div>';
+
+  if(!partidos.length){
+    h += '<div style="font-size:13px;color:var(--nbs-muted);line-height:1.6;margin:14px 0">'
+      + '\u2705 <b>Todas tus marcas est\u00e1n bien.</b><br><br>'
+      + 'No hay ninguna partida en dos por c\u00f3mo est\u00e1 escrita.</div>';
+    h += '<button onclick="cerrarUnificarMarcas()" class="btn" style="width:100%;margin:0;'
+      + 'background:#F0F0F5;color:#333">Cerrar</button></div>';
+    ov.innerHTML = h;
+    return;
+  }
+
+  var totalProd = partidos.reduce(function(a, x){ return a + x.total; }, 0);
+  h += '<div style="font-size:12.5px;color:var(--nbs-muted);line-height:1.55;margin-bottom:14px">'
+    + 'Encontr\u00e9 <b>' + partidos.length + ' marca(s)</b> que est\u00e1n partidas en dos porque '
+    + 'se escribieron distinto. Eso hace que sus productos salgan en grupos separados.<br><br>'
+    + '\u{1F512} <b>No se toca ning\u00fan precio ni ninguna factura</b> \u2014 solo se corrige c\u00f3mo '
+    + 'est\u00e1 escrita la marca.</div>';
+
+  partidos.forEach(function(g){
+    h += '<div style="background:var(--nbs-gold-bg);border-radius:10px;padding:12px;'
+      + 'margin-bottom:9px">';
+    h += '<div style="font-size:12px;color:var(--nbs-muted);margin-bottom:5px">'
+      + g.formas.map(function(f){
+          return '<b>' + escaparHtml(f.texto) + '</b> (' + f.cuantos + ')';
+        }).join('  +  ') + '</div>';
+    h += '<div style="font-size:15px;font-weight:900;color:var(--nbs-green-text)">'
+      + '\u2192 ' + escaparHtml(g.quedaComo)
+      + '  <span style="font-size:12px;color:var(--nbs-muted);font-weight:600">('
+      + g.total + ' productos juntos)</span></div>';
+    h += '</div>';
+  });
+
+  h += '<div style="font-size:12px;color:var(--nbs-muted);margin:13px 0 10px;text-align:center">'
+    + 'Se van a corregir <b>' + totalProd + ' productos</b>.</div>';
+  h += '<button onclick="aplicarUnificarMarcas()" class="btn" style="width:100%;margin:0 0 8px;'
+    + 'background:var(--nbs-green-text);color:#fff;font-weight:900;font-size:15px;padding:14px">'
+    + '\u2705 S\u00ed, unificarlas</button>';
+  h += '<button onclick="cerrarUnificarMarcas()" class="btn" style="width:100%;margin:0;'
+    + 'background:#F0F0F5;color:#333">Ahora no</button>';
+  h += '</div>';
+  ov.innerHTML = h;
+}
+
+function cerrarUnificarMarcas(){
+  var ov = document.getElementById('unif-marcas-ov');
+  if(ov) ov.remove();
+}
+
+// 🔒 APLICARLO. Protegido con huella, porque toca los datos.
+function aplicarUnificarMarcas(){
+  var partidos = agruparMarcasParecidas();
+  if(!partidos.length){ cerrarUnificarMarcas(); return; }
+
+  protegerConHuella(function(){
+    loadProds();
+    var P = LS('np', []);
+    var cambiados = 0;
+    var mapa = {};
+    partidos.forEach(function(g){ mapa[g.clave] = g.quedaComo; });
+
+    P.forEach(function(p){
+      var m = String(p.marca || '').trim();
+      if(!m) return;
+      var clave = m.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if(!mapa[clave]) return;
+      if(p.marca !== mapa[clave]){ p.marca = mapa[clave]; cambiados++; }
+    });
+
+    SS('np', P);
+    PRODS = []; loadProds();
+    try { marcarPendienteDeSubir('np'); } catch(e){}
+    cerrarUnificarMarcas();
+    avisoGrande('\u2705 Listo. Se unificaron ' + partidos.length + ' marca(s) en '
+      + cambiados + ' producto(s).\n\nNing\u00fan precio ni ninguna factura se toc\u00f3.');
+    try { if(typeof renderCatalogo === 'function') renderCatalogo(); } catch(e){}
+  });
+}
+
+// 🔤 Y PONER **TODAS** LAS MARCAS CON LA PRIMERA LETRA EN MAYÚSCULA.
+// Sensei: "no entiendo por qué salen en letras mayúsculas todas".
+function abrirArreglarMayusculas(){
+  loadProds();
+  var cambios = [];
+  productos.forEach(function(p){
+    var m = String(p.marca || '').trim();
+    if(!m) return;
+    var bonita = marcaBonita(m);
+    if(bonita && bonita !== m) cambios.push({ de: m, a: bonita });
+  });
+  // Agrupar para enseñárselo
+  var vistos = {};
+  cambios.forEach(function(c){
+    var k = c.de + '\u2192' + c.a;
+    vistos[k] = (vistos[k] || 0) + 1;
+  });
+  var lista = Object.keys(vistos).map(function(k){
+    var p = k.split('\u2192');
+    return { de: p[0], a: p[1], cuantos: vistos[k] };
+  }).sort(function(a, b){ return b.cuantos - a.cuantos; });
+
+  var ov = document.getElementById('unif-marcas-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'unif-marcas-ov';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99997;'
+    + 'overflow-y:auto;padding:18px 14px';
+
+  var h = '<div style="max-width:460px;margin:0 auto;background:#fff;border-radius:14px;padding:18px">';
+  h += '<div style="font-size:18px;font-weight:900;margin-bottom:4px">'
+    + '\u{1F524} Marcas con may\u00fascula solo al principio</div>';
+  if(!lista.length){
+    h += '<div style="font-size:13px;color:var(--nbs-muted);margin:14px 0">'
+      + '\u2705 <b>Ya est\u00e1n todas bien escritas.</b></div>';
+    h += '<button onclick="cerrarUnificarMarcas()" class="btn" style="width:100%;margin:0;'
+      + 'background:#F0F0F5;color:#333">Cerrar</button></div>';
+    ov.innerHTML = h;
+    return;
+  }
+  h += '<div style="font-size:12.5px;color:var(--nbs-muted);line-height:1.55;margin-bottom:13px">'
+    + '\u{1F512} <b>No se toca ning\u00fan precio ni ninguna factura</b> \u2014 solo c\u00f3mo se escribe '
+    + 'la marca.</div>';
+  h += '<div style="max-height:320px;overflow-y:auto;margin-bottom:13px">';
+  lista.forEach(function(c){
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;'
+      + 'border-bottom:1px solid var(--nbs-line);font-size:13px">'
+      + '<span style="flex:1;color:var(--nbs-muted)">' + escaparHtml(c.de) + '</span>'
+      + '<span style="color:#BBB">\u2192</span>'
+      + '<span style="flex:1;font-weight:900">' + escaparHtml(c.a) + '</span>'
+      + '<span style="font-size:11px;color:var(--nbs-muted)">' + c.cuantos + '</span>'
+      + '</div>';
+  });
+  h += '</div>';
+  h += '<button onclick="aplicarArreglarMayusculas()" class="btn" style="width:100%;margin:0 0 8px;'
+    + 'background:var(--nbs-green-text);color:#fff;font-weight:900;padding:14px">'
+    + '\u2705 S\u00ed, arreglarlas</button>';
+  h += '<button onclick="cerrarUnificarMarcas()" class="btn" style="width:100%;margin:0;'
+    + 'background:#F0F0F5;color:#333">Ahora no</button></div>';
+  ov.innerHTML = h;
+}
+
+function aplicarArreglarMayusculas(){
+  protegerConHuella(function(){
+    var P = LS('np', []);
+    var n = 0;
+    P.forEach(function(p){
+      var m = String(p.marca || '').trim();
+      if(!m) return;
+      var bonita = marcaBonita(m);
+      if(bonita && bonita !== p.marca){ p.marca = bonita; n++; }
+    });
+    SS('np', P);
+    PRODS = []; loadProds();
+    try { marcarPendienteDeSubir('np'); } catch(e){}
+    cerrarUnificarMarcas();
+    avisoGrande('\u2705 Listo. Se arreglaron ' + n + ' producto(s).\n\n'
+      + 'Ning\u00fan precio ni ninguna factura se toc\u00f3.');
+    try { if(typeof renderCatalogo === 'function') renderCatalogo(); } catch(e){}
+  });
+}
+
 function agruparPosiblesDuplicados(listaClientes){
   var padre = {};
   function raiz(id){ if(padre[id]===undefined) padre[id]=id; while(padre[id]!==id){ id=padre[id]; } return id; }
