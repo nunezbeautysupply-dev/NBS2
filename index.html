@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260819d-OFICIAL-V2.0">
+<meta name="app-version" content="20260819e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -750,6 +750,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <button class="btn" style="background:var(--nbs-gold);color:white" onclick="abrirEditarPorMarca()">✏️ Editar toda una marca</button>
   <button class="btn" style="background:#00695C;color:white" onclick="abrirUnificarMarcas()">🔤 Unificar marcas repetidas</button>
   <button class="btn" style="background:#3949AB;color:white" onclick="abrirArreglarMayusculas()">🔤 Marcas con mayúscula solo al principio</button>
+  <button class="btn" style="background:#C62828;color:white" onclick="abrirProductosBorrados()">♻️ Productos que ya no están (recuperar)</button>
     <button class="btn" style="background:#546E7A;color:white" onclick="redondearPrecios()">⬆️ Redondear precios al entero</button>
     <button class="btn" style="background:#6A1B9A;color:white" onclick="eliminarDuplicados()">🔍 Detectar y eliminar duplicados</button>
     <button class="btn" style="background:#00838F;color:white" onclick="exportarCatalogoParaPedidos()">📲 Generar página de pedidos por SMS para clientes</button>
@@ -8670,7 +8671,14 @@ function renderCatalogo(q){
 
   var el = document.getElementById('catlista');
   if(!el) return;
-  var list = productos.slice().sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+  // 🔑 SIN BÚSQUEDA: alfabético, como siempre.
+  // CON BÚSQUEDA: sin ordenar antes, para que mande la RELEVANCIA. Antes se
+  // ordenaba alfabético primero y el producto buscado caía al medio de la lista:
+  // Sensei buscaba "gummy" y su 700ml salía de NOVENO entre 13. -19 ago-
+  var _hayBusqueda = !!(q && String(q).trim());
+  var list = _hayBusqueda
+    ? productos.slice()
+    : productos.slice().sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
   // Ahora tambien por MARCA, PRECIO y COSTO. El catalogo era el unico buscador de
   // productos que no miraba la marca, y el precio no lo miraba ninguno. -4 ago-
   // El catalogo busca por TODO lo que tiene un producto: nombre, marca, categoria,
@@ -10017,9 +10025,26 @@ function filtrarPorBusqueda(lista, consulta, sacarTexto){
     var p = puntajeBusqueda(sacarTexto(lista[i]), consulta);
     if(p >= 0) conPuntaje.push({ item: lista[i], puntaje: p, orden: i });
   }
+  // 🔑 EL DESEMPATE. Cuando varios sacan el mismo puntaje —13 productos que
+  // todos dicen "gummy"— hay que decidir cuál va arriba. Se premia:
+  //   1. que EMPIECE con lo que él escribió
+  //   2. que tenga MÁS EXISTENCIA (lo que sí puede vender)
+  //   3. y el nombre más corto (más directo)
+  // Antes mandaba el orden alfabético y su producto caía al medio. -19 ago-
+  var _qn = normalizarTextoBusqueda(consulta);
+  conPuntaje.forEach(function(x){
+    var t = normalizarTextoBusqueda(sacarTexto(x.item));
+    x.extra = 0;
+    if(_qn && t.indexOf(_qn) === 0) x.extra += 50;          // empieza igual
+    var st = parseFloat(x.item && x.item.stock);
+    if(isFinite(st) && st > 0) x.extra += 10;                 // hay en existencia
+    x.largo = t.length;
+  });
   conPuntaje.sort(function(a,b){
     if(b.puntaje !== a.puntaje) return b.puntaje - a.puntaje;
-    return a.orden - b.orden; // si empatan, respetar el orden original -alfabetico-
+    if(b.extra !== a.extra) return b.extra - a.extra;
+    if(a.largo !== b.largo) return a.largo - b.largo;         // el más corto arriba
+    return a.orden - b.orden;
   });
   return conPuntaje.map(function(x){ return x.item; });
 }
@@ -13167,6 +13192,198 @@ function guardarEdicionProducto(){
   renderCatalogo(document.getElementById('catbuscar').value || '');
   window.scrollTo(0, 0);
   avisoGrande('✓ Producto guardado\n\n' + nombreCompleto);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  ♻️ LOS PRODUCTOS BORRADOS
+//
+//  🔑 Sensei, 19 ago: un producto no le aparecía en el catálogo ni al
+//  hacer una orden, pero SÍ salía en una factura vieja. Eso solo pasa
+//  cuando el producto se borró: la factura guarda una foto del momento
+//  de la venta, así que ahí sigue.
+//
+//  La app guardaba los ids borrados pero no había forma de verlos.
+// ═══════════════════════════════════════════════════════════════════
+
+// 🔍 Busca en las FACTURAS los productos que ya no están en el catálogo
+function productosQueYaNoEstan(){
+  loadProds();
+  var vivos = {};
+  productos.forEach(function(p){ vivos[String(p.id)] = true; });
+
+  var fantasmas = {};
+  // ── En las VENTAS ──
+  LS('nv', []).forEach(function(v){
+    if(v.cancelada) return;
+    (v.items || []).forEach(function(it){
+      var pid = String(it.pid || '');
+      if(!pid || vivos[pid]) return;
+      if(!fantasmas[pid]){
+        fantasmas[pid] = {
+          pid: pid,
+          nombre: it.nombre || '(sin nombre)',
+          precio: parseFloat(it.precio) || 0,
+          costo: parseFloat(it.costo) || 0,
+          vendido: 0, veces: 0, ultima: '', clientes: {}
+        };
+      }
+      var f = fantasmas[pid];
+      f.vendido += parseFloat(it.cant) || 0;
+      f.veces++;
+      // El nombre y el precio más recientes mandan
+      var fe = parsearFechaVenta(v.fecha);
+      var fu = f.ultima ? parsearFechaVenta(f.ultima) : null;
+      if(!fu || (fe && fe.getTime() > fu.getTime())){
+        f.ultima = v.fecha || '';
+        f.nombre = it.nombre || f.nombre;
+        f.precio = parseFloat(it.precio) || f.precio;
+        if(parseFloat(it.costo)) f.costo = parseFloat(it.costo);
+      }
+      if(v.cn) f.clientes[v.cn] = true;
+    });
+  });
+
+  // ── Y en las COMPRAS, que dan el costo real ──
+  LS('nc', []).forEach(function(c){
+    (c.items || []).forEach(function(it){
+      var pid = String(it.pid || '');
+      if(!pid || vivos[pid]) return;
+      if(!fantasmas[pid]){
+        fantasmas[pid] = { pid: pid, nombre: it.nombre || '(sin nombre)',
+                           precio: 0, costo: parseFloat(it.costo) || 0,
+                           vendido: 0, veces: 0, ultima: '', clientes: {} };
+      }
+      if(parseFloat(it.costo)) fantasmas[pid].costo = parseFloat(it.costo);
+      fantasmas[pid].comprado = (fantasmas[pid].comprado || 0) + (parseFloat(it.cant) || 0);
+    });
+  });
+
+  return Object.keys(fantasmas).map(function(k){
+    var f = fantasmas[k];
+    f.cuantosClientes = Object.keys(f.clientes).length;
+    return f;
+  }).sort(function(a, b){ return b.vendido - a.vendido; });
+}
+
+// LA PANTALLA
+function abrirProductosBorrados(){
+  var lista = productosQueYaNoEstan();
+  var ov = document.getElementById('borrados-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'borrados-ov';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99997;'
+    + 'overflow-y:auto;padding:18px 14px';
+
+  var h = '<div style="max-width:470px;margin:0 auto;background:#fff;border-radius:14px;padding:18px">';
+  h += '<div style="font-size:18px;font-weight:900;margin-bottom:4px">'
+    + '\u267B\uFE0F Productos que ya no est\u00e1n</div>';
+
+  if(!lista.length){
+    h += '<div style="font-size:13px;color:var(--nbs-muted);line-height:1.6;margin:14px 0">'
+      + '\u2705 <b>No falta ninguno.</b><br><br>'
+      + 'Todos los productos de tus facturas siguen en el cat\u00e1logo.</div>';
+    h += '<button onclick="cerrarProductosBorrados()" class="btn" style="width:100%;margin:0;'
+      + 'background:#F0F0F5;color:#333">Cerrar</button></div>';
+    ov.innerHTML = h;
+    return;
+  }
+
+  h += '<div style="font-size:12.5px;color:var(--nbs-muted);line-height:1.55;margin-bottom:14px">'
+    + 'Estos <b>' + lista.length + ' producto(s)</b> est\u00e1n en tus facturas pero ya <b>NO est\u00e1n '
+    + 'en el cat\u00e1logo</b>. Por eso no los encuentras al vender ni al comprar.<br><br>'
+    + 'Se pueden devolver al cat\u00e1logo con su nombre, precio y costo, sac\u00e1ndolos de sus '
+    + 'propias facturas.</div>';
+
+  lista.forEach(function(f){
+    h += '<div style="background:var(--nbs-red-bg);border-radius:11px;padding:13px;margin-bottom:10px;'
+      + 'border:1px solid #EF9A9A">';
+    h += '<div style="font-size:14.5px;font-weight:900;color:var(--nbs-ink);line-height:1.3">'
+      + escaparHtml(f.nombre) + '</div>';
+    h += '<div style="font-size:12px;color:var(--nbs-muted);margin-top:5px;line-height:1.5">'
+      + 'Vendiste <b>' + f.vendido + '</b> unidad(es) en <b>' + f.veces + '</b> factura(s)'
+      + (f.cuantosClientes ? ' a <b>' + f.cuantosClientes + '</b> cliente(s)' : '') + '.<br>'
+      + (f.ultima ? 'La \u00faltima vez el <b>' + escaparHtml(f.ultima) + '</b>.<br>' : '')
+      + 'Se vend\u00eda a <b>$' + fmtNum(f.precio) + '</b>'
+      + (f.costo ? ' y costaba <b>$' + fmtNum(f.costo) + '</b>' : '') + '.</div>';
+    h += '<button onclick="devolverAlCatalogo(' + _arg(f.pid) + ')" class="btn" '
+      + 'style="width:100%;margin:10px 0 0;background:var(--nbs-green-text);color:#fff;'
+      + 'font-weight:900;font-size:13.5px;padding:11px">'
+      + '\u267B\uFE0F Devolverlo al cat\u00e1logo</button>';
+    h += '</div>';
+  });
+
+  h += '<button onclick="cerrarProductosBorrados()" class="btn" style="width:100%;margin:8px 0 0;'
+    + 'background:#F0F0F5;color:#333">Cerrar</button></div>';
+  ov.innerHTML = h;
+}
+
+function cerrarProductosBorrados(){
+  var ov = document.getElementById('borrados-ov');
+  if(ov) ov.remove();
+}
+
+// ♻️ DEVOLVERLO AL CATÁLOGO, reconstruido desde sus facturas
+function devolverAlCatalogo(pid){
+  var lista = productosQueYaNoEstan();
+  var f = lista.find(function(x){ return String(x.pid) === String(pid); });
+  if(!f){ alert('Ya no encuentro ese producto.'); return; }
+
+  var cuantas = prompt('\u267B\uFE0F Devolver "' + f.nombre + '" al cat\u00e1logo.\n\n'
+    + '\u00bfCu\u00e1ntas unidades tienes de este producto AHORA?\n'
+    + '(si no tienes ninguna, pon 0)', '0');
+  if(cuantas === null) return;
+  var stock = parseInt(cuantas, 10);
+  if(isNaN(stock) || stock < 0) stock = 0;
+
+  protegerConHuella(function(){
+    loadProds();
+    var P = LS('np', []);
+    // Por si acaso, que no esté ya
+    if(P.some(function(x){ return String(x.id) === String(pid); })){
+      alert('Ese producto ya est\u00e1 en el cat\u00e1logo.');
+      cerrarProductosBorrados();
+      return;
+    }
+    // 🔑 La marca: la primera palabra del nombre, como hace el resto de la app
+    var partes = String(f.nombre || '').trim().split(/\s+/);
+    var marca = partes.length > 1 ? partes[0] : '';
+    var nombreCorto = partes.length > 1 ? partes.slice(1).join(' ') : f.nombre;
+
+    P.push({
+      id: f.pid,
+      nombre: f.nombre,
+      nombreCorto: nombreCorto,
+      marca: marca,
+      cat: '',
+      sku: '',
+      precio: f.precio,
+      costo: f.costo,
+      stock: stock,
+      min: 5,
+      unidad: 'unidad',
+      desc: '',
+      mod: Date.now()
+    });
+    SS('np', P);
+
+    // 🔑 Y sacarlo de la lista de borrados, para que no lo vuelva a esconder
+    var elim = LS('np_eliminados', []);
+    var i = elim.indexOf(String(pid));
+    if(i >= 0){ elim.splice(i, 1); SS('np_eliminados', elim); }
+
+    PRODS = []; loadProds();
+    try { marcarPendienteDeSubir('np'); } catch(e){}
+    cerrarProductosBorrados();
+    avisoGrande('\u2705 "' + f.nombre + '" volvi\u00f3 al cat\u00e1logo.\n\n'
+      + 'Precio $' + fmtNum(f.precio) + ' \u00b7 costo $' + fmtNum(f.costo)
+      + ' \u00b7 ' + stock + ' unidad(es).\n\n'
+      + 'Rev\u00edsalo por si quieres ajustarle algo.');
+    try { if(typeof renderCatalogo === 'function') renderCatalogo(''); } catch(e){}
+  });
 }
 
 function eliminarProductoCatalogo(){
@@ -16396,10 +16613,12 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260819d';
+var NOVEDADES_VERSION = '20260819e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'Ya se por que el Gummy gel de setecientos no te aparece: ESE PRODUCTO SE BORRO DEL CATALOGO. Por eso sale en la factura del dia doce pero no lo encuentras al vender ni al comprar. Una factura guarda una foto del producto del momento de la venta, asi que ahi sigue apareciendo aunque el producto ya no exista.',
+  'En el Catalogo tienes un boton nuevo que dice: Productos que ya no estan, recuperar. Ahi te salen TODOS los que estan en tus facturas pero ya no estan en el catalogo, con lo que vendiste de cada uno y a que precio. Y los puedes devolver al catalogo con un toque: el nombre, el precio y el costo se sacan de sus propias facturas.',
   'Ya se por que el Gummy gel de setecientos no te aparecia. No era la busqueda: tenias DOS marcas que son la misma, GUMMY en mayusculas y Gummy normal, y ese producto estaba en el grupo chiquito. Y al medir tus datos encontre catorce marcas partidas asi, no solo esa. Babyliss, Level3, Nishman, Wahl y diez mas.',
   'En el Catalogo tienes dos botones nuevos: Unificar marcas repetidas, que las junta, y Marcas con mayuscula solo al principio. Los dos te ensenan ANTES lo que van a hacer, y no tocan ningun precio ni ninguna factura.',
   'Tambien le puse un diccionario de tus palabras a la busqueda: si escribes gelatina te encuentra los gel, si escribes cera te encuentra los wax, cuchilla te encuentra las navajas, y asi con cincuenta y cuatro palabras mas.',
