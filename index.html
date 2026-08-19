@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260817m-OFICIAL-V2.0">
+<meta name="app-version" content="20260819c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -13260,6 +13260,7 @@ function cobroRapidoContadoEfectivo(){
   registrarVentaConFirma();
 }
 
+
 function registrarVentaConFirma(){
   // Si el cliente pertenece a una barberia de la ruta de hoy, arranca el reloj
   // para recordarte marcarla como visitada (23 jul).
@@ -13723,18 +13724,11 @@ function saveV(){
   // Medido: 334 de sus 349 ventas (96%) no tienen firma. Si un cliente reclama,
   // no tiene prueba. Se le ofrece SOLO en las de crédito, que son las que pueden
   // dar problema — y solo si no la tomó ya.
-  try {
-    var _vf = ventas[ventas.length - 1];
-    if(_vf && _vf.tipo === 'credito' && !_vf.firma && LS('nbs_pedir_firma', true)){
-      setTimeout(function(){
-        if(confirm('\u270d\ufe0f \u00bfLe tomas la firma a ' + (_vf.cn || 'este cliente') + '?\n\n'
-            + 'Es una venta a cr\u00e9dito de $' + fmtNum(_vf.total) + '.\n'
-            + 'Con la firma tienes prueba de que se llev\u00f3 la mercanc\u00eda.')){
-          try { abrirFirmaFactura(_vf.id); } catch(e){}
-        }
-      }, 700);
-    }
-  } catch(eFirma){}
+  // ✍️ AQUÍ HABÍA UN TERCER AVISO DE FIRMA que salía 700ms DESPUÉS de guardar
+  // la venta. Sensei: "la firma solo debe pedirla UNA VEZ y yo decido SÍ o NO...
+  // hay órdenes que no requieren firma y otras que sí, y eso lo manejaré yo a
+  // discreción". Tenía razón — la pregunta de antes de guardar ya es suficiente.
+  // QUITADO del todo el 19 ago. NO volver a ponerlo.
 
   // 🤖 LA VISITA SE MARCA SOLA (14 ago): la ruta, el récord y la bitácora, de una vez.
   try {
@@ -16121,10 +16115,13 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260817m';
+var NOVEDADES_VERSION = '20260819c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
+  'La firma quedo como tu la querias: te pregunto UNA sola vez y tu decides SI o NO en cada venta. Dos botones, nada mas. Le habia agregado un aviso extra que salia despues de guardar y un cuadrito de no me preguntes mas, y las dos cosas sobraban, porque tu ya me habias explicado que hay ordenes que necesitan firma y otras que no, y eso lo manejas tu a discrecion. Ya lo quite todo.',
+  'Arregle lo de la firma, y encontre la causa de verdad. Habia TRES sitios que te pedian firma, no uno. Se arreglo el segundo hace unos dias, pero quedaba un tercero escondido dentro de guardar la venta: un aviso que salia menos de un segundo DESPUES de haberla guardado. La venta ya estaba guardada, pero como el aviso aparecia justo despues, parecia que no se habia cerrado.',
+  'Ya no sale. Y ahora en la pregunta de la firma tienes un cuadrito que dice: no me preguntes mas por la firma, guarda directo. Si lo marcas, no te vuelvo a preguntar nunca mas y las ventas se guardan de una vez.',
   'Ahora soy mucho mas inteligente. Antes solo entendia nueve preguntas y todo lo demas me hacia decir no te entendi. Ahora entiendo veintiseis temas y no busco frases exactas sino ideas, asi que me da igual como me lo escribas. Preguntame cosas como: cuales son los clientes que mas dinero me deben, a quien tengo que cobrarle, cuanto vale mi inventario, que es lo que mas vendo, cuanto llevo en el mes, cuantos puntos tiene Eric, o cuanto me debe Luis. Y si de verdad no te entiendo, en vez de darte una lista fria te adivino lo que quisiste decir y te lo ofrezco en botones.',
   'Y arregle algo que te molestaba: si yo estoy hablando y tu tocas el boton de hablame, ahora me callo en seco, como cuando uno interrumpe a alguien.',
   'Se construyo la simulacion determinista, que es lo mas fuerte que existe: simula un ano completo de tu negocio con el reloj congelado y con tropiezos metidos a proposito, como que el guardado falle o que la app se cierre a media venta. Trescientos dias, mas de novecientos tropiezos, y el dinero cuadro en cero.',
