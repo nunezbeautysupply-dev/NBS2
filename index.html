@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260819f-OFICIAL-V2.0">
+<meta name="app-version" content="20260819g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -7510,6 +7510,30 @@ function verFacturaCompra(c, sid){
       +'<span style="font-weight:700;color:#5D4037">$'+fmtNum((cantSegura*costoSeguro))+'</span>';
     prodCard.appendChild(row);
   });
+  // Lo que no son productos pero SI son parte del total: envio y tarjeta suman, descuentos restan.
+  var sumaProd = (c.items || []).reduce(function(a,it){
+    var q = Number(it.cant); if(!isFinite(q) || q <= 0) q = 1;
+    var co = Number(it.costo); if(!isFinite(co) || co < 0) co = 0;
+    return a + q * co;
+  }, 0);
+  var hayExtras = (c.envio > 0) || (c.cargoTarjeta > 0) || ((c.descuentos || []).length > 0);
+  if(hayExtras){
+    var extra = document.createElement('div');
+    extra.style.cssText = 'margin-top:8px;padding-top:8px;border-top:1px solid #e0e0e0';
+    var filas = '<div style="display:flex;justify-content:space-between;font-size:12px;color:#777;margin-bottom:4px">'
+              + '<span>Productos</span><span>$' + fmtNum(sumaProd) + '</span></div>';
+    if(c.envio > 0) filas += '<div style="display:flex;justify-content:space-between;font-size:12px;color:#777;margin-bottom:4px"><span>\ud83d\ude9a Envío</span><span>$' + fmtNum(c.envio) + '</span></div>';
+    if(c.cargoTarjeta > 0) filas += '<div style="display:flex;justify-content:space-between;font-size:12px;color:#777;margin-bottom:4px"><span>\ud83d\udcb3 Cargo por tarjeta</span><span>$' + fmtNum(c.cargoTarjeta) + '</span></div>';
+    (c.descuentos || []).forEach(function(d){
+      filas += '<div style="display:flex;justify-content:space-between;font-size:12px;color:#C62828;font-weight:700;margin-bottom:4px">'
+             + '<span>\ud83d\udcb8 ' + String(d.desc||'Descuento').replace(/[<>&"]/g,'') + '</span>'
+             + '<span>\u2212$' + fmtNum(d.monto||0) + '</span></div>';
+    });
+    filas += '<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;color:#5D4037;border-top:1px solid #e0e0e0;padding-top:6px;margin-top:2px">'
+           + '<span>TOTAL</span><span>$' + fmtNum(c.total||0) + '</span></div>';
+    extra.innerHTML = filas;
+    prodCard.appendChild(extra);
+  }
   el.appendChild(prodCard);
 
   if(c.pagosFactura && (c.pagosFactura || []).length){
@@ -7928,17 +7952,89 @@ function editarCompra(cid, sid){
   envioInput.onfocus = function(){ envioInput.select(); };
   wrap.appendChild(envioInput);
 
+  // 💳 CARGO POR TARJETA EN EL EDITOR -19 ago-. Antes NO estaba aqui, y al modificar una compra
+  // el total se recalculaba como productos + envio: el cargo por tarjeta se PERDIA del total y
+  // lo que se le debia a ese suplidor quedaba por debajo de lo real. Ahora se edita y se conserva.
+  var tarjLabel = document.createElement('label');
+  tarjLabel.className = 'lbl';
+  tarjLabel.textContent = 'Cargo por tarjeta de crédito';
+  wrap.appendChild(tarjLabel);
+  var tarjInput = document.createElement('input');
+  tarjInput.className = 'inp';
+  tarjInput.type = 'text';
+  tarjInput.inputMode = 'numeric';
+  tarjInput.id = 'compra-edit-tarjeta';
+  tarjInput.value = (c.cargoTarjeta||0).toFixed(2);
+  tarjInput.onfocus = function(){ tarjInput.select(); };
+  wrap.appendChild(tarjInput);
+
+  // 💸 LOS TRES DESCUENTOS EN EL EDITOR -19 ago-. Sensei los necesita para arreglar compras
+  // que ya entro sin ellos y quedaron sin cuadrar.
+  var descWrap = document.createElement('div');
+  descWrap.style.cssText = 'background:#FFEBEE;border-radius:9px;padding:8px;margin:8px 0';
+  var descHtml = '<label style="font-size:12.5px;font-weight:800;color:#C62828;display:block;margin-bottom:5px">💸 DESCUENTOS -hasta 3</label>';
+  for(var iDe = 1; iDe <= 3; iDe++){
+    var dGuardado = (c.descuentos || [])[iDe-1] || { desc: '', monto: 0 };
+    descHtml += '<div style="display:flex;gap:5px;margin-bottom:4px">'
+      + '<input class="inp" id="compra-edit-desc' + iDe + '" type="text" placeholder="Por qué (ej: promoción)" autocomplete="off" value="' + String(dGuardado.desc||'').replace(/"/g,"'") + '" style="flex:1;padding:7px 8px;font-size:12.5px;margin:0">'
+      + '<input class="inp" id="compra-edit-descm' + iDe + '" type="text" inputmode="numeric" placeholder="$0.00" value="' + (dGuardado.monto ? Number(dGuardado.monto).toFixed(2) : '') + '" style="width:84px;padding:7px 4px;font-size:12.5px;text-align:center;margin:0">'
+      + '</div>';
+  }
+  descHtml += '<div style="font-size:10.5px;color:#B71C1C;margin-top:2px">Escribe el número sin el menos. La app lo resta sola.</div>';
+  descWrap.innerHTML = descHtml;
+  wrap.appendChild(descWrap);
+
   var totalEditWrap = document.createElement('div');
-  totalEditWrap.style.cssText = 'background:#EFEBE9;border-radius:8px;padding:12px;margin:10px 0;display:flex;justify-content:space-between';
-  totalEditWrap.innerHTML = '<span style="font-size:13px;color:#5D4037">Total de la compra</span><span id="compra-edit-total" style="font-weight:700;font-size:18px;color:#5D4037">$0.00</span>';
+  totalEditWrap.style.cssText = 'background:#EFEBE9;border-radius:8px;padding:12px;margin:10px 0';
+  totalEditWrap.innerHTML = '<div id="compra-edit-desc-detalle"></div>'
+    + '<div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:#5D4037">Total de la compra</span><span id="compra-edit-total" style="font-weight:700;font-size:18px;color:#5D4037">$0.00</span></div>';
   wrap.appendChild(totalEditWrap);
+
+  function descuentosEdicionCompra(){
+    var lista = [], total = 0;
+    for(var i = 1; i <= 3; i++){
+      var elD = document.getElementById('compra-edit-desc' + i);
+      var elM = document.getElementById('compra-edit-descm' + i);
+      var monto = elM ? (parseFloat(String(elM.value).replace(/[$,]/g,'')) || 0) : 0;
+      if(!(monto > 0.005)) continue;
+      var texto = elD && elD.value ? String(elD.value).trim() : '';
+      lista.push({ desc: texto || 'Descuento', monto: monto });
+      total += monto;
+    }
+    return { lista: lista, total: total };
+  }
+  window._descuentosEdicionCompra = descuentosEdicionCompra;
 
   function actualizarTotalEdicionCompra(){
     var totItems = window._compraEditItems.reduce(function(s,it){ return s+(it.cant*it.costo); },0);
-    var envio = parseFloat(document.getElementById('compra-edit-envio').value)||0;
-    document.getElementById('compra-edit-total').textContent = '$'+fmtNum(totItems+envio);
+    var envio = parseFloat(String((document.getElementById('compra-edit-envio')||{}).value||'').replace(/[$,]/g,''))||0;
+    var tarj  = parseFloat(String((document.getElementById('compra-edit-tarjeta')||{}).value||'').replace(/[$,]/g,''))||0;
+    var d = descuentosEdicionCompra();
+    document.getElementById('compra-edit-total').textContent = '$'+fmtNum(totItems + envio + tarj - d.total);
+    var det = document.getElementById('compra-edit-desc-detalle');
+    if(det){
+      det.innerHTML = d.lista.length
+        ? d.lista.map(function(x){
+            return '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:#C62828;margin-bottom:3px">'
+                 + '<span>💸 ' + String(x.desc).replace(/[<>&"]/g,'') + '</span>'
+                 + '<span style="font-weight:700">\u2212$' + fmtNum(x.monto) + '</span></div>';
+          }).join('') + '<div style="border-top:1px solid #d7ccc8;margin:4px 0"></div>'
+        : '';
+    }
   }
   envioInput.addEventListener('input', function(){ formatoMoneda(envioInput); actualizarTotalEdicionCompra(); });
+  tarjInput.addEventListener('input', function(){ formatoMoneda(tarjInput); actualizarTotalEdicionCompra(); });
+  // ⚠️ AQUI SE BUSCA DENTRO DE descWrap, NO con document.getElementById: en este punto 'wrap'
+  // todavia no esta colgado en la pantalla, asi que getElementById devolveria null y las tres
+  // casillas quedarian muertas -el total no se movia al escribir un descuento-. -19 ago-
+  for(var iEv = 1; iEv <= 3; iEv++){
+    (function(k){
+      var elM = descWrap.querySelector('#compra-edit-descm' + k);
+      if(elM) elM.addEventListener('input', function(){ formatoMoneda(elM); actualizarTotalEdicionCompra(); });
+      var elD = descWrap.querySelector('#compra-edit-desc' + k);
+      if(elD) elD.addEventListener('input', actualizarTotalEdicionCompra);
+    })(iEv);
+  }
   var renderOriginal = renderCompraEditItems;
   renderCompraEditItems = function(){ renderOriginal(); actualizarTotalEdicionCompra(); };
   setTimeout(actualizarTotalEdicionCompra, 0);
@@ -7986,9 +8082,19 @@ function guardarEdicionCompra(){
   compras[idx].items = window._compraEditItems.map(function(it){
     return { nombre: (it.nombre||'').trim(), cant: it.cant||1, costo: it.costo||0, pid: it.pid||null, esNuevo: it.esNuevo||false, marca: it.marca||'', cat: it.cat||'' };
   });
-  var envioEditado = parseFloat(document.getElementById('compra-edit-envio').value) || 0;
+  var envioEditado = parseFloat(String((document.getElementById('compra-edit-envio')||{}).value||'').replace(/[$,]/g,'')) || 0;
+  // 🔴 EL CARGO POR TARJETA SE PERDIA AQUI -arreglado el 19 ago-. El total se recalculaba como
+  // productos + envio, sin la tarjeta, asi que cada vez que se modificaba una compra con cargo
+  // de tarjeta el total bajaba solo y la deuda con ese suplidor quedaba corta.
+  var tarjEl = document.getElementById('compra-edit-tarjeta');
+  var tarjEditada = tarjEl ? (parseFloat(String(tarjEl.value).replace(/[$,]/g,'')) || 0)
+                           : (parseFloat(compras[idx].cargoTarjeta) || 0);
+  var descEditados = window._descuentosEdicionCompra ? window._descuentosEdicionCompra() : { lista: [], total: 0 };
   compras[idx].envio = envioEditado;
-  compras[idx].total = compras[idx].items.reduce(function(s,it){ return s+(it.cant*it.costo); },0) + envioEditado;
+  compras[idx].cargoTarjeta = tarjEditada;
+  compras[idx].descuentos = descEditados.lista;
+  compras[idx].total = compras[idx].items.reduce(function(s,it){ return s+(it.cant*it.costo); },0)
+                     + envioEditado + tarjEditada - descEditados.total;
 
   var fechaEl = document.getElementById('compra-edit-fecha');
   if(fechaEl && fechaEl.value){
@@ -8933,7 +9039,10 @@ function revisarIntegridad(){
     var items = c.items || [];
     if(!items.length) return false;
     var suma = items.reduce(function(a,i){ return a + (parseFloat(i.cant)||0) * (parseFloat(i.costo)||0); }, 0);
-    var tot  = (parseFloat(c.total)||0) - (parseFloat(c.envio)||0) - (parseFloat(c.cargoTarjeta)||0);
+    // Los descuentos se SUMAN de vuelta porque bajaron el total pero no salieron de los
+    // productos. Sin esta linea, cada compra con descuento gritaria "no suman el total". -19 ago-
+    var desc = (c.descuentos || []).reduce(function(a,d){ return a + (parseFloat(d.monto)||0); }, 0);
+    var tot  = (parseFloat(c.total)||0) - (parseFloat(c.envio)||0) - (parseFloat(c.cargoTarjeta)||0) + desc;
     return Math.abs(suma - tot) > 0.05;
   });
   if(compDescuadre.length){
@@ -14791,11 +14900,7 @@ function renderICC(){
       // solo se actualiza el numero del total de esa linea y el total general.
       var totalLineaInp = el.querySelector('.icc-total-linea[data-i="'+i+'"]');
       if(totalLineaInp) totalLineaInp.value = (iCC[i].cant*iCC[i].costo).toFixed(2);
-      var totGeneral = iCC.reduce(function(s,it){ return s+(it.cant*it.costo); },0);
-      var costoEnvioEl2 = document.getElementById('cc-envio');
-      var envio2 = (costoEnvioEl2 ? (parseFloat(costoEnvioEl2.value)||0) : 0)
-                 + (parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0);
-      document.getElementById('cctot').textContent = '$' + fmtNum(totGeneral + envio2);
+      pintarTotalCompra();
     };
     inp.onblur = function(){
       finalizarCostoPreciso(inp);
@@ -14803,11 +14908,7 @@ function renderICC(){
       iCC[i].costo = parseFloat(inp.value)||0;
       var totalLineaInp = el.querySelector('.icc-total-linea[data-i="'+i+'"]');
       if(totalLineaInp) totalLineaInp.value = (iCC[i].cant*iCC[i].costo).toFixed(2);
-      var totGeneral = iCC.reduce(function(s,it){ return s+(it.cant*it.costo); },0);
-      var costoEnvioEl2b = document.getElementById('cc-envio');
-      var envio2b = (costoEnvioEl2b ? (parseFloat(costoEnvioEl2b.value)||0) : 0)
-                  + (parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0);
-      document.getElementById('cctot').textContent = '$' + fmtNum(totGeneral + envio2b);
+      pintarTotalCompra();
     };
   });
   // LA GRAN IDEA: si se escribe el TOTAL de la linea en vez del costo por unidad -muy comun en
@@ -14822,11 +14923,7 @@ function renderICC(){
       iCC[i].costo = costoCalculado;
       var costoInp = el.querySelector('.icc-costo[data-i="'+i+'"]');
       if(costoInp) costoInp.value = costoCalculado;
-      var totGeneral = iCC.reduce(function(s,it){ return s+(it.cant*it.costo); },0);
-      var costoEnvioEl3 = document.getElementById('cc-envio');
-      var envio3 = (costoEnvioEl3 ? (parseFloat(costoEnvioEl3.value)||0) : 0)
-                 + (parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0);
-      document.getElementById('cctot').textContent = '$' + fmtNum(totGeneral + envio3);
+      pintarTotalCompra();
     };
     inp.onblur = function(){
       finalizarCostoPreciso(inp);
@@ -14837,24 +14934,57 @@ function renderICC(){
       iCC[i].costo = costoCalculado;
       var costoInp = el.querySelector('.icc-costo[data-i="'+i+'"]');
       if(costoInp) costoInp.value = costoCalculado;
-      var totGeneral = iCC.reduce(function(s,it){ return s+(it.cant*it.costo); },0);
-      var costoEnvioEl3b = document.getElementById('cc-envio');
-      var envio3b = (costoEnvioEl3b ? (parseFloat(costoEnvioEl3b.value)||0) : 0)
-                  + (parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0);
-      document.getElementById('cctot').textContent = '$' + fmtNum(totGeneral + envio3b);
+      pintarTotalCompra();
     };
   });
-  var costoEnvioEl = document.getElementById('cc-envio');
-  var costoEnvio = costoEnvioEl ? (parseFloat(costoEnvioEl.value)||0) : 0;
-  // Cargo por tarjeta -27 jul-. Algunos suplidores lo cobran aparte, como Monkeys Group
-  // -"Credicard Fee"-. Va igual que el envio: se suma al total de la compra pero NO se
-  // reparte entre los productos, asi el costo de cada uno se queda como esta.
-  var cargoTarjetaEl = document.getElementById('cc-tarjeta');
-  var cargoTarjeta = cargoTarjetaEl ? (parseFloat(cargoTarjetaEl.value)||0) : 0;
-  document.getElementById('cctot').textContent = '$' + fmtNum(tot + costoEnvio + cargoTarjeta);
+  // El envio y el cargo por tarjeta SUMAN, los descuentos RESTAN. Los tres van al total de la
+  // compra pero NINGUNO se reparte entre los productos: el costo de cada uno se queda como esta.
+  pintarTotalCompra();
 }
 
 function rmICC(i){ iCC.splice(i,1); renderICC(); }
+
+// 💸 LOS DESCUENTOS DE LA COMPRA QUE SE ESTA ENTRANDO -Sensei, 19 ago-.
+// Lee las tres casillas. El monto se escribe en POSITIVO y aqui se devuelve en positivo;
+// quien lo use lo RESTA. Asi Sensei nunca tiene que acordarse de poner el signo menos.
+function descuentosCompraActual(){
+  var lista = [], total = 0;
+  for(var i = 1; i <= 3; i++){
+    var elDesc  = document.getElementById('cc-desc' + i);
+    var elMonto = document.getElementById('cc-descm' + i);
+    var monto = elMonto ? (parseFloat(String(elMonto.value).replace(/[$,]/g,'')) || 0) : 0;
+    if(!(monto > 0.005)) continue;
+    var texto = elDesc && elDesc.value ? String(elDesc.value).trim() : '';
+    lista.push({ desc: texto || 'Descuento', monto: monto });
+    total += monto;
+  }
+  return { lista: lista, total: total };
+}
+
+// EL TOTAL DE LA COMPRA, EN UN SOLO SITIO -19 ago-.
+// Antes esto estaba repetido en CINCO lugares dentro de renderICC, cada uno sumando envio y
+// tarjeta por su cuenta. Con el descuento eso eran cinco sitios mas donde equivocarse, asi que
+// se junto todo aqui: quien necesite repintar el total llama a esta funcion y ya.
+function pintarTotalCompra(){
+  var tot = iCC.reduce(function(s2,it){ return s2 + (it.cant * it.costo); }, 0);
+  var elEnv = document.getElementById('cc-envio');
+  var envio = elEnv ? (parseFloat(String(elEnv.value).replace(/[$,]/g,'')) || 0) : 0;
+  var elTar = document.getElementById('cc-tarjeta');
+  var tarjeta = elTar ? (parseFloat(String(elTar.value).replace(/[$,]/g,'')) || 0) : 0;
+  var d = descuentosCompraActual();
+  var elTot = document.getElementById('cctot');
+  if(elTot) elTot.textContent = '$' + fmtNum(tot + envio + tarjeta - d.total);
+  var det = document.getElementById('cc-desc-detalle');
+  if(det){
+    det.innerHTML = d.lista.length
+      ? d.lista.map(function(x){
+          return '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:#C62828;margin-bottom:3px">'
+               + '<span>💸 ' + String(x.desc).replace(/[<>&"]/g,'') + '</span>'
+               + '<span style="font-weight:700">\u2212$' + fmtNum(x.monto) + '</span></div>';
+        }).join('') + '<div style="border-top:1px solid #d7ccc8;margin:4px 0"></div>'
+      : '';
+  }
+}
 
 function saveCC(){
   if(!iCC.length){ alert('Agrega al menos un producto'); return; }
@@ -14868,7 +14998,8 @@ function saveCC(){
   var ini = metodosPago.reduce(function(s,m){ return s+m.monto; }, 0);
   var costoEnvio = parseFloat(document.getElementById('cc-envio').value) || 0;
   var cargoTarjeta = parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0;
-  var tot = iCC.reduce(function(s,it){ return s + it.cant*it.costo; }, 0) + costoEnvio + cargoTarjeta;
+  var descC = descuentosCompraActual();
+  var tot = iCC.reduce(function(s,it){ return s + it.cant*it.costo; }, 0) + costoEnvio + cargoTarjeta - descC.total;
   if(tipo==='contado' && ini < tot){
     if(!confirm('Marcaste "Contado" pero el pago que registraste ($'+fmtNum(ini)+') no cubre el total ($'+fmtNum(tot)+'). ¿Continuar de todas formas?')) return;
   }
@@ -14888,7 +15019,7 @@ function saveCC(){
       if(p){ p.stock += it.cant; p.costo = it.costo; }
     }
   });
-  tot += costoEnvio + cargoTarjeta;
+  tot += costoEnvio + cargoTarjeta - descC.total;
 
   var pagosIniciales = [];
   if(ini > 0) pagosIniciales.push({ monto: ini, fecha: fechaHoy(), nota: 'Pago inicial', metodos: metodosPago });
@@ -14897,6 +15028,7 @@ function saveCC(){
   compras.push({
     id: Date.now(), sid: sid, sn: sn, tipo: tipo,
     items: iCC.slice(), total: tot, envio: costoEnvio, cargoTarjeta: cargoTarjeta,
+    descuentos: descC.lista,
     fecha: fechaHoy(),
     hora: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}),
     pagosFactura: pagosIniciales,
@@ -14910,6 +15042,10 @@ function saveCC(){
   document.getElementById('cc-envio').value = '';
   var ccTarjEl = document.getElementById('cc-tarjeta');
   if(ccTarjEl) ccTarjEl.value = '';
+  for(var iD = 1; iD <= 3; iD++){
+    var elD = document.getElementById('cc-desc' + iD);   if(elD) elD.value = '';
+    var elM = document.getElementById('cc-descm' + iD);  if(elM) elM.value = '';
+  }
   quitarFotoGasto('cc');
   var ocrResEl = document.getElementById('cc-ocr-resultado');
   if(ocrResEl) ocrResEl.style.display = 'none';
@@ -16841,7 +16977,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260819f';
+var NOVEDADES_VERSION = '20260819g';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -32199,6 +32335,65 @@ function detectarSuplidorFactura(textoCompleto){
 // Busca en la factura los cargos que NO son productos: el envio y el cargo por tarjeta.
 // Sale de las facturas reales de Sensei: Vecina pone "Shipping Charges: 10.00" y Monkeys
 // pone "Credicard Fee $30.17" -27 jul-.
+// 💸 LOS DESCUENTOS QUE TRAE EL PDF DEL SUPLIDOR -Sensei, 19 ago-.
+//
+// LA SEÑAL: que el ULTIMO numero de la linea sea NEGATIVO. Ejemplo real de su factura de
+// Kanar Online: "All reign pairs clipper and trimmer $155.00   -612.78". Ojo con ese $155.00
+// del medio: hay que quedarse con el ULTIMO numero, no con el primero.
+//
+// POR QUE ESTAS LINEAS NO SE CUELAN COMO PRODUCTOS: leerLineaDeFactura exige que el total sea
+// mayor que cero, asi que una linea que termina en negativo ya devolvia null. Aqui solo se
+// recogen, no se le quita nada a nadie.
+function montoNegativoDeLinea(pal){
+  for(var j = pal.length - 1; j >= 0; j--){
+    var t = String(pal[j].t || '').trim();
+    // 1) el numero viene con su signo pegado:  -612.78
+    if(esNumeroFactura(t)){
+      var v = aNumero(t);
+      if(isFinite(v) && v < -0.005) return { monto: Math.abs(v), corte: j };
+      // 2) el signo quedo suelto en la palabra de antes:  -   612.78
+      if(isFinite(v) && v > 0.005 && j > 0 && String(pal[j-1].t || '').trim() === '-'){
+        return { monto: v, corte: j - 1 };
+      }
+      return null;   // el ultimo numero es positivo: no es descuento
+    }
+    // 3) contabilidad clasica, el negativo entre parentesis:  (612.78)
+    var m = t.match(/^\(\$?([\d,]+\.?\d*)\)$/);
+    if(m){
+      var v2 = parseFloat(m[1].replace(/,/g,''));
+      if(isFinite(v2) && v2 > 0.005) return { monto: v2, corte: j };
+      return null;
+    }
+  }
+  return null;
+}
+
+function descuentosDeLaFactura(lineas){
+  var hallados = [];
+  (lineas || []).forEach(function(l){
+    var pal = l.palabras || [];
+    if(!pal.length) return;
+    var T = String(l.texto || '').toUpperCase();
+    // El total, el balance y los pagos no son descuentos aunque salgan en negativo
+    if(T.indexOf('TOTAL') >= 0 || T.indexOf('BALANCE') >= 0 || T.indexOf('AMOUNT DUE') >= 0) return;
+    var neg = montoNegativoDeLinea(pal);
+    if(!neg) return;
+    var desc = pal.slice(0, neg.corte).map(function(p){ return p.t; }).join(' ')
+                 .replace(/\s+/g,' ').trim();
+    if(desc.length > 60) desc = desc.slice(0,60).trim();
+    hallados.push({ desc: desc || 'Descuento', monto: neg.monto });
+  });
+  // 🔑 LO QUE SENSEI ESCOGIO -opcion B, 19 ago-: si vienen MAS DE TRES, se dejan los dos
+  // primeros con su nombre y TODOS los demas se juntan en el tercero. Asi el total de la
+  // factura siempre cuadra solo, sin que el tenga que sumar nada a mano.
+  if(hallados.length > 3){
+    var resto = hallados.slice(2);
+    var suma = resto.reduce(function(a,x){ return a + x.monto; }, 0);
+    hallados = hallados.slice(0,2).concat([{ desc: 'Otros descuentos (' + resto.length + ')', monto: suma }]);
+  }
+  return hallados;
+}
+
 function cargosDeLaFactura(lineas){
   var r = { envio: 0, tarjeta: 0 };
   var senasEnvio   = ['SHIPPING','FLETE','ENVIO','FREIGHT','DELIVERY CHARGE'];
@@ -32482,6 +32677,7 @@ function analizarFacturaYMostrar(lineas){
 
   var sub = subtotalImpreso(lineas);
   window._facturaCargos = cargosDeLaFactura(lineas);
+  window._facturaDescuentos = descuentosDeLaFactura(lineas);
   window._facturaItems = items;
   window._facturaSup = { id: supId, nombre: sup ? sup.nombre : 'Suplidor no reconocido' };
   window._facturaSubtotal = sub;
@@ -32525,6 +32721,19 @@ function pintarRevisionFactura(){
   // mucho, pero si se pudiera escribir en la busqueda fuera muchisimo mas facil"-.
 
   // Los cargos que no son productos, para que Sensei los vea antes de confirmar
+  var descsPdf = window._facturaDescuentos || [];
+  if(descsPdf.length){
+    html += '<div style="background:#FFEBEE;border:1px solid #EF9A9A;border-radius:9px;padding:9px;margin-bottom:10px;font-size:12.5px;color:#C62828;font-weight:700">'
+      + '\ud83d\udcb8 Descuentos que encontré en la factura:'
+      + descsPdf.map(function(d){
+          return '<div style="margin-top:4px;display:flex;justify-content:space-between">'
+               + '<span>' + String(d.desc||'').replace(/[<>&"]/g,'') + '</span>'
+               + '<span>\u2212$' + fmtNum(d.monto) + '</span></div>';
+        }).join('')
+      + '<div style="font-size:11.5px;font-weight:600;margin-top:5px">Se restarán del total al agregar los renglones. Puedes corregirlos abajo.</div>'
+      + '</div>';
+  }
+
   var cargos = window._facturaCargos || { envio: 0, tarjeta: 0 };
   if(cargos.envio > 0 || cargos.tarjeta > 0){
     html += '<div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:9px;padding:9px;margin-bottom:10px;font-size:12.5px;color:#1565C0;font-weight:700">'
@@ -32936,12 +33145,25 @@ function agregarFacturaALaCompra(){
     var elEnv = document.getElementById('cc-envio');
     if(elEnv){ elEnv.value = cg.envio.toFixed(2); puestos += '\n🚚 Envío: $' + fmtNum(cg.envio); }
   }
+  var dsPdf = window._facturaDescuentos || [];
+  if(dsPdf.length){
+    for(var iDp = 0; iDp < 3; iDp++){
+      var elDd = document.getElementById('cc-desc' + (iDp+1));
+      var elDm = document.getElementById('cc-descm' + (iDp+1));
+      if(dsPdf[iDp]){
+        if(elDd) elDd.value = dsPdf[iDp].desc || 'Descuento';
+        if(elDm) elDm.value = Number(dsPdf[iDp].monto).toFixed(2);
+        puestos += '\n\ud83d\udcb8 ' + (dsPdf[iDp].desc || 'Descuento') + ': \u2212$' + fmtNum(dsPdf[iDp].monto);
+      }
+    }
+  }
   if(cg.tarjeta > 0){
     var elTar = document.getElementById('cc-tarjeta');
     if(elTar){ elTar.value = cg.tarjeta.toFixed(2); puestos += '\n💳 Cargo por tarjeta: $' + fmtNum(cg.tarjeta); }
   }
 
   window._facturaItems = null;      // ya se agregaron: no hay nada a medias
+  window._facturaDescuentos = null;
   cerrarRevisionFactura();
   renderICC();
   avisoGrande('✓ Se agregaron ' + agregados + ' renglones a la compra.'
@@ -35582,7 +35804,15 @@ function verHistorialCliente(cid, modo){
     <input class="inp" id="cc-envio" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);renderICC()">
     <label class="lbl">Cargo por tarjeta de crédito -opcional</label>
     <input class="inp" id="cc-tarjeta" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);renderICC()">
+    <!-- 💸 DESCUENTOS DE LA FACTURA DE COMPRA -Sensei, 19 ago-. Hasta TRES. Se escriben en
+         positivo y la app los RESTA del total. NO se reparten entre los productos: el costo
+         de cada uno se queda como el lo escribio -igual que el envio y el cargo por tarjeta-. -->
+    <div style="background:#FFEBEE;border-radius:9px;padding:8px;margin:8px 0">
+      <label style="font-size:12.5px;font-weight:800;color:#C62828;display:block;margin-bottom:5px">💸 DESCUENTOS -opcional, hasta 3</label>
+      <div style="display:flex;gap:5px;margin-bottom:4px"><input class="inp" id="cc-desc1" type="text" placeholder="Por qué (ej: promoción)" autocomplete="off" style="flex:1;padding:7px 8px;font-size:12.5px;margin:0"><input class="inp" id="cc-descm1" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);pintarTotalCompra()" style="width:84px;padding:7px 4px;font-size:12.5px;text-align:center;margin:0"></div><div style="display:flex;gap:5px;margin-bottom:4px"><input class="inp" id="cc-desc2" type="text" placeholder="Por qué (ej: promoción)" autocomplete="off" style="flex:1;padding:7px 8px;font-size:12.5px;margin:0"><input class="inp" id="cc-descm2" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);pintarTotalCompra()" style="width:84px;padding:7px 4px;font-size:12.5px;text-align:center;margin:0"></div><div style="display:flex;gap:5px;margin-bottom:4px"><input class="inp" id="cc-desc3" type="text" placeholder="Por qué (ej: promoción)" autocomplete="off" style="flex:1;padding:7px 8px;font-size:12.5px;margin:0"><input class="inp" id="cc-descm3" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);pintarTotalCompra()" style="width:84px;padding:7px 4px;font-size:12.5px;text-align:center;margin:0"></div><div style="font-size:10.5px;color:#B71C1C;margin-top:2px">Escribe el número sin el menos. La app lo resta sola.</div>
+    </div>
     <div style="background:#EFEBE9;border-radius:8px;padding:12px;margin:8px 0">
+      <div id="cc-desc-detalle"></div>
       <div style="display:flex;justify-content:space-between"><span>Total compra</span><span id="cctot" style="font-weight:700;font-size:18px;color:#5D4037">$0.00</span></div>
     </div>
     <label class="lbl">Tipo de pago</label>
