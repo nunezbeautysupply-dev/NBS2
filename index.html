@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260819i-OFICIAL-V2.0">
+<meta name="app-version" content="20260819j-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3855,6 +3855,14 @@ function SS(k,v){
 // subida a la nube falla. Antes eso fallaba EN SILENCIO. Ahora queda anotado, la app te avisa,
 // y reintenta sola cuando vuelve la señal.
 var CLAVE_PENDIENTES = 'nbs_pendientes_subir';
+
+// Para no ensenarle a Sensei nombres de programador como "ncl" o "npedidos".
+var NOMBRES_DE_CLAVES = { ncl:'clientes', nc:'compras', nsup:'suplidores', nv:'ventas',
+  np:'productos', npedidos:'pedidos', ngastos:'gastos', ndevoluciones:'devoluciones',
+  nvisitas:'visitas', ncuadres:'cuadres de caja', ncreditos:'creditos', nrutas:'rutas',
+  nvip:'programa VIP', npremios:'premios', nbalances:'balances', nfotos:'fotos',
+  nnotas:'notas', nprecios:'precios', ntarjetas:'tarjetas', ndeudas:'deudas' };
+function nombreBonitoDeClave(k){ return NOMBRES_DE_CLAVES[k] || k; }
 function marcarPendienteDeSubir(k){
   try{
     var p = JSON.parse(localStorage.getItem(CLAVE_PENDIENTES) || '{}');
@@ -3870,6 +3878,36 @@ function quitarPendienteDeSubir(k){
     actualizarAvisoPendientes();
   }catch(e){}
 }
+// 🔴 ESTA FUNCION NO EXISTIA -19 ago-. `subirPendientes` la llamaba dentro de un
+// try/catch, asi que reventaba EN SILENCIO en cada intento y la limpieza nunca se hacia.
+// Si en la lista de pendientes se colaba una clave que no es un dato de la app -por
+// ejemplo un ajuste o algo de una version vieja-, se quedaba ahi PARA SIEMPRE: nunca
+// podia subir, nunca se quitaba, y el aviso naranja se quedaba encendido sin razon.
+var CLAVES_QUE_SI_SON_DATOS = ['ncl','nc','nsup','nv','np','npedidos','ngastos','ndevoluciones',
+  'nvisitas','ncuadres','ncreditos','nrutas','nvip','npremios','nbalances','nfotos','nnotas',
+  'nprecios','nmarcas','ncategorias','ntarjetas','ndeudas','nreposicion'];
+function limpiarPendientesQueNoSonDatos(){
+  try{
+    var p = JSON.parse(localStorage.getItem(CLAVE_PENDIENTES) || '{}');
+    var cambio = false;
+    Object.keys(p).forEach(function(k){
+      var esDato = CLAVES_QUE_SI_SON_DATOS.indexOf(k) >= 0;
+      // Tambien vale si hay algo guardado con esa clave: asi no se borra un dato nuevo
+      // que todavia no este en la lista de arriba.
+      var existeEnElAparato = localStorage.getItem(k) !== null;
+      if(!esDato && !existeEnElAparato){ delete p[k]; cambio = true; }
+    });
+    if(cambio) localStorage.setItem(CLAVE_PENDIENTES, JSON.stringify(p));
+  }catch(e){}
+}
+
+// Los nombres de lo que esta esperando subir, para poder decirselo a Sensei.
+function nombresPendientesDeSubir(){
+  try{
+    return Object.keys(JSON.parse(localStorage.getItem(CLAVE_PENDIENTES) || '{}'));
+  }catch(e){ return []; }
+}
+
 function hayPendientesDeSubir(){
   try{
     var p = JSON.parse(localStorage.getItem(CLAVE_PENDIENTES) || '{}');
@@ -17010,7 +17048,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260819i';
+var NOVEDADES_VERSION = '20260819j';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -29927,10 +29965,28 @@ function cargarDatosDeLaNube(callback){
 // falsos decia que todo estaba bien, porque escribia datos de mentira en documentos de
 // mentira. Esto reintenta la subida DE VERDAD y enseña el error exacto de cada pieza.
 function reintentarYDecirmeElError(){
+  var _quePendiente = nombresPendientesDeSubir();
+  var _lista = _quePendiente.length
+    ? ('\n\nEsperando: ' + _quePendiente.map(function(k){ return nombreBonitoDeClave(k); }).join(', '))
+    : '';
+
+  // Antes estos dos casos tambien se salian callados cuando se tocaba el aviso naranja.
   if(typeof fbAuth === 'undefined' || !fbAuth.currentUser){
-    avisoGrande('Primero entra con tu correo y clave.'); return;
+    avisoGrande('\u2601\ufe0f No estas conectado a la nube.\n\nEntra con tu correo y clave y se sube '
+      + 'solo. Mientras tanto tus datos NO se pierden: estan guardados en el telefono.' + _lista);
+    return;
   }
-  if(!navigator.onLine){ avisoGrande('No hay internet. Conectate y prueba otra vez.'); return; }
+  if(!navigator.onLine){
+    avisoGrande('\ud83d\udcf4 No hay internet.\n\nEn cuanto vuelva la se\u00f1al se sube solo, no '
+      + 'tienes que hacer nada. Tus datos estan guardados en el telefono.' + _lista);
+    return;
+  }
+  if(!_quePendiente.length){
+    limpiarPendientesQueNoSonDatos();
+    actualizarAvisoPendientes();
+    avisoGrande('\u2705 Ya no hay nada pendiente. Todo esta en la nube.');
+    return;
+  }
 
   try { localStorage.removeItem('nbs_fallos_subida'); } catch(e){}
   var antes = hayPendientesDeSubir();
@@ -29960,7 +30016,7 @@ function reintentarYDecirmeElError(){
       t.push('\ud83d\udd34 ESTAS NO PUDIERON SUBIR:\n');
       nombres.slice(0, 6).forEach(function(k){
         var f = fallos[k];
-        t.push('\u2022 ' + k + '   (' + Math.round(f.bytes/1024) + ' KB)');
+        t.push('\u2022 ' + nombreBonitoDeClave(k) + '  [' + k + ']   (' + Math.round(f.bytes/1024) + ' KB)');
         t.push('   ' + f.codigo);
         t.push('   ' + f.mensaje);
         t.push('');
@@ -30229,7 +30285,11 @@ function actualizarAvisoPendientes(){
     aviso = document.createElement('div');
     aviso.id = 'aviso-sin-sincronizar';
     aviso.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#E65100;color:white;padding:9px 14px;font-size:12px;font-weight:700;z-index:99990;text-align:center;cursor:pointer;box-shadow:0 -2px 8px rgba(0,0,0,0.2)';
-    aviso.onclick = function(){ subirPendientes(); };
+    // 🔴 ANTES ESTO LLAMABA A subirPendientes() A SECAS -19 ago-. Esa funcion se sale
+    // CALLADA en cuatro casos -sin sesion, sin internet, lista ilegible, lista vacia- y los
+    // fallos de verdad solo se apuntaban en la consola. Resultado: Sensei tocaba el aviso y
+    // no pasaba absolutamente nada, sin saber por que. Ahora el toque SIEMPRE le contesta.
+    aviso.onclick = function(){ reintentarYDecirmeElError(); };
     document.body.appendChild(aviso);
   }
   if(n === 0){
