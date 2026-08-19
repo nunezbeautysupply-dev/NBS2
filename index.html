@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260819h-OFICIAL-V2.0">
+<meta name="app-version" content="20260819i-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -7402,6 +7402,15 @@ function verSup(id, modo){
   btnFactura.style.cssText = 'width:100%;padding:12px;border:2px solid #2E7D32;border-radius:10px;background:#E8F5E9;color:#2E7D32;font-weight:800;font-size:13.5px;cursor:pointer';
   btnFactura.onclick = (function(sid){ return function(){ nuevaCompraASuplidor(sid, true); }; })(id);
 
+  // 💸 PAGARLE -19 ago-. Antes no existia: para pagar habia que entrar factura por factura.
+  var btnPagar = document.createElement('button');
+  var _leDebo = LS('nc', []).filter(function(cc){ return String(cc.sid) === String(id); })
+                  .reduce(function(a, cc){ var s2 = saldoDeCompra(cc); return a + (s2 > 0.005 ? s2 : 0); }, 0);
+  btnPagar.textContent = _leDebo > 0.005 ? ('💸 Pagarle ($' + fmtNum(_leDebo) + ')') : '💸 Pagarle';
+  btnPagar.style.cssText = 'width:100%;padding:12px;border:2px solid #C62828;border-radius:10px;background:#FFEBEE;color:#C62828;font-weight:800;font-size:13.5px;cursor:pointer';
+  btnPagar.onclick = (function(sid){ return function(){ abrirPagoSuplidor(sid); }; })(id);
+
+  atajos.appendChild(btnPagar);
   atajos.appendChild(btnCompra);
   atajos.appendChild(btnFactura);
   el.appendChild(atajos);
@@ -7543,7 +7552,8 @@ function verFacturaCompra(c, sid){
     (c.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).forEach(function(p){
       var row = document.createElement('div');
       row.style.cssText = 'display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px';
-      row.innerHTML = '<span style="color:#777">'+p.fecha+(p.nota?' · '+p.nota:'')+'</span>'
+      var _comoPago = p.metodo ? (' · ' + etiquetaMetodoCompra(p.metodo)) : '';
+      row.innerHTML = '<span style="color:#777">'+p.fecha+_comoPago+(p.nota?' · '+p.nota:'')+'</span>'
         +'<span style="font-weight:700;color:#2E7D32">+$'+fmtNum(p.monto)+'</span>';
       pagCard.appendChild(row);
     });
@@ -7557,6 +7567,11 @@ function verFacturaCompra(c, sid){
       +'<div style="font-size:12px;color:#aaa;margin-bottom:8px">Saldo pendiente: $'+fmtNum(saldo)+'</div>'
       +'<div style="display:flex;gap:8px;align-items:center">'
       +'<input type="text" inputmode="numeric" placeholder="0.00" id="pagocompra-'+c.id+'" value="0.00" style="flex:1;padding:6px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px;outline:none;font-family:sans-serif" onfocus="this.select()" oninput="formatoMoneda(this)">'
+      // 🔴 ANTES ESTE PAGO SE GUARDABA SIN FORMA DE PAGO -19 ago-. Se apuntaba el monto y la
+      // fecha y nada mas, asi que despues no habia manera de saber con que le habia pagado.
+      +'<select id="metpagocompra-'+c.id+'" style="width:120px;padding:9px 6px;border:1px solid #ddd;border-radius:8px;font-size:12px">'
+      + METODOS_PAGO_COMPRA.map(function(m){ return '<option value="'+m.tipo+'">'+m.texto+'</option>'; }).join('')
+      +'</select>'
       +'<button id="btnpagocompra-'+c.id+'" style="padding:10px 14px;background:#5D4037;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">✓ Pagar</button>'
       +'</div>';
     el.appendChild(payCard);
@@ -7565,9 +7580,13 @@ function verFacturaCompra(c, sid){
     pagarTodoCard.className = 'card';
     pagarTodoCard.innerHTML = '<div style="font-size:13px;font-weight:700;color:#5D4037;margin-bottom:4px">O PAGAR TODA LA FACTURA</div>'
       + '<div style="font-size:12px;color:#aaa;margin-bottom:10px">Un toque paga los $'+fmtNum(saldo)+' completos</div>'
-      + '<div style="display:flex;gap:10px">'
-      + '<button id="pagtodo-efe-'+c.id+'" style="flex:1;padding:16px 10px;background:#2E7D32;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700">\ud83d\udcb5 EFECTIVO<br><span style="font-size:13px;font-weight:600">$'+fmtNum(saldo)+'</span></button>'
-      + '<button id="pagtodo-tar-'+c.id+'" style="flex:1;padding:16px 10px;background:#1565C0;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700">\ud83d\udcb3 TARJETA<br><span style="font-size:13px;font-weight:600">$'+fmtNum(saldo)+'</span></button>'
+      // Las CUATRO formas con las que Sensei le paga a sus suplidores -19 ago-. Antes solo habia
+      // efectivo y tarjeta, y faltaban Zelle y CashApp.
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      + METODOS_PAGO_COMPRA.map(function(m){
+          return '<button id="pagtodo-'+m.tipo+'-'+c.id+'" style="padding:13px 8px;background:'+m.color+';color:white;border:none;border-radius:10px;font-size:13.5px;font-weight:800">'
+               + m.texto + '<br><span style="font-size:12px;font-weight:600">$'+fmtNum(saldo)+'</span></button>';
+        }).join('')
       + '</div>';
     el.appendChild(pagarTodoCard);
     // Funcion que paga TODO el saldo con el metodo elegido (protegida con huella por ser dinero).
@@ -7584,8 +7603,10 @@ function verFacturaCompra(c, sid){
         verSup(sid);
       });
     };
-    document.getElementById('pagtodo-efe-'+c.id).onclick = function(){ pagarTodoCompra('efectivo', '\ud83d\udcb5 Efectivo'); };
-    document.getElementById('pagtodo-tar-'+c.id).onclick = function(){ pagarTodoCompra('tarjeta', '\ud83d\udcb3 Tarjeta'); };
+    METODOS_PAGO_COMPRA.forEach(function(m){
+      var b = document.getElementById('pagtodo-'+m.tipo+'-'+c.id);
+      if(b) b.onclick = function(){ pagarTodoCompra(m.tipo, m.texto); };
+    });
     document.getElementById('btnpagocompra-'+c.id).onclick = function(){
       var inp = document.getElementById('pagocompra-'+c.id);
       var monto = parseFloat(inp.value) || 0;
@@ -7595,7 +7616,9 @@ function verFacturaCompra(c, sid){
       var compraReal = compras.find(function(x){ return String(x.id) === String(c.id); });
       if(!compraReal) return;
       if(!compraReal.pagosFactura) compraReal.pagosFactura = [];
-      compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy() });
+      var _selMet = document.getElementById('metpagocompra-'+c.id);
+      compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy(),
+                                     metodo: _selMet ? _selMet.value : 'efectivo' });
       SS('nc', compras);
       alert('Pago de $'+fmtNum(monto)+' aplicado correctamente');
       verSup(sid);
@@ -16987,7 +17010,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260819h';
+var NOVEDADES_VERSION = '20260819i';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -25994,6 +26017,194 @@ function borrarPagoDesdeEditor(vid, pidx){
 }
 
 var METODOS_PAGO_LABELS = { efectivo:'💵 Efectivo', cashapp:'📱 CashApp', zelle:'💸 Zelle', credito_cliente:'🎁 Crédito del cliente', tarjeta:'💳 Tarjeta (anterior)' };
+
+// 💳 LAS CUATRO FORMAS CON LAS QUE SENSEI LE PAGA A SUS SUPLIDORES -19 ago-.
+// Va aparte de METODOS_PAGO_LABELS a proposito: en las VENTAS la tarjeta esta marcada como
+// "anterior" porque sus clientes ya no le pagan asi, pero a los SUPLIDORES si les paga con
+// tarjeta de credito. Tocar la lista de ventas para esto habria cambiado lo que ven sus
+// clientes sin motivo.
+var METODOS_PAGO_COMPRA = [
+  { tipo:'tarjeta',  texto:'💳 Tarjeta', color:'#1565C0' },
+  { tipo:'efectivo', texto:'💵 Cash',    color:'#2E7D32' },
+  { tipo:'zelle',    texto:'🏦 Zelle',   color:'#6A1B9A' },
+  { tipo:'cashapp',  texto:'📱 CashApp', color:'#00838F' }
+];
+
+function etiquetaMetodoCompra(tipo){
+  for(var i = 0; i < METODOS_PAGO_COMPRA.length; i++){
+    if(METODOS_PAGO_COMPRA[i].tipo === tipo) return METODOS_PAGO_COMPRA[i].texto;
+  }
+  return METODOS_PAGO_LABELS[tipo] || '';
+}
+
+// Lo que le queda debiendo una compra: su total menos lo que ya le pago.
+function saldoDeCompra(c){
+  var total = parseFloat(c.total) || 0;
+  var pagado = (c.pagosFactura || []).filter(function(p){ return typeof p.monto === 'number'; })
+                 .reduce(function(a, p){ return a + p.monto; }, 0);
+  return total - pagado;
+}
+
+// 💸 PAGARLE A UN SUPLIDOR -19 ago-. Antes no habia ninguna forma de pagarle desde la
+// pantalla del suplidor: habia que entrar factura por factura.
+//
+// 🔴 REGLA DE SENSEI, TEXTUAL: "yo elijo a que factura le aplico el pago, eso no deberia ser
+// automatico en ningun caso". Por eso aqui NO se reparte nada solo, ni el sobrante. El pago va
+// entero a la factura que el marque. -Lo de repartir a la mas vieja es SOLO para los pagos de
+// sus CLIENTES, y eso se queda como esta.-
+function abrirPagoSuplidor(sid){
+  var sups = LS('nsup', []);
+  var sup = sups.find(function(x){ return String(x.id) === String(sid); });
+  if(!sup){ alert('No encontré ese suplidor.'); return; }
+  var abiertas = LS('nc', []).filter(function(c){
+    return String(c.sid) === String(sid) && esSaldoPendiente(saldoDeCompra(c));
+  }).sort(function(a, b){ return (a.id || 0) - (b.id || 0); });
+
+  if(!abiertas.length){
+    alert('No le debes nada a ' + sup.nombre + '. No hay facturas con saldo pendiente.');
+    return;
+  }
+
+  window._pagoSupSid = sid;
+  window._pagoSupFacturas = abiertas;
+  window._pagoSupEscogida = null;
+  window._pagoSupMetodo = null;
+
+  var ov = document.getElementById('pagosup-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'pagosup-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;'
+    + 'align-items:flex-end;justify-content:center;padding:0';
+  ov.innerHTML = '<div id="pagosup-caja" style="background:#fff;width:100%;max-width:520px;'
+    + 'border-radius:16px 16px 0 0;padding:14px;max-height:92vh;overflow:auto"></div>';
+  pintarPagoSuplidor();
+}
+
+function cerrarPagoSuplidor(){
+  var ov = document.getElementById('pagosup-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function pintarPagoSuplidor(){
+  var caja = document.getElementById('pagosup-caja');
+  if(!caja) return;
+  var sups = LS('nsup', []);
+  var sup = sups.find(function(x){ return String(x.id) === String(window._pagoSupSid); });
+  var facturas = window._pagoSupFacturas || [];
+  var debeTodo = facturas.reduce(function(a, c){ return a + saldoDeCompra(c); }, 0);
+  var esc = window._pagoSupEscogida;
+  var elegida = facturas.find(function(c){ return String(c.id) === String(esc); });
+  var saldoElegida = elegida ? saldoDeCompra(elegida) : 0;
+
+  var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    + '<div style="font-size:15px;font-weight:900;color:#5D4037">💸 Pagarle a ' + (sup ? sup.nombre : 'suplidor') + '</div>'
+    + '<button onclick="cerrarPagoSuplidor()" style="background:#F0F0F2;border:none;border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button>'
+    + '</div>'
+    + '<div style="font-size:12px;color:#777;margin-bottom:10px">Le debes <b>$' + fmtNum(debeTodo) + '</b> en ' + facturas.length + ' factura(s)</div>';
+
+  h += '<div style="font-size:11.5px;font-weight:800;color:#5D4037;margin-bottom:5px">1. ESCOGE LA FACTURA</div>';
+  facturas.forEach(function(c){
+    var sal = saldoDeCompra(c);
+    var marcada = String(c.id) === String(esc);
+    h += '<div onclick="escogerFacturaSuplidor(\'' + c.id + '\')" style="display:flex;justify-content:space-between;'
+      + 'align-items:center;padding:9px 10px;margin-bottom:5px;border-radius:9px;cursor:pointer;'
+      + 'border:' + (marcada ? '2px solid #5D4037' : '1px solid #e0e0e0') + ';'
+      + 'background:' + (marcada ? '#EFEBE9' : '#fff') + '">'
+      + '<div style="font-size:12.5px;color:#333">' + (marcada ? '◉' : '○') + ' ' + (c.fecha || '') + '</div>'
+      + '<div style="font-size:13px;font-weight:800;color:#C62828">$' + fmtNum(sal) + '</div>'
+      + '</div>';
+  });
+
+  if(elegida){
+    h += '<div style="font-size:11.5px;font-weight:800;color:#5D4037;margin:10px 0 5px">2. CUÁNTO LE PAGASTE</div>'
+      + '<div style="display:flex;gap:6px;align-items:center">'
+      + '<input type="text" inputmode="numeric" id="pagosup-monto" value="' + saldoElegida.toFixed(2) + '"'
+      + ' onfocus="this.select()" oninput="formatoMoneda(this)"'
+      + ' style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;font-weight:700;text-align:center">'
+      + '<button onclick="ponerTodoElSaldoSuplidor()" style="padding:10px 12px;background:#EFEBE9;border:1px solid #5D4037;'
+      + 'border-radius:8px;color:#5D4037;font-size:12px;font-weight:700;cursor:pointer">Todo el saldo</button>'
+      + '</div>';
+
+    h += '<div style="font-size:11.5px;font-weight:800;color:#5D4037;margin:10px 0 5px">3. CÓMO LE PAGASTE</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+    METODOS_PAGO_COMPRA.forEach(function(m){
+      var sel = window._pagoSupMetodo === m.tipo;
+      h += '<button onclick="escogerMetodoSuplidor(\'' + m.tipo + '\')" style="padding:11px 6px;border-radius:9px;cursor:pointer;'
+        + 'font-size:12.5px;font-weight:800;'
+        + (sel ? 'background:' + m.color + ';color:#fff;border:2px solid ' + m.color + ';'
+               : 'background:#fff;color:' + m.color + ';border:1.5px solid ' + m.color + ';')
+        + '">' + m.texto + '</button>';
+    });
+    h += '</div>';
+
+    h += '<div style="display:flex;gap:8px;margin-top:12px">'
+      + '<button onclick="cerrarPagoSuplidor()" style="flex:.8;padding:13px;background:#F0F0F2;border:none;'
+      + 'border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">Cancelar</button>'
+      + '<button onclick="aplicarPagoSuplidor()" style="flex:1.4;padding:13px;background:#5D4037;color:#fff;border:none;'
+      + 'border-radius:10px;font-size:13.5px;font-weight:900;cursor:pointer">✋ Huella y pagar</button>'
+      + '</div>';
+  } else {
+    h += '<div style="font-size:12px;color:#aaa;margin-top:10px;text-align:center">Toca una factura para seguir.</div>';
+  }
+
+  caja.innerHTML = h;
+}
+
+function escogerFacturaSuplidor(cid){
+  window._pagoSupEscogida = cid;
+  window._pagoSupMetodo = null;
+  pintarPagoSuplidor();
+}
+
+function escogerMetodoSuplidor(tipo){
+  window._pagoSupMetodo = tipo;
+  pintarPagoSuplidor();
+}
+
+function ponerTodoElSaldoSuplidor(){
+  var f = (window._pagoSupFacturas || []).find(function(c){ return String(c.id) === String(window._pagoSupEscogida); });
+  if(!f) return;
+  var el = document.getElementById('pagosup-monto');
+  if(el) el.value = saldoDeCompra(f).toFixed(2);
+}
+
+function aplicarPagoSuplidor(){
+  var el = document.getElementById('pagosup-monto');
+  var monto = el ? (parseFloat(String(el.value).replace(/[$,]/g, '')) || 0) : 0;
+  if(!(monto > 0.005)){ alert('Escribe cuánto le pagaste.'); return; }
+  if(!window._pagoSupMetodo){ alert('Escoge cómo le pagaste.'); return; }
+
+  var comprasT = LS('nc', []);
+  var c = comprasT.find(function(x){ return String(x.id) === String(window._pagoSupEscogida); });
+  if(!c){ alert('No encontré esa factura.'); return; }
+  var saldo = saldoDeCompra(c);
+
+  // 🔴 NO se pasa el sobrante a otra factura: Sensei lo prohibio expresamente para suplidores.
+  if(monto > saldo + 0.005){
+    if(!confirm('Esa factura solo debe $' + fmtNum(saldo) + ' y escribiste $' + fmtNum(monto) + '.\n\n'
+      + 'El sobrante NO se pasa a otra factura. ¿Guardar de todas formas?')) return;
+  }
+
+  var etiqueta = etiquetaMetodoCompra(window._pagoSupMetodo);
+  if(!confirm('¿Pagar $' + fmtNum(monto) + ' de la factura del ' + (c.fecha || '') + ' con ' + etiqueta + '?')) return;
+
+  var metodoElegido = window._pagoSupMetodo;
+  var sidGuardado = window._pagoSupSid;
+  protegerConHuella(function(){
+    var todas = LS('nc', []);
+    var real = todas.find(function(x){ return String(x.id) === String(window._pagoSupEscogida); });
+    if(!real){ alert('No encontré esa factura.'); return; }
+    if(!real.pagosFactura) real.pagosFactura = [];
+    real.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy(), metodo: metodoElegido });
+    SS('nc', todas);
+    cerrarPagoSuplidor();
+    alert('✅ Pago de $' + fmtNum(monto) + ' con ' + etiqueta + ' aplicado a la factura del ' + (real.fecha || '') + '.');
+    verSup(sidGuardado);
+  });
+}
 
 // Devuelve las opciones de metodo de pago para una fila especifica -incluye "usar credito del
 // cliente" SOLO si el cliente seleccionado en Vender tiene credito a favor disponible-.
