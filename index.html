@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260819l-OFICIAL-V2.0">
+<meta name="app-version" content="20260819m-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -762,6 +762,15 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <div id="busqueda-inteligente-wrap" style="margin-bottom:10px">
       <button id="btn-busqueda-inteligente" onclick="activarBusquedaInteligente()" style="width:100%;padding:9px;background:#EDE7F6;color:#5E35B1;border:1px solid #D1C4E9;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🧠 Buscar con Inteligencia Artificial -encuentra productos aunque los escribas distinto o con una falta-</button>
       <div id="busqueda-inteligente-resultado" style="display:none;margin-top:8px"></div>
+    </div>
+    <!-- 🏪 FILTRAR EL CATALOGO POR SUPLIDOR -idea de Sensei, 19 ago-: escoges un
+         suplidor y salen solo los productos que le compras a el. Sale de sus compras,
+         no hace falta guardar nada nuevo en cada producto. -->
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <select id="cat-suplidor" onchange="filtrarCatalogo()" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:9px;font-size:13px;font-weight:700;background:#fff">
+        <option value="">🏪 Todos los suplidores</option>
+      </select>
+      <button id="cat-btn-sinprecio" onclick="verSoloSinPrecio()" style="flex-shrink:0;padding:10px 11px;background:#FFEBEE;color:#C62828;border:1.5px solid #C62828;border-radius:9px;font-size:12px;font-weight:800;cursor:pointer">⚠️ Sin precio</button>
     </div>
     <div id="catlista"></div>
   </div>
@@ -8829,6 +8838,140 @@ function renderInventario(q){
   }).join('');
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  🚨 EL PRECIO DE VENTA EN CERO  (19 ago 2026)
+//
+//  🔴 LO QUE CAZO SENSEI: entro la factura de Kanar Online, la app creo los
+//  productos nuevos que venian en ella, y quedaron con precio de venta $0.00.
+//  Al ir a venderlos el precio salia en cero: se los estaba REGALANDO sin darse
+//  cuenta. Sus palabras: "si no me fijo de repente se lo estoy regalando".
+//
+//  LA CAUSA: al guardar la compra se hace `precio: it.precioVenta || 0`. Si el
+//  producto vino de un PDF escaneado, nadie le habia puesto precio de venta.
+// ═══════════════════════════════════════════════════════════════════
+
+// Todos los productos que no tienen precio de venta.
+function productosSinPrecio(){
+  loadProds();
+  return productos.filter(function(p){ return !(parseFloat(p.precio) > 0.005); });
+}
+
+// Su margen de siempre, sacado de sus PROPIOS productos — no de un numero inventado.
+// Se usa solo para SUGERIR un precio; el ultimo que decide es el.
+function margenDeCasa(){
+  loadProds();
+  var margenes = [];
+  productos.forEach(function(p){
+    var c = parseFloat(p.costo) || 0, v = parseFloat(p.precio) || 0;
+    if(c > 0.005 && v > c) margenes.push((v - c) / v);
+  });
+  if(!margenes.length) return 0.40;                 // sin datos: 40%, lo tipico del ramo
+  margenes.sort(function(a,b){ return a-b; });
+  return margenes[Math.floor(margenes.length / 2)]; // la mediana, no el promedio:
+                                                    // un producto raro no la mueve
+}
+
+function precioSugerido(costo){
+  var c = parseFloat(costo) || 0;
+  if(!(c > 0.005)) return 0;
+  var m = margenDeCasa();
+  if(m >= 0.95) m = 0.40;
+  var p = c / (1 - m);
+  return Math.round(p * 100) / 100;
+}
+
+// ── LA PARADA ANTES DE GUARDAR LA COMPRA ──
+// Devuelve true si hay productos nuevos sin precio -y abre la pantalla para ponerselo-.
+function faltanPreciosDeVenta(alTerminar){
+  var faltan = [];
+  iCC.forEach(function(it, i){
+    if(it.esNuevo && !(parseFloat(it.precioVenta) > 0.005)) faltan.push(i);
+  });
+  if(!faltan.length) return false;
+
+  window._alTerminarPrecios = alTerminar;
+  var ov = document.getElementById('precios-nuevos-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'precios-nuevos-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;'
+    + 'align-items:flex-end;justify-content:center';
+  var h = '<div style="background:#fff;width:100%;max-width:520px;border-radius:16px 16px 0 0;padding:14px;max-height:92vh;overflow:auto">'
+    + '<div style="font-size:15px;font-weight:900;color:#C62828;margin-bottom:4px">⚠️ Pónles precio de venta</div>'
+    + '<div style="font-size:12px;color:#777;margin-bottom:10px">Estos productos son nuevos y todavía no tienen precio. '
+    + 'Si los guardas en cero, al venderlos saldrían <b>gratis</b>.</div>';
+  faltan.forEach(function(i){
+    var it = iCC[i];
+    var sug = precioSugerido(it.costo);
+    h += '<div style="background:#FFF8E1;border-radius:9px;padding:9px;margin-bottom:7px">'
+      + '<div style="font-size:12.5px;font-weight:800;color:#5D4037;margin-bottom:5px">' + String(it.nombre || '').replace(/[<>&"]/g,'') + '</div>'
+      + '<div style="display:flex;gap:6px;align-items:center">'
+      + '<span style="font-size:11.5px;color:#777;flex-shrink:0">Costo $' + fmtNum(it.costo) + '</span>'
+      + '<input type="text" inputmode="decimal" id="precionuevo-' + i + '" value="' + (sug ? sug.toFixed(2) : '') + '"'
+      + ' placeholder="0.00" onfocus="this.select();this.dataset.modoPreciso=\'\'"'
+      + ' oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"'
+      + ' style="flex:1;padding:9px;border:2px solid #C62828;border-radius:8px;font-size:15px;font-weight:800;text-align:center">'
+      + '</div>'
+      + (sug ? '<div style="font-size:10.5px;color:#999;margin-top:3px">Sugerido con tu margen de siempre ('
+             + Math.round(margenDeCasa()*100) + '%). Cámbialo si quieres.</div>' : '')
+      + '</div>';
+  });
+  h += '<div style="display:flex;gap:8px;margin-top:10px">'
+    + '<button onclick="cerrarPreciosNuevos()" style="flex:.8;padding:13px;background:#F0F0F2;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">Volver</button>'
+    + '<button onclick="guardarPreciosNuevos()" style="flex:1.4;padding:13px;background:#C62828;color:#fff;border:none;border-radius:10px;font-size:13.5px;font-weight:900;cursor:pointer">✓ Ponerles precio y guardar</button>'
+    + '</div></div>';
+  ov.innerHTML = h;
+  return true;
+}
+
+function cerrarPreciosNuevos(){
+  var ov = document.getElementById('precios-nuevos-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function guardarPreciosNuevos(){
+  var sinPoner = [];
+  iCC.forEach(function(it, i){
+    if(!it.esNuevo) return;
+    var el = document.getElementById('precionuevo-' + i);
+    if(!el) return;
+    var v = parseFloat(String(el.value).replace(/[$,]/g,'')) || 0;
+    if(v > 0.005) it.precioVenta = v; else sinPoner.push(it.nombre);
+  });
+  if(sinPoner.length){
+    alert('Todavía falta el precio de:\n\n• ' + sinPoner.join('\n• '));
+    return;
+  }
+  cerrarPreciosNuevos();
+  var seguir = window._alTerminarPrecios;
+  window._alTerminarPrecios = null;
+  if(typeof seguir === 'function') seguir();
+}
+
+// ── QUE PRODUCTOS LE COMPRA A CADA SUPLIDOR ──
+// No hace falta guardar nada nuevo: sale de sus propias compras. Cada compra tiene el
+// suplidor -sid- y sus renglones tienen el producto -pid-. -Idea de Sensei, 19 ago-
+function productosDeSuplidor(sid){
+  var ids = {};
+  LS('nc', []).forEach(function(c){
+    if(String(c.sid) !== String(sid)) return;
+    (c.items || []).forEach(function(it){ if(it.pid) ids[String(it.pid)] = true; });
+  });
+  return ids;
+}
+
+function filtrarCatalogo(){
+  try { renderCatalogo(document.getElementById('catbuscar').value); } catch(e){ renderCatalogo(''); }
+}
+
+function verSoloSinPrecio(){
+  var sel = document.getElementById('cat-suplidor');
+  if(sel) sel.value = 'SINPRECIO';
+  filtrarCatalogo();
+}
+
 function renderCatalogo(q){
   loadProds();
 
@@ -8847,6 +8990,40 @@ function renderCatalogo(q){
   var list = _hayBusqueda
     ? productos.slice()
     : productos.slice().sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+
+  // 🏪 EL FILTRO POR SUPLIDOR Y EL DE SIN PRECIO -19 ago-
+  var _sel = document.getElementById('cat-suplidor');
+  var _filtro = _sel ? _sel.value : '';
+  if(_sel){
+    // Se rellena el desplegable con sus suplidores, conservando lo que tenga escogido
+    var _sups = LS('nsup', []);
+    var _falta = _sel.options.length !== (_sups.length + 2);
+    if(_falta){
+      var _html = '<option value="">🏪 Todos los suplidores</option>';
+      _sups.forEach(function(sp){
+        _html += '<option value="' + sp.id + '">' + String(sp.nombre || '').replace(/[<>&"]/g,'') + '</option>';
+      });
+      _html += '<option value="SINPRECIO">⚠️ Solo los que no tienen precio de venta</option>';
+      _sel.innerHTML = _html;
+      _sel.value = _filtro || '';
+    }
+  }
+  if(_filtro === 'SINPRECIO'){
+    list = list.filter(function(p){ return !(parseFloat(p.precio) > 0.005); });
+  } else if(_filtro){
+    var _ids = productosDeSuplidor(_filtro);
+    list = list.filter(function(p){ return _ids[String(p.id)]; });
+  }
+
+  // El botón rojo lleva la cuenta de cuántos están en cero
+  var _btnSP = document.getElementById('cat-btn-sinprecio');
+  if(_btnSP){
+    var _n = productos.filter(function(p){ return !(parseFloat(p.precio) > 0.005); }).length;
+    _btnSP.textContent = _n ? ('⚠️ Sin precio (' + _n + ')') : '✓ Todos con precio';
+    _btnSP.style.background = _n ? '#FFEBEE' : '#E8F5E9';
+    _btnSP.style.color      = _n ? '#C62828' : '#2E7D32';
+    _btnSP.style.borderColor= _n ? '#C62828' : '#2E7D32';
+  }
   // Ahora tambien por MARCA, PRECIO y COSTO. El catalogo era el unico buscador de
   // productos que no miraba la marca, y el precio no lo miraba ninguno. -4 ago-
   // El catalogo busca por TODO lo que tiene un producto: nombre, marca, categoria,
@@ -14033,6 +14210,29 @@ function agregarProducto(pid, cant, prod){
   var encontrado = false;
   var cidActual = document.getElementById('vcl') ? document.getElementById('vcl').value : null;
   var precioAUsar = obtenerPrecioParaCliente(cidActual, prod.id, prod.precio);
+
+  // 🚨 LA RED: nunca meter en una venta un producto que va en $0.00 -19 ago-.
+  // Sensei: "el producto a la hora de venderlo sale el precio del cliente en 0.00, o sea
+  // que le sale gratis, y si no me fijo de repente se lo estoy regalando".
+  if(!(parseFloat(precioAUsar) > 0.005)){
+    var _sug = precioSugerido(prod.costo);
+    var _esc = prompt('⚠️ "' + prod.nombre + '" no tiene precio de venta.\n\n'
+      + 'Si lo dejas así se lo estás REGALANDO.\n\n'
+      + 'Escribe a qué precio lo vendes:', _sug ? _sug.toFixed(2) : '');
+    if(_esc === null) return;                       // se arrepintio: no se agrega nada
+    var _v = parseFloat(String(_esc).replace(/[$,]/g,'')) || 0;
+    if(!(_v > 0.005)){
+      alert('No se agregó: sin precio de venta el producto iría gratis.');
+      return;
+    }
+    precioAUsar = _v;
+    // Y se le guarda al producto, para no volver a preguntar en cada venta
+    try {
+      loadProds();
+      var _p = productos.find(function(x){ return String(x.id) === String(prod.id); });
+      if(_p){ _p.precio = _v; SS('np', productos); }
+    } catch(e){}
+  }
   for(var j=0;j<iV.length;j++){
     if(String(iV[j].pid)===String(pid)){ iV[j].cant+=cant; encontrado=true; break; }
   }
@@ -15069,6 +15269,13 @@ function saveCC(){
   var ini = metodosPago.reduce(function(s,m){ return s+m.monto; }, 0);
   var costoEnvio = parseFloat(document.getElementById('cc-envio').value) || 0;
   var cargoTarjeta = parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0;
+  // 🚨 LA PARADA: no se guarda una compra que crearia productos SIN precio de venta.
+  // Se abre la pantalla para ponerselos y, cuando termine, vuelve aqui y sigue. -19 ago-
+  if(!window._preciosYaPuestos && faltanPreciosDeVenta(function(){
+        window._preciosYaPuestos = true;
+        try { saveCC(); } finally { window._preciosYaPuestos = false; }
+      })) return;
+
   var descC = descuentosCompraActual();
   var tot = iCC.reduce(function(s,it){ return s + it.cant*it.costo; }, 0) + costoEnvio + cargoTarjeta - descC.total;
   if(tipo==='contado' && ini < tot){
@@ -17048,7 +17255,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260819l';
+var NOVEDADES_VERSION = '20260819m';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
