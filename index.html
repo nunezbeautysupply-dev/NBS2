@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260819k-OFICIAL-V2.0">
+<meta name="app-version" content="20260819l-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4792,7 +4792,7 @@ function toggleSinServicio(btn){
         if(String(v.cid) !== String(id) || v.cancelada || v.tipo !== 'credito') return;
         var pg = 0;
         (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
-        debe += (parseFloat(v.total) || 0) - pg;
+        debe += cobradoYDebeDe(v).debe;
       });
     } catch(e){}
     var msg = 'Marcar a ' + nombreCl(C[i]) + ' como SIN SERVICIO?\n\n'
@@ -17048,7 +17048,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260819k';
+var NOVEDADES_VERSION = '20260819l';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -17441,7 +17441,7 @@ function _contestarAsistenteTexto(texto){
     V.forEach(function(v){
       var pg = 0;
       (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
-      var s = (parseFloat(v.total) || 0) - pg;
+      var s = cobradoYDebeDe(v).debe;
       if(s <= 0.01) return;
       debe += s; facturas++;
       var d = _diasDesde(v.fecha);
@@ -18148,7 +18148,7 @@ function deudasViejas(diasMin){
     if(v.tipo !== 'credito') return;
     var pg = 0;
     (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
-    var saldo = (parseFloat(v.total) || 0) - pg;
+    var saldo = cobradoYDebeDe(v).debe;
     if(saldo <= 0.01) return;
     var d = _diasDesde(v.fecha);
     if(d === null || d < tope) return;
@@ -22865,7 +22865,11 @@ function pintarPanelCliente(cid){
     var contF = listaF.slice(0, 40).map(function(v){
       var pg = 0;
       (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
-      var saldo = (parseFloat(v.total) || 0) - pg;
+      // 🔴 AQUI ESTABA EL FALLO QUE VIO SENSEI -19 ago-. Este renglon calculaba
+      // `total - pagos` por su cuenta. Una venta al CONTADO no lleva pagos apuntados
+      // -se pago en el momento-, asi que salia en rojo "debe $10.00" aunque estuviera
+      // pagada, mientras el DEBE de arriba, que si usa la regla buena, decia otra cosa.
+      var saldo = cobradoYDebeDe(v).debe;
       var canc = !!v.cancelada;
       var col = canc ? '#B71C1C' : (esSaldoPendiente(saldo) ? 'var(--nbs-red-text)' : 'var(--nbs-green-text)');
       return '<div onclick="event.stopPropagation();verFacturaProfesional(' + _arg(v.id) + ')" '
@@ -23177,7 +23181,8 @@ function verCl(id){
 function verFactura(v){
   var el=document.getElementById('cl-factura-contenido');el.innerHTML='';
   var pagado=v.pagosFactura?(v.pagosFactura || []).filter(function(p){return p.monto!==undefined&&typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0):0;
-  var saldo=Math.max(0,v.total-pagado);
+  pagado = cobradoYDebeDe(v).cobrado;
+  var saldo = cobradoYDebeDe(v).debe;
 
   var card=document.createElement('div');card.className='card';
   card.innerHTML='<div style="font-size:18px;font-weight:700;margin-bottom:4px">Factura</div>'
@@ -25357,7 +25362,7 @@ function renderFacturasSaldadas(q){
     var pagado = v.tipo==='credito'
       ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0)
       : v.total;
-    return (v.total - pagado) <= 0.005;
+    return cobradoYDebeDe(v).debe <= 0.005;
   });
 
   if(q && q.trim()){
@@ -25609,7 +25614,9 @@ function usarCreditoAFavor(cid){
     (v.pagosFactura || []).forEach(function(p){
       if(!p.esDevolucion) pagado += parseFloat(p.monto) || 0;
     });
-    var debe = Math.round((total - pagado) * 100) / 100;
+    // 🔴 ESTO MUEVE DINERO: sin la regla unica, el credito a favor se le podia
+    // aplicar a una factura de CONTADO que ya estaba pagada. -19 ago-
+    var debe = cobradoYDebeDe(v).debe;
     if(debe <= 0.005) return;
     var pone = Math.min(queda, debe);
     pone = Math.round(pone * 100) / 100;
@@ -27024,7 +27031,8 @@ function renderFacturas(q){
 
 function crearTarjetaFactura(v){
     var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
-    var saldo = Math.max(0, v.total - pagado);
+    pagado = cobradoYDebeDe(v).cobrado;
+    var saldo = cobradoYDebeDe(v).debe;
     var numFact = v.numFactura || String(v.id).slice(-6);
     var clForCard = clientes.find(function(x){return String(x.id)===String(v.cid);});
     var negForCard = clForCard && clForCard.negocio ? clForCard.negocio.trim() : '';
@@ -27080,7 +27088,8 @@ function verFacturaProfesional(vid){
   if(!v) return;
   var cl = clientes.find(function(c){ return String(c.id)===String(v.cid); });
   var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
-  var saldo = Math.max(0, v.total - pagado);
+  pagado = cobradoYDebeDe(v).cobrado;
+  var saldo = cobradoYDebeDe(v).debe;
   var numFact = v.numFactura || String(v.id).slice(-6);
 
   var overlay = document.getElementById('factura-view-overlay');
@@ -27290,7 +27299,8 @@ function imprimirFacturaBT(vid){
   if(!v) return;
   var cl = clientes.find(function(c){ return String(c.id)===String(v.cid); });
   var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
-  var saldo = Math.max(0, v.total - pagado);
+  pagado = cobradoYDebeDe(v).cobrado;
+  var saldo = cobradoYDebeDe(v).debe;
   var numFact = v.numFactura || String(v.id).slice(-6);
 
   // Construir texto formateado para ESC POS de 32 caracteres (58mm)
@@ -27809,7 +27819,8 @@ function imprimirFacturaDiseno(vid){
   if(!v) return;
   var cl = clientes.find(function(c){ return String(c.id)===String(v.cid); });
   var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
-  var saldo = Math.max(0, v.total - pagado);
+  pagado = cobradoYDebeDe(v).cobrado;
+  var saldo = cobradoYDebeDe(v).debe;
   var numFact = v.numFactura || String(v.id).slice(-6);
 
   conLogoListo(function(){
@@ -27840,7 +27851,8 @@ function compartirFactura(vid){
   if(!v) return;
   var cl = clientes.find(function(c){ return String(c.id)===String(v.cid); });
   var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
-  var saldo = Math.max(0, v.total - pagado);
+  pagado = cobradoYDebeDe(v).cobrado;
+  var saldo = cobradoYDebeDe(v).debe;
   var numFact = v.numFactura || String(v.id).slice(-6);
 
   conLogoListo(function(){
@@ -27907,7 +27919,7 @@ function pintarPagosEnEditorFactura(vid){
   var pagado = 0;
   pagos.forEach(function(p){ if(!p.esDevolucion) pagado += parseFloat(p.monto) || 0; });
   pagado = Math.round(pagado * 100) / 100;
-  var saldo = Math.round((total - pagado) * 100) / 100;
+  var saldo = cobradoYDebeDe(v).debe;
 
   var h = '<div style="border-top:1px solid #E8E8EF;padding-top:12px;margin-bottom:14px">';
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">'
@@ -28896,7 +28908,8 @@ function importD(inp){
 
 function imprimirFactura(v){
   var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
-  var saldo = v.tipo==='credito' ? Math.max(0, v.total - pagado) : 0;
+  pagado = cobradoYDebeDe(v).cobrado;
+  var saldo = cobradoYDebeDe(v).debe;
   var items = (v.items && (v.items || []).length) ? (v.items || []).map(function(it){
     return '<tr><td style="padding:8px;border-bottom:1px solid #eee">'+escaparHtml(it.nombre)+'</td>'
       +'<td style="padding:8px;border-bottom:1px solid #eee;text-align:center">'+it.cant+'</td>'
@@ -28937,7 +28950,8 @@ function imprimirFactura(v){
 
 function emailFactura(v){
   var pagado = v.tipo==='credito' ? (v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : 0) : v.total;
-  var saldo = v.tipo==='credito' ? Math.max(0, v.total - pagado) : 0;
+  pagado = cobradoYDebeDe(v).cobrado;
+  var saldo = cobradoYDebeDe(v).debe;
   var items = (v.items && (v.items || []).length) ? (v.items || []).map(function(it){ return it.nombre+' x'+it.cant+' = $'+(it.cant*it.precio).toFixed(2); }).join('\n') : '';
   var body = 'Estimado/a '+v.cn+',\n\n'
     +'Aqui el detalle de su factura de Nunez Beauty Supply:\n\n'
@@ -35707,7 +35721,9 @@ function verHistorialCliente(cid, modo){
   todasVentasCl.forEach(function(v){
     var pagado = (v.tipo==='credito' && v.pagosFactura) ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0) : v.total;
     v._pagado = pagado;
-    v._saldo = Math.max(0, v.total - pagado);
+    var _cdH = cobradoYDebeDe(v);
+    v._pagado = _cdH.cobrado;
+    v._saldo  = _cdH.debe;
   });
 
   var ventasCl = modo==='abiertas' ? todasVentasCl.filter(function(v){ return v.tipo==='credito' && esSaldoPendiente(v._saldo); }) : todasVentasCl;
