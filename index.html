@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260819n-OFICIAL-V2.0">
+<meta name="app-version" content="20260819p-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -751,15 +751,25 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       </div>
       <div id="cat-marcas-detalle" style="display:none;margin-top:10px;border-top:1px solid #B2EBF2;padding-top:10px;max-height:220px;overflow-y:auto"></div>
     </div>
-    <button class="btn" style="background:#2E7D32;color:white" onclick="nuevoProductoCatalogo()">+ Nuevo producto</button>
-    <button class="btn" style="background:var(--nbs-gold);color:white" onclick="abrirEditarPorMarca()">✏️ Editar toda una marca</button>
-  <button class="btn" style="background:#00695C;color:white" onclick="abrirUnificarMarcas()">🔤 Unificar marcas repetidas</button>
-  <button class="btn" style="background:#3949AB;color:white" onclick="abrirArreglarMayusculas()">🔤 Marcas con mayúscula solo al principio</button>
-  <button class="btn" style="background:#C62828;color:white" onclick="abrirProductosBorrados()">♻️ Productos que ya no están (recuperar)</button>
-  <button class="btn" style="background:#00695C;color:white" onclick="abrirBuscadorProfundo()">🔎 Buscador profundo (no encuentro un producto)</button>
-    <button class="btn" style="background:#546E7A;color:white" onclick="redondearPrecios()">⬆️ Redondear precios al entero</button>
-    <button class="btn" style="background:#6A1B9A;color:white" onclick="eliminarDuplicados()">🔍 Detectar y eliminar duplicados</button>
-    <button class="btn" style="background:#00838F;color:white" onclick="exportarCatalogoParaPedidos()">📲 Generar página de pedidos por SMS para clientes</button>
+    <!-- ⚙️ OPCIONES DEL CATALOGO -Sensei, 19 ago-: "ya hay demasiadas [opciones] arriba,
+         deberias hacer un menu que se despliegue y titular OPCIONES". Los nueve botones
+         que habia sueltos ahora viven aqui dentro. Se abre y se cierra; nada se quito. -->
+    <button class="btn" id="cat-btn-opciones" onclick="toggleOpcionesCatalogo()"
+      style="background:#1a237e;color:white;display:flex;align-items:center;justify-content:center;gap:8px">
+      <span>⚙️ Opciones del catálogo</span>
+      <span id="cat-opciones-flecha" style="font-size:12px">▼</span>
+    </button>
+    <div id="cat-opciones" style="display:none;background:#F7F7FA;border-radius:10px;padding:10px 10px 1px;margin-bottom:10px">
+      <button class="btn" style="background:#2E7D32;color:white" onclick="nuevoProductoCatalogo()">+ Nuevo producto</button>
+      <button class="btn" style="background:var(--nbs-gold);color:white" onclick="abrirEditarPorMarca()">✏️ Editar toda una marca</button>
+      <button class="btn" style="background:#00695C;color:white" onclick="abrirUnificarMarcas()">🔤 Unificar marcas repetidas</button>
+      <button class="btn" style="background:#3949AB;color:white" onclick="abrirArreglarMayusculas()">🔤 Marcas con mayúscula solo al principio</button>
+      <button class="btn" style="background:#C62828;color:white" onclick="abrirProductosBorrados()">♻️ Productos que ya no están (recuperar)</button>
+      <button class="btn" style="background:#00695C;color:white" onclick="abrirBuscadorProfundo()">🔎 Buscador profundo (no encuentro un producto)</button>
+      <button class="btn" style="background:#546E7A;color:white" onclick="redondearPrecios()">⬆️ Redondear precios al entero</button>
+      <button class="btn" style="background:#6A1B9A;color:white" onclick="eliminarDuplicados()">🔍 Detectar y eliminar duplicados</button>
+      <button class="btn" style="background:#00838F;color:white" onclick="exportarCatalogoParaPedidos()">📲 Generar página de pedidos por SMS para clientes</button>
+    </div>
     <div style="display:flex;gap:8px">
       <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="catbuscar" type="text" placeholder="Buscar producto por nombre..." oninput="renderCatalogo(this.value)"></div>
       <button id="btn-dictar-catalogo" onclick="dictarBusquedaSimple('catbuscar','btn-dictar-catalogo')" style="background:#5E35B1;color:white;border:none;border-radius:8px;width:44px;flex-shrink:0;cursor:pointer;font-size:18px">🎤</button>
@@ -770,12 +780,18 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     </div>
     <!-- 🏪 FILTRAR EL CATALOGO POR SUPLIDOR -idea de Sensei, 19 ago-: escoges un
          suplidor y salen solo los productos que le compras a el. Sale de sus compras,
-         no hace falta guardar nada nuevo en cada producto. -->
-    <div style="display:flex;gap:6px;margin-bottom:8px">
-      <select id="cat-suplidor" onchange="filtrarCatalogo()" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:9px;font-size:13px;font-weight:700;background:#fff">
-        <option value="">🏪 Todos los suplidores</option>
-      </select>
-      <button id="cat-btn-sinprecio" onclick="verSoloSinPrecio()" style="flex-shrink:0;padding:10px 11px;background:#FFEBEE;color:#C62828;border:1.5px solid #C62828;border-radius:9px;font-size:12px;font-weight:800;cursor:pointer">⚠️ Sin precio</button>
+         no hace falta guardar nada nuevo en cada producto.
+         El desplegable usa la clase .inp de la app para que quede del mismo alto y del
+         mismo ancho que la caja de buscar, y no descuadrado como quedo la primera vez. -->
+    <select class="inp" id="cat-suplidor" onchange="filtrarCatalogo()" style="font-size:14px;font-weight:700;margin-bottom:8px">
+      <option value="">🏪 Todos los suplidores</option>
+    </select>
+    <!-- El aviso de los que no tienen precio va en su propia franja, de lado a lado, y
+         SOLO aparece cuando de verdad hay alguno. Cuando no queda ninguno, desaparece. -->
+    <div id="cat-aviso-sinprecio" onclick="verSoloSinPrecio()" style="display:none;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:10px;padding:10px 12px;margin-bottom:10px;cursor:pointer;align-items:center;gap:9px">
+      <span style="font-size:16px;flex-shrink:0">⚠️</span>
+      <span id="cat-aviso-sinprecio-txt" style="flex:1;font-size:12.5px;font-weight:800;color:#C62828;line-height:1.35"></span>
+      <span style="font-size:15px;color:#C62828;flex-shrink:0">›</span>
     </div>
     <div id="catlista"></div>
   </div>
@@ -8967,6 +8983,15 @@ function productosDeSuplidor(sid){
   return ids;
 }
 
+function toggleOpcionesCatalogo(){
+  var caja = document.getElementById('cat-opciones');
+  var flecha = document.getElementById('cat-opciones-flecha');
+  if(!caja) return;
+  var abierto = caja.style.display !== 'none';
+  caja.style.display = abierto ? 'none' : 'block';
+  if(flecha) flecha.textContent = abierto ? '\u25bc' : '\u25b2';
+}
+
 function filtrarCatalogo(){
   try { renderCatalogo(document.getElementById('catbuscar').value); } catch(e){ renderCatalogo(''); }
 }
@@ -8975,6 +9000,7 @@ function verSoloSinPrecio(){
   var sel = document.getElementById('cat-suplidor');
   if(sel) sel.value = 'SINPRECIO';
   filtrarCatalogo();
+  try { document.getElementById('catlista').scrollIntoView({ behavior:'smooth', block:'start' }); } catch(e){}
 }
 
 function renderCatalogo(q){
@@ -9020,14 +9046,18 @@ function renderCatalogo(q){
     list = list.filter(function(p){ return _ids[String(p.id)]; });
   }
 
-  // El botón rojo lleva la cuenta de cuántos están en cero
-  var _btnSP = document.getElementById('cat-btn-sinprecio');
-  if(_btnSP){
+  // La franja del aviso: sale SOLO si hay productos sin precio. Si no hay, no ocupa sitio.
+  var _avSP = document.getElementById('cat-aviso-sinprecio');
+  if(_avSP){
     var _n = productos.filter(function(p){ return !(parseFloat(p.precio) > 0.005); }).length;
-    _btnSP.textContent = _n ? ('⚠️ Sin precio (' + _n + ')') : '✓ Todos con precio';
-    _btnSP.style.background = _n ? '#FFEBEE' : '#E8F5E9';
-    _btnSP.style.color      = _n ? '#C62828' : '#2E7D32';
-    _btnSP.style.borderColor= _n ? '#C62828' : '#2E7D32';
+    if(_n > 0 && _filtro !== 'SINPRECIO'){
+      _avSP.style.display = 'flex';
+      document.getElementById('cat-aviso-sinprecio-txt').textContent =
+        _n + (_n === 1 ? ' producto sin precio de venta \u2014 t\u00f3calo para ponerle precio'
+                       : ' productos sin precio de venta \u2014 t\u00f3calos para ponerles precio');
+    } else {
+      _avSP.style.display = 'none';
+    }
   }
   // Ahora tambien por MARCA, PRECIO y COSTO. El catalogo era el unico buscador de
   // productos que no miraba la marca, y el precio no lo miraba ninguno. -4 ago-
@@ -15296,10 +15326,19 @@ function saveCC(){
       var nuevoId = 'custom_' + Date.now() + '_' + Math.floor(Math.random()*1000);
       var marcaFinal = it.marca || '';
       var nombreFinal = marcaFinal ? (it.nombre.toLowerCase().indexOf(marcaFinal.toLowerCase())===0 ? it.nombre : marcaFinal+' '+it.nombre) : it.nombre;
-      productos.push({ id: nuevoId, marca: marcaFinal, nombreCorto: it.nombre, nombre: nombreFinal, cat: it.cat||'', sku: '', costo: it.costo, precio: it.precioVenta||0, stock: it.cant, min: 5 });
+      // 🏪 EL PROVEEDOR PREFERIDO SE LLENA SOLO -Sensei, 19 ago-: "si yo entro una factura
+      // de un suplidor X, esa factura en la parte de proveedor preferido deberia llenarse
+      // automaticamente porque se esta entrando una factura a nombre de ese suplidor". Tiene
+      // razon: el dato ya esta ahi y hacerselo escribir a mano es trabajo de gratis.
+      productos.push({ id: nuevoId, marca: marcaFinal, nombreCorto: it.nombre, nombre: nombreFinal, cat: it.cat||'', sku: '', costo: it.costo, precio: it.precioVenta||0, stock: it.cant, min: 5, proveedorPref: sn || '' });
     } else {
       var p = productos.find(function(x){ return String(x.id)===String(it.pid); });
-      if(p){ p.stock += it.cant; p.costo = it.costo; }
+      if(p){
+        p.stock += it.cant; p.costo = it.costo;
+        // Si el producto todavia no tenia proveedor preferido, se le pone este. Si YA tenia
+        // uno, NO se le pisa: puede que se lo compre a dos y el haya escogido cual prefiere.
+        if(sn && !String(p.proveedorPref || '').trim()) p.proveedorPref = sn;
+      }
     }
   });
   tot += costoEnvio + cargoTarjeta - descC.total;
@@ -17260,7 +17299,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260819n';
+var NOVEDADES_VERSION = '20260819p';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
