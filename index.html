@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260819j-OFICIAL-V2.0">
+<meta name="app-version" content="20260819k-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -17048,7 +17048,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260819j';
+var NOVEDADES_VERSION = '20260819k';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34198,8 +34198,43 @@ function quitarDeDia(diaKey, neg){
 function nombreDeVisita(v){ return (v && typeof v === 'object') ? v.n : v; }
 
 // Devuelve la posicion de una barberia en la lista de visitas, o -1
+// 🔴 POR QUE LA VISITA NO SE MARCABA SOLA -19 ago-.
+//
+// La ruta se guarda en `rutas_por_dia` y la pantalla de la ruta arma su lista con
+// `(c.negocio||'').trim()` — o sea, SIN espacios de sobra. Pero el marcado automatico
+// comparaba con `cl.negocio` TAL CUAL esta guardado en el cliente, sin limpiar.
+//
+// Si al escribir el nombre de la barberia se colo un espacio al final, o quedo en
+// mayusculas en un sitio y en minusculas en otro, `rutaHoy.indexOf(negocio)` daba -1 y la
+// funcion se salia CALLADA: ni marcaba, ni avisaba, ni dejaba rastro. Por eso Sensei tenia
+// que marcar a mano sin entender por que.
+//
+// Ahora los nombres se comparan normalizados: sin espacios de sobra, sin dobles espacios,
+// sin acentos y sin distinguir mayusculas. "Modern Cuts ", "MODERN CUTS" y "modern cuts"
+// son la misma barberia.
+function normNegocio(x){
+  return String(x || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // quita acentos
+    .replace(/\s+/g, ' ')                               // dobles espacios -> uno
+    .trim()
+    .toUpperCase();
+}
+
+function mismoNegocio(a, b){
+  var na = normNegocio(a);
+  return na !== '' && na === normNegocio(b);
+}
+
+// Busca una barberia dentro de una lista sin que un espacio lo rompa. Devuelve la posicion.
+function posEnLista(lista, neg){
+  for(var i = 0; i < (lista || []).length; i++){
+    if(mismoNegocio(lista[i], neg)) return i;
+  }
+  return -1;
+}
+
 function posVisita(visitas, neg){
-  for(var i=0;i<visitas.length;i++){ if(nombreDeVisita(visitas[i]) === neg) return i; }
+  for(var i=0;i<visitas.length;i++){ if(mismoNegocio(nombreDeVisita(visitas[i]), neg)) return i; }
   return -1;
 }
 
@@ -34410,7 +34445,14 @@ function marcarVisitaAutomatica(negocio){
     var hoyKey = getDiaHoy();
     var rutas  = LS('rutas_por_dia', {});
     var rutaHoy = rutas[hoyKey] || [];
-    if(rutaHoy.indexOf(negocio) < 0) return false;      // no está en la ruta de hoy
+    // Se busca sin que un espacio o una mayuscula lo rompa. -19 ago-
+    var _pos = posEnLista(rutaHoy, negocio);
+    if(_pos < 0) return false;      // de verdad no está en la ruta de hoy
+
+    // 🔑 Y se apunta con el nombre TAL COMO ESTA EN LA RUTA, no como venga del cliente.
+    // Si se apuntara el del cliente -con su espacio de mas-, la pantalla de la ruta seguiria
+    // sin encontrarlo y el ✓ no aparecería aunque el dato estuviera guardado.
+    negocio = rutaHoy[_pos];
 
     var key = 'visitas_' + hoyKey + '_' + fechaMasRecienteParaDia(hoyKey);
     var visitas = LS(key, []);
