@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260819q-OFICIAL-V2.0">
+<meta name="app-version" content="20260821a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -17307,7 +17307,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260819q';
+var NOVEDADES_VERSION = '20260821a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -24721,7 +24721,11 @@ function editarCl(id){
     +'<input type="file" id="ecl-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoCliente(this)">'
     +'<input type="file" id="ecl-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoCliente(this)">'
     +'<input type="hidden" id="ecl-foto-data" value="'+(c.foto||'')+'">'
-    +'<div style="display:none">'+'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
+    // 🔴 ARREGLO 21 ago: antes esto abria un <div style="display:none"> que envolvia la
+    // foto Y TAMBIEN el bloque de Nombre, Apellido y Apodo, asi que esos tres campos
+    // quedaban escondidos y no se podian editar. Ahora el display:none va en la fila de
+    // la foto y en nada mas.
+    +'<div style="display:none;align-items:center;gap:12px;margin-bottom:14px">'
     +'<div id="ecl-foto-preview" onclick="abrirOpcionesFotoCliente()" style="width:64px;height:64px;border-radius:12px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden;'+(c.foto?'background:#f0f0f0':'background:var(--nbs-gold-bg);border:2px dashed var(--nbs-gold)')+'">'+(c.foto?'<img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover">':'📷')+'</div>'
     +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--nbs-ink)">Foto del cliente</div>'
     +'<div style="font-size:11px;color:#888">Toca la foto para tomar una o elegir de la galería'+(c.foto?', o quitarla':'')+'</div></div>'
@@ -24730,7 +24734,6 @@ function editarCl(id){
     +'<div><label class="lbl">Nombre *</label><input class="inp" id="ecl-n" type="text" value="'+( c.nombre||'')+'" onblur="capitalizarFinal(this)"></div>'
     +'<div><label class="lbl">Apellido *</label><input class="inp" id="ecl-a" type="text" value="'+(c.apellido||'')+'" onblur="capitalizarFinal(this)"></div>'
     +'<label class="lbl">Apodo / Como lo conoces 🔒 (uso interno)</label><input class="inp" id="ecl-apodo" type="text" value="'+(c.apodo||'')+'" placeholder="Ej: El Flaco, Cano..." onblur="capitalizarFinal(this)">'
-    +'</div>'
     +'</div>'
     +'<label class="lbl">Tipo de negocio</label>'
     +'<select class="inp" id="ecl-tipo" onchange="toggleSubtipoTienda(\'ecl-tipo\',\'ecl-subtipo-wrap\');toggleIntervaloVisita(\'ecl-tipo\',\'ecl-intervalo-wrap\')">'
