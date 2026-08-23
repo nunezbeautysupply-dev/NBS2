@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260821c-OFICIAL-V2.0">
+<meta name="app-version" content="20260821d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16335,14 +16335,21 @@ function marcarBarberoActivo(idx){
     var cab = document.getElementById('multi-cab-' + i);
     if(!c) continue;
     var encendido = (i === idx);
-    c.style.borderTopColor = encendido ? '#1a237e' : 'var(--nbs-line)';
-    c.style.borderRightColor = encendido ? '#1a237e' : 'var(--nbs-line)';
-    c.style.borderBottomColor = encendido ? '#1a237e' : 'var(--nbs-line)';
-    c.style.borderTopWidth = encendido ? '2.5px' : '0.5px';
-    c.style.borderRightWidth = encendido ? '2.5px' : '0.5px';
-    c.style.borderBottomWidth = encendido ? '2.5px' : '0.5px';
-    c.style.boxShadow = encendido ? '0 4px 14px rgba(26,35,126,0.22)' : '0 2px 8px rgba(0,0,0,0.08)';
-    if(cab) cab.style.background = encendido ? '#E3E7FB' : '#EFEFF3';
+    c.style.borderTopColor = encendido ? '#1a237e' : '#B9B9C6';
+    c.style.borderRightColor = encendido ? '#1a237e' : '#B9B9C6';
+    c.style.borderBottomColor = encendido ? '#1a237e' : '#B9B9C6';
+    c.style.borderTopWidth = encendido ? '4px' : '1.5px';
+    c.style.borderRightWidth = encendido ? '4px' : '1.5px';
+    c.style.borderBottomWidth = encendido ? '4px' : '1.5px';
+    c.style.boxShadow = encendido ? '0 5px 18px rgba(26,35,126,0.30)' : '0 1px 5px rgba(0,0,0,0.06)';
+    // La rayita de la izquierda: ROJA y mas gruesa mientras este elegido; al apagarse
+    // vuelve a su color de siempre.
+    c.style.borderLeftWidth = encendido ? '10px' : '6px';
+    c.style.borderLeftColor = encendido ? '#C62828' : (c.getAttribute('data-rayita') || '#999');
+    // Los apagados se ven mas suaves: menos color y un poco mas claros. El elegido, entero.
+    c.style.filter  = encendido ? 'none' : 'saturate(0.45) opacity(0.72)';
+    c.style.background = encendido ? '#fff' : '#FAFAFC';
+    if(cab) cab.style.background = encendido ? '#DDE3FA' : '#F2F2F5';
   }
 }
 
@@ -16386,7 +16393,9 @@ function renderPedidosMultiples(){
     var card = document.createElement('div');
     card.id = 'multi-card-' + idx;
     card.setAttribute('data-idx', idx);
-    card.style.cssText = 'background:white;border-radius:12px;margin-bottom:14px;border:0.5px solid var(--nbs-line);border-left:5px solid '+col.fuerte+';overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);transition:border-color .12s, box-shadow .12s';
+    // Su color de siempre, guardado aqui para poder devolverselo cuando se apague
+    card.setAttribute('data-rayita', col.fuerte);
+    card.style.cssText = 'background:white;border-radius:12px;margin-bottom:16px;border:1.5px solid #B9B9C6;border-left:6px solid '+col.fuerte+';overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.10);transition:border-color .12s, box-shadow .12s';
     card.onclick = function(){ marcarBarberoActivo(idx); };
 
     // --- Cabecera: barbero, total, y la ✕ para quitarlo si hoy no compra ---
@@ -17339,7 +17348,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260821c';
+var NOVEDADES_VERSION = '20260821d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
