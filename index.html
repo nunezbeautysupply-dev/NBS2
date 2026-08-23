@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260821b-OFICIAL-V2.0">
+<meta name="app-version" content="20260821c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15776,6 +15776,8 @@ function abrirPantallaMultiple(){
   document.getElementById('ped-multi-wrap').style.display = 'block';
   loadProds();
   renderPedidosMultiples();
+  // El primero viene encendido, para que nunca haya duda de a cual le estas escribiendo
+  try { marcarBarberoActivo(0); } catch(e){}
   window.scrollTo(0,0);
 }
 
@@ -16323,6 +16325,27 @@ function _marcarBarberoSinCompra(idx, estado, titulo, nota){
   try { avisoChico(titulo + ' \u00b7 ' + String(nom).slice(0, 18)); } catch(e){}
 }
 
+// 🎯 EN CUAL BARBERO ESTAS -21 ago-. Con 4 o 5 pedidos abiertos, lo importante no es
+// distinguirlos por color: es saber a cual le estas escribiendo AHORA. El que tocaste se
+// enciende con borde azul grueso y cabecera azul clarita; los demas se apagan en gris.
+function marcarBarberoActivo(idx){
+  window._barberoActivo = idx;
+  for(var i = 0; i < (pedidosMultiTemp || []).length; i++){
+    var c = document.getElementById('multi-card-' + i);
+    var cab = document.getElementById('multi-cab-' + i);
+    if(!c) continue;
+    var encendido = (i === idx);
+    c.style.borderTopColor = encendido ? '#1a237e' : 'var(--nbs-line)';
+    c.style.borderRightColor = encendido ? '#1a237e' : 'var(--nbs-line)';
+    c.style.borderBottomColor = encendido ? '#1a237e' : 'var(--nbs-line)';
+    c.style.borderTopWidth = encendido ? '2.5px' : '0.5px';
+    c.style.borderRightWidth = encendido ? '2.5px' : '0.5px';
+    c.style.borderBottomWidth = encendido ? '2.5px' : '0.5px';
+    c.style.boxShadow = encendido ? '0 4px 14px rgba(26,35,126,0.22)' : '0 2px 8px rgba(0,0,0,0.08)';
+    if(cab) cab.style.background = encendido ? '#E3E7FB' : '#EFEFF3';
+  }
+}
+
 function renderPedidosMultiples(){
   var el = document.getElementById('ped-multi-lista');
   if(!el) return;
@@ -16354,20 +16377,29 @@ function renderPedidosMultiples(){
     var _debe = 0;
     try { _debe = cuentaDeCliente(p.cliente.id).dinero.debe; } catch(eD){}
 
+    // 👤 TODOS IGUALES, Y UNO ENCENDIDO -Sensei, 21 ago-: "que los nombres sean todos de
+    // un solo color negro y un fondo gris, que se vean bien todos iguales... la cosa es que
+    // yo los pueda elegir rapido porque se me confunden".
+    // Se quitaron los cinco colores de los nombres. Queda una RAYITA fina de color a la
+    // izquierda, que es lo unico que te dice donde empieza y donde termina cada bloque
+    // cuando estas abajo agregando productos. Y el barbero en el que estas se marca solo.
     var card = document.createElement('div');
-    card.style.cssText = 'background:white;border-radius:12px;margin-bottom:14px;border:0.5px solid var(--nbs-line);border-left:5px solid '+col.fuerte+';overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)';
+    card.id = 'multi-card-' + idx;
+    card.setAttribute('data-idx', idx);
+    card.style.cssText = 'background:white;border-radius:12px;margin-bottom:14px;border:0.5px solid var(--nbs-line);border-left:5px solid '+col.fuerte+';overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);transition:border-color .12s, box-shadow .12s';
+    card.onclick = function(){ marcarBarberoActivo(idx); };
 
     // --- Cabecera: barbero, total, y la ✕ para quitarlo si hoy no compra ---
-    var html = '<div style="padding:11px 12px;display:flex;align-items:center;gap:9px;border-bottom:0.5px solid #f0f0f3;background:'+col.suave+'">'
-      +'<div style="width:34px;height:34px;border-radius:9px;background:'+col.fuerte+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:white;flex-shrink:0">'+escaparHtml(p.cliente.nombre[0])+'</div>'
+    var html = '<div id="multi-cab-'+idx+'" style="padding:11px 12px;display:flex;align-items:center;gap:9px;border-bottom:0.5px solid #f0f0f3;background:#EFEFF3">'
+      +'<div style="width:34px;height:34px;border-radius:9px;background:#455A64;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:white;flex-shrink:0">'+escaparHtml(p.cliente.nombre[0])+'</div>'
       +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:18px;font-weight:900;color:'+col.fuerte+';line-height:1.15;letter-spacing:-0.3px">'+escaparHtml(nombreCompleto)+'</div>'
+      +'<div style="font-size:18px;font-weight:900;color:#1A1A1A;line-height:1.15;letter-spacing:-0.3px">'+escaparHtml(nombreCompleto)+'</div>'
       +(listaNegocios.length > 1 ? '<div style="font-size:11px;color:#888">'+escaparHtml(p.barberia)+'</div>' : '')
       +'</div>'
       +'<div id="multi-total-'+idx+'" style="font-size:15px;font-weight:800;color:'+(totalBarbero>0?'var(--nbs-green-text)':'#bbb')+'">$'+fmtNum(totalBarbero)+'</div>'
       +'<div style="display:flex;flex-direction:column;gap:1px;margin-right:5px">'
-      +'<button onclick="event.stopPropagation();moverBarberoMulti('+idx+',-1)" title="Subir" style="background:rgba(255,255,255,0.75);color:'+col.fuerte+';border:none;border-radius:5px 5px 0 0;width:26px;height:17px;cursor:pointer;font-size:11px;font-weight:900;line-height:1;padding:0'+(idx===0?';opacity:.3':'')+'">\u25b2</button>'
-      +'<button onclick="event.stopPropagation();moverBarberoMulti('+idx+',1)" title="Bajar" style="background:rgba(255,255,255,0.75);color:'+col.fuerte+';border:none;border-radius:0 0 5px 5px;width:26px;height:17px;cursor:pointer;font-size:11px;font-weight:900;line-height:1;padding:0'+(idx===pedidosMultiTemp.length-1?';opacity:.3':'')+'">\u25bc</button>'
+      +'<button onclick="event.stopPropagation();moverBarberoMulti('+idx+',-1)" title="Subir" style="background:rgba(255,255,255,0.85);color:#546E7A;border:none;border-radius:5px 5px 0 0;width:26px;height:17px;cursor:pointer;font-size:11px;font-weight:900;line-height:1;padding:0'+(idx===0?';opacity:.3':'')+'">\u25b2</button>'
+      +'<button onclick="event.stopPropagation();moverBarberoMulti('+idx+',1)" title="Bajar" style="background:rgba(255,255,255,0.85);color:#546E7A;border:none;border-radius:0 0 5px 5px;width:26px;height:17px;cursor:pointer;font-size:11px;font-weight:900;line-height:1;padding:0'+(idx===pedidosMultiTemp.length-1?';opacity:.3':'')+'">\u25bc</button>'
       +'</div>'
       +'<button onclick="quitarBarberoMulti('+idx+')" title="Hoy no compró" style="background:rgba(255,255,255,0.75);color:var(--nbs-red-dark);border:none;border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>'
       +'</div>';
@@ -16474,9 +16506,9 @@ function renderPedidosMultiples(){
       if(_cuantasSug){
         html += '<div style="padding:8px 12px 2px">'
           + '<button onclick="event.stopPropagation();toggleSugerencias(' + idx + ')" '
-          +   'style="width:100%;padding:10px;background:' + (_abierto ? col.fuerte : '#fff')
-          +   ';color:' + (_abierto ? '#fff' : col.fuerte)
-          +   ';border:1.5px solid ' + col.fuerte + ';border-radius:9px;font-size:12.5px;'
+          +   'style="width:100%;padding:10px;background:' + (_abierto ? '#37474F' : '#fff')
+          +   ';color:' + (_abierto ? '#fff' : '#37474F')
+          +   ';border:1.5px solid #90A4AE;border-radius:9px;font-size:12.5px;'
           +   'font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">'
           +   '\u26a1 Sugerencias (' + _cuantasSug + ')'
           +   '<span style="font-size:10px">' + (_abierto ? '\u25b2' : '\u25bc') + '</span>'
@@ -16499,11 +16531,11 @@ function renderPedidosMultiples(){
 
     if(p._habituales.length && !p._guardado && _abierto){
       html += '<div style="padding:9px 12px 2px">'
-        +'<div style="font-size:12px;font-weight:700;color:'+col.fuerte+';margin-bottom:6px">\u26A1 LO QUE M\u00c1S COMPRA</div>'
+        +'<div style="font-size:12px;font-weight:700;color:#37474F;margin-bottom:6px">\u26A1 LO QUE M\u00c1S COMPRA</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:8px">';
       p._habituales.forEach(function(h, hi){
         html += '<button onclick="agregarHabitualMulti('+idx+','+hi+')" '
-          + 'style="flex:1;min-width:calc(50% - 4px);background:'+col.suave+';border:1.5px solid '+col.fuerte+';'
+          + 'style="flex:1;min-width:calc(50% - 4px);background:#F2F2F6;border:1.5px solid #C7C7D1;'
           + 'border-radius:10px;padding:10px 8px;cursor:pointer;text-align:left">'
           + '<div style="font-size:14px;font-weight:700;color:var(--nbs-ink);line-height:1.2">'+escaparHtml(h.prod.nombre)+'</div>'
           + '<div style="font-size:13px;font-weight:800;color:#2E7D32;margin-top:3px">$'+fmtNum(h.prod.precio)+' <span style="color:#999;font-weight:600">&middot; x'+h.veces+'</span></div>'
@@ -16514,15 +16546,15 @@ function renderPedidosMultiples(){
 
     // --- Buscador propio de esta tarjeta ---
     html += '<div style="padding:9px 12px 4px">'
-      +'<div style="display:flex;gap:6px;background:'+col.suave+';padding:7px;border-radius:13px;border:1px solid '+col.fuerte+'33">'
-      +'<div class="busca-caja" style="border:2px solid '+col.fuerte+'">'
+      +'<div style="display:flex;gap:6px;background:#F2F2F6;padding:7px;border-radius:13px;border:1px solid #DCDCE4">'
+      +'<div class="busca-caja" style="border:2px solid #444">'
       +'<span style="font-size:15px;flex-shrink:0;opacity:0.75">🔍</span>'
-      +'<input id="multi-buscar-'+idx+'" class="busca-fuerte" type="text" placeholder="Buscar producto..." oninput="filterPedMulti('+idx+', this.value)" onfocus="filterPedMulti('+idx+', this.value||\'\')">'
+      +'<input id="multi-buscar-'+idx+'" class="busca-fuerte" type="text" placeholder="Buscar producto..." onfocus="marcarBarberoActivo('+idx+')" oninput="filterPedMulti('+idx+', this.value)" onfocus="filterPedMulti('+idx+', this.value||\'\')">'
       +'</div>'
       +'<button id="multi-mic-'+idx+'" onclick="dictarBusquedaSimple(\'multi-buscar-'+idx+'\', \'multi-mic-'+idx+'\')" title="Dictar por voz" style="background:#5E35B1;color:white;border:none;border-radius:11px;width:46px;flex-shrink:0;cursor:pointer;font-size:18px;box-shadow:0 2px 5px rgba(94,53,177,0.35)">🎤</button>'
       +'<button onclick="toggleNuevoProdPed('+idx+')" title="Agregar producto nuevo al catálogo" style="background:#00838F;color:white;border:none;border-radius:11px;width:46px;flex-shrink:0;cursor:pointer;font-size:18px;box-shadow:0 2px 5px rgba(0,131,143,0.35)">📦</button>'
       +'</div>'
-      +'<div id="multi-plist-'+idx+'" style="background:white;border:2px solid '+col.fuerte+'55;border-radius:11px;max-height:180px;overflow-y:auto;display:none;margin-top:7px;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div>';
+      +'<div id="multi-plist-'+idx+'" style="background:white;border:2px solid #C7C7D1;border-radius:11px;max-height:180px;overflow-y:auto;display:none;margin-top:7px;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div>';
 
     // --- Producto elegido + cantidad + boton de agregar ---
     if(prodSel){
@@ -16534,7 +16566,7 @@ function renderPedidosMultiples(){
         +'<button onclick="cambiarCantSelMulti('+idx+',-1)" style="width:34px;height:34px;background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:8px;cursor:pointer;font-size:17px;font-weight:700;line-height:1;flex-shrink:0">−</button>'
         +'<input id="multi-cant-'+idx+'" type="number" min="1" value="'+cantSel+'" oninput="pedMultiCant['+idx+']=parseInt(this.value)||1" style="width:46px;padding:7px 2px;border:0.5px solid #ddd;border-radius:6px;font-size:13px;text-align:center">'
         +'<button onclick="cambiarCantSelMulti('+idx+',1)" style="width:34px;height:34px;background:var(--nbs-green-bg);color:var(--nbs-green-text);border:none;border-radius:8px;cursor:pointer;font-size:17px;font-weight:700;line-height:1;flex-shrink:0">+</button>'
-        +'<button onclick="addItemMulti('+idx+')" style="flex:1;padding:9px;background:'+col.fuerte+';color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">+ Agregar a '+escaparHtml(p.cliente.nombre)+'</button>'
+        +'<button onclick="addItemMulti('+idx+')" style="flex:1;padding:9px;background:#1a237e;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">+ Agregar a '+escaparHtml(p.cliente.nombre)+'</button>'
         +'</div>';
     }
     html += '</div>';
@@ -17307,7 +17339,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260821b';
+var NOVEDADES_VERSION = '20260821c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
