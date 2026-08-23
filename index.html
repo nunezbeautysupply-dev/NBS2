@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260821a-OFICIAL-V2.0">
+<meta name="app-version" content="20260821b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16361,7 +16361,7 @@ function renderPedidosMultiples(){
     var html = '<div style="padding:11px 12px;display:flex;align-items:center;gap:9px;border-bottom:0.5px solid #f0f0f3;background:'+col.suave+'">'
       +'<div style="width:34px;height:34px;border-radius:9px;background:'+col.fuerte+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:white;flex-shrink:0">'+escaparHtml(p.cliente.nombre[0])+'</div>'
       +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:15px;font-weight:800;color:'+col.fuerte+'">'+escaparHtml(nombreCompleto)+'</div>'
+      +'<div style="font-size:18px;font-weight:900;color:'+col.fuerte+';line-height:1.15;letter-spacing:-0.3px">'+escaparHtml(nombreCompleto)+'</div>'
       +(listaNegocios.length > 1 ? '<div style="font-size:11px;color:#888">'+escaparHtml(p.barberia)+'</div>' : '')
       +'</div>'
       +'<div id="multi-total-'+idx+'" style="font-size:15px;font-weight:800;color:'+(totalBarbero>0?'var(--nbs-green-text)':'#bbb')+'">$'+fmtNum(totalBarbero)+'</div>'
@@ -17307,7 +17307,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260821a';
+var NOVEDADES_VERSION = '20260821b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
