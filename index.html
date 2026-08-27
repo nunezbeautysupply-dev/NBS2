@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260821d-OFICIAL-V2.0">
+<meta name="app-version" content="20260821e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -14132,6 +14132,43 @@ function forzarAgregar(){
 // Muestra los productos que ESTE cliente compra más seguido, como botones grandes.
 // Tocar uno lo agrega a la venta al instante (con su precio personalizado si tiene).
 // Ahorra tener que buscar y escribir el producto en cada venta.
+// 👤 Pinta arriba, bien grande, a quien le estas vendiendo. Se llama al escoger cliente
+// y cada vez que se abre la pantalla de Vender. -21 ago-
+// Vuelve a enseñar el buscador y el desplegable para escoger otro cliente. -21 ago-
+function cambiarClienteVenta(){
+  var esc = document.getElementById('v-escoger-cliente');
+  if(esc) esc.style.display = 'block';
+  var caja = document.getElementById('v-quien');
+  if(caja) caja.style.display = 'none';
+  var bus = document.getElementById('vcl-buscar');
+  if(bus){ bus.value = ''; try { bus.focus(); } catch(e){} }
+}
+
+function pintarAQuienLeVendo(){
+  var caja = document.getElementById('v-quien');
+  if(!caja) return;
+  var esc = document.getElementById('v-escoger-cliente');
+  var sel = document.getElementById('vcl');
+  var cid = sel ? sel.value : '';
+  // 📏 Sin cliente escogido: se enseña el buscador. Con cliente: se esconde y manda la
+  // franja azul, que ya dice quien es y trae su boton de Cambiar. Así la pantalla no repite
+  // el mismo dato tres veces. -Sensei, 21 ago: "hay demasiada informacion, es muy largo"-
+  if(esc) esc.style.display = cid ? 'none' : 'block';
+  if(!cid){ caja.style.display = 'none'; return; }
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c){ caja.style.display = 'none'; return; }
+
+  var nom = [c.nombre, c.apellido].filter(function(x){ return String(x||'').trim(); }).join(' ').trim();
+  if(String(c.apodo||'').trim()) nom += ' "' + String(c.apodo).trim() + '"';
+  document.getElementById('v-quien-nombre').textContent = nom || 'Cliente';
+  var neg = String(c.negocio||'').trim();
+  var elNeg = document.getElementById('v-quien-negocio');
+  elNeg.textContent = neg ? ('\ud83c\udfea ' + neg) : '';
+  elNeg.style.display = neg ? 'block' : 'none';
+  caja.style.display = 'block';
+}
+
 function renderFavoritosCliente(){
   var cont = document.getElementById('v-favoritos');
   if(!cont) return;
@@ -17348,7 +17385,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260821d';
+var NOVEDADES_VERSION = '20260821e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -19834,6 +19871,15 @@ function savePedido(){
 }
 
 function convertirPedidoAVenta(idx){
+  // Al llegar desde un pedido: se pinta la franja del cliente y se ensenan los dos enlaces
+  // chicos de abajo, que sustituyen a los botones grandes de antes.
+  setTimeout(function(){
+    try{ pintarAQuienLeVendo(); }catch(e){}
+    try{
+      var acc = document.getElementById('pedido-conv-acciones');
+      if(acc) acc.style.display = 'flex';
+    }catch(e){}
+  }, 60);
   pedidos = LS('npedidos', []);
   var p = pedidos[idx];
   if(!p) return;
@@ -19909,7 +19955,13 @@ function borrarPedidoQueSeEstaConvirtiendo(){
   try { avisoChico('\ud83d\uddd1\ufe0f Pedido borrado'); } catch(e){ }
 }
 
+function ocultarAccionesDeConversion(){
+  var acc = document.getElementById('pedido-conv-acciones');
+  if(acc) acc.style.display = 'none';
+}
+
 function cancelarConversionPedido(){
+  ocultarAccionesDeConversion();
   if(!confirm('¿Cancelar esto y volver a Pedidos Pendientes?\n\nEl pedido sigue guardado tal cual, no se pierde nada.')) return;
   iV = [];
   renderIV();
@@ -23162,36 +23214,68 @@ function pintarPanelCliente(cid){
       var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
       return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
     });
-    var contF = listaF.slice(0, 40).map(function(v){
-      var pg = 0;
-      (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
-      // 🔴 AQUI ESTABA EL FALLO QUE VIO SENSEI -19 ago-. Este renglon calculaba
-      // `total - pagos` por su cuenta. Una venta al CONTADO no lleva pagos apuntados
-      // -se pago en el momento-, asi que salia en rojo "debe $10.00" aunque estuviera
-      // pagada, mientras el DEBE de arriba, que si usa la regla buena, decia otra cosa.
-      var saldo = cobradoYDebeDe(v).debe;
-      var canc = !!v.cancelada;
-      var col = canc ? '#B71C1C' : (esSaldoPendiente(saldo) ? 'var(--nbs-red-text)' : 'var(--nbs-green-text)');
+    // 📄 LAS QUE DEBEN, ABIERTAS. LAS PAGADAS, EN UNA LINEA. -Sensei, 21 ago-:
+    // "quiero que solo esten abiertas las facturas que tengan balance y que las otras solo
+    // se vean pero no abiertas, porque eso tambien hace que sean mas largas las pantallas.
+    // Y ademas que la factura mas vieja se vea en balance mas grande para que sea mas
+    // notable y yo pueda elegirla con mas facilidad a la hora de aplicarle un pago".
+    var _conSaldo = [], _saldadas = [];
+    listaF.forEach(function(v){
+      var sal = cobradoYDebeDe(v).debe;
+      if(!v.cancelada && esSaldoPendiente(sal)) _conSaldo.push({ v: v, saldo: sal });
+      else _saldadas.push(v);
+    });
+    // La MAS VIEJA de las que deben va primera y marcada: es la que toca cobrar
+    _conSaldo.sort(function(a, b){
+      var fa = parsearFechaVenta(a.v.fecha), fb = parsearFechaVenta(b.v.fecha);
+      return (fa ? fa.getTime() : 0) - (fb ? fb.getTime() : 0);
+    });
+
+    var contF = _conSaldo.map(function(o, i){
+      var v = o.v, saldo = o.saldo;
+      var laVieja = (i === 0 && _conSaldo.length > 1);
       return '<div onclick="event.stopPropagation();verFacturaProfesional(' + _arg(v.id) + ')" '
-        + 'style="background:#fff;border-left:3px solid ' + col + ';border-radius:8px;padding:9px 10px;'
-        + 'margin-bottom:5px;cursor:pointer' + (canc ? ';opacity:.7' : '') + '">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+        + 'style="background:#fff;border:' + (laVieja ? '2px solid #C62828' : '1px solid #F0C4C4')
+        + ';border-left:' + (laVieja ? '7px' : '4px') + ' solid #C62828;border-radius:9px;'
+        + 'padding:' + (laVieja ? '11px 12px' : '9px 11px') + ';margin-bottom:6px;cursor:pointer'
+        + (laVieja ? ';box-shadow:0 2px 8px rgba(198,40,40,.16)' : '') + '">'
+        + (laVieja ? '<div style="font-size:9.5px;font-weight:900;color:#C62828;letter-spacing:.7px;margin-bottom:3px">\u2b50 LA M\u00c1S VIEJA \u2014 C\u00d3BRALE ESTA PRIMERO</div>' : '')
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
         +   '<div style="flex:1;min-width:0">'
-        +     '<div style="font-size:12.5px;font-weight:700;color:var(--nbs-ink)' + (canc ? ';text-decoration:line-through' : '') + '">'
+        +     '<div style="font-size:12.5px;font-weight:700;color:var(--nbs-ink)">'
         +       escaparHtml(v.fecha || '') + (v.hora ? ' \u00b7 ' + escaparHtml(v.hora) : '') + '</div>'
         +     '<div style="font-size:10.5px;color:var(--nbs-muted);margin-top:1px">'
-        +       ((v.items || []).length) + ' producto(s) \u00b7 ' + (v.tipo === 'credito' ? 'a cr\u00e9dito' : 'contado')
-        +       (canc ? ' \u00b7 \ud83d\udeab CANCELADA' : '')
+        +       ((v.items || []).length) + ' producto(s) \u00b7 de $' + fmtNum(v.total)
         +       (v.modificada ? ' \u00b7 modificada' : '') + '</div>'
         +   '</div>'
         +   '<div style="text-align:right;flex-shrink:0">'
-        +     '<div style="font-size:13px;font-weight:800;color:var(--nbs-ink)">$' + fmtNum(v.total) + '</div>'
-        +     '<div style="font-size:10.5px;font-weight:700;color:' + col + '">'
-        +       (canc ? 'cancelada' : (esSaldoPendiente(saldo) ? 'debe $' + fmtNum(saldo) : 'pagada')) + '</div>'
+        +     '<div style="font-size:9.5px;font-weight:800;color:#B0757A;letter-spacing:.4px">DEBE</div>'
+        +     '<div style="font-size:' + (laVieja ? '26px' : '19px') + ';font-weight:900;color:#C62828;line-height:1.05;letter-spacing:-0.6px">$'
+        +       fmtNum(saldo) + '</div>'
         +   '</div>'
         + '</div></div>';
     }).join('')
-    + (listaF.length > 40 ? '<div style="font-size:11px;color:var(--nbs-muted);text-align:center;padding:6px">y ' + (listaF.length - 40) + ' m\u00e1s</div>' : '')
+
+    // Las pagadas y las canceladas: una linea cada una, sin ocupar sitio. Se siguen tocando.
+    + (_saldadas.length
+        ? '<div style="font-size:10px;font-weight:800;color:var(--nbs-muted);letter-spacing:.6px;margin:9px 0 4px">'
+          + (_conSaldo.length ? 'YA SALDADAS' : 'TODAS SALDADAS \u2014 no te debe nada') + ' (' + _saldadas.length + ')</div>'
+          + _saldadas.slice(0, 40).map(function(v){
+              var canc = !!v.cancelada;
+              return '<div onclick="event.stopPropagation();verFacturaProfesional(' + _arg(v.id) + ')" '
+                + 'style="display:flex;justify-content:space-between;align-items:center;gap:8px;'
+                + 'padding:5px 10px;border-bottom:1px solid #F2F2F5;cursor:pointer;font-size:11.5px'
+                + (canc ? ';opacity:.65' : '') + '">'
+                + '<span style="color:var(--nbs-muted)' + (canc ? ';text-decoration:line-through' : '') + '">'
+                +   escaparHtml(v.fecha || '') + '</span>'
+                + '<span style="display:flex;gap:9px;align-items:center;flex-shrink:0">'
+                +   '<span style="font-weight:700;color:var(--nbs-ink)">$' + fmtNum(v.total) + '</span>'
+                +   '<span style="font-size:10px;font-weight:700;color:' + (canc ? '#B71C1C' : 'var(--nbs-green-text)') + '">'
+                +     (canc ? 'cancelada' : 'pagada') + '</span>'
+                + '</span></div>';
+            }).join('')
+        : '')
+    + (_saldadas.length > 40 ? '<div style="font-size:11px;color:var(--nbs-muted);text-align:center;padding:6px">y ' + (_saldadas.length - 40) + ' m\u00e1s</div>' : '')
     + '<button onclick="event.stopPropagation();verHistorialCliente(' + _arg(cid) + ',\'completo\')" '
     + 'style="width:100%;margin-top:6px;padding:9px;background:#1a237e;color:#fff;border:none;border-radius:8px;'
     + 'font-size:11.5px;font-weight:800;cursor:pointer">\ud83d\udccb Ver historial completo</button>';
@@ -36225,13 +36309,28 @@ function verHistorialCliente(cid, modo){
 <div id="p-v" class="pg">
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">🧾 Vender</h2>
+  <!-- 👤 A QUIEN LE ESTAS VENDIENDO -Sensei, 21 ago-: "cuando voy al carrito de compras,
+       ahi precisamente el nombre se confunde con todo lo demas, lo necesito mas grande y que
+       se distinga bastante". El nombre solo salia dentro del desplegable, chiquito y hasta
+       cortado. Ahora va en una franja propia arriba del todo, imposible de confundir. -->
+  <div id="v-quien" style="display:none;background:#1a237e;border-radius:11px;padding:9px 12px;margin-bottom:9px;box-shadow:0 3px 10px rgba(26,35,126,.28)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="flex:1;min-width:0">
+        <div id="v-quien-nombre" style="font-size:20px;font-weight:900;color:#fff;line-height:1.1;letter-spacing:-0.4px"></div>
+        <div id="v-quien-negocio" style="font-size:11.5px;font-weight:700;color:#C5CAE9;margin-top:1px"></div>
+      </div>
+      <button onclick="cambiarClienteVenta()" style="flex-shrink:0;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer">✏️ Cambiar</button>
+    </div>
+  </div>
   <div class="card">
+    <div id="v-escoger-cliente">
     <label class="lbl">Cliente</label>
     <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="vcl-buscar" type="text" placeholder="Escribe nombre o barbería..." oninput="filtrarClienteVenta(this.value)" autocomplete="off"></div>
     <div id="vcl-lista" style="background:white;border:1px solid #ddd;border-radius:8px;max-height:200px;overflow-y:auto;display:none;margin-bottom:8px"></div>
-    <select class="inp" id="vcl" onchange="renderMetodosPago('vini'); renderFavoritosCliente()">
+    <select class="inp" id="vcl" onchange="renderMetodosPago('vini'); renderFavoritosCliente(); pintarAQuienLeVendo()">
       <option value="">-- Cliente general --</option>
     </select>
+    </div>
     <div id="v-favoritos" style="display:none;margin-bottom:10px"></div>
     <label class="lbl">Buscar producto</label>
     <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="vb" type="text" placeholder="Escribe para buscar..." oninput="filterV(this.value)" onfocus="filterV(this.value||'')"></div>
@@ -36240,10 +36339,15 @@ function verHistorialCliente(cid, modo){
       <span id="vsn" style="font-size:13px;color:#1565C0;font-weight:500"></span>
       <button onclick="clearV()" style="background:none;border:none;cursor:pointer;color:#1565C0;font-size:18px">✕</button>
     </div>
-    <label class="lbl">Cantidad</label>
-    <input class="inp" id="vcant" type="number" value="1" min="1">
-    <button class="btn" style="background:#546E7A;color:white" onclick="addIV()">+ Agregar producto</button>
-    <button class="btn" style="background:#00838F;color:white" onclick="toggleNuevoProdVenta()">📦 Agregar producto nuevo al catálogo</button>
+    <!-- Cantidad y Agregar, en una sola linea. Antes eran dos bloques de 45 y 42 px. -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <div style="flex-shrink:0">
+        <label class="lbl" style="margin-bottom:2px">Cantidad</label>
+        <input class="inp" id="vcant" type="number" value="1" min="1" style="width:82px;margin:0;text-align:center;padding:10px 6px">
+      </div>
+      <button class="btn" style="background:#546E7A;color:white;flex:1;margin:0;align-self:flex-end;padding:12px" onclick="addIV()">+ Agregar producto</button>
+    </div>
+    <div onclick="toggleNuevoProdVenta()" style="text-align:center;font-size:12px;font-weight:700;color:#00838F;padding:4px 0 8px;cursor:pointer">📦 Agregar producto nuevo al catálogo</div>
     <div id="v-nuevo-prod-wrap" style="display:none;background:#E0F7FA;border-radius:10px;padding:12px;margin-bottom:8px">
       <div style="font-size:12px;font-weight:700;color:#00838F;margin-bottom:8px">📦 NUEVO PRODUCTO</div>
       <label class="lbl">Marca *</label><input class="inp" id="vnp-marca" type="text" placeholder="Ej: DORCO, IMMORTAL" autocomplete="off" oninput="onMarcaInput('vnp-marca')" onblur="ocultarDropdown('vnp-marca')">
@@ -36260,10 +36364,10 @@ function verHistorialCliente(cid, modo){
       </div>
     </div>
     <div id="iv" style="margin:8px 0"></div>
-    <div style="background:#E8F5E9;border-radius:8px;padding:12px;margin:8px 0">
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Subtotal</span><span id="vsubtot" style="font-weight:700;font-size:16px;color:#1565C0">$0.00</span></div>
-      <div style="border-top:1px solid #ddd;padding-top:8px">
-        <div style="font-size:12px;color:#666;font-weight:700;margin-bottom:6px">DESCUENTO (opcional)</div>
+    <div style="background:#E8F5E9;border-radius:8px;padding:9px 10px;margin:8px 0">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px"><span>Subtotal</span><span id="vsubtot" style="font-weight:700;font-size:16px;color:#1565C0">$0.00</span></div>
+      <div style="border-top:1px solid #ddd;padding-top:6px">
+        <div style="font-size:10.5px;color:#666;font-weight:800;margin-bottom:4px;letter-spacing:.4px">DESCUENTO (opcional)</div>
         <div style="display:flex;gap:8px;align-items:center">
           <select class="inp" id="vdesc-tipo" style="flex:1;margin:0;padding:10px" onchange="onDescTipoChange()">
             <option value="ninguno">Sin descuento</option>
@@ -36278,17 +36382,19 @@ function verHistorialCliente(cid, modo){
       </div>
       <div style="display:flex;justify-content:space-between;border-top:1px solid #ddd;padding-top:8px;margin-top:8px"><span style="font-weight:700">Total</span><span id="vtot" style="font-weight:700;font-size:18px;color:#1565C0">$0.00</span></div>
     </div>
-    <label class="lbl">Fecha de la venta</label>
-    <input class="inp" id="vfecha" type="date">
-    <div style="background:#FFF3E0;border-radius:10px;padding:12px;margin-bottom:8px">
-      <label style="font-size:15px;font-weight:800;color:#E65100;display:block;margin-bottom:8px">💳 TIPO DE PAGO</label>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span class="lbl" style="margin:0;flex-shrink:0">Fecha de la venta</span>
+      <input class="inp" id="vfecha" type="date" style="flex:1;margin:0;padding:7px 10px;font-size:13px">
+    </div>
+    <div style="background:#FFF3E0;border-radius:10px;padding:8px 10px;margin-bottom:8px">
+      <label style="font-size:11.5px;font-weight:800;color:#E65100;display:block;margin-bottom:5px;letter-spacing:.4px">💳 TIPO DE PAGO</label>
       <select class="inp" id="vtipo" onchange="actualizarLabelPagoVenta()" style="font-size:16px;font-weight:700;border:3px solid #E65100;color:#E65100;background:#FFF8F0;padding:12px">
         <option value="credito">✅ A crédito - pago parcial</option>
         <option value="contado">💵 Contado - pago completo</option>
       </select>
     </div>
-    <div id="vini-g" style="background:#E8F5E9;border-radius:10px;padding:12px;margin-bottom:8px">
-      <label id="v-pago-label" style="font-size:14px;font-weight:700;color:#2E7D32;display:block;margin-bottom:6px">💰 Pago inicial (opcional, puede ser $0)</label>
+    <div id="vini-g" style="background:#E8F5E9;border-radius:10px;padding:8px 10px;margin-bottom:8px">
+      <label id="v-pago-label" style="font-size:11.5px;font-weight:800;color:#2E7D32;display:block;margin-bottom:5px;letter-spacing:.4px">💰 Pago inicial (opcional, puede ser $0)</label>
       <div id="pago-metodos-vini"></div>
       <button type="button" onclick="agregarMetodoPago('vini')" style="background:none;border:1px dashed #2E7D32;border-radius:8px;padding:6px 10px;font-size:11px;color:#2E7D32;cursor:pointer;margin:4px 0 8px;width:100%">+ Agregar otra forma de pago</button>
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -36296,9 +36402,16 @@ function verHistorialCliente(cid, modo){
         <span id="pago-total-vini" style="font-size:16px;font-weight:800;color:#2E7D32">$0.00</span>
       </div>
     </div>
-    <button class="btn" style="background:#00838F;color:white;font-size:16px;font-weight:800;padding:15px" onclick="cobroRapidoContadoEfectivo()">⚡ Cobro rápido (contado en efectivo)</button>
+    <button class="btn" style="background:#00838F;color:white;font-size:15px;font-weight:800;padding:12px" onclick="cobroRapidoContadoEfectivo()">⚡ Cobro rápido (contado en efectivo)</button>
     <button class="btn" style="background:#2E7D32;color:white" onclick="registrarVentaConFirma()">✓ Registrar venta</button>
-    <button id="btn-cancelar-conversion-pedido" style="display:none;width:100%;padding:10px;background:#FFEBEE;color:#C62828;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px" onclick="cancelarConversionPedido()">✕ Cancelar y volver a Pedidos Pendientes -no se pierde nada-</button><button id="btn-borrar-pedido-conversion" style="display:none;width:100%;padding:10px;background:#B71C1C;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;margin-top:6px" onclick="borrarPedidoQueSeEstaConvirtiendo()">🗑️ El cliente ya no lo quiere — borrar este pedido</button>
+    <!-- Estos dos solo salen al venir de un pedido. Antes eran dos botones grandes de 50 px
+         cada uno. Ahora son enlaces chicos en una sola linea: siguen ahi, hacen lo mismo,
+         pero dejan de gritar y ahorran unos 70 px. -Sensei, 21 ago- -->
+    <div id="pedido-conv-acciones" style="display:none;gap:10px;justify-content:space-between;align-items:center;margin:6px 2px 8px">
+      <span onclick="cancelarConversionPedido()" style="font-size:11.5px;font-weight:700;color:#C62828;cursor:pointer;text-decoration:underline">✕ Cancelar y volver</span>
+      <span onclick="borrarPedidoQueSeEstaConvirtiendo()" style="font-size:11.5px;font-weight:700;color:#B71C1C;cursor:pointer;text-decoration:underline">🗑️ Ya no lo quiere — borrar</span>
+    </div>
+    <button id="btn-cancelar-conversion-pedido" style="display:none;width:0;height:0;padding:0;margin:0;border:0;overflow:hidden;opacity:0" onclick="cancelarConversionPedido()"></button><button id="btn-borrar-pedido-conversion" style="display:none;width:0;height:0;padding:0;margin:0;border:0;overflow:hidden;opacity:0" onclick="borrarPedidoQueSeEstaConvirtiendo()"></button>
     <div class="snk" id="mk-v">Venta registrada</div>
   </div>
 </div>
