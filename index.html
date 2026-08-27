@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260821e-OFICIAL-V2.0">
+<meta name="app-version" content="20260821g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -7418,6 +7418,189 @@ function editarSuplidor(id){
   overlay.style.display='block'; overlay.scrollTop = 0;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  🏪 EL PERFIL DEL SUPLIDOR — como la ficha del cliente  (21 ago 2026)
+//
+//  Sensei: "¿deberían los suplidores tener más o menos su perfil parecido al de
+//  los clientes?". Si: los datos YA estaban guardados -persona de contacto, dos
+//  telefonos, email, direccion, notas- pero solo se veian entrando a Editar.
+//
+//  Se copian los renglones desplegables del cliente, con lo que aplica a un
+//  suplidor. NO se traen VIP, premios, fidelidad, visitas ni "lo que te deja":
+//  eso es de vender, no de comprar.
+// ═══════════════════════════════════════════════════════════════════
+
+var _panelSupAbierto = null;
+
+function toggleSupPanel(clave, id){
+  _panelSupAbierto = (_panelSupAbierto === clave) ? null : clave;
+  verSup(id, window._modoSupActual || 'abiertas');
+  setTimeout(function(){
+    var f = document.getElementById('supfila-' + clave);
+    if(f) try { f.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(e){}
+  }, 80);
+}
+
+// Un renglon: icono, titulo, su numero a la derecha, y el contenido que se despliega.
+function _filaSup(clave, icono, titulo, resumen, contenido, id){
+  var abierto = (_panelSupAbierto === clave);
+  var h = '<div id="supfila-' + clave + '" style="border-radius:11px;margin-bottom:7px;overflow:hidden;'
+    + 'border:1px solid ' + (abierto ? '#5D4037' : 'var(--nbs-line)') + '">'
+    + '<div onclick="toggleSupPanel(\'' + clave + '\',' + id + ')" style="display:flex;align-items:center;gap:9px;'
+    + 'padding:11px 12px;cursor:pointer;background:' + (abierto ? '#EFEBE9' : '#fff') + '">'
+    + '<span style="font-size:16px;flex-shrink:0">' + icono + '</span>'
+    + '<span style="flex:1;font-size:14px;font-weight:800;color:' + (abierto ? '#5D4037' : 'var(--nbs-ink)') + '">' + titulo + '</span>'
+    + (resumen ? '<span style="font-size:12px;font-weight:700;color:var(--nbs-muted);flex-shrink:0">' + resumen + '</span>' : '')
+    + '<span style="font-size:13px;color:var(--nbs-muted);flex-shrink:0">' + (abierto ? '\u2303' : '\u203a') + '</span>'
+    + '</div>';
+  if(abierto) h += '<div style="padding:11px 12px;background:#FAFAFC;border-top:1px solid var(--nbs-line)">' + contenido + '</div>';
+  return h + '</div>';
+}
+
+function panelesDelSuplidor(id, s, comprasDelSup){
+  var h = '';
+  var _esc = function(x){ return escaparHtml(String(x || '')); };
+
+  // ── 📇 SUS DATOS ──
+  var telLimpio = String(s.tel || '').replace(/[^0-9]/g, '');
+  var telCLimpio = String(s.telContacto || '').replace(/[^0-9]/g, '');
+  var dirCompleta = [s.dir, s.ciudad, s.zip].filter(function(x){ return String(x || '').trim(); }).join(', ');
+  var dato = function(rotulo, valor){
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #F0F0F3">'
+      + '<span style="font-size:11.5px;color:var(--nbs-muted);font-weight:700;flex-shrink:0">' + rotulo + '</span>'
+      + '<span style="font-size:12.5px;color:var(--nbs-ink);font-weight:600;text-align:right">' + (_esc(valor) || '—') + '</span></div>';
+  };
+  var cont = dato('Contacto', s.contacto)
+    + dato('Tel. empresa', s.tel)
+    + dato('Tel. contacto', s.telContacto)
+    + dato('Email', s.email)
+    + dato('Dirección', dirCompleta);
+  var acciones = '';
+  if(telLimpio || telCLimpio){
+    var elTel = telLimpio || telCLimpio;
+    acciones += '<a href="tel:' + elTel + '" style="flex:1;text-align:center;padding:9px;background:#E8F5E9;color:#2E7D32;'
+      + 'border-radius:9px;font-size:12px;font-weight:800;text-decoration:none">📞 Llamar</a>';
+    acciones += '<a href="https://wa.me/' + (elTel.length === 10 ? '1' + elTel : elTel) + '" target="_blank" '
+      + 'style="flex:1;text-align:center;padding:9px;background:#E8F5E9;color:#128C7E;border-radius:9px;font-size:12px;font-weight:800;text-decoration:none">💬 WhatsApp</a>';
+  }
+  if(dirCompleta){
+    acciones += '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(dirCompleta) + '" target="_blank" '
+      + 'style="flex:1;text-align:center;padding:9px;background:#E3F2FD;color:#1565C0;border-radius:9px;font-size:12px;font-weight:800;text-decoration:none">🗺️ Mapa</a>';
+  }
+  if(acciones) cont += '<div style="display:flex;gap:6px;margin-top:9px">' + acciones + '</div>';
+  h += _filaSup('datos', '📇', 'Sus datos', (s.tel || s.telContacto || s.contacto || '—'), cont, id);
+
+  // ── 💵 MIS PAGOS ── el record de todo lo que le he pagado, cada uno con su lapiz
+  var pagos = [];
+  comprasDelSup.forEach(function(c){
+    (c.pagosFactura || []).forEach(function(p, i){
+      if(typeof p.monto !== 'number') return;
+      pagos.push({ compra: c, idx: i, pago: p });
+    });
+  });
+  pagos.sort(function(a, b){
+    var fa = parsearFechaVenta(a.pago.fecha), fb = parsearFechaVenta(b.pago.fecha);
+    return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
+  });
+  var totalPagos = pagos.reduce(function(a, x){ return a + x.pago.monto; }, 0);
+  var contPagos = pagos.length
+    ? pagos.slice(0, 40).map(function(x){
+        return '<div onclick="abrirEditorPagoCompra(' + _arg(x.compra.id) + ',' + x.idx + ',' + _arg(id) + ')" '
+          + 'style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;'
+          + 'border-bottom:1px solid #F0F0F3;cursor:pointer">'
+          + '<span style="font-size:12px;color:var(--nbs-muted);flex:1;min-width:0">' + _esc(x.pago.fecha)
+          +   (x.pago.metodo ? ' · ' + etiquetaMetodoCompra(x.pago.metodo) : '') + '</span>'
+          + '<span style="font-size:13px;font-weight:800;color:#2E7D32;flex-shrink:0">$' + fmtNum(x.pago.monto) + '</span>'
+          + '<span style="flex-shrink:0;font-size:12px">✏️</span></div>';
+      }).join('')
+    : '<div style="font-size:12px;color:var(--nbs-muted)">Todavía no le has pagado nada.</div>';
+  h += _filaSup('pagos', '💵', 'Mis pagos', pagos.length + ' · $' + fmtNum(totalPagos), contPagos, id);
+
+  // ── 📦 LO QUE MÁS LE COMPRO ──
+  var porProd = {};
+  comprasDelSup.forEach(function(c){
+    (c.items || []).forEach(function(it){
+      var clave = it.pid ? String(it.pid) : ('n:' + String(it.nombre || ''));
+      if(!porProd[clave]) porProd[clave] = { nombre: it.nombre || '', unid: 0, gastado: 0 };
+      var q = Number(it.cant); if(!isFinite(q) || q <= 0) q = 1;
+      var co = Number(it.costo); if(!isFinite(co) || co < 0) co = 0;
+      porProd[clave].unid += q;
+      porProd[clave].gastado += q * co;
+    });
+  });
+  var lista = Object.keys(porProd).map(function(k){ return porProd[k]; })
+    .sort(function(a, b){ return b.gastado - a.gastado; });
+  var contTop = lista.length
+    ? lista.slice(0, 15).map(function(x){
+        return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #F0F0F3">'
+          + '<span style="font-size:12px;color:var(--nbs-ink);flex:1;min-width:0">' + _esc(x.nombre) + '</span>'
+          + '<span style="font-size:11.5px;color:var(--nbs-muted);flex-shrink:0">' + x.unid + ' unid · $' + fmtNum(x.gastado) + '</span></div>';
+      }).join('')
+    : '<div style="font-size:12px;color:var(--nbs-muted)">Todavía no le has comprado nada.</div>';
+  h += _filaSup('top', '📦', 'Lo que más le compro', lista.length + ' productos', contTop, id);
+
+  // ── 💲 HISTORIAL DE COSTOS ──
+  h += _filaSup('costos', '💲', 'Historial de costos', '',
+    '<div style="font-size:12px;color:var(--nbs-muted);margin-bottom:8px">Cómo te ha ido cambiando el costo de cada producto que le compras.</div>'
+    + '<button onclick="event.stopPropagation();verHistorialCostoSuplidor(' + _arg(id) + ')" '
+    + 'style="width:100%;padding:10px;background:#5D4037;color:#fff;border:none;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">Ver el historial de costos</button>', id);
+
+  // ── 📅 CADA CUÁNTO LE COMPRO ──
+  var fechas = [];
+  comprasDelSup.forEach(function(c){
+    var f = parsearFechaVenta(c.fecha);
+    if(f && !isNaN(f.getTime())) fechas.push(f.getTime());
+  });
+  fechas.sort(function(a, b){ return a - b; });
+  var cada = null, diasDesde = null;
+  if(fechas.length >= 2){
+    var huecos = [];
+    for(var i = 1; i < fechas.length; i++) huecos.push((fechas[i] - fechas[i-1]) / 86400000);
+    huecos.sort(function(a, b){ return a - b; });
+    cada = Math.round(huecos[Math.floor(huecos.length / 2)]);
+  }
+  if(fechas.length) diasDesde = Math.floor((Date.now() - fechas[fechas.length - 1]) / 86400000);
+  var contRitmo = '<div style="font-size:12.5px;color:var(--nbs-ink);line-height:1.8">'
+    + 'Le has hecho <b>' + comprasDelSup.length + '</b> compra(s).<br>'
+    + (cada !== null ? 'Le compras cada <b>' + cada + ' días</b> más o menos.<br>' : '')
+    + (diasDesde !== null ? 'La última fue hace <b>' + diasDesde + ' día(s)</b>.' : 'Sin compras todavía.')
+    + '</div>';
+  h += _filaSup('ritmo', '📅', 'Cada cuánto le compro', (cada !== null ? cada + ' días' : '—'), contRitmo, id);
+
+  // ── 💳 CÓMO LE SUELO PAGAR ──
+  var porMetodo = {};
+  pagos.forEach(function(x){
+    var m = x.pago.metodo || 'sin apuntar';
+    if(!porMetodo[m]) porMetodo[m] = { veces: 0, monto: 0 };
+    porMetodo[m].veces++;
+    porMetodo[m].monto += x.pago.monto;
+  });
+  var metodos = Object.keys(porMetodo).sort(function(a, b){ return porMetodo[b].monto - porMetodo[a].monto; });
+  var contMet = metodos.length
+    ? metodos.map(function(m){
+        return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #F0F0F3">'
+          + '<span style="font-size:12.5px;color:var(--nbs-ink)">' + (m === 'sin apuntar' ? 'Sin apuntar' : etiquetaMetodoCompra(m)) + '</span>'
+          + '<span style="font-size:12px;color:var(--nbs-muted)">' + porMetodo[m].veces + ' vez/veces · $' + fmtNum(porMetodo[m].monto) + '</span></div>';
+      }).join('')
+    : '<div style="font-size:12px;color:var(--nbs-muted)">Todavía no le has pagado nada.</div>';
+  h += _filaSup('comopago', '💳', 'Cómo le suelo pagar',
+    (metodos.length ? (metodos[0] === 'sin apuntar' ? 'Sin apuntar' : etiquetaMetodoCompra(metodos[0])) : '—'), contMet, id);
+
+  // ── 📝 NOTAS ──
+  h += _filaSup('notas', '📝', 'Notas', (String(s.notas || '').trim() ? 'sí' : 'ninguna'),
+    '<div style="font-size:12.5px;color:var(--nbs-ink);white-space:pre-wrap;line-height:1.6">'
+    + (String(s.notas || '').trim() ? _esc(s.notas) : '<span style="color:var(--nbs-muted)">Sin notas. Se escriben en Editar suplidor.</span>')
+    + '</div>', id);
+
+  // ── ⚙️ AJUSTES ── (los botones que antes estaban sueltos arriba)
+  h += _filaSup('ajustes', '⚙️', 'Ajustes', '',
+    '<button class="btn" style="background:#1565C0;color:white;margin-bottom:7px" onclick="event.stopPropagation();editarSuplidor(' + _arg(id) + ')">✏️ Editar suplidor</button>'
+    + '<button class="btn" style="background:#6A1B9A;color:white;margin-bottom:7px" onclick="event.stopPropagation();agregarBalanceInicialSuplidor(' + _arg(id) + ')">💰 Agregar balance inicial</button>'
+    + '<button class="btn" style="background:#D32F2F;color:white;margin:0" onclick="event.stopPropagation();eliminarSup(' + _arg(id) + ')">🗑️ Eliminar suplidor</button>', id);
+
+  return h;
+}
+
 function verSup(id, modo){
   modo = modo || 'abiertas';
   suplidores = LS('nsup', []);
@@ -7446,21 +7629,38 @@ function verSup(id, modo){
   header.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
     +'<div class="av" style="width:56px;height:56px;font-size:20px;background:#EFEBE9;color:#5D4037">'+ini(s.nombre,'')+'</div>'
     +'<div><div style="font-size:22px;font-weight:700">'+escaparHtml(s.nombre)+'</div>'
-    +'<div style="font-size:13px;color:#aaa">'+(s.contacto?'Contacto: '+s.contacto:'Sin contacto registrado')+'</div></div></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">TEL. EMPRESA</div><div style="font-size:14px;margin-top:2px">'+(s.tel||'N/A')+'</div></div>'
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">TEL. CONTACTO</div><div style="font-size:14px;margin-top:2px">'+(s.telContacto||'N/A')+'</div></div>'
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">EMAIL</div><div style="font-size:14px;margin-top:2px">'+(s.email||'N/A')+'</div></div>'
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px;grid-column:span 2"><div style="font-size:10px;color:#aaa;font-weight:700">DIRECCION</div><div style="font-size:14px;margin-top:2px">'+((s.dir||'')+(s.ciudad?', '+s.ciudad:'')+(s.estado?', '+s.estado:'')+(s.zip?' '+s.zip:'')||'N/A')+'</div></div>'
-    +'<div style="background:#f5f5f5;border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">TOTAL COMPRADO</div><div style="font-size:18px;font-weight:700;color:#1565C0;margin-top:2px">$'+fmtNum(totalComprado)+'</div></div>'
-    +'<div style="background:'+(debo>0?'#FFEBEE':'#f5f5f5')+';border-radius:8px;padding:10px"><div style="font-size:10px;color:#aaa;font-weight:700">DEBO (CUENTAS POR PAGAR)</div><div style="font-size:18px;font-weight:700;color:'+(debo>0?'#C62828':'#2E7D32')+';margin-top:2px">$'+fmtNum(debo)+'</div></div>'
-    +(s.notas ? '<div style="background:#FFF8E1;border-radius:8px;padding:10px;grid-column:span 2"><div style="font-size:10px;color:#aaa;font-weight:700">NOTAS</div><div style="font-size:13px;margin-top:2px">'+s.notas+'</div></div>' : '')
-    +'</div>'
-    +'<div style="display:flex;gap:8px;margin-top:8px">'
-    +'<button class="btn" style="background:#1565C0;color:white;flex:1;margin:0" onclick="editarSuplidor('+id+')">✏️ Editar suplidor</button>'
-    +'<button class="btn" style="background:#D32F2F;color:white;flex:1;margin:0" onclick="eliminarSup('+id+')">🗑️ Eliminar</button>'
-    +'</div>'
-    +'<button class="btn" style="background:#6A1B9A;color:white;margin-top:8px" onclick="agregarBalanceInicialSuplidor('+id+')">💰 Agregar balance inicial</button>';
+  // 🏪 LA CABECERA, COMO LA DEL CLIENTE -Sensei, 21 ago-: cuatro numeros arriba y ya. Los
+  // datos y los botones de ajustes se fueron a los renglones desplegables de abajo.
+  var _prodDistintos = {};
+  todasComprasS.forEach(function(c){
+    (c.items || []).forEach(function(it){
+      _prodDistintos[it.pid ? String(it.pid) : ('n:' + String(it.nombre || ''))] = true;
+    });
+  });
+  var _fechasSup = [];
+  todasComprasS.forEach(function(c){
+    var f = parsearFechaVenta(c.fecha);
+    if(f && !isNaN(f.getTime())) _fechasSup.push(f.getTime());
+  });
+  _fechasSup.sort(function(a,b){ return a-b; });
+  var _ultimaSup = _fechasSup.length ? Math.floor((Date.now() - _fechasSup[_fechasSup.length-1]) / 86400000) : null;
+
+  var _num = function(rotulo, valor, color, fondo){
+    return '<div style="background:' + (fondo || '#F5F5F7') + ';border-radius:9px;padding:8px 6px;text-align:center">'
+      + '<div style="font-size:9px;color:var(--nbs-muted);font-weight:800;letter-spacing:.3px">' + rotulo + '</div>'
+      + '<div style="font-size:16px;font-weight:900;color:' + (color || 'var(--nbs-ink)') + ';margin-top:2px;letter-spacing:-0.4px">' + valor + '</div></div>';
+  };
+
+  header.innerHTML = '<div style="display:flex;align-items:center;gap:11px;margin-bottom:11px">'
+    +'<div class="av" style="width:50px;height:50px;font-size:19px;background:#EFEBE9;color:#5D4037;flex-shrink:0">'+ini(s.nombre,'')+'</div>'
+    +'<div style="min-width:0"><div style="font-size:20px;font-weight:900;color:var(--nbs-ink);line-height:1.12">'+escaparHtml(s.nombre)+'</div>'
+    +'<div style="font-size:12px;color:var(--nbs-muted)">'+(s.contacto?escaparHtml(s.contacto):'Sin contacto registrado')+'</div></div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'
+    + _num('COMPRÉ', '$'+fmtNum(totalComprado), '#1565C0')
+    + _num('DEBO', '$'+fmtNum(debo), debo>0.005?'#C62828':'#2E7D32', debo>0.005?'#FFEBEE':'#E8F5E9')
+    + _num('PRODUCTOS', String(Object.keys(_prodDistintos).length), '#5D4037')
+    + _num('ÚLTIMA', (_ultimaSup===null?'—':(_ultimaSup+' d')), '#5D4037')
+    +'</div>';
   el.appendChild(header);
 
   // Atajos para comprarle a ESTE suplidor -27 jul, idea de Sensei-. Antes habia que ir a
@@ -7490,6 +7690,13 @@ function verSup(id, modo){
   atajos.appendChild(btnCompra);
   atajos.appendChild(btnFactura);
   el.appendChild(atajos);
+
+  // 🏪 LOS RENGLONES DESPLEGABLES, como los del cliente. -21 ago-
+  window._modoSupActual = modo;
+  var paneles = document.createElement('div');
+  paneles.style.cssText = 'margin-bottom:12px';
+  paneles.innerHTML = panelesDelSuplidor(id, s, todasComprasS);
+  el.appendChild(paneles);
 
   var tabs = document.createElement('div');
   tabs.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px';
@@ -7625,12 +7832,21 @@ function verFacturaCompra(c, sid){
     var pagCard = document.createElement('div');
     pagCard.className = 'card';
     pagCard.innerHTML = '<div style="font-size:13px;font-weight:700;color:#5D4037;margin-bottom:10px">PAGOS APLICADOS</div>';
-    (c.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).forEach(function(p){
+    // ✏️ CADA PAGO SE PUEDE CORREGIR -Sensei, 21 ago-: acababa de pagarle a un suplidor
+    // y no habia forma de cambiarle la fecha ni de editarlo. A los CLIENTES si se les podia
+    // corregir un cobro desde hace tiempo; a los suplidores no. Ahora es igual en los dos.
+    (c.pagosFactura || []).forEach(function(p, _i){
+      if(typeof p.monto !== 'number') return;
       var row = document.createElement('div');
-      row.style.cssText = 'display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px';
+      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;'
+        + 'padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px;cursor:pointer';
       var _comoPago = p.metodo ? (' · ' + etiquetaMetodoCompra(p.metodo)) : '';
-      row.innerHTML = '<span style="color:#777">'+p.fecha+_comoPago+(p.nota?' · '+p.nota:'')+'</span>'
-        +'<span style="font-weight:700;color:#2E7D32">+$'+fmtNum(p.monto)+'</span>';
+      row.innerHTML = '<span style="color:#777;flex:1;min-width:0">'+p.fecha+_comoPago+(p.nota?' · '+p.nota:'')+'</span>'
+        +'<span style="font-weight:700;color:#2E7D32;flex-shrink:0">+$'+fmtNum(p.monto)+'</span>'
+        +'<span style="flex-shrink:0;background:#FFF8E1;border:1px solid #D4A017;border-radius:7px;padding:3px 7px;font-size:11px;font-weight:800;color:#8a6d00">✏️</span>';
+      row.onclick = (function(cid, idx, sidd){
+        return function(){ abrirEditorPagoCompra(cid, idx, sidd); };
+      })(c.id, _i, sid);
       pagCard.appendChild(row);
     });
     el.appendChild(pagCard);
@@ -17385,7 +17601,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260821e';
+var NOVEDADES_VERSION = '20260821g';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -26484,6 +26700,156 @@ function saldoDeCompra(c){
 // automatico en ningun caso". Por eso aqui NO se reparte nada solo, ni el sobrante. El pago va
 // entero a la factura que el marque. -Lo de repartir a la mas vieja es SOLO para los pagos de
 // sus CLIENTES, y eso se queda como esta.-
+// ✏️ CORREGIR UN PAGO QUE YA LE HICISTE A UN SUPLIDOR -Sensei, 21 ago-.
+// Sus palabras: "acabo de hacer un pago a un suplidor y se hizo el pago pero no me deja
+// cambiar la fecha, ni tengo forma de editarlo, eso esta muy mal". Tenia razon: a los
+// CLIENTES si se les podia corregir un cobro desde hace tiempo -abrirEditorPago-, y a los
+// suplidores no habia ninguna manera. Ahora es el mismo camino en los dos lados: se puede
+// cambiar la FECHA, el MONTO y la FORMA DE PAGO, o borrarlo del todo. Todo con huella.
+function abrirEditorPagoCompra(cid, pidx, sid){
+  var todas = LS('nc', []);
+  var c = todas.find(function(x){ return String(x.id) === String(cid); });
+  if(!c || !c.pagosFactura || c.pagosFactura[pidx] === undefined){ alert('No encontré ese pago.'); return; }
+  var pago = c.pagosFactura[pidx];
+  window._editPagoCompra = { cid: cid, pidx: pidx, sid: sid };
+  window._editPagoCompraMetodo = pago.metodo || 'efectivo';
+
+  var ov = document.getElementById('editor-pago-compra');
+  if(!ov){ ov = document.createElement('div'); ov.id = 'editor-pago-compra'; document.body.appendChild(ov); }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;'
+    + 'display:flex;align-items:center;justify-content:center;padding:16px';
+
+  var h = '<div style="background:#fff;border-radius:14px;padding:16px;max-width:400px;width:100%;max-height:90vh;overflow-y:auto">'
+    + '<div style="font-size:16px;font-weight:900;color:#5D4037;margin-bottom:3px">✏️ Corregir este pago</div>'
+    + '<div style="font-size:11.5px;color:#888;margin-bottom:14px">Factura del '
+    +   escaparHtml(c.fecha || '') + ' · ' + escaparHtml(c.sn || '') + '</div>'
+
+    + '<div style="font-size:11px;color:#888;font-weight:800;margin-bottom:5px">QUÉ DÍA LE PAGASTE</div>'
+    + '<input type="date" id="edpc-fecha" value="' + fechaUSAaISO(pago.fecha) + '" '
+    +   'style="width:100%;padding:11px;border:1px solid #ccc;border-radius:8px;font-size:15px;margin-bottom:14px;box-sizing:border-box">'
+
+    + '<div style="font-size:11px;color:#888;font-weight:800;margin-bottom:5px">CUÁNTO LE PAGASTE</div>'
+    + '<input type="text" inputmode="numeric" id="edpc-monto" value="' + (parseFloat(pago.monto)||0).toFixed(2) + '" '
+    +   'onfocus="this.select()" oninput="formatoMoneda(this)" '
+    +   'style="width:100%;padding:11px;border:1px solid #ccc;border-radius:8px;font-size:17px;font-weight:800;'
+    +   'text-align:center;margin-bottom:14px;box-sizing:border-box">'
+
+    + '<div style="font-size:11px;color:#888;font-weight:800;margin-bottom:5px">CÓMO LE PAGASTE</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">';
+
+  METODOS_PAGO_COMPRA.forEach(function(m){
+    var sel = (pago.metodo || 'efectivo') === m.tipo;
+    h += '<button onclick="escogerMetodoEditPagoCompra(\'' + m.tipo + '\')" data-met="' + m.tipo + '" '
+      + 'class="edpc-met" style="padding:10px 6px;border-radius:9px;cursor:pointer;font-size:12.5px;font-weight:800;'
+      + (sel ? 'background:' + m.color + ';color:#fff;border:2px solid ' + m.color + ';'
+             : 'background:#fff;color:' + m.color + ';border:1.5px solid ' + m.color + ';')
+      + '">' + m.texto + '</button>';
+  });
+
+  h += '</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:10px">'
+    + '<button onclick="guardarEditorPagoCompra()" style="flex:1.4;padding:12px;background:#2E7D32;color:#fff;'
+    +   'border:none;border-radius:9px;font-size:14px;font-weight:800;cursor:pointer">✓ Guardar cambios</button>'
+    + '<button onclick="cerrarEditorPagoCompra()" style="flex:.8;padding:12px;background:#F0F0F5;color:#333;'
+    +   'border:none;border-radius:9px;font-size:13.5px;font-weight:700;cursor:pointer">Cancelar</button>'
+    + '</div>'
+    + '<button onclick="borrarPagoCompra()" style="width:100%;padding:11px;background:#FFEBEE;color:#C62828;'
+    +   'border:none;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">🗑️ Borrar este pago</button>'
+    + '</div>';
+  ov.innerHTML = h;
+}
+
+function cerrarEditorPagoCompra(){
+  var ov = document.getElementById('editor-pago-compra');
+  if(ov) ov.style.display = 'none';
+}
+
+function escogerMetodoEditPagoCompra(tipo){
+  window._editPagoCompraMetodo = tipo;
+  var botones = document.querySelectorAll('.edpc-met');
+  for(var i = 0; i < botones.length; i++){
+    var b = botones[i], m = null;
+    for(var j = 0; j < METODOS_PAGO_COMPRA.length; j++){
+      if(METODOS_PAGO_COMPRA[j].tipo === b.getAttribute('data-met')) m = METODOS_PAGO_COMPRA[j];
+    }
+    if(!m) continue;
+    var sel = (m.tipo === tipo);
+    b.style.background = sel ? m.color : '#fff';
+    b.style.color = sel ? '#fff' : m.color;
+    b.style.border = (sel ? '2px solid ' : '1.5px solid ') + m.color;
+  }
+}
+
+function guardarEditorPagoCompra(){
+  var d = window._editPagoCompra;
+  if(!d) return;
+
+  var elM = document.getElementById('edpc-monto');
+  var monto = elM ? (parseFloat(String(elM.value).replace(/[$,]/g, '')) || 0) : 0;
+  if(!(monto > 0.005)){
+    alert('El pago tiene que ser mayor que cero.\n\nSi lo quieres quitar, usa Borrar este pago.');
+    return;
+  }
+  var elF = document.getElementById('edpc-fecha');
+  var fecha = elF && elF.value ? fechaISOaUSA(elF.value) : null;
+  if(!fecha){ alert('Escoge la fecha del pago.'); return; }
+
+  var todas = LS('nc', []);
+  var c = todas.find(function(x){ return String(x.id) === String(d.cid); });
+  if(!c || !c.pagosFactura || c.pagosFactura[d.pidx] === undefined){ alert('No encontré ese pago.'); return; }
+
+  // Si con el cambio le quedaria pagado de mas, se AVISA. No se bloquea: puede haber
+  // razones -un adelanto, un credito-, y el que decide es Sensei.
+  var otros = c.pagosFactura.reduce(function(a, p, i){
+    return a + (i === d.pidx ? 0 : (typeof p.monto === 'number' ? p.monto : 0));
+  }, 0);
+  var total = parseFloat(c.total) || 0;
+  if(otros + monto > total + 0.005){
+    if(!confirm('Con ese cambio le quedarías pagando $' + fmtNum(otros + monto)
+      + ' a una factura de $' + fmtNum(total) + '.\n\n¿Guardar de todas formas?')) return;
+  }
+
+  var metodo = window._editPagoCompraMetodo || 'efectivo';
+  protegerConHuella(function(){
+    var t2 = LS('nc', []);
+    var c2 = t2.find(function(x){ return String(x.id) === String(d.cid); });
+    if(!c2 || !c2.pagosFactura || c2.pagosFactura[d.pidx] === undefined){ alert('No encontré ese pago.'); return; }
+    c2.pagosFactura[d.pidx].monto = monto;
+    c2.pagosFactura[d.pidx].fecha = fecha;
+    c2.pagosFactura[d.pidx].metodo = metodo;
+    SS('nc', t2);
+    cerrarEditorPagoCompra();
+    alert('✅ Pago corregido: $' + fmtNum(monto) + ' con ' + etiquetaMetodoCompra(metodo) + ' el ' + fecha + '.');
+    compras = LS('nc', []);
+    var cAct = compras.find(function(x){ return String(x.id) === String(d.cid); });
+    if(cAct) verFacturaCompra(cAct, d.sid);
+  });
+}
+
+function borrarPagoCompra(){
+  var d = window._editPagoCompra;
+  if(!d) return;
+  var todas = LS('nc', []);
+  var c = todas.find(function(x){ return String(x.id) === String(d.cid); });
+  if(!c || !c.pagosFactura || c.pagosFactura[d.pidx] === undefined){ alert('No encontré ese pago.'); return; }
+  var p = c.pagosFactura[d.pidx];
+  if(!confirm('¿Borrar el pago de $' + fmtNum(p.monto) + ' del ' + (p.fecha || '') + '?\n\n'
+    + 'La deuda con este suplidor va a SUBIR $' + fmtNum(p.monto) + '.')) return;
+
+  protegerConHuella(function(){
+    var t2 = LS('nc', []);
+    var c2 = t2.find(function(x){ return String(x.id) === String(d.cid); });
+    if(!c2 || !c2.pagosFactura || c2.pagosFactura[d.pidx] === undefined){ alert('No encontré ese pago.'); return; }
+    c2.pagosFactura.splice(d.pidx, 1);
+    SS('nc', t2);
+    cerrarEditorPagoCompra();
+    alert('🗑️ Pago borrado.');
+    compras = LS('nc', []);
+    var cAct = compras.find(function(x){ return String(x.id) === String(d.cid); });
+    if(cAct) verFacturaCompra(cAct, d.sid);
+  });
+}
+
 function abrirPagoSuplidor(sid){
   var sups = LS('nsup', []);
   var sup = sups.find(function(x){ return String(x.id) === String(sid); });
@@ -26523,6 +26889,11 @@ function cerrarPagoSuplidor(){
 function pintarPagoSuplidor(){
   var caja = document.getElementById('pagosup-caja');
   if(!caja) return;
+  // Lo que ya haya escrito, para no perderlo al repintar. -21 ago-
+  var _elFprev = document.getElementById('pagosup-fecha');
+  var _fechaPrev = _elFprev && _elFprev.value ? _elFprev.value : null;
+  var _elMprev = document.getElementById('pagosup-monto');
+  var _montoPrev = _elMprev && _elMprev.value ? _elMprev.value : null;
   var sups = LS('nsup', []);
   var sup = sups.find(function(x){ return String(x.id) === String(window._pagoSupSid); });
   var facturas = window._pagoSupFacturas || [];
@@ -26553,14 +26924,18 @@ function pintarPagoSuplidor(){
   if(elegida){
     h += '<div style="font-size:11.5px;font-weight:800;color:#5D4037;margin:10px 0 5px">2. CUÁNTO LE PAGASTE</div>'
       + '<div style="display:flex;gap:6px;align-items:center">'
-      + '<input type="text" inputmode="numeric" id="pagosup-monto" value="' + saldoElegida.toFixed(2) + '"'
+      + '<input type="text" inputmode="numeric" id="pagosup-monto" value="' + (_montoPrev !== null ? _montoPrev : saldoElegida.toFixed(2)) + '"'
       + ' onfocus="this.select()" oninput="formatoMoneda(this)"'
       + ' style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;font-weight:700;text-align:center">'
       + '<button onclick="ponerTodoElSaldoSuplidor()" style="padding:10px 12px;background:#EFEBE9;border:1px solid #5D4037;'
       + 'border-radius:8px;color:#5D4037;font-size:12px;font-weight:700;cursor:pointer">Todo el saldo</button>'
       + '</div>';
 
-    h += '<div style="font-size:11.5px;font-weight:800;color:#5D4037;margin:10px 0 5px">3. CÓMO LE PAGASTE</div>'
+    // 📅 La fecha del pago, para cuando le pagaste otro dia -Sensei, 21 ago-.
+    h += '<div style="font-size:11.5px;font-weight:800;color:#5D4037;margin:10px 0 5px">3. QUÉ DÍA LE PAGASTE</div>'
+      + '<input type="date" id="pagosup-fecha" value="' + (_fechaPrev || fechaUSAaISO(fechaHoy())) + '"'
+      + ' style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box">'
+      + '<div style="font-size:11.5px;font-weight:800;color:#5D4037;margin:10px 0 5px">4. CÓMO LE PAGASTE</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
     METODOS_PAGO_COMPRA.forEach(function(m){
       var sel = window._pagoSupMetodo === m.tipo;
@@ -26588,6 +26963,10 @@ function pintarPagoSuplidor(){
 function escogerFacturaSuplidor(cid){
   window._pagoSupEscogida = cid;
   window._pagoSupMetodo = null;
+  // Al cambiar de factura si se limpia el monto: es otro pago, con otro saldo. La FECHA se
+  // respeta, porque el dia en que pago es el mismo aunque cambie de factura. -21 ago-
+  var _m = document.getElementById('pagosup-monto');
+  if(_m) _m.value = '';
   pintarPagoSuplidor();
 }
 
@@ -26630,7 +27009,10 @@ function aplicarPagoSuplidor(){
     var real = todas.find(function(x){ return String(x.id) === String(window._pagoSupEscogida); });
     if(!real){ alert('No encontré esa factura.'); return; }
     if(!real.pagosFactura) real.pagosFactura = [];
-    real.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy(), metodo: metodoElegido });
+    // La fecha que el escogio; si no la toca, queda la de hoy.
+    var _elF = document.getElementById('pagosup-fecha');
+    var _fechaPago = _elF && _elF.value ? fechaISOaUSA(_elF.value) : fechaHoy();
+    real.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: _fechaPago, metodo: metodoElegido });
     SS('nc', todas);
     cerrarPagoSuplidor();
     alert('✅ Pago de $' + fmtNum(monto) + ' con ' + etiqueta + ' aplicado a la factura del ' + (real.fecha || '') + '.');
