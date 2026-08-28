@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260821g-OFICIAL-V2.0">
+<meta name="app-version" content="20260827b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5843,7 +5843,7 @@ function saveGasto(){
     if(!desc){ alert('Describe el tipo de gasto'); return; }
     cat = desc;
   }
-  var monto = parseFloat(document.getElementById('gmonto').value) || 0;
+  var monto = dinero(document.getElementById('gmonto').value) || 0;
   if(monto <= 0){ alert('Ingresa un monto válido'); return; }
   // Convertir la fecha del campo -formato AAAA-MM-DD- al formato que usa el resto de la app -MM/DD/AAAA-
   var fechaEl = document.getElementById('gfecha');
@@ -6094,7 +6094,7 @@ function selComidaTipoEdit(tipo){
 
 function guardarEdicionGasto(id){
   var cat = document.getElementById('eg-cat').value.trim();
-  var monto = parseFloat(document.getElementById('eg-monto').value) || 0;
+  var monto = dinero(document.getElementById('eg-monto').value) || 0;
   // Convertir la fecha del campo -formato AAAA-MM-DD- al formato que usa el resto de la app -MM/DD/AAAA-
   var fechaElEdit = document.getElementById('eg-fecha');
   var fecha = fechaHoy();
@@ -7035,8 +7035,8 @@ function guardarTarjeta(id){
   var nombre = document.getElementById('cxpt-nombre').value.trim();
   if(!nombre){ alert('Escribe el nombre de la tarjeta'); return; }
   var banco = document.getElementById('cxpt-banco').value.trim();
-  var balance = parseFloat(document.getElementById('cxpt-balance').value) || 0;
-  var limite = parseFloat(document.getElementById('cxpt-limite').value) || 0;
+  var balance = dinero(document.getElementById('cxpt-balance').value) || 0;
+  var limite = dinero(document.getElementById('cxpt-limite').value) || 0;
 
   var tarjetas = LS('ntarjetas', []);
   if(id){
@@ -7076,7 +7076,7 @@ function registrarMovimientoTarjeta(id, tipo){
   var texto = tipo==='pago' ? '¿Cuánto vas a pagar a esta tarjeta?' : '¿Cuánto fue el cargo/compra a esta tarjeta?';
   var monto = prompt(texto, '0');
   if(monto === null) return;
-  var montoNum = parseFloat(monto);
+  var montoNum = dinero(monto);
   if(isNaN(montoNum) || montoNum <= 0){ alert('Monto inválido'); return; }
   if(tipo==='pago' && !verificarSobrepago(t.balance, montoNum)) return;
   if(!t.historial) t.historial = [];
@@ -7119,7 +7119,7 @@ function guardarOtraDeuda(id){
   var nombre = document.getElementById('cxpd-nombre').value.trim();
   if(!nombre){ alert('Escribe el nombre o descripción de la deuda'); return; }
   var tipo = document.getElementById('cxpd-tipo').value;
-  var balance = parseFloat(document.getElementById('cxpd-balance').value) || 0;
+  var balance = dinero(document.getElementById('cxpd-balance').value) || 0;
   var notas = document.getElementById('cxpd-notas').value.trim();
 
   var deudas = LS('notrasdeudas', []);
@@ -7150,7 +7150,7 @@ function registrarMovimientoOtraDeuda(id, tipo){
   var texto = tipo==='pago' ? '¿Cuánto vas a pagar de esta deuda?' : '¿Cuánto aumentó esta deuda?';
   var monto = prompt(texto, '0');
   if(monto === null) return;
-  var montoNum = parseFloat(monto);
+  var montoNum = dinero(monto);
   if(isNaN(montoNum) || montoNum <= 0){ alert('Monto inválido'); return; }
   if(tipo==='pago' && !verificarSobrepago(d.balance, montoNum)) return;
   if(!d.historial) d.historial = [];
@@ -7287,7 +7287,7 @@ function guardarBalanceInicialSuplidor(id){
   var s = suplidores.find(function(x){ return String(x.id) === String(id); });
   if(!s) return;
 
-  var monto = parseFloat(document.getElementById('bis-monto').value) || 0;
+  var monto = dinero(document.getElementById('bis-monto').value) || 0;
   if(monto <= 0){ alert('Ingresa un monto válido mayor a $0.00'); return; }
 
   var nota = limpiarTexto(document.getElementById('bis-nota').value.trim()) || 'Balance inicial traído de sistema anterior';
@@ -7901,7 +7901,7 @@ function verFacturaCompra(c, sid){
     });
     document.getElementById('btnpagocompra-'+c.id).onclick = function(){
       var inp = document.getElementById('pagocompra-'+c.id);
-      var monto = parseFloat(inp.value) || 0;
+      var monto = dinero(inp.value) || 0;
       if(monto <= 0){ alert('Ingresa un monto valido'); return; }
       if(monto > saldo){ if(!confirm('El monto es mayor al saldo. ¿Continuar?')) return; monto = saldo; }
       compras = LS('nc', []);
@@ -8144,7 +8144,7 @@ function editarCompra(cid, sid){
       inp.oninput = function(e){
         formatoCostoPreciso(inp, e);
         var i = parseInt(inp.dataset.i);
-        window._compraEditItems[i].costo = parseFloat(inp.value)||0;
+        window._compraEditItems[i].costo = dinero(inp.value)||0;
         var totalLineaInp = itemsWrap.querySelector('.compra-edit-total-linea[data-i="'+i+'"]');
         if(totalLineaInp) totalLineaInp.value = (window._compraEditItems[i].cant*window._compraEditItems[i].costo).toFixed(2);
         actualizarTotalEdicionCompra();
@@ -8152,7 +8152,7 @@ function editarCompra(cid, sid){
       inp.onblur = function(){
         finalizarCostoPreciso(inp);
         var i = parseInt(inp.dataset.i);
-        window._compraEditItems[i].costo = parseFloat(inp.value)||0;
+        window._compraEditItems[i].costo = dinero(inp.value)||0;
         var totalLineaInp = itemsWrap.querySelector('.compra-edit-total-linea[data-i="'+i+'"]');
         if(totalLineaInp) totalLineaInp.value = (window._compraEditItems[i].cant*window._compraEditItems[i].costo).toFixed(2);
         actualizarTotalEdicionCompra();
@@ -8165,7 +8165,7 @@ function editarCompra(cid, sid){
       inp.oninput = function(e){
         formatoCostoPreciso(inp, e);
         var i = parseInt(inp.dataset.i);
-        var totalEscrito = parseFloat(inp.value) || 0;
+        var totalEscrito = dinero(inp.value) || 0;
         var cantActual = window._compraEditItems[i].cant || 1;
         var costoCalculado = Math.round((totalEscrito / cantActual) * 1000000) / 1000000;
         window._compraEditItems[i].costo = costoCalculado;
@@ -8176,7 +8176,7 @@ function editarCompra(cid, sid){
       inp.onblur = function(){
         finalizarCostoPreciso(inp);
         var i = parseInt(inp.dataset.i);
-        var totalEscrito = parseFloat(inp.value) || 0;
+        var totalEscrito = dinero(inp.value) || 0;
         var cantActual = window._compraEditItems[i].cant || 1;
         var costoCalculado = Math.round((totalEscrito / cantActual) * 1000000) / 1000000;
         window._compraEditItems[i].costo = costoCalculado;
@@ -8543,7 +8543,7 @@ function saveCl(){
   SS('ncl',clientes);
 
   // Registrar balance inicial si se ingresó
-  var biMonto = parseFloat(document.getElementById('cbi-monto').value) || 0;
+  var biMonto = dinero(document.getElementById('cbi-monto').value) || 0;
   if(biMonto > 0){
     var biNota = document.getElementById('cbi-nota').value.trim() || 'Balance inicial traído de sistema anterior';
     var biComentario = document.getElementById('cbi-comentario').value.trim();
@@ -10304,6 +10304,27 @@ function nuevoPagoId(){
   return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
 }
 
+// 💵 LEER UN NUMERO DE DINERO, DE UNA SOLA FORMA EN TODA LA APP -Sensei, 27 ago-.
+//
+// 🔴 EL PELIGRO QUE ESTO EVITA: las casillas de dinero pasan a ensenar la coma de los
+// miles -$2,554.87-. Pero parseFloat("2,554.87") devuelve 2. O sea que un pago de dos mil
+// quinientos se habria guardado como DOS DOLARES. Habia 46 sitios en la app leyendo casillas
+// de dinero a pelo con parseFloat; todos pasan por aqui ahora.
+//
+// Acepta cualquier cosa: "2,554.87", "$2,554.87", " 2554.87 ", un numero, o nada.
+function dinero(v){
+  if(v === null || v === undefined) return 0;
+  if(typeof v === 'number') return isFinite(v) ? v : 0;
+  var n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
+  return isFinite(n) ? n : 0;
+}
+
+// Lo mismo pero leyendo la casilla directamente, por id o por el elemento.
+function dineroDe(elOid){
+  var el = (typeof elOid === 'string') ? document.getElementById(elOid) : elOid;
+  return el ? dinero(el.value) : 0;
+}
+
 function fmtNum(n){
   if(n===undefined||n===null) return '0.00';
   return parseFloat(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -11880,8 +11901,8 @@ function guardarNuevoProdVan(){
   if(!nombre){ alert('El nombre del producto es requerido'); return; }
   var nombreCompleto = marca + ' ' + nombre;
   var cat = document.getElementById('vannp-cat').value.trim();
-  var costo = parseFloat(document.getElementById('vannp-costo').value) || 0;
-  var precio = parseFloat(document.getElementById('vannp-precio').value) || 0;
+  var costo = dinero(document.getElementById('vannp-costo').value) || 0;
+  var precio = dinero(document.getElementById('vannp-precio').value) || 0;
   var stock = parseInt(document.getElementById('vannp-stock').value) || 0;
 
   // ID numerico secuencial (como los productos originales del catalogo)
@@ -12493,6 +12514,8 @@ function formatoMoneda(input){
   while(digitos.length < 3) digitos = '0' + digitos;
   var entero = digitos.slice(0, -2);
   var decimales = digitos.slice(-2);
+  // La coma de los miles, para que se lea como dinero: 2554.87 -> 2,554.87
+  entero = entero.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   input.value = entero + '.' + decimales;
 }
 
@@ -12514,6 +12537,8 @@ function costoBonito(n){
 }
 
 function formatoCostoPreciso(input, event){
+  // La coma es solo para leerlo; aqui estorba. Se quita antes de trabajar. -27 ago-
+  if(String(input.value).indexOf(',') >= 0) input.value = String(input.value).replace(/,/g, '');
   // Si el usuario teclea el punto decimal el mismo -precision especifica, como 4.0985-, o si
   // pega/rellena un valor de una vez que ya trae un punto -en vez de escribirlo letra por
   // letra-, se activa el "modo preciso" para el resto de esta edicion. Se revisa el texto que
@@ -12546,9 +12571,22 @@ function formatoCostoPreciso(input, event){
 // Al salir del campo -onblur-, si el usuario nunca escribio un punto el mismo, se aplica el
 // formato de calculadora de siempre -insertar el punto automatico 2 posiciones del final-,
 // para que escribir "400" de $4.00 no se quede tal cual ni se guarde por error como $400.00.
+// El costo con decimales de mas -4.4589- tambien se ensena con su coma al salir. -27 ago-
+function ponerComaSiHaceFalta(input){
+  var v = String(input.value || '');
+  if(v.indexOf(',') >= 0) return;
+  var partes = v.split('.');
+  if(!partes[0]) return;
+  partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  input.value = partes.join('.');
+}
+
 function finalizarCostoPreciso(input){
   if(input.dataset.modoPreciso !== '1'){
     formatoMoneda(input);
+  } else {
+    // Modo preciso -4.4589-: se respetan sus decimales, pero se le pone la coma. -27 ago-
+    ponerComaSiHaceFalta(input);
   }
 }
 
@@ -13681,8 +13719,8 @@ function guardarEdicionProducto(){
   if(!nombre){ alert('El nombre del producto es requerido'); return; }
   var cat = limpiarTexto(document.getElementById('ep-cat').value.trim());
   var sku = document.getElementById('ep-sku').value.trim();
-  var costo = parseFloat(document.getElementById('ep-costo').value) || 0;
-  var precio = parseFloat(document.getElementById('ep-precio').value) || 0;
+  var costo = dinero(document.getElementById('ep-costo').value) || 0;
+  var precio = dinero(document.getElementById('ep-precio').value) || 0;
   var stock = parseInt(document.getElementById('ep-stock').value) || 0;
   var min = parseInt(document.getElementById('ep-min').value) || 5;
   var foto = document.getElementById('ep-foto-data').value || '';
@@ -14555,7 +14593,7 @@ function onDescInput(input){
 
 function calcDesc(){
   var tipo = document.getElementById('vdesc-tipo') ? document.getElementById('vdesc-tipo').value : 'ninguno';
-  var val = parseFloat(document.getElementById('vdesc-val') ? document.getElementById('vdesc-val').value : 0) || 0;
+  var val = dinero(document.getElementById('vdesc-val') ? document.getElementById('vdesc-val').value : 0) || 0;
   var subtot = iV.reduce(function(s,it){ return s + it.cant*it.precio; }, 0);
   var desc = 0;
   if(tipo === 'pct' && val > 0){
@@ -14615,7 +14653,7 @@ function cambiarCantIV(i, delta){
 
 function actualizarPrecioIV(i, val){
   if(!iV[i]) return;
-  iV[i].precio = parseFloat(val) || 0;
+  iV[i].precio = dinero(val);
   // No se vuelve a dibujar toda la lista aqui -perderias el foco del campo mientras escribes-,
   // solo se actualiza el numero del total de esa linea y el subtotal general.
   var el = document.getElementById('iv');
@@ -14652,7 +14690,7 @@ function cobroRapidoContadoEfectivo(){
   // aplicar descuento si hay
   try{
     var tipoD = document.getElementById('vdesc-tipo');
-    var valD = parseFloat((document.getElementById('vdesc-val')||{}).value) || 0;
+    var valD = dinero((document.getElementById('vdesc-val')||{}).value);
     if(tipoD && tipoD.value==='pct' && valD>0) total = total - total*(valD/100);
     else if(tipoD && tipoD.value==='monto' && valD>0) total = Math.max(0, total - valD);
   }catch(e){}
@@ -14999,7 +15037,7 @@ function saveV(){
 
   // Calcular descuento
   var descTipo = document.getElementById('vdesc-tipo') ? document.getElementById('vdesc-tipo').value : 'ninguno';
-  var descVal = parseFloat(document.getElementById('vdesc-val') ? document.getElementById('vdesc-val').value : 0) || 0;
+  var descVal = dinero(document.getElementById('vdesc-val') ? document.getElementById('vdesc-val').value : 0) || 0;
 
   var subtot = iV.reduce(function(s,it){ return s + it.cant*it.precio; },0);
   var descMonto = 0;
@@ -15382,8 +15420,8 @@ function addCC(){
   loadProds();
   var pid = document.getElementById('ccsel').value;
   var cant = parseInt(document.getElementById('cccant').value) || 1;
-  var costo = parseFloat(document.getElementById('cccosto').value) || 0;
-  var precio = parseFloat(document.getElementById('ccprecio').value) || 0;
+  var costo = dinero(document.getElementById('cccosto').value) || 0;
+  var precio = dinero(document.getElementById('ccprecio').value) || 0;
 
   if(pid){
     var prod = productos.find(function(x){ return String(x.id)===String(pid); });
@@ -15462,7 +15500,7 @@ function renderICC(){
     inp.oninput = function(e){
       formatoCostoPreciso(inp, e);
       var i = parseInt(inp.dataset.i);
-      iCC[i].costo = parseFloat(inp.value)||0;
+      iCC[i].costo = dinero(inp.value)||0;
       // No se vuelve a dibujar toda la lista aqui -perderias el foco del campo mientras escribes-,
       // solo se actualiza el numero del total de esa linea y el total general.
       var totalLineaInp = el.querySelector('.icc-total-linea[data-i="'+i+'"]');
@@ -15472,7 +15510,7 @@ function renderICC(){
     inp.onblur = function(){
       finalizarCostoPreciso(inp);
       var i = parseInt(inp.dataset.i);
-      iCC[i].costo = parseFloat(inp.value)||0;
+      iCC[i].costo = dinero(inp.value)||0;
       var totalLineaInp = el.querySelector('.icc-total-linea[data-i="'+i+'"]');
       if(totalLineaInp) totalLineaInp.value = (iCC[i].cant*iCC[i].costo).toFixed(2);
       pintarTotalCompra();
@@ -15484,7 +15522,7 @@ function renderICC(){
     inp.oninput = function(e){
       formatoCostoPreciso(inp, e);
       var i = parseInt(inp.dataset.i);
-      var totalEscrito = parseFloat(inp.value) || 0;
+      var totalEscrito = dinero(inp.value) || 0;
       var cantActual = iCC[i].cant || 1;
       var costoCalculado = Math.round((totalEscrito / cantActual) * 1000000) / 1000000;
       iCC[i].costo = costoCalculado;
@@ -15495,7 +15533,7 @@ function renderICC(){
     inp.onblur = function(){
       finalizarCostoPreciso(inp);
       var i = parseInt(inp.dataset.i);
-      var totalEscrito = parseFloat(inp.value) || 0;
+      var totalEscrito = dinero(inp.value) || 0;
       var cantActual = iCC[i].cant || 1;
       var costoCalculado = Math.round((totalEscrito / cantActual) * 1000000) / 1000000;
       iCC[i].costo = costoCalculado;
@@ -15563,8 +15601,8 @@ function saveCC(){
   var tipo = document.getElementById('cctipo').value;
   var metodosPago = (window._pagoMetodos && window._pagoMetodos['ccini']) ? window._pagoMetodos['ccini'].filter(function(m){ return m.monto>0; }) : [];
   var ini = metodosPago.reduce(function(s,m){ return s+m.monto; }, 0);
-  var costoEnvio = parseFloat(document.getElementById('cc-envio').value) || 0;
-  var cargoTarjeta = parseFloat((document.getElementById('cc-tarjeta')||{}).value) || 0;
+  var costoEnvio = dinero(document.getElementById('cc-envio').value) || 0;
+  var cargoTarjeta = dinero((document.getElementById('cc-tarjeta')||{}).value);
   // 🚨 LA PARADA: no se guarda una compra que crearia productos SIN precio de venta.
   // Se abre la pantalla para ponerselos y, cuando termine, vuelve aqui y sigue. -19 ago-
   if(!window._preciosYaPuestos && faltanPreciosDeVenta(function(){
@@ -16430,7 +16468,7 @@ function ponerMontoCobro(cid, monto){
 function previewCobroPedidos(cid){
   var caja = document.getElementById('cobped-preview');
   if(!caja) return;
-  var monto = parseFloat((document.getElementById('cobped-monto') || {}).value) || 0;
+  var monto = dinero((document.getElementById('cobped-monto') || {}).value);
   if(monto <= 0.005){ caja.innerHTML = ''; return; }
 
   var pendientes = facturasQueDebenDe(cid, null);
@@ -16471,7 +16509,7 @@ function previewCobroPedidos(cid){
 
 // Aplicar el pago. Escribe con la MISMA forma que confirmarPagoMultiple. -15 ago-
 function aplicarCobroPedidos(cid){
-  var monto = parseFloat((document.getElementById('cobped-monto') || {}).value) || 0;
+  var monto = dinero((document.getElementById('cobped-monto') || {}).value);
   if(monto <= 0.005){ alert('Escribe cu\u00e1nto te est\u00e1 pagando.'); return; }
   var metodo = (document.getElementById('cobped-metodo') || {}).value || 'efectivo';
 
@@ -16849,7 +16887,7 @@ function renderPedidosMultiples(){
           +'<button onclick="cambiarCantItemMulti('+idx+','+itIdx+',1)" style="width:32px;height:32px;background:var(--nbs-green-bg);color:var(--nbs-green-text);border:none;border-radius:7px;cursor:pointer;font-size:16px;font-weight:700;line-height:1;flex-shrink:0">+</button>'
           +'<div style="display:flex;align-items:center;gap:3px">'
           +'<span style="font-size:11px;color:#999">$</span>'
-          +'<input type="text" inputmode="decimal" value="'+it.precio.toFixed(2)+'" onfocus="this.select()" oninput="formatoMoneda(this);actualizarItemMulti('+idx+','+itIdx+',\'precio\',parseFloat(this.value)||0)" style="width:62px;padding:6px 4px;border:0.5px solid #ddd;border-radius:6px;font-size:12px;text-align:center">'
+          +'<input type="text" inputmode="decimal" value="'+it.precio.toFixed(2)+'" onfocus="this.select()" oninput="formatoMoneda(this);actualizarItemMulti('+idx+','+itIdx+',\'precio\',dinero(this.value)||0)" style="width:62px;padding:6px 4px;border:0.5px solid #ddd;border-radius:6px;font-size:12px;text-align:center">'
           +'</div>'
           +'<span id="multi-isub-'+idx+'-'+itIdx+'" style="flex:1;text-align:right;font-size:13px;font-weight:700;color:var(--nbs-green-text)">$'+fmtNum(sub)+'</span>'
           +'</div>'
@@ -17601,7 +17639,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260821g';
+var NOVEDADES_VERSION = '20260827b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -19796,7 +19834,7 @@ function renderPedItems(){
       +'</div>'
       +'<div>'
       +'<label style="font-size:9px;color:#999;display:block;margin-bottom:2px">PRECIO $</label>'
-      +'<input type="text" inputmode="decimal" value="'+it.precio.toFixed(2)+'" onfocus="this.select()" oninput="formatoMoneda(this);actualizarPedItem('+i+',\'precio\',parseFloat(this.value)||0);actualizarSubtotalPed('+i+')" style="width:68px;padding:6px 4px;border:0.5px solid #ddd;border-radius:6px;font-size:13px;text-align:center">'
+      +'<input type="text" inputmode="decimal" value="'+it.precio.toFixed(2)+'" onfocus="this.select()" oninput="formatoMoneda(this);actualizarPedItem('+i+',\'precio\',dinero(this.value)||0);actualizarSubtotalPed('+i+')" style="width:68px;padding:6px 4px;border:0.5px solid #ddd;border-radius:6px;font-size:13px;text-align:center">'
       +'</div>'
       +'<span id="ped-subtotal-'+i+'" style="flex:1;text-align:right;font-size:14px;font-weight:700;color:var(--nbs-green-text)">$'+fmtNum(subtotal)+'</span>'
       +'</div>';
@@ -19924,8 +19962,8 @@ function guardarNuevoProdVenta(){
   if(!nombre){ alert('El nombre del producto es requerido'); return; }
   var nombreCompleto = marca + ' ' + nombre;
   var cat = document.getElementById('vnp-cat').value.trim();
-  var costo = parseFloat(document.getElementById('vnp-costo').value) || 0;
-  var precio = parseFloat(document.getElementById('vnp-precio').value) || 0;
+  var costo = dinero(document.getElementById('vnp-costo').value) || 0;
+  var precio = dinero(document.getElementById('vnp-precio').value) || 0;
   var stock = parseInt(document.getElementById('vnp-stock').value) || 0;
   // -confirmacion redundante quitada, el boton ya es la confirmacion-
   var nuevoId = 'custom_' + Date.now();
@@ -20005,8 +20043,8 @@ function guardarNuevoProdPed(){
   if(!nombre){ alert('El nombre del producto es requerido'); return; }
   var nombreCompleto = marca + ' ' + nombre;
   var cat = document.getElementById('pednp-cat').value.trim();
-  var costo = parseFloat(document.getElementById('pednp-costo').value) || 0;
-  var precio = parseFloat(document.getElementById('pednp-precio').value) || 0;
+  var costo = dinero(document.getElementById('pednp-costo').value) || 0;
+  var precio = dinero(document.getElementById('pednp-precio').value) || 0;
   var stock = parseInt(document.getElementById('pednp-stock').value) || 0;
   var nuevoId = 'custom_' + Date.now();
   var nuevoProd = { id: nuevoId, marca: marca, nombreCorto: nombre, nombre: nombreCompleto, cat: cat, sku: '', costo: costo, precio: precio, stock: stock, min: 5 };
@@ -20538,7 +20576,7 @@ function darRegaloFidelidad(cid){
   }
   var monto = prompt('¿Cuánto vale el regalo que le vas a dar? (sugerido entre $10 y $20)', '15');
   if(monto === null) return;
-  var montoNum = parseFloat(monto);
+  var montoNum = dinero(monto);
   if(isNaN(montoNum) || montoNum <= 0){ alert('Monto inválido'); return; }
   if(!confirm('¿Confirmar regalo de $'+fmtNum(montoNum)+' para '+nombreCl(c)+'?\n\nEl contador de fidelidad vuelve a $0 y empieza un nuevo ciclo hacia $'+fmtNum(fidelidad.meta)+'.')) return;
   if(!c.fidelidadRegalos) c.fidelidadRegalos = [];
@@ -20747,6 +20785,124 @@ function revisionDiaria(){
       }
     } catch(e){}
 
+    // ═══════════════════════════════════════════════════════════════
+    //  🔔 LO QUE VIGILA EL LADO DE LAS COMPRAS  (27 ago 2026)
+    //
+    //  Sensei preguntó si se puede garantizar que la app está 100% bien. La
+    //  respuesta honesta es que no existe tal garantía para NINGÚN programa.
+    //  Lo que sí se puede es que ningún descuadre viva escondido: que la app
+    //  se revise sola y avise el mismo día.
+    //
+    //  La revisión que había miraba solo las VENTAS. Estas cuatro miran el
+    //  lado de las COMPRAS, que es donde vive el código más nuevo.
+    // ═══════════════════════════════════════════════════════════════
+
+    // ── 7. UN PAGO A SUPLIDOR MAYOR QUE SU FACTURA ──
+    // Es el fallo que dejaría la coma del dinero si algún sitio leyera mal:
+    // un número cortado o inflado salta aquí en cuanto pasa.
+    try {
+      var comprasV = LS('nc', []);
+      var pagadasDeMas = [];
+      comprasV.forEach(function(c){
+        var total = parseFloat(c.total) || 0;
+        var pagado = (c.pagosFactura || []).reduce(function(a, p){
+          return a + (typeof p.monto === 'number' ? p.monto : 0);
+        }, 0);
+        if(pagado > total + 0.05){
+          pagadasDeMas.push({ sn: c.sn || 'suplidor', fecha: c.fecha || '', de: r2(pagado - total) });
+        }
+      });
+      if(pagadasDeMas.length){
+        var deMas = r2(pagadasDeMas.reduce(function(a, x){ return a + x.de; }, 0));
+        hallazgos.push({
+          grave: true,
+          titulo: '$' + fmtNum(deMas) + ' pagado de más a suplidores',
+          detalle: pagadasDeMas.length + ' factura(s) con más pagos que su total. '
+            + 'La primera: ' + pagadasDeMas[0].sn + ', ' + pagadasDeMas[0].fecha + '.',
+          accion: 'Ver suplidores', fn: 'irASuplidores'
+        });
+      }
+    } catch(e){}
+
+    // ── 8. LA CUENTA DE LO QUE DEBES A SUPLIDORES ──
+    // Se calcula de dos formas distintas y tienen que dar lo mismo. Si no,
+    // hay un pago o una factura que no está sumando donde debe.
+    try {
+      var comprasD = LS('nc', []);
+      var porFactura = 0, totalC = 0, pagadoC = 0;
+      comprasD.forEach(function(c){
+        var t = parseFloat(c.total) || 0;
+        var pg = (c.pagosFactura || []).reduce(function(a, p){
+          return a + (typeof p.monto === 'number' ? p.monto : 0);
+        }, 0);
+        totalC += t;
+        pagadoC += pg;
+        var saldo = t - pg;
+        if(saldo > 0.005) porFactura += saldo;
+      });
+      var porResta = totalC - pagadoC;
+      // Solo cuadran si NINGUNA está pagada de más; si alguna lo está, el aviso 7
+      // ya lo dijo y este no debe repetirlo.
+      var hayPagadaDeMas = comprasD.some(function(c){
+        var t = parseFloat(c.total) || 0;
+        var pg = (c.pagosFactura || []).reduce(function(a, p){
+          return a + (typeof p.monto === 'number' ? p.monto : 0);
+        }, 0);
+        return pg > t + 0.05;
+      });
+      if(!hayPagadaDeMas && Math.abs(r2(porFactura) - r2(porResta)) > 0.05){
+        hallazgos.push({
+          grave: true,
+          titulo: 'Lo que debes a suplidores no cuadra',
+          detalle: 'Sumando factura por factura da $' + fmtNum(porFactura)
+            + ', pero por la resta da $' + fmtNum(porResta) + '.',
+          accion: 'Ver suplidores', fn: 'irASuplidores'
+        });
+      }
+    } catch(e){}
+
+    // ── 9. PRODUCTOS EN $0.00 ──
+    // Si uno se cuela sin precio, se regala en la próxima venta.
+    try {
+      var sinPrecio = (typeof productosSinPrecio === 'function') ? productosSinPrecio() : [];
+      if(sinPrecio.length){
+        hallazgos.push({
+          grave: true,
+          titulo: sinPrecio.length + ' producto(s) sin precio de venta',
+          detalle: 'Si los vendes así, salen GRATIS. El primero: ' + (sinPrecio[0].nombre || '') + '.',
+          accion: 'Ponerles precio', fn: 'irACatalogo'
+        });
+      }
+    } catch(e){}
+
+    // ── 10. COMPRAS DONDE LOS PRODUCTOS NO SUMAN EL TOTAL ──
+    // Contando el envío y el cargo por tarjeta que suman, y los descuentos que restan.
+    try {
+      var comprasS = LS('nc', []);
+      var descuadradas = [];
+      comprasS.forEach(function(c){
+        var suma = (c.items || []).reduce(function(a, it){
+          var q = Number(it.cant); if(!isFinite(q) || q <= 0) q = 1;
+          var co = Number(it.costo); if(!isFinite(co) || co < 0) co = 0;
+          return a + q * co;
+        }, 0);
+        var desc = (c.descuentos || []).reduce(function(a, d){ return a + (parseFloat(d.monto) || 0); }, 0);
+        var esperado = suma + (parseFloat(c.envio) || 0) + (parseFloat(c.cargoTarjeta) || 0) - desc;
+        if(Math.abs(r2(esperado) - r2(parseFloat(c.total) || 0)) > 0.05){
+          descuadradas.push({ sn: c.sn || 'suplidor', fecha: c.fecha || '' });
+        }
+      });
+      if(descuadradas.length){
+        hallazgos.push({
+          grave: false,
+          titulo: descuadradas.length + ' compra(s) donde los productos no suman el total',
+          detalle: 'La primera: ' + descuadradas[0].sn + ', ' + descuadradas[0].fecha
+            + '. Puede ser un costo mal escrito o un descuento sin apuntar.',
+          accion: 'Ver suplidores', fn: 'irASuplidores'
+        });
+      }
+    } catch(e){}
+
   } catch(e){
     return { error: String(e).slice(0, 90), hallazgos: [] };
   }
@@ -20758,14 +20914,22 @@ function revisionDiaria(){
 function correrRevisionDiaria(){
   try {
     var hoy = fechaHoy();
-    if(LS('nbs_revision_dia', '') === hoy) return;
-    SS('nbs_revision_dia', hoy);
     var r = revisionDiaria();
     SS('nbs_revision_resultado', r);
     var graves = (r.hallazgos || []).filter(function(x){ return x.grave; });
-    if(!(r.hallazgos || []).length) return;      // todo cuadra: callado
-    // Solo interrumpe si hay algo GRAVE; lo demás espera en el asistente
-    if(graves.length) setTimeout(function(){ mostrarRevisionDiaria(); }, 2500);
+
+    // La huella de lo grave: si cambia, es que salió algo nuevo y hay que avisar YA,
+    // aunque la revisión de hoy ya se hubiera corrido.
+    var huella = graves.map(function(x){ return x.titulo; }).sort().join(' | ');
+    var huellaVieja = LS('nbs_revision_huella', '');
+    var yaHoy = (LS('nbs_revision_dia', '') === hoy);
+
+    SS('nbs_revision_dia', hoy);
+    SS('nbs_revision_huella', huella);
+
+    if(!graves.length) return;                 // nada grave: callado
+    if(yaHoy && huella === huellaVieja) return; // lo mismo de antes: no repetir
+    setTimeout(function(){ mostrarRevisionDiaria(); }, 2500);
   } catch(e){}
 }
 
@@ -20828,6 +20992,10 @@ function cerrarRevisionDiaria(){
 function irARevisionIntegridad(){ try { ir('p-integridad'); } catch(e){ try { ir('p-ajustes'); } catch(e2){} } }
 function irACuentasPorCobrar(){ try { ir('p-cxc'); renderCxC(''); } catch(e){} }
 function irACatalogo(){ try { ir('p-inv'); } catch(e){ try { ir('p-cat'); } catch(e2){} } }
+// Lo pide el aviso del vigilante y NO existia: el boton habria quedado muerto. -27 ago-
+// La pantalla es 'p-sup', que al abrirse ensena la LISTA de suplidores -asi lo hace ir()-.
+// Ojo: 'p-sups' no existe; se probo y habria dejado el boton sin hacer nada.
+function irASuplidores(){ try { ir('p-sup'); } catch(e){} }
 
 // Arreglar las facturas pagadas de más: el sobrante se le deja a favor. -15 ago-
 function arreglarPagadasDeMas(){
@@ -21462,7 +21630,7 @@ function cambiarCantidadCuadre(campo, denom, valor){
 
 function cambiarOtroCuadre(campo, valor){
   if(!_cuadreActual) return;
-  _cuadreActual[campo] = parseFloat(valor) || 0;
+  _cuadreActual[campo] = dinero(valor);
   if(campo === 'fondo'){ try { SS(CUADRE_FONDO, _cuadreActual.fondo); } catch(e){} }
   pintarComparacionCuadre();
 }
@@ -23858,7 +24026,7 @@ function verFactura(v){
     })(v.id, saldo);
     document.getElementById('btnpagofactura-'+v.id).onclick = function(){
       var inp = document.getElementById('pagofactura-'+v.id);
-      var monto = parseFloat(inp.value) || 0;
+      var monto = dinero(inp.value) || 0;
       if(monto <= 0){ alert('Ingresa un monto valido'); return; }
       if(monto > saldo){ if(!confirm('El monto es mayor al saldo. ¿Continuar?')) return; monto = saldo; }
       ventas = LS('nv', []);
@@ -24668,7 +24836,7 @@ function guardarProductoIndividualDeMarca(i){
   p.marca = marcaFinal;
   p.foto = fotoInput ? fotoInput.value : (p.foto || '');
   p.cat = (catSelInput.value === '__otra__' ? catInput.value.trim() : catSelInput.value);
-  p.costo = parseFloat(costoInput.value) || 0;
+  p.costo = dinero(costoInput.value) || 0;
   // ⚠️ LA EXISTENCIA. Sensei la necesita aqui para hacer el inventario por marca sin
   // entrar producto por producto. Solo se toca si el campo EXISTE y trae un numero:
   // si no, se deja la de antes — nunca se pone en cero por error. -11 ago-
@@ -24682,7 +24850,7 @@ function guardarProductoIndividualDeMarca(i){
   }
   // Igual que arriba: apuntar el precio de ANTES para poder compararlo -27 jul-
   var precioAntesI = (typeof p.precio === 'number') ? p.precio : parseFloat(p.precio) || 0;
-  p.precio = parseFloat(precioInput.value) || 0;
+  p.precio = dinero(precioInput.value) || 0;
   if(precioAntesI !== p.precio) registrarCambioPrecio(p.nombre, precioAntesI, p.precio);
   p.proveedorPref = supInput.value;
 
@@ -24752,7 +24920,7 @@ function guardarTodosLosProductosDeMarca(){
     p.marca = marcaFinal;
     p.foto = fotoInput ? fotoInput.value : (p.foto || '');
     p.cat = (catSelInput.value === '__otra__' ? catInput.value.trim() : catSelInput.value);
-    p.costo = parseFloat(costoInput.value) || 0;
+    p.costo = dinero(costoInput.value) || 0;
   // ⚠️ LA EXISTENCIA. Sensei la necesita aqui para hacer el inventario por marca sin
   // entrar producto por producto. Solo se toca si el campo EXISTE y trae un numero:
   // si no, se deja la de antes — nunca se pone en cero por error. -11 ago-
@@ -24768,7 +24936,7 @@ function guardarTodosLosProductosDeMarca(){
     // asignarlo se lee el nuevo y nunca se registra nada -mismo error que tenia el editor
     // de un producto suelto, encontrado el 27 jul-.
     var precioAntesM = (typeof p.precio === 'number') ? p.precio : parseFloat(p.precio) || 0;
-    p.precio = parseFloat(precioInput.value) || 0;
+    p.precio = dinero(precioInput.value) || 0;
     if(precioAntesM !== p.precio) registrarCambioPrecio(p.nombre, precioAntesM, p.precio);
     p.proveedorPref = supInput.value;
   });
@@ -24898,7 +25066,7 @@ function modificarFactura(v){
 
     window.actualizarItemEdit = function(i){
       var cant = parseInt(document.getElementById('edit-cant-'+i).value) || 1;
-      var precio = parseFloat(document.getElementById('edit-precio-'+i).value) || 0;
+      var precio = dinero(document.getElementById('edit-precio-'+i).value) || 0;
       itemsEdit[i].cant = cant;
       itemsEdit[i].precio = precio;
       var totEl = document.getElementById('edit-tot-'+i);
@@ -25010,7 +25178,7 @@ function guardarBalanceInicial(id){
   var cl = clientes.find(function(x){ return String(x.id) === String(id); });
   if(!cl) return;
 
-  var monto = parseFloat(document.getElementById('bi-monto').value) || 0;
+  var monto = dinero(document.getElementById('bi-monto').value) || 0;
   if(monto <= 0){ alert('Ingresa un monto válido mayor a $0.00'); return; }
 
   var nota = limpiarTexto(document.getElementById('bi-nota').value.trim()) || 'Balance inicial traído de sistema anterior';
@@ -26567,8 +26735,7 @@ function fijarMetodoEditPago(idx, tipo){
   window._editPagoMetodos[idx].tipo = tipo;
 }
 function fijarMontoEditPago(idx, valor){
-  var n = parseFloat(valor);
-  window._editPagoMetodos[idx].monto = isNaN(n) ? 0 : n;
+  window._editPagoMetodos[idx].monto = dinero(valor);
   actualizarTotalEditPago();
 }
 function actualizarTotalEditPago(){
@@ -27063,7 +27230,7 @@ function renderMetodosPago(vid){
       +'<select onchange="actualizarMetodoPago(\''+vid+'\','+i+',\'tipo\',this.value)" style="flex:1.2;min-width:0;padding:8px 6px;border:1px solid #ddd;border-radius:6px;font-size:12px">'
       +Object.keys(opciones).map(function(k){ return '<option value="'+k+'"'+(m.tipo===k?' selected':'')+'>'+opciones[k]+'</option>'; }).join('')
       +'</select>'
-      +'<input type="text" inputmode="numeric" value="'+m.monto.toFixed(2)+'" onfocus="this.select()" oninput="formatoMoneda(this);actualizarMetodoPago(\''+vid+'\','+i+',\'monto\',parseFloat(this.value)||0)" style="width:80px;padding:8px 6px;border:1px solid #ddd;border-radius:6px;font-size:12px;text-align:center">'
+      +'<input type="text" inputmode="numeric" value="'+m.monto.toFixed(2)+'" onfocus="this.select()" oninput="formatoMoneda(this);actualizarMetodoPago(\''+vid+'\','+i+',\'monto\',dinero(this.value)||0)" style="width:80px;padding:8px 6px;border:1px solid #ddd;border-radius:6px;font-size:12px;text-align:center">'
       +(filas.length>1 ? '<button type="button" onclick="quitarMetodoPago(\''+vid+'\','+i+')" style="background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:8px;width:38px;height:38px;cursor:pointer;font-size:14px">✕</button>' : '')
       +'</div>';
   }).join('');
@@ -27081,7 +27248,8 @@ function quitarMetodoPago(vid, idx){
 }
 
 function actualizarMetodoPago(vid, idx, campo, valor){
-  window._pagoMetodos[vid][idx][campo] = valor;
+  // El campo 'monto' viene de una casilla de dinero: puede traer coma. El 'tipo' es texto.
+  window._pagoMetodos[vid][idx][campo] = (campo === 'monto') ? dinero(valor) : valor;
   actualizarTotalPago(vid);
 }
 
@@ -28892,7 +29060,7 @@ function renderItemsFacturaEdit(){
       +'<div><label style="font-size:11px;color:var(--nbs-muted);font-weight:500;display:block;margin-bottom:4px">Cantidad</label>'
       +'<input type="number" value="'+it.cant+'" id="fact-item-cant-'+i+'" oninput="actualizarItemFacturaEdit('+i+',\'cant\',parseInt(this.value)||1)" style="width:100%;padding:9px 10px;border:0.5px solid #d8d8dc;border-radius:8px;font-size:14px;text-align:center;box-sizing:border-box;color:var(--nbs-ink)"></div>'
       +'<div><label style="font-size:11px;color:var(--nbs-muted);font-weight:500;display:block;margin-bottom:4px">Precio ($)</label>'
-      +'<input type="text" inputmode="decimal" value="'+it.precio.toFixed(2)+'" id="fact-item-precio-'+i+'" onfocus="this.select()" oninput="formatoMoneda(this);actualizarItemFacturaEdit('+i+',\'precio\',parseFloat(this.value)||0)" style="width:100%;padding:9px 10px;border:0.5px solid #d8d8dc;border-radius:8px;font-size:14px;text-align:center;box-sizing:border-box;color:var(--nbs-ink)"></div>'
+      +'<input type="text" inputmode="decimal" value="'+it.precio.toFixed(2)+'" id="fact-item-precio-'+i+'" onfocus="this.select()" oninput="formatoMoneda(this);actualizarItemFacturaEdit('+i+',\'precio\',dinero(this.value)||0)" style="width:100%;padding:9px 10px;border:0.5px solid #d8d8dc;border-radius:8px;font-size:14px;text-align:center;box-sizing:border-box;color:var(--nbs-ink)"></div>'
       +'</div>';
     itemsWrap.appendChild(row);
   });
@@ -34115,7 +34283,7 @@ function guardarProductoNuevoFactura(i){
   var marca = (mSel === '__otra__') ? (document.getElementById('pn-marca-otra').value || '').trim() : mSel;
   var cSel = document.getElementById('pn-cat-sel').value;
   var cat = (cSel === '__otra__') ? (document.getElementById('pn-cat-otra').value || '').trim() : cSel;
-  var precio = parseFloat(document.getElementById('pn-precio').value) || 0;
+  var precio = dinero(document.getElementById('pn-precio').value) || 0;
 
   // Se guarda en el renglon. El producto se crea de verdad al GUARDAR LA COMPRA -asi si
   // Sensei cancela la compra, no le queda un producto suelto en el catalogo-.
@@ -34137,7 +34305,7 @@ function marcarLineaFactura(i, val){
 function cambiarNumeroFactura(i, campo, val){
   var it = window._facturaItems && window._facturaItems[i];
   if(!it) return;
-  var v = parseFloat(val) || 0;
+  var v = dinero(val);
   it[campo] = campo === 'cant' ? Math.round(v) : v;
   pintarRevisionFactura();
 }
@@ -35971,7 +36139,7 @@ function renderItemsCambio(vid){
 }
 
 function cambiarPrecioCambioItem(i, val, vid){
-  var n = parseFloat(val);
+  var n = dinero(val);
   if(isNaN(n) || n<0) n=0;
   window._cambioItems[i].precio = n;
   renderItemsCambio(vid);
@@ -36367,7 +36535,7 @@ function abrirPreciosPersonalizados(cid){
           +'<input class="inp" id="precio-esp-nuevo" type="text" inputmode="numeric" value="'+productoSeleccionado.precio.toFixed(2)+'" onfocus="this.select()" oninput="formatoMoneda(this)">'
           +'<button style="width:100%;padding:12px;background:#00695C;color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">✓ Guardar precio especial</button>';
         formNuevoPrecio.querySelector('button').onclick = function(){
-          var nuevoPrecio = parseFloat(document.getElementById('precio-esp-nuevo').value) || 0;
+          var nuevoPrecio = dinero(document.getElementById('precio-esp-nuevo').value) || 0;
           clientes = LS('ncl', []);
           var c2 = clientes.find(function(x){ return String(x.id)===String(cid); });
           if(!c2.preciosPersonalizados) c2.preciosPersonalizados = [];
