@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260827b-OFICIAL-V2.0">
+<meta name="app-version" content="20260827c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -17639,7 +17639,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260827b';
+var NOVEDADES_VERSION = '20260827c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -26485,15 +26485,31 @@ function abrirAbono(cid){
     if(v.tipo === 'credito') return true;
     return cobradoYDebeDe(v).debe > 0.005;
   });
-  // Las canceladas van AL FINAL de la lista, para que no se confundan con las que
-  // de verdad debe. Se siguen viendo -para poder consultarlas- pero marcadas. -1 ago-
-  facturasCredito.sort(function(a, b){
-    // Las canceladas al final; el resto por fecha, la MÁS NUEVA ARRIBA. -15 ago-
+  // \ud83d\udcc4 IGUAL QUE EN LA FICHA DEL CLIENTE -Sensei, 27 ago-: "ese mismo cambio debiste
+  // haberlo hecho cuando entro a cuentas por cobrar, ¿no crees?". Tenia razon, y aqui pesa
+  // MAS todavia: esta es LA pantalla de cobrar.
+  //
+  // \ud83d\udd34 Y estaba ordenada de la MAS NUEVA a la mas vieja, o sea al reves de como se
+  // cobra. La que hay que cobrar primero quedaba abajo del todo.
+  var _conSaldoCxC = [], _saldadasCxC = [];
+  facturasCredito.forEach(function(v){
+    var sal = cobradoYDebeDe(v).debe;
+    if(!v.cancelada && esSaldoPendiente(sal)) _conSaldoCxC.push(v);
+    else _saldadasCxC.push(v);
+  });
+  // Las que DEBEN: de la mas vieja a la mas nueva. Esa es la que toca cobrar.
+  _conSaldoCxC.sort(function(a, b){
+    var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
+    return (fa ? fa.getTime() : 0) - (fb ? fb.getTime() : 0);
+  });
+  // Las saldadas y las canceladas: de la mas nueva a la mas vieja, que es como se consultan.
+  _saldadasCxC.sort(function(a, b){
     var c = (a.cancelada ? 1 : 0) - (b.cancelada ? 1 : 0);
     if(c !== 0) return c;
     var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
     return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
   });
+  facturasCredito = _conSaldoCxC.concat(_saldadasCxC);
 
 
 
@@ -26527,21 +26543,56 @@ function abrirAbono(cid){
     div.textContent = 'Facturas a credito';
     el.appendChild(div);
 
-    facturasCredito.forEach(function(v){
-      // Calculate how much has been paid on this invoice
+    // Un rotulo antes de las saldadas, y a partir de ahi van en una linea cada una.
+    var _yaPuseRotuloSaldadas = false;
+
+    facturasCredito.forEach(function(v, _iCxC){
       var pagadoFactura = 0;
       if(v.pagosFactura) pagadoFactura = (v.pagosFactura || []).filter(function(p){return p.monto!==undefined&&typeof p.monto==='number';}).reduce(function(s,p){return s+p.monto;},0);
-      var saldoFactura = v.total - pagadoFactura;
+      // \ud83d\udd11 La regla unica, como en el resto de la app. Antes era total - pagos a mano.
+      var saldoFactura = cobradoYDebeDe(v).debe;
       if(saldoFactura < 0) saldoFactura = 0;
 
+      var _debeEsta = !v.cancelada && esSaldoPendiente(saldoFactura);
+      var _laViejaCxC = _debeEsta && (_iCxC === 0) && (_conSaldoCxC.length > 1);
+
+      // ── LAS SALDADAS Y LAS CANCELADAS: una linea, sin ocupar media pantalla ──
+      if(!_debeEsta){
+        if(!_yaPuseRotuloSaldadas){
+          _yaPuseRotuloSaldadas = true;
+          var rot = document.createElement('div');
+          rot.style.cssText = 'font-size:10px;font-weight:800;color:var(--nbs-muted);letter-spacing:.6px;margin:12px 0 4px';
+          rot.textContent = (_conSaldoCxC.length ? 'YA SALDADAS' : 'TODAS SALDADAS \u2014 no te debe nada')
+            + ' (' + _saldadasCxC.length + ')';
+          el.appendChild(rot);
+        }
+        var fila = document.createElement('div');
+        fila.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;'
+          + 'padding:6px 10px;border-bottom:1px solid #F2F2F5;cursor:pointer;font-size:11.5px'
+          + (v.cancelada ? ';opacity:.65' : '');
+        fila.innerHTML = '<span style="color:var(--nbs-muted)' + (v.cancelada ? ';text-decoration:line-through' : '') + '">'
+          + escaparHtml(v.fecha || '') + '</span>'
+          + '<span style="display:flex;gap:9px;align-items:center;flex-shrink:0">'
+          + '<span style="font-weight:700;color:var(--nbs-ink)">$' + fmtNum(v.total) + '</span>'
+          + '<span style="font-size:10px;font-weight:700;color:' + (v.cancelada ? '#B71C1C' : 'var(--nbs-green-text)') + '">'
+          + (v.cancelada ? 'cancelada' : 'pagada') + '</span></span>';
+        fila.onclick = (function(vid){ return function(){ verFacturaProfesional(vid); }; })(v.id);
+        el.appendChild(fila);
+        return;
+      }
+
       var card = document.createElement('div');
-      card.style.cssText = 'background:#F8F4FF;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid '+(esSaldoPendiente(saldoFactura)?'#C62828':'#2E7D32');
-      card.innerHTML = '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'
+      card.style.cssText = 'background:#F8F4FF;border-radius:10px;padding:' + (_laViejaCxC ? '13px' : '12px')
+        + ';margin-bottom:8px;border-left:' + (_laViejaCxC ? '7px' : '3px') + ' solid #C62828'
+        + (_laViejaCxC ? ';border:2px solid #C62828;border-left:7px solid #C62828;box-shadow:0 2px 8px rgba(198,40,40,.16)' : '');
+      card.innerHTML = (_laViejaCxC ? '<div style="font-size:9.5px;font-weight:900;color:#C62828;letter-spacing:.7px;margin-bottom:4px">\u2b50 LA M\u00c1S VIEJA \u2014 C\u00d3BRALE ESTA PRIMERO</div>' : '')
+        +'<div style="display:flex;justify-content:space-between;margin-bottom:6px;gap:10px">'
         +'<div><div style="font-size:13px;font-weight:700">Factura '+(v.numFactura?'#'+v.numFactura+' · ':'')+v.fecha+' - '+v.hora+'</div>'
         +'<div style="font-size:11px;color:#aaa">Total factura: $'+fmtNum(v.total)+'</div></div>'
-        +'<div style="text-align:right"><div style="font-size:16px;font-weight:700;color:'+(esSaldoPendiente(saldoFactura)?'#C62828':'#2E7D32')+'">$'+fmtNum(saldoFactura)+'</div>'
-        +'<div style="font-size:11px;color:'+(v.cancelada?'#C62828':'#aaa')+';font-weight:'+(v.cancelada?'800':'400')+'">'
-        +(v.cancelada ? '\ud83d\udeab CANCELADA' : (esSaldoPendiente(saldoFactura)?'pendiente':'pagado'))+'</div></div></div>'
+        +'<div style="text-align:right;flex-shrink:0">'
+        +'<div style="font-size:9.5px;font-weight:800;color:#B0757A;letter-spacing:.4px">DEBE</div>'
+        +'<div style="font-size:'+(_laViejaCxC?'26px':'19px')+';font-weight:900;color:#C62828;line-height:1.05;letter-spacing:-0.6px">$'+fmtNum(saldoFactura)+'</div>'
+        +'</div></div>'
         +'<button type="button" onclick="verFacturaProfesional(\''+v.id+'\')" style="width:100%;padding:8px;background:#E8EAF6;color:#1a237e;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:8px">👁️ Ver factura completa / Editar productos y pagos</button>';
 
       // Items of the invoice
