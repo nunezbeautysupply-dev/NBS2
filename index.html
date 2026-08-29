@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260828c-OFICIAL-V2.0">
+<meta name="app-version" content="20260829a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1036,6 +1036,10 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <button onclick="compartirRecargaVan()" style="flex:1;padding:11px;background:#6A1B9A;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">📤 Lista de recarga</button>
   </div>
 
+  <!-- 🚚 EL CIERRE DE RUTA -28 ago-. Cuadrar la MERCANCIA al terminar el dia, igual que
+       cuadras el dinero. Lo hacen todos los sistemas de reparto de la industria. -->
+  <button onclick="abrirCierreRuta()" style="width:100%;padding:12px;margin-bottom:12px;background:#5D4037;color:white;border:none;border-radius:9px;font-size:13.5px;font-weight:800;cursor:pointer">🚚 Cierre de ruta · cuadrar la mercancía</button>
+
   <div class="card" style="margin-bottom:10px;padding:10px 12px">
     <div style="font-size:11px;color:var(--nbs-muted);font-weight:700;margin-bottom:6px">📅 CONTAR VENTAS DESDE QUE CARGUÉ</div>
     <div style="font-size:12px;color:var(--nbs-ink)" id="van-fecha-carga">Aún no has cargado la van.</div>
@@ -2064,7 +2068,7 @@ function descomprimirTexto(base64){
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var CLAVES_A_RESPALDAR = ['ncl','nv','nc','ncr','np','nsup','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','np_eliminados','nvisitas_barberos','historial_precios','rutas_por_dia',
-  'nvan','nrelleno','nbs_facturas_emparejadas','nbs_correcciones_van',
+  'nvan','nrelleno','ncierres_ruta','nbs_facturas_emparejadas','nbs_correcciones_van',
   // La LISTA de impresoras sí viaja a la nube. La que está ACTIVA no: eso es de cada
   // aparato -el teléfono puede usar la portátil y la PC la de escritorio-. -30 jul-
   'impresoras_lista',
@@ -2623,7 +2627,7 @@ function tocarHoraUltimaCopiaLocal(){
 // llevaban, asi que una copia local no era una foto completa del negocio. Encontrado en
 // la auditoria del 27 jul.
 var CLAVES_COPIA_LOCAL = ['nv','ncl','nc','ncr','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','nvisitas_barberos',
-                          'np','nsup','historial_precios','nvan','nrelleno','rutas_por_dia',
+                          'np','nsup','historial_precios','nvan','nrelleno','ncierres_ruta','rutas_por_dia',
                           'nbs_facturas_emparejadas'];
 var FACTURAS_ENTRE_COPIAS = 5;
 var COPIAS_LOCALES_QUE_SE_GUARDAN = 40; // 40 copias del teléfono (cada 15 min ≈ el último día de trabajo)
@@ -11524,6 +11528,200 @@ function calcularEstadoVan(){
   return { filas: filas, totalEnVan: totalEnVan, productosBajos: productosBajos };
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  🚚 CIERRE DE RUTA — cuadrar la MERCANCÍA al terminar el día  (28 ago 2026)
+//
+//  Vino de comparar la app con los sistemas de reparto que usa la industria
+//  (Pepperi, bMobile, SimplyDepo). Todos hacen lo mismo al final del turno:
+//  el repartidor cuenta lo que le quedó en la van y el sistema lo compara con
+//  lo que DEBERÍA quedar. Si no cuadra, se sabe el mismo día.
+//
+//  Sensei ya cuadraba el DINERO (Cuadre de Caja). Lo que faltaba era cuadrar
+//  la MERCANCÍA. Un producto que se pierde no lo dice ningún número de dinero:
+//  simplemente deja de estar, y meses después el inventario no cuadra y nadie
+//  sabe cuándo empezó.
+//
+//  🔒 NO toca el inventario ni las ventas. Solo apunta lo que contaste y la
+//  diferencia, para que quede constancia con su fecha.
+// ═══════════════════════════════════════════════════════════════════
+
+function abrirCierreRuta(){
+  var estado = calcularEstadoVan();
+  if(!estado.filas.length){
+    alert('Todavía no has cargado nada en la van.\n\nCarga la van primero y al terminar el día vuelves aquí a cuadrarla.');
+    return;
+  }
+  window._cierreRuta = { contado: {} };
+
+  var ov = document.getElementById('cierre-ruta-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'cierre-ruta-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;'
+    + 'display:flex;align-items:flex-end;justify-content:center';
+  ov.innerHTML = '<div id="cierre-ruta-caja" style="background:#fff;width:100%;max-width:520px;'
+    + 'border-radius:16px 16px 0 0;padding:14px;max-height:92vh;overflow:auto"></div>';
+  pintarCierreRuta();
+}
+
+function cerrarCierreRuta(){
+  var ov = document.getElementById('cierre-ruta-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function pintarCierreRuta(){
+  var caja = document.getElementById('cierre-ruta-caja');
+  if(!caja) return;
+  var estado = calcularEstadoVan();
+  var contado = (window._cierreRuta || {}).contado || {};
+
+  // Solo tiene sentido contar lo que debería quedar algo, o lo que ya contaste
+  var filas = estado.filas.filter(function(f){
+    return f.quedan > 0 || contado[f.pid] !== undefined;
+  });
+
+  var faltan = 0, sobran = 0, valorFaltante = 0, yaContados = 0;
+  loadProds();
+  filas.forEach(function(f){
+    if(contado[f.pid] === undefined) return;
+    yaContados++;
+    var dif = contado[f.pid] - f.quedan;
+    if(dif < 0){
+      faltan += -dif;
+      var prod = productos.find(function(x){ return String(x.id) === String(f.pid); });
+      var costo = prod ? (parseFloat(prod.costo) || 0) : 0;
+      valorFaltante += (-dif) * costo;
+    }
+    if(dif > 0) sobran += dif;
+  });
+
+  var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+    + '<div style="font-size:16px;font-weight:900;color:#5D4037">🚚 Cierre de ruta</div>'
+    + '<button onclick="cerrarCierreRuta()" style="background:#F0F0F2;border:none;border-radius:8px;'
+    +   'width:32px;height:32px;font-size:15px;cursor:pointer">✕</button>'
+    + '</div>'
+    + '<div style="font-size:11.5px;color:#888;margin-bottom:10px">'
+    +   'Cuenta lo que te quedó en la van y escríbelo. La app lo compara con lo que debería quedar.</div>';
+
+  // El resumen, arriba y siempre a la vista
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">'
+    + '<div style="background:#F5F5F7;border-radius:9px;padding:8px 6px;text-align:center">'
+    +   '<div style="font-size:9px;color:#888;font-weight:800">CONTADOS</div>'
+    +   '<div style="font-size:16px;font-weight:900;color:#5D4037">' + yaContados + '/' + filas.length + '</div></div>'
+    + '<div style="background:' + (faltan ? '#FFEBEE' : '#E8F5E9') + ';border-radius:9px;padding:8px 6px;text-align:center">'
+    +   '<div style="font-size:9px;color:#888;font-weight:800">FALTAN</div>'
+    +   '<div style="font-size:16px;font-weight:900;color:' + (faltan ? '#C62828' : '#2E7D32') + '">' + faltan + '</div></div>'
+    + '<div style="background:' + (sobran ? '#FFF8E1' : '#E8F5E9') + ';border-radius:9px;padding:8px 6px;text-align:center">'
+    +   '<div style="font-size:9px;color:#888;font-weight:800">SOBRAN</div>'
+    +   '<div style="font-size:16px;font-weight:900;color:' + (sobran ? '#8a6d00' : '#2E7D32') + '">' + sobran + '</div></div>'
+    + '</div>';
+
+  if(faltan){
+    h += '<div style="background:#FFEBEE;border:1px solid #EF9A9A;border-radius:10px;padding:9px 11px;margin-bottom:10px">'
+      + '<div style="font-size:12.5px;font-weight:800;color:#C62828">Te faltan ' + faltan + ' unidad(es)</div>'
+      + '<div style="font-size:11.5px;color:#B0757A;margin-top:2px">A tu costo son <b>$' + fmtNum(valorFaltante) + '</b>. '
+      + 'Puede ser una venta sin apuntar, algo que se quedó en una barbería, o un conteo mal hecho.</div>'
+      + '</div>';
+  }
+
+  // Un renglón por producto
+  filas.forEach(function(f){
+    var val = contado[f.pid];
+    var dif = (val === undefined) ? null : (val - f.quedan);
+    var colorDif = (dif === null) ? '#bbb' : (dif === 0 ? '#2E7D32' : (dif < 0 ? '#C62828' : '#8a6d00'));
+    var textoDif = (dif === null) ? '—' : (dif === 0 ? '✓ cuadra' : (dif > 0 ? '+' + dif : String(dif)));
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #F2F2F5">'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:12.5px;font-weight:700;color:var(--nbs-ink)">' + escaparHtml(f.nombre) + '</div>'
+      +   '<div style="font-size:10.5px;color:#888">cargaste ' + f.cargado + ' · vendiste ' + f.vendido
+      +     ' · <b>deberían quedar ' + f.quedan + '</b></div>'
+      + '</div>'
+      + '<input type="number" min="0" inputmode="numeric" id="cr-' + f.pid + '" '
+      +   'value="' + (val === undefined ? '' : val) + '" placeholder="?" '
+      +   'onfocus="this.select()" onchange="apuntarContadoRuta(\'' + f.pid + '\', this.value)" '
+      +   'style="width:62px;padding:8px 4px;border:1.5px solid #ccc;border-radius:8px;font-size:15px;'
+      +   'font-weight:800;text-align:center;flex-shrink:0">'
+      + '<div style="width:56px;text-align:right;flex-shrink:0;font-size:12.5px;font-weight:800;color:' + colorDif + '">'
+      +   textoDif + '</div>'
+      + '</div>';
+  });
+
+  h += '<div style="display:flex;gap:8px;margin-top:14px">'
+    + '<button onclick="cerrarCierreRuta()" style="flex:.8;padding:13px;background:#F0F0F2;color:#333;'
+    +   'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">Seguir después</button>'
+    + '<button onclick="guardarCierreRuta()" style="flex:1.4;padding:13px;background:#5D4037;color:#fff;'
+    +   'border:none;border-radius:10px;font-size:13.5px;font-weight:900;cursor:pointer">💾 Guardar el cierre</button>'
+    + '</div>';
+
+  caja.innerHTML = h;
+}
+
+function apuntarContadoRuta(pid, valor){
+  if(!window._cierreRuta) window._cierreRuta = { contado: {} };
+  var v = String(valor).trim();
+  if(v === ''){ delete window._cierreRuta.contado[pid]; }
+  else {
+    var n = parseInt(v, 10);
+    window._cierreRuta.contado[pid] = (isFinite(n) && n >= 0) ? n : 0;
+  }
+  pintarCierreRuta();
+}
+
+function guardarCierreRuta(){
+  var d = window._cierreRuta;
+  if(!d || !Object.keys(d.contado).length){
+    alert('Todavía no has contado ningún producto.\n\nEscribe cuántos te quedaron de al menos uno.');
+    return;
+  }
+  var estado = calcularEstadoVan();
+  loadProds();
+
+  var renglones = [], faltan = 0, sobran = 0, valorFaltante = 0;
+  estado.filas.forEach(function(f){
+    if(d.contado[f.pid] === undefined) return;
+    var dif = d.contado[f.pid] - f.quedan;
+    var prod = productos.find(function(x){ return String(x.id) === String(f.pid); });
+    var costo = prod ? (parseFloat(prod.costo) || 0) : 0;
+    if(dif < 0){ faltan += -dif; valorFaltante += (-dif) * costo; }
+    if(dif > 0) sobran += dif;
+    renglones.push({ pid: f.pid, nombre: f.nombre, cargado: f.cargado, vendido: f.vendido,
+                     debian: f.quedan, contados: d.contado[f.pid], diferencia: dif, costo: costo });
+  });
+
+  var sinContar = estado.filas.filter(function(f){
+    return f.quedan > 0 && d.contado[f.pid] === undefined;
+  }).length;
+  if(sinContar){
+    if(!confirm('Te quedan ' + sinContar + ' producto(s) sin contar.\n\n¿Guardar el cierre así?')) return;
+  }
+
+  var cierres = LS('ncierres_ruta', []);
+  cierres.push({
+    id: Date.now(),
+    fecha: fechaHoy(),
+    hora: new Date().toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true }),
+    fechaCarga: (cargarDatosVan() || {}).fechaCarga || null,
+    renglones: renglones,
+    faltan: faltan,
+    sobran: sobran,
+    valorFaltante: Math.round(valorFaltante * 100) / 100,
+    sinContar: sinContar
+  });
+  if(!SS('ncierres_ruta', cierres)){ return; }   // SS ya avisa si no cupo
+
+  cerrarCierreRuta();
+  var msg = '✅ Cierre de ruta guardado.\n\n';
+  if(!faltan && !sobran) msg += 'Todo cuadra. No falta ni sobra nada.';
+  else {
+    if(faltan) msg += 'Faltan ' + faltan + ' unidad(es) — $' + fmtNum(valorFaltante) + ' a tu costo.\n';
+    if(sobran) msg += 'Sobran ' + sobran + ' unidad(es).\n';
+    msg += '\nQueda apuntado con la fecha de hoy.';
+  }
+  alert(msg);
+}
+
 function renderVan(q){
   q = (q||'').toLowerCase().trim();
   var estado = calcularEstadoVan();
@@ -17813,7 +18011,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260828c';
+var NOVEDADES_VERSION = '20260829a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -23706,7 +23904,9 @@ function pintarPanelCliente(cid){
         +   (vOrigen ? 'De la factura #' + escaparHtml(String(vOrigen.numFactura||vOrigen.id)) : 'Factura no encontrada')
         +   (d.hora ? ' \u00b7 ' + escaparHtml(d.hora) : '') + (d.esCambio ? ' \u00b7 cambio de producto' : '') + '</div>'
         + '<div style="margin-top:5px">' + prods + '</div>'
-        + (d.nota ? '<div style="font-size:11px;color:var(--nbs-muted);margin-top:4px;font-style:italic">\u201c' + escaparHtml(d.nota) + '\u201d</div>' : '')
+        + (d.motivoTexto ? '<div style="font-size:11px;font-weight:800;color:#C62828;margin-top:4px">' + escaparHtml(d.motivoTexto) + '</div>' : '')
+        + (d.nota ? '<div style="font-size:11px;color:var(--nbs-muted);margin-top:2px;font-style:italic">\u201c' + escaparHtml(d.nota) + '\u201d</div>' : '')
+        + (d.foto ? '<img src="' + d.foto + '" onclick="event.stopPropagation();verFotoGasto(this.src)" style="margin-top:6px;width:64px;height:64px;object-fit:cover;border-radius:9px;cursor:pointer;border:1px solid #ddd">' : '')
         + '<button onclick="event.stopPropagation();deshacerDevolucion(' + _arg(d.id) + ')" '
         + 'style="width:100%;margin-top:7px;padding:8px;background:#fff;border:1px solid #96331A;color:#96331A;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">\u21a9\ufe0f Deshacer esta devoluci\u00f3n</button>'
       );
@@ -36203,6 +36403,25 @@ function abrirFirmaFactura(vid){
 }
 
 // Cierra la pantalla de devolución sin hacer nada (por si el cliente cambia de parecer)
+// Los motivos de siempre en una ruta de beauty supply. Se guardan por su clave -no por su
+// texto- para poder contarlos aunque manana se cambie como se leen. -28 ago-
+var MOTIVOS_DEVOLUCION = [
+  { id:'defectuoso',  texto:'\ud83d\udd27 Vino da\u00f1ado o defectuoso' },
+  { id:'equivocado',  texto:'\u274c No era el que pidi\u00f3' },
+  { id:'no_vendio',   texto:'\ud83d\udcc9 No se le vendi\u00f3' },
+  { id:'vencido',     texto:'\ud83d\udcc5 Vencido o muy viejo' },
+  { id:'de_mas',      texto:'\u2795 Le lleg\u00f3 de m\u00e1s' },
+  { id:'no_gusto',    texto:'\ud83d\ude41 No le gust\u00f3 al cliente' },
+  { id:'otro',        texto:'\u2026 Otro motivo' }
+];
+
+function textoDelMotivo(id){
+  for(var i = 0; i < MOTIVOS_DEVOLUCION.length; i++){
+    if(MOTIVOS_DEVOLUCION[i].id === id) return MOTIVOS_DEVOLUCION[i].texto;
+  }
+  return id || '';
+}
+
 function cerrarDevolucion(){
   var overlay = document.getElementById('devolucion-overlay');
   if(overlay) overlay.style.display = 'none';
@@ -36305,9 +36524,31 @@ function abrirDevolucion(vid){
     wrap.appendChild(avisoCredito);
   }
 
-  var notaLabel = document.createElement('div');
-  notaLabel.innerHTML = '<label class="lbl">Motivo (opcional)</label><input class="inp" id="dev-nota" type="text" placeholder="Ej: producto defectuoso, no era el correcto...">';
-  wrap.appendChild(notaLabel);
+  // ── EL MOTIVO, DE LISTA ── para poder contarlos despues y ver que te devuelven mas
+  var motivoBox = document.createElement('div');
+  motivoBox.innerHTML = '<label class="lbl">\u00bfPor qu\u00e9 lo devuelve?</label>'
+    + '<select class="inp" id="dev-motivo" style="margin-bottom:8px">'
+    +   MOTIVOS_DEVOLUCION.map(function(m){ return '<option value="'+m.id+'">'+m.texto+'</option>'; }).join('')
+    + '</select>'
+    + '<label class="lbl">Detalle (opcional)</label>'
+    + '<input class="inp" id="dev-nota" type="text" placeholder="Lo que quieras apuntar de este caso">';
+  wrap.appendChild(motivoBox);
+
+  // ── LA FOTO DE PRUEBA ── se reusa el mismo mecanismo de las fotos de gastos y compras
+  var fotoBox = document.createElement('div');
+  fotoBox.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:10px';
+  fotoBox.innerHTML =
+      '<div id="dev-foto-preview" onclick="abrirOpcionesFotoGasto(\'dev\')" '
+    +   'style="width:64px;height:64px;border-radius:12px;flex-shrink:0;cursor:pointer;display:flex;'
+    +   'align-items:center;justify-content:center;background:#F5F5F7;border:2px dashed #c9c9d2;font-size:24px">\ud83d\udcf7</div>'
+    + '<div style="flex:1">'
+    +   '<div style="font-size:13px;font-weight:700;color:var(--nbs-ink)">Foto de lo devuelto</div>'
+    +   '<div style="font-size:11px;color:#888">Opcional, pero si hay discusi\u00f3n despu\u00e9s, la foto la resuelve</div>'
+    + '</div>'
+    + '<input type="hidden" id="dev-foto-data">'
+    + '<input type="file" id="dev-foto-camara" accept="image/*" capture="environment" style="display:none" onchange="cargarFotoGasto(this,\'dev\')">'
+    + '<input type="file" id="dev-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this,\'dev\')">';
+  wrap.appendChild(fotoBox);
 
   var contBotones = document.createElement('div');
   contBotones.style.cssText = 'display:flex;gap:10px;margin-top:8px';
@@ -36546,6 +36787,11 @@ function procesarDevolucion(vid){
   SS('np', productos);
 
   var nota = limpiarTexto(document.getElementById('dev-nota').value.trim());
+  // El motivo de lista y la foto de prueba. -28 ago-
+  var _elMot = document.getElementById('dev-motivo');
+  var motivo = _elMot ? _elMot.value : '';
+  var _elFoto = document.getElementById('dev-foto-data');
+  var fotoDev = _elFoto ? _elFoto.value : '';
   var fechaHoyStr = fechaHoy();
   var horaHoyStr = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
 
@@ -36566,6 +36812,9 @@ function procesarDevolucion(vid){
     montoNuevo: totalNuevo,
     diferencia: diferencia,
     nota: nota,
+    motivo: motivo,                    // la clave, para poder contarlos
+    motivoTexto: textoDelMotivo(motivo),
+    foto: fotoDev || null,             // la prueba, si la tomo
     tipoFacturaOrigen: v.tipo
   });
   SS('ndevoluciones', devoluciones);
@@ -37094,7 +37343,9 @@ function verHistorialCliente(cid, modo){
           var itemsTxt = (d.items || []).map(function(it){ return it.nombre+' x'+it.cant; }).join(', ');
           return '<div style="background:white;border-radius:8px;padding:8px 10px;margin-bottom:6px">'
             +'<div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:700">'+d.fecha+'</span><span style="font-size:12px;font-weight:700;color:#E65100">$'+fmtNum(d.monto)+'</span></div>'
-            +'<div style="font-size:11px;color:#777;margin-top:2px">'+itemsTxt+(d.nota?' · '+d.nota:'')+'</div>'
+            +'<div style="font-size:11px;color:#777;margin-top:2px">'+itemsTxt+(d.nota?' \u00b7 '+d.nota:'')+'</div>'
+            +(d.motivoTexto?'<div style="font-size:11px;font-weight:800;color:#C62828;margin-top:2px">'+escaparHtml(d.motivoTexto)+'</div>':'')
+            +(d.foto?'<img src="'+d.foto+'" onclick="event.stopPropagation();verFotoGasto(this.src)" style="margin-top:5px;width:56px;height:56px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid #ddd">':'')
             +(d.numFacturaOrigen?'<div style="font-size:10px;color:#aaa;margin-top:2px">De la factura #'+d.numFacturaOrigen+'</div>':'')
             +'<button type="button" onclick="deshacerDevolucion('+d.id+')" style="margin-top:6px;width:100%;padding:6px;background:#FFEBEE;color:#C62828;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">🗑️ Deshacer esta devolución -por error o duplicada-</button>'
             +'</div>';
