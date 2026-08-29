@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260827c-OFICIAL-V2.0">
+<meta name="app-version" content="20260828a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -17639,7 +17639,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260827c';
+var NOVEDADES_VERSION = '20260828a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -31050,6 +31050,10 @@ function reintentarYDecirmeElError(){
       nombres.slice(0, 6).forEach(function(k){
         var f = fallos[k];
         t.push('\u2022 ' + nombreBonitoDeClave(k) + '  [' + k + ']   (' + Math.round(f.bytes/1024) + ' KB)');
+        // \ud83d\udd0e Lo que hacia falta para saber POR QUE. -28 ago-
+        if(f.como) t.push('   por donde fue: ' + f.como);
+        if(f.crudoKB !== undefined) t.push('   sin comprimir: ' + f.crudoKB + ' KB');
+        if(f.sabeComprimir !== undefined) t.push('   \u00bfsabe comprimir?: ' + (f.sabeComprimir ? 'S\u00cd' : 'NO'));
         t.push('   ' + f.codigo);
         t.push('   ' + f.mensaje);
         t.push('');
@@ -31260,50 +31264,78 @@ function subirPendientes(){
       }catch(e){}
     }
 
-    // ═══ SE COMPRIME LO GRANDE (30 jul) ═══
-    // Firestore no acepta documentos de mas de 1 MB. Las ventas de Sensei ya iban por
-    // 449 KB sin comprimir, y cada venta con FIRMA del cliente suma ~23 KB. Las copias
-    // ya se comprimian (183 KB) pero los cambios del dia no.
-    // Solo se comprime lo que pasa de 100 KB: lo chico sigue yendo igual que siempre,
-    // asi el cambio toca lo menos posible. Si el navegador no sabe comprimir, o si
-    // comprimido no queda mas chico, se manda tal cual — nunca se pierde nada.
+    // ═══ SE COMPRIME LO GRANDE (30 jul · rehecho el 28 ago) ═══
+    // Firestore no acepta documentos de mas de 1 MB.
+    //
+    // 🔴 LO QUE ESTABA MAL Y CAZO SENSEI: si el envio COMPRIMIDO fallaba por cualquier
+    // motivo, el `.catch` reintentaba con el crudo — que NO cabe — y el error que se
+    // guardaba era el del crudo. O sea que el mensaje TAPABA la causa de verdad.
+    // Sus ventas [nv] pesan 1.539 KB sin comprimir; comprimidas caben de sobra.
+    //
+    // AHORA: cada camino guarda SU propio error, y el crudo solo se intenta si de
+    // verdad cabe. Ademas se apunta si el telefono sabe comprimir y cuanto quedo.
     var subirDoc = function(d){
       return fbDb.collection('nbs_data').doc(k.replace(/\//g,'_')).set(d);
     };
-    var listo;
-    if(docPend.valor.length > 100000 && typeof comprimirTexto === 'function'){
-      listo = comprimirTexto(docPend.valor).then(function(z){
-        if(z && z.length < docPend.valor.length){
-          var dz = { zip: z, actualizado: docPend.actualizado };
-          if(docPend.pidsConFoto) dz.pidsConFoto = docPend.pidsConFoto;
-          return subirDoc(dz);
-        }
-        return subirDoc(docPend);
-      }).catch(function(){ return subirDoc(docPend); });
-    } else {
-      listo = subirDoc(docPend);
-    }
-
-    listo.then(function(){
+    var TOPE_NUBE = 1000000;   // 1 MB con un margen
+    var apuntarFallo = function(e, comoFue, bytes){
+      try {
+        var fallos = JSON.parse(localStorage.getItem('nbs_fallos_subida') || '{}');
+        fallos[k] = {
+          codigo: (e && e.code) ? e.code : '(sin codigo)',
+          mensaje: (e && e.message) ? String(e.message).slice(0, 180) : String(e).slice(0, 180),
+          bytes: bytes,
+          como: comoFue,
+          sabeComprimir: (typeof navegadorSabeComprimir === 'function') ? !!navegadorSabeComprimir() : false,
+          crudoKB: Math.round(docPend.valor.length / 1024),
+          hora: Date.now()
+        };
+        localStorage.setItem('nbs_fallos_subida', JSON.stringify(fallos));
+      } catch(e2){}
+    };
+    var alSubir = function(){
       quitarPendienteDeSubir(k);
       try {
         var okf = JSON.parse(localStorage.getItem('nbs_fallos_subida') || '{}');
         if(okf[k]){ delete okf[k]; localStorage.setItem('nbs_fallos_subida', JSON.stringify(okf)); }
       } catch(e2){}
       console.log('Se subió a la nube lo que estaba pendiente: '+k);
-    }).catch(function(e){
-      console.error('Sigue sin poder subir "'+k+'":', e);
-      try {
-        var fallos = JSON.parse(localStorage.getItem('nbs_fallos_subida') || '{}');
-        fallos[k] = {
-          codigo: (e && e.code) ? e.code : '(sin codigo)',
-          mensaje: (e && e.message) ? String(e.message).slice(0, 180) : String(e).slice(0, 180),
-          bytes: JSON.stringify(docPend).length,
-          hora: Date.now()
-        };
-        localStorage.setItem('nbs_fallos_subida', JSON.stringify(fallos));
-      } catch(e2){}
-    });
+    };
+    // El crudo, solo si CABE. Si no cabe, no se intenta: seria un error seguro que
+    // ademas taparia el motivo verdadero.
+    var subirCrudo = function(porQue){
+      if(docPend.valor.length > TOPE_NUBE){
+        apuntarFallo({ code: 'no-cabe', message: 'Sin comprimir son '
+          + Math.round(docPend.valor.length/1024) + ' KB y el tope de la nube es 1024 KB. '
+          + (porQue || '') }, 'crudo (no se intento)', JSON.stringify(docPend).length);
+        return;
+      }
+      subirDoc(docPend).then(alSubir).catch(function(e){
+        apuntarFallo(e, 'crudo', JSON.stringify(docPend).length);
+      });
+    };
+
+    if(docPend.valor.length > 100000 && typeof comprimirTexto === 'function'){
+      comprimirTexto(docPend.valor).then(function(z){
+        if(z && z.length < docPend.valor.length && z.length < TOPE_NUBE){
+          var dz = { zip: z, actualizado: docPend.actualizado };
+          if(docPend.pidsConFoto) dz.pidsConFoto = docPend.pidsConFoto;
+          // 🔑 Este catch es SOLO del envio comprimido: guarda SU error, no el del crudo.
+          subirDoc(dz).then(alSubir).catch(function(e){
+            apuntarFallo(e, 'comprimido (' + Math.round(z.length/1024) + ' KB)', z.length);
+          });
+        } else {
+          subirCrudo(z ? ('Comprimido quedo en ' + Math.round(z.length/1024) + ' KB.')
+                       : 'Este telefono no pudo comprimir.');
+        }
+      }).catch(function(e){
+        subirCrudo('Fallo al comprimir: ' + ((e && e.message) ? String(e.message).slice(0,80) : e));
+      });
+    } else {
+      subirDoc(docPend).then(alSubir).catch(function(e){
+        apuntarFallo(e, 'directo', JSON.stringify(docPend).length);
+      });
+    }
   });
 }
 
