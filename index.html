@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260829d-OFICIAL-V2.0">
+<meta name="app-version" content="20260829e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10892,6 +10892,16 @@ function filtrarPorBusqueda(lista, consulta, sacarTexto){
     var p = puntajeBusqueda(sacarTexto(lista[i]), consulta);
     if(p >= 0) conPuntaje.push({ item: lista[i], puntaje: p, orden: i });
   }
+
+  // \ud83d\udd0e Con DOS O MAS palabras, manda la frase completa. -29 ago-
+  // El puntaje 100 significa justamente eso: el texto lleva la frase tal cual, junta.
+  var _palabras = normalizarTextoBusqueda(consulta).split(' ').filter(function(x){ return x; });
+  if(_palabras.length >= 2){
+    var _exactos = conPuntaje.filter(function(x){ return x.puntaje >= 100; });
+    // Solo se afina si HAY alguno con la frase completa; si no, se deja lo de antes
+    // para que nunca se quede sin resultados.
+    if(_exactos.length) conPuntaje = _exactos;
+  }
   // 🔑 EL DESEMPATE. Cuando varios sacan el mismo puntaje —13 productos que
   // todos dicen "gummy"— hay que decidir cuál va arriba. Se premia:
   //   1. que EMPIECE con lo que él escribió
@@ -18112,7 +18122,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260829d';
+var NOVEDADES_VERSION = '20260829e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
