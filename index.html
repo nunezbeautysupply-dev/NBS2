@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260828b-OFICIAL-V2.0">
+<meta name="app-version" content="20260828c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -14752,7 +14752,14 @@ function calcDesc(){
 function renderIV(){
   var el = document.getElementById('iv'); el.innerHTML = '';
   var subtot = 0;
-  iV.forEach(function(it,i){
+  // 🛒 EL ULTIMO QUE AGREGAS, ARRIBA -Sensei, 28 ago-: "el ultimo de 4 que agregue
+  // deberia quedar arriba porque es el mas reciente".
+  // 🔑 Se cambia SOLO EL ORDEN EN QUE SE PINTA. El carrito `iV` NO se toca: si se le
+  // diera la vuelta al array, los numeros de cada renglon -que son los que usan el boton de
+  // quitar y las casillas de cantidad y precio- apuntarian al producto equivocado.
+  var _ordenIV = iV.map(function(it, i){ return { it: it, i: i }; }).reverse();
+  _ordenIV.forEach(function(_par){
+    var it = _par.it, i = _par.i;
     subtot += it.cant * it.precio;
     var row = document.createElement('div');
     row.style.cssText = 'padding:8px 0;border-bottom:1px solid #f0f0f0';
@@ -16200,9 +16207,9 @@ function abrirPantallaMultiple(){
   document.getElementById('ped-barbero-wrap').style.display = 'none';
   document.getElementById('ped-multi-wrap').style.display = 'block';
   loadProds();
+  // Todos CERRADOS al abrir, como lo pidio Sensei. Se abre el que el toque. -28 ago-
+  window._barberoAbierto = null;
   renderPedidosMultiples();
-  // El primero viene encendido, para que nunca haya duda de a cual le estas escribiendo
-  try { marcarBarberoActivo(0); } catch(e){}
   window.scrollTo(0,0);
 }
 
@@ -16753,6 +16760,30 @@ function _marcarBarberoSinCompra(idx, estado, titulo, nota){
 // 🎯 EN CUAL BARBERO ESTAS -21 ago-. Con 4 o 5 pedidos abiertos, lo importante no es
 // distinguirlos por color: es saber a cual le estas escribiendo AHORA. El que tocaste se
 // enciende con borde azul grueso y cabecera azul clarita; los demas se apagan en gris.
+// \ud83d\udcc2 ABRIR UNO Y CERRAR LOS DEMAS -28 ago-. No se vuelve a dibujar la pantalla: solo
+// se esconde y se ensena. Asi no se pierde lo que estuviera escrito en una casilla.
+function toggleBarberoMulti(idx){
+  var abrir = (window._barberoAbierto !== idx);
+  window._barberoAbierto = abrir ? idx : null;
+  for(var i = 0; i < (pedidosMultiTemp || []).length; i++){
+    var cuerpo = document.getElementById('multi-cuerpo-' + i);
+    var flecha = document.getElementById('multi-flecha-' + i);
+    var cab = document.getElementById('multi-cab-' + i);
+    var esteAbierto = (i === idx && abrir);
+    if(cuerpo) cuerpo.style.display = esteAbierto ? 'block' : 'none';
+    if(flecha) flecha.textContent = esteAbierto ? '\u2303' : '\u203a';
+    if(cab) cab.style.background = esteAbierto ? '#DDE3FA' : '#EFEFF3';
+  }
+  if(abrir){
+    marcarBarberoActivo(idx);
+    // La cabecera del que se abrio, arriba de la pantalla
+    setTimeout(function(){
+      var c = document.getElementById('multi-cab-' + idx);
+      if(c) try { c.scrollIntoView({ behavior:'smooth', block:'start' }); } catch(e){}
+    }, 60);
+  }
+}
+
 function marcarBarberoActivo(idx){
   window._barberoActivo = idx;
   for(var i = 0; i < (pedidosMultiTemp || []).length; i++){
@@ -16774,7 +16805,7 @@ function marcarBarberoActivo(idx){
     // Los apagados se ven mas suaves: menos color y un poco mas claros. El elegido, entero.
     c.style.filter  = encendido ? 'none' : 'saturate(0.45) opacity(0.72)';
     c.style.background = encendido ? '#fff' : '#FAFAFC';
-    if(cab) cab.style.background = encendido ? '#DDE3FA' : '#F2F2F5';
+    if(cab) cab.style.background = encendido ? '#DDE3FA' : '#EFEFF3';
   }
 }
 
@@ -16824,7 +16855,11 @@ function renderPedidosMultiples(){
     card.onclick = function(){ marcarBarberoActivo(idx); };
 
     // --- Cabecera: barbero, total, y la ✕ para quitarlo si hoy no compra ---
-    var html = '<div id="multi-cab-'+idx+'" style="padding:11px 12px;display:flex;align-items:center;gap:9px;border-bottom:0.5px solid #f0f0f3;background:#EFEFF3">'
+    // \ud83d\udcc2 ACORDEON -Sensei, 28 ago-: "que cada barbero este cerrado y que cuando lo toque
+    // se abra... con mas de 4 barberos se hace dificil subir y bajar entre uno y otro".
+    // Nacen todos CERRADOS. Se abre el que tocas, y el que estaba abierto se cierra solo.
+    var _abiertoEste = (window._barberoAbierto === idx);
+    var html = '<div id="multi-cab-'+idx+'" onclick="toggleBarberoMulti('+idx+')" style="padding:11px 12px;display:flex;align-items:center;gap:9px;cursor:pointer;border-bottom:0.5px solid #f0f0f3;background:'+(_abiertoEste?'#DDE3FA':'#EFEFF3')+'">'
       +'<div style="width:34px;height:34px;border-radius:9px;background:#455A64;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:white;flex-shrink:0">'+escaparHtml(p.cliente.nombre[0])+'</div>'
       +'<div style="flex:1;min-width:0">'
       +'<div style="font-size:18px;font-weight:900;color:#1A1A1A;line-height:1.15;letter-spacing:-0.3px">'+escaparHtml(nombreCompleto)+'</div>'
@@ -16835,8 +16870,11 @@ function renderPedidosMultiples(){
       +'<button onclick="event.stopPropagation();moverBarberoMulti('+idx+',-1)" title="Subir" style="background:rgba(255,255,255,0.85);color:#546E7A;border:none;border-radius:5px 5px 0 0;width:26px;height:17px;cursor:pointer;font-size:11px;font-weight:900;line-height:1;padding:0'+(idx===0?';opacity:.3':'')+'">\u25b2</button>'
       +'<button onclick="event.stopPropagation();moverBarberoMulti('+idx+',1)" title="Bajar" style="background:rgba(255,255,255,0.85);color:#546E7A;border:none;border-radius:0 0 5px 5px;width:26px;height:17px;cursor:pointer;font-size:11px;font-weight:900;line-height:1;padding:0'+(idx===pedidosMultiTemp.length-1?';opacity:.3':'')+'">\u25bc</button>'
       +'</div>'
-      +'<button onclick="quitarBarberoMulti('+idx+')" title="Hoy no compró" style="background:rgba(255,255,255,0.75);color:var(--nbs-red-dark);border:none;border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>'
-      +'</div>';
+      +'<button onclick="event.stopPropagation();quitarBarberoMulti('+idx+')" title="Hoy no compró" style="background:rgba(255,255,255,0.75);color:var(--nbs-red-dark);border:none;border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>'
+      +'<span id="multi-flecha-'+idx+'" style="font-size:15px;color:#546E7A;flex-shrink:0;font-weight:900">'+(_abiertoEste?'\u2303':'\u203a')+'</span>'
+      +'</div>'
+      // Todo lo de abajo vive dentro de esta caja, que es la que se abre y se cierra.
+      +'<div id="multi-cuerpo-'+idx+'" style="display:'+(_abiertoEste?'block':'none')+'">';
 
     // --- El balance del barbero, SIEMPRE visible -aunque sea $0- ---
     // Siempre se muestra, incluso al dia: si dice $0.00 queda confirmado que no debe nada,
@@ -16886,6 +16924,7 @@ function renderPedidosMultiples(){
         +     'border-radius:7px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer">'
         +     '\u2795 Agregar m\u00e1s</button>'
         + '</div>';
+      html += '</div>';                      // se cierra la caja que se abre y se cierra
       card.innerHTML = html;
       el.appendChild(card);
       return;
@@ -17045,6 +17084,7 @@ function renderPedidosMultiples(){
         + '\ud83d\udcbe Guardar este pedido \u00b7 $'+fmtNum(totalBarbero)+'</button>';
     }
 
+    html += '</div>';                        // se cierra la caja que se abre y se cierra
     card.innerHTML = html;
     el.appendChild(card);
   });
@@ -17773,7 +17813,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260828b';
+var NOVEDADES_VERSION = '20260828c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -19363,15 +19403,10 @@ function avisoChico(txt){
 }
 
 // Abrir y cerrar el barbero en el que está trabajando
-function toggleBarberoMulti(idx){
-  var p = pedidosMultiTemp[idx];
-  if(!p) return;
-  var abrir = !p._abierto;
-  // Uno a la vez: se cierran los demas para que la pantalla no se corra
-  pedidosMultiTemp.forEach(function(x){ x._abierto = false; });
-  p._abierto = abrir;
-  renderPedidosMultiples();
-}
+// -- La funcion vieja que habia aqui se quito el 28 ago: era de un acordeon que nunca
+// llego a funcionar -usaba `_abierto`, que se escribia y nadie leia, como decia el
+// comentario del 14 ago-. Y como estaba MAS ABAJO en el archivo, pisaba a la buena.
+// La que vale es toggleBarberoMulti, mas arriba, junto a marcarBarberoActivo. --
 
 // ═══ TERMINAR LA BARBERÍA ═══
 // Apunta la visita de TODOS: los que compraron ya quedaron apuntados al guardar,
