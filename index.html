@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260829a-OFICIAL-V2.0">
+<meta name="app-version" content="20260829c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -568,6 +568,13 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <span class="ini-txt"><b>Pedidos Rápidos</b><i>Toma pedidos en la barbería</i></span>
     <span class="ini-fl">›</span>
   </button>
+  <!-- 💳 CUENTAS POR COBRAR, en el segundo puesto -Sensei, 29 ago-. Es lo que hace
+       despues de tomar el pedido: cobrarle al que debe. -->
+  <button onclick="irACuentasPorCobrar()" class="ini-btn" style="--c:#2E7D32;--cb:#E8F5E9">
+    <span class="ini-ico">💳</span>
+    <span class="ini-txt"><b>Cuentas por Cobrar</b><i>Quién te debe y cuánto</i></span>
+    <span class="ini-fl">›</span>
+  </button>
 
   <button onclick="ir('p-cl')" class="ini-btn" style="--c:#1565C0;--cb:#E8F1FB">
     <span class="ini-ico">👥</span>
@@ -581,11 +588,8 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <span class="ini-fl">›</span>
   </button>
 
-  <button onclick="irMenuProtegido('p-relleno')" class="ini-btn" style="--c:#6A1B9A;--cb:#F3EAF8">
-    <span class="ini-ico">🚐</span>
-    <span class="ini-txt"><b>Lista de Relleno</b><i>Arma qué reponer en la van</i></span>
-    <span class="ini-fl">›</span>
-  </button>
+  <!-- La Lista de Relleno se quito de aqui el 29 ago: Sensei la usa ocasionalmente.
+       Sigue estando en el menu ☰, en el grupo de Mercancia. -->
 
   <button onclick="abrirCajaCuadre()" class="ini-btn" style="--c:#00695C;--cb:#E0F2F1">
     <span class="ini-ico">🧮</span>
@@ -615,7 +619,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       <div style="font-size:11px;color:var(--nbs-muted)">Supply Manager · OFICIAL V2.0</div>
     </div>
   </div>
-  <div style="padding:8px 8px 14px"><button onclick="toggleGrupoMenu('vender')" id="gm-t-vender" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">🛒</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">VENDER</span><span id="gm-f-vender" style="font-size:15px;color:#8a90a8;font-weight:800">⌄</span></button><div id="gm-c-vender" style="display:block;padding:2px 0 8px 6px"><button onclick="window._vendiendoDesde=null;irMenu('p-v')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💵</span></span>Vender<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">hacer una venta ahora</span></button><button onclick="irMenu('p-ped')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">⚡</span></span>Pedidos rápidos<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">anotar pedidos de varias barberías</span></button><button onclick="irMenu('p-rutas')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🗺️</span></span>Ruta de Visitas<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">a quién visitar hoy y en qué orden</span></button><button onclick="irMenu('p-cl')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">👥</span></span>Clientes<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">tus barberos y barberías</span></button><button onclick="irMenu('p-vip')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">⭐</span></span>Programa VIP<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">quién va ganando su regalo</span></button></div><button onclick="toggleGrupoMenu('dinero')" id="gm-t-dinero" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">💰</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">DINERO</span><span id="gm-f-dinero" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-dinero" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenu('p-resumen')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💰</span></span>Cobrado y Vendido<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">cuánto entró y cuánto vendiste</span></button><button onclick="irMenu('p-cxc')" class="mlb2" style="background:#EAF3E2;border-radius:10px;margin-bottom:8px"><span class="mlb2-icon" style="font-size:16px">💳</span><span style="color:#2E7D32;font-weight:700">Cuentas por Cobrar / Facturas</span><span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">lo que TE DEBEN tus clientes</span></button><button onclick="irMenu('p-cxp')" class="mlb2" style="background:#F5E6EA;border-radius:10px;margin-bottom:4px"><span class="mlb2-icon" style="font-size:16px">📤</span><span style="color:#7B1E3A;font-weight:700">Cuentas por Pagar</span><span style="margin-left:auto;font-size:10px;color:#7B1E3A;opacity:0.7">↑ tú debes</span><span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">lo que TÚ DEBES a suplidores</span></button><button onclick="irMenuProtegido('p-gastos')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💸</span></span>Gastos<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">gasolina, comida, lo que sale</span></button></div><button onclick="toggleGrupoMenu('reportes')" id="gm-t-reportes" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">📊</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">REPORTES</span><span id="gm-f-reportes" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-reportes" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenu('p-dashboard')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📈</span></span>Resumen Financiero<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">cómo va el negocio en números</span></button><button onclick="irMenu('p-panorama')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📊</span></span>Panorama Completo<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">todo el negocio de un vistazo</span></button><button onclick="cerrarMenuLateral();setTimeout(function(){mostrarReporteClientes('ganancia')},350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📊</span></span>Reporte por Cliente<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">quién te compra y te deja más</span></button><button onclick="irMenuProtegido('p-rpt')" class="mlb2 mlb2-destacado"><span class="mlb2-icon"><span style="font-size:22px">📊</span></span>REPORTES<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">reportes por rango de fechas</span></button><button onclick="abrirBitacora();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📋</span></span>Bitácora de visitas<span style="display:block;font-size:10.5px;color:#888;font-weight:400">Quién visitaste, cuándo y qué compró</span></button></div><button onclick="toggleGrupoMenu('mercancia')" id="gm-t-mercancia" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">📦</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">MERCANCÍA</span><span id="gm-f-mercancia" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-mercancia" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenuProtegido('p-cat')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📦</span></span>Catálogo<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">tus productos y precios</span></button><button onclick="irMenuProtegido('p-inventario')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💰</span></span>Inventario<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">todo lo que tienes en almacén</span></button><button onclick="irMenuProtegido('p-van')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🚐</span></span>VAN<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">qué llevas en la camioneta hoy</span></button><button onclick="irMenuProtegido('p-relleno')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🚐</span></span>Lista de Relleno<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">qué comprarle al suplidor</span></button><button onclick="irMenuProtegido('p-comp')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🚚</span></span>Compras<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">lo que le compras a tus suplidores</span></button><button onclick="irMenuProtegido('p-sup')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🏭</span></span>Suplidores<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">a quién le compras</span></button></div><button onclick="toggleGrupoMenu('seguridad')" id="gm-t-seguridad" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">🛡️</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">SEGURIDAD</span><span id="gm-f-seguridad" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-seguridad" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenuProtegido('p-copias')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🛡️</span></span>Copias de Seguridad<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">tus respaldos del teléfono y la nube</span></button><button onclick="irProtegido('exportar');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💾</span></span>Exportar backup<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">bajar un backup a este teléfono</span></button><button onclick="irProtegido('importar');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📂</span></span>Importar backup<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">volver a como estaba con un backup</span></button><button onclick="cerrarMenuLateral();setTimeout(revisarIntegridad,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🩺</span></span>Revisi&oacute;n de integridad<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">que los números cuadren</span></button>
+  <div style="padding:8px 8px 14px"><button onclick="toggleGrupoMenu('vender')" id="gm-t-vender" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">🛒</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">VENDER</span><span id="gm-f-vender" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-vender" style="display:none;padding:2px 0 8px 6px"><button onclick="window._vendiendoDesde=null;irMenu('p-v')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💵</span></span>Vender<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">hacer una venta ahora</span></button><button onclick="irMenu('p-ped')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">⚡</span></span>Pedidos rápidos<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">anotar pedidos de varias barberías</span></button><button onclick="irMenu('p-rutas')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🗺️</span></span>Ruta de Visitas<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">a quién visitar hoy y en qué orden</span></button><button onclick="irMenu('p-cl')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">👥</span></span>Clientes<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">tus barberos y barberías</span></button><button onclick="irMenu('p-vip')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">⭐</span></span>Programa VIP<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">quién va ganando su regalo</span></button></div><button onclick="toggleGrupoMenu('dinero')" id="gm-t-dinero" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">💰</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">DINERO</span><span id="gm-f-dinero" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-dinero" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenu('p-resumen')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💰</span></span>Cobrado y Vendido<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">cuánto entró y cuánto vendiste</span></button><button onclick="irMenu('p-cxc')" class="mlb2" style="background:#EAF3E2;border-radius:10px;margin-bottom:8px"><span class="mlb2-icon" style="font-size:16px">💳</span><span style="color:#2E7D32;font-weight:700">Cuentas por Cobrar / Facturas</span><span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">lo que TE DEBEN tus clientes</span></button><button onclick="irMenu('p-cxp')" class="mlb2" style="background:#F5E6EA;border-radius:10px;margin-bottom:4px"><span class="mlb2-icon" style="font-size:16px">📤</span><span style="color:#7B1E3A;font-weight:700">Cuentas por Pagar</span><span style="margin-left:auto;font-size:10px;color:#7B1E3A;opacity:0.7">↑ tú debes</span><span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">lo que TÚ DEBES a suplidores</span></button><button onclick="irMenuProtegido('p-gastos')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💸</span></span>Gastos<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">gasolina, comida, lo que sale</span></button></div><button onclick="toggleGrupoMenu('reportes')" id="gm-t-reportes" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">📊</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">REPORTES</span><span id="gm-f-reportes" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-reportes" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenu('p-dashboard')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📈</span></span>Resumen Financiero<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">cómo va el negocio en números</span></button><button onclick="irMenu('p-panorama')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📊</span></span>Panorama Completo<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">todo el negocio de un vistazo</span></button><button onclick="cerrarMenuLateral();setTimeout(function(){mostrarReporteClientes('ganancia')},350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📊</span></span>Reporte por Cliente<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">quién te compra y te deja más</span></button><button onclick="irMenuProtegido('p-rpt')" class="mlb2 mlb2-destacado"><span class="mlb2-icon"><span style="font-size:22px">📊</span></span>REPORTES<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">reportes por rango de fechas</span></button><button onclick="abrirBitacora();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📋</span></span>Bitácora de visitas<span style="display:block;font-size:10.5px;color:#888;font-weight:400">Quién visitaste, cuándo y qué compró</span></button></div><button onclick="toggleGrupoMenu('mercancia')" id="gm-t-mercancia" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">📦</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">MERCANCÍA</span><span id="gm-f-mercancia" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-mercancia" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenuProtegido('p-cat')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📦</span></span>Catálogo<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">tus productos y precios</span></button><button onclick="irMenuProtegido('p-inventario')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💰</span></span>Inventario<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">todo lo que tienes en almacén</span></button><button onclick="irMenuProtegido('p-van')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🚐</span></span>VAN<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">qué llevas en la camioneta hoy</span></button><button onclick="irMenuProtegido('p-relleno')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🚐</span></span>Lista de Relleno<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">qué comprarle al suplidor</span></button><button onclick="irMenuProtegido('p-comp')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🚚</span></span>Compras<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">lo que le compras a tus suplidores</span></button><button onclick="irMenuProtegido('p-sup')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🏭</span></span>Suplidores<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">a quién le compras</span></button></div><button onclick="toggleGrupoMenu('seguridad')" id="gm-t-seguridad" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">🛡️</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">SEGURIDAD</span><span id="gm-f-seguridad" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-seguridad" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenuProtegido('p-copias')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🛡️</span></span>Copias de Seguridad<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">tus respaldos del teléfono y la nube</span></button><button onclick="irProtegido('exportar');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💾</span></span>Exportar backup<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">bajar un backup a este teléfono</span></button><button onclick="irProtegido('importar');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📂</span></span>Importar backup<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">volver a como estaba con un backup</span></button><button onclick="cerrarMenuLateral();setTimeout(revisarIntegridad,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🩺</span></span>Revisi&oacute;n de integridad<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">que los números cuadren</span></button>
     <div style="background:#F5F3EF;border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center">
       <span style="font-size:13px;font-weight:600;color:var(--nbs-ink);display:flex;align-items:center;gap:6px">🔒PIN</span>
       <div style="display:flex;align-items:center;gap:8px">
@@ -641,7 +645,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       </div>
     </div>
     <button onclick="bloquearAhora()" style="width:100%;margin-top:8px;background:none;border:1px solid #546E7A;color:#546E7A;padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">🔒 Bloquear ahora</button>
-    <button onclick="cerrarSesionNBS()" style="width:100%;margin-top:8px;background:none;border:1px solid #e0574a;color:#e0574a;padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">🚪 Cerrar sesión</button></div><button onclick="toggleGrupoMenu('herramientas')" id="gm-t-herramientas" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">⚙️</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">HERRAMIENTAS</span><span id="gm-f-herramientas" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-herramientas" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenu('p-docs')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📁</span></span>Mis Documentos<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">guías y papeles guardados</span></button><button onclick="irMenu('p-academia')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🎓</span></span>Academia<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">aprender de negocio escuchando</span></button><button onclick="irMenu('p-manual')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📖</span></span>Manual de Usuario<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">cómo se usa cada cosa</span></button><button onclick="abrirConfigImpresora();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🖨️</span></span>Configurar Impresora</button><button onclick="traerLoNuevo();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🔄</span></span>Traer lo nuevo de la nube</button><button onclick="cambiarWhatsAppApp();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💬</span></span>Cuál WhatsApp usar</button><button onclick="adminAccion('huerfanas');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🧹</span></span>Limpiar ventas huérfanas</button><button onclick="cerrarMenuLateral();setTimeout(verLogAtras,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🔧</span></span>Registro bot&oacute;n atr&aacute;s</button><button onclick="adminAccion('borrar');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon" style="background:var(--nbs-red-bg)"><span style="font-size:19px">⚠️</span></span><span style="color:var(--nbs-red-dark)">Borrar todos los datos</span></button></div></div>
+    <button onclick="cerrarSesionNBS()" style="width:100%;margin-top:8px;background:none;border:1px solid #e0574a;color:#e0574a;padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">🚪 Cerrar sesión</button></div><button onclick="toggleGrupoMenu('herramientas')" id="gm-t-herramientas" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:18px;flex-shrink:0">⚙️</span><span style="flex:1;font-size:14.5px;font-weight:900;color:#1a237e;letter-spacing:.3px">HERRAMIENTAS</span><span id="gm-f-herramientas" style="font-size:15px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-herramientas" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenu('p-docs')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📁</span></span>Mis Documentos<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">guías y papeles guardados</span></button><button onclick="irMenu('p-academia')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🎓</span></span>Academia<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">aprender de negocio escuchando</span></button><button onclick="irMenu('p-manual')" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📖</span></span>Manual de Usuario<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">cómo se usa cada cosa</span></button><button onclick="verQueUsoMas();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">📊</span></span>Qué uso más<span style="display:block;font-size:10.5px;color:var(--nbs-muted);font-weight:500;line-height:1.3;margin-top:1px">las pantallas que más abres</span></button><button onclick="abrirConfigImpresora();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🖨️</span></span>Configurar Impresora</button><button onclick="traerLoNuevo();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🔄</span></span>Traer lo nuevo de la nube</button><button onclick="cambiarWhatsAppApp();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">💬</span></span>Cuál WhatsApp usar</button><button onclick="adminAccion('huerfanas');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🧹</span></span>Limpiar ventas huérfanas</button><button onclick="cerrarMenuLateral();setTimeout(verLogAtras,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:19px">🔧</span></span>Registro bot&oacute;n atr&aacute;s</button><button onclick="adminAccion('borrar');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon" style="background:var(--nbs-red-bg)"><span style="font-size:19px">⚠️</span></span><span style="color:var(--nbs-red-dark)">Borrar todos los datos</span></button></div></div>
 </div>
 
 
@@ -2068,7 +2072,7 @@ function descomprimirTexto(base64){
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var CLAVES_A_RESPALDAR = ['ncl','nv','nc','ncr','np','nsup','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','np_eliminados','nvisitas_barberos','historial_precios','rutas_por_dia',
-  'nvan','nrelleno','ncierres_ruta','nbs_facturas_emparejadas','nbs_correcciones_van',
+  'nvan','nrelleno','ncierres_ruta','nbs_uso_pantallas','nbs_facturas_emparejadas','nbs_correcciones_van',
   // La LISTA de impresoras sí viaja a la nube. La que está ACTIVA no: eso es de cada
   // aparato -el teléfono puede usar la portátil y la PC la de escritorio-. -30 jul-
   'impresoras_lista',
@@ -4690,7 +4694,82 @@ function revisarSubvistasSinCubrir(){
   } catch(e){}
   return faltan;
 }
+// ═══════════════════════════════════════════════════════════════════
+//  📊 EL RÉCORD DE USO  (29 ago 2026)
+//
+//  Sensei preguntó qué le sugiero para la pantalla de inicio "de acuerdo al
+//  récord de uso de la app". No había ninguno: la app nunca apuntó qué usa.
+//
+//  Así que ahora lo apunta. Solo cuenta CUÁNTAS VECES abre cada pantalla y
+//  cuándo fue la última. Nada más: ni qué escribió, ni cuánto vendió, ni nada
+//  que salga del teléfono. Es para poder decidir con datos qué merece estar en
+//  el inicio, en vez de adivinar.
+//
+//  Dentro de unas semanas, en Herramientas → 📊 Qué uso más, va a poder ver la
+//  lista de verdad y ajustar el inicio a lo que hace, no a lo que cree que hace.
+// ═══════════════════════════════════════════════════════════════════
+
+var CLAVE_USO = 'nbs_uso_pantallas';
+
+// Nombres en cristiano, para que la lista se lea
+var NOMBRES_PANTALLA = {
+  'p-inicio':'Inicio', 'p-ped':'Pedidos Rápidos', 'p-v':'Vender', 'p-cl':'Clientes',
+  'p-cxc':'Cuentas por Cobrar', 'p-cat':'Catálogo', 'p-comp':'Compras', 'p-sup':'Suplidores',
+  'p-van':'Control de la Van', 'p-relleno':'Lista de Relleno', 'p-gastos':'Gastos',
+  'p-cuadre':'Cuadre de Caja', 'p-copias':'Copias de Seguridad', 'p-rpt':'Reportes',
+  'p-rutas':'Ruta de Visitas', 'p-vip':'Programa VIP', 'p-bitacora':'Bitácora',
+  'p-resumen':'Resumen', 'p-mas':'Más', 'p-academia':'Academia', 'p-cxp':'Cuentas por Pagar',
+  'p-cl-perfil':'Ficha del cliente', 'p-inv':'Inventario'
+};
+
+function apuntarUsoPantalla(id){
+  if(!id || String(id).indexOf('p-') !== 0) return;
+  try {
+    var u = JSON.parse(localStorage.getItem(CLAVE_USO) || '{}');
+    if(!u[id]) u[id] = { veces: 0, ultima: null };
+    u[id].veces++;
+    u[id].ultima = Date.now();
+    localStorage.setItem(CLAVE_USO, JSON.stringify(u));
+  } catch(e){}
+}
+
+function verQueUsoMas(){
+  var u = {};
+  try { u = JSON.parse(localStorage.getItem(CLAVE_USO) || '{}'); } catch(e){}
+  var lista = Object.keys(u).map(function(id){
+    return { id: id, nombre: NOMBRES_PANTALLA[id] || id, veces: u[id].veces, ultima: u[id].ultima };
+  }).sort(function(a, b){ return b.veces - a.veces; });
+
+  if(!lista.length){
+    avisoGrande('📊 QUÉ USO MÁS\n\nTodavía no hay nada apuntado.\n\n'
+      + 'La app empezó a contar hoy. Vuelve en una semana y aquí vas a ver, en orden, '
+      + 'las pantallas que más abres — para decidir cuáles merecen estar en el inicio.');
+    return;
+  }
+
+  var total = lista.reduce(function(a, x){ return a + x.veces; }, 0);
+  var t = ['📊 QUÉ USO MÁS', '', 'De ' + total + ' veces que has entrado a una pantalla:', ''];
+  lista.slice(0, 15).forEach(function(x, i){
+    var pct = Math.round((x.veces / total) * 100);
+    var dias = x.ultima ? Math.floor((Date.now() - x.ultima) / 86400000) : null;
+    t.push((i + 1) + '. ' + x.nombre + ' — ' + x.veces + ' vez/veces (' + pct + '%)'
+      + (dias === 0 ? ' · hoy' : (dias !== null ? ' · hace ' + dias + ' día(s)' : '')));
+  });
+  t.push('');
+  t.push('Las de arriba son las que merecen estar en el inicio.');
+  avisoGrande(t.join('\n'));
+}
+
+function borrarRecordDeUso(){
+  if(!confirm('¿Empezar a contar de cero?\n\nSe borra solo el récord de qué pantallas abres. '
+    + 'No se toca ningún dato de tu negocio.')) return;
+  try { localStorage.removeItem(CLAVE_USO); } catch(e){}
+  alert('✅ El récord de uso empezó de cero.');
+}
+
 function ir(id, sinHistorial){
+  // 📊 Apuntar que pantalla se abrio, para poder decidir el inicio con datos. -29 ago-
+  try { apuntarUsoPantalla(id); } catch(e){}
   if(!sinHistorial){
     var actual = pantallaActual();
     if(actual && actual !== id) historialPantallas.push(actual);
@@ -9343,6 +9422,27 @@ function productosDeSuplidor(sid){
     (c.items || []).forEach(function(it){ if(it.pid) ids[String(it.pid)] = true; });
   });
   return ids;
+}
+
+// 📂 Abrir y cerrar un bloque de la pantalla de compras. -29 ago-
+function toggleBloqueCompra(idBloque, idBoton){
+  var caja = document.getElementById(idBloque);
+  if(!caja) return;
+  var abierto = caja.style.display !== 'none';
+  caja.style.display = abierto ? 'none' : 'block';
+  var btn = document.getElementById(idBoton);
+  if(btn){
+    var fl = btn.querySelector('.cc-flecha');
+    if(fl) fl.textContent = abierto ? '\u203a' : '\u2303';
+    btn.style.background = abierto ? '#F2F2F6' : '#E3E7FB';
+    btn.style.borderColor = abierto ? '#DCDCE4' : '#1a237e';
+  }
+}
+
+// Para abrirlo desde el codigo -por ejemplo, cuando el PDF trae descuentos-.
+function abrirBloqueCompra(idBloque, idBoton){
+  var caja = document.getElementById(idBloque);
+  if(caja && caja.style.display === 'none') toggleBloqueCompra(idBloque, idBoton);
 }
 
 function toggleOpcionesCatalogo(){
@@ -18011,7 +18111,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260829a';
+var NOVEDADES_VERSION = '20260829c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34892,6 +34992,8 @@ function agregarFacturaALaCompra(){
   }
   var dsPdf = window._facturaDescuentos || [];
   if(dsPdf.length){
+    // Se abre solo para que VEA los descuentos que se le pusieron. -29 ago-
+    try { abrirBloqueCompra('cc-bloque-extras', 'cc-btn-extras'); } catch(e){}
     for(var iDp = 0; iDp < 3; iDp++){
       var elDd = document.getElementById('cc-desc' + (iDp+1));
       var elDm = document.getElementById('cc-descm' + (iDp+1));
@@ -37621,6 +37723,12 @@ function verHistorialCliente(cid, modo){
       </select>
       <button id="btn-nuevo-sup-compra" type="button" onclick="crearSuplidorRapido()" style="background:#546E7A;color:white;border:none;border-radius:8px;padding:0 14px;cursor:pointer;font-size:20px;flex-shrink:0">+</button>
     </div>
+    <!-- 📎 SE RECOGE LO QUE NO SE USA TODOS LOS DIAS -Sensei, 29 ago-. Medido: la foto y
+         los dos lectores ocupaban 228 px a la vista siempre. Nada se quito: se recogio. -->
+    <button type="button" id="cc-btn-factura" onclick="toggleBloqueCompra('cc-bloque-factura','cc-btn-factura')"
+      style="width:100%;padding:11px;margin-bottom:8px;background:#F2F2F6;color:#37474F;border:1.5px solid #DCDCE4;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+      <span>📎 Foto y lectura de la factura</span><span class="cc-flecha">›</span></button>
+    <div id="cc-bloque-factura" style="display:none">
     <label class="lbl">Foto de la factura del suplidor (opcional)</label>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <div id="cc-foto-preview" onclick="abrirOpcionesFotoGasto('cc')" style="width:56px;height:56px;border-radius:10px;background:var(--nbs-gold-bg);border:2px dashed var(--nbs-gold);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden;cursor:pointer">📷</div>
@@ -37639,6 +37747,7 @@ function verHistorialCliente(cid, modo){
       <div style="font-size:11px;color:#777;font-weight:700;margin-bottom:6px">TEXTO ENCONTRADO EN LA FOTO -tócalo y cópialo, no siempre sale perfecto-</div>
       <textarea id="cc-ocr-texto" readonly style="width:100%;min-height:100px;border:none;background:white;border-radius:6px;padding:8px;font-size:12px;font-family:monospace;resize:vertical"></textarea>
     </div>
+    </div><!-- fin del bloque de foto y lectura de factura -->
     <label class="lbl">Buscar producto existente</label>
     <div style="display:flex;gap:8px">
       <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="ccb" type="text" placeholder="Escribe para buscar..." oninput="filterCC(this.value)" onfocus="filterCC(this.value||'')"></div>
@@ -37669,6 +37778,12 @@ function verHistorialCliente(cid, modo){
     <p style="font-size:11px;color:#aaa;margin:-4px 0 8px">El precio de venta solo aplica si es producto nuevo.</p>
     <button class="btn" style="background:#546E7A;color:white" onclick="addCC()">+ Agregar producto a la compra</button>
     <div id="iccp" style="margin:8px 0"></div>
+    <!-- 💰 Lo mismo con envio, tarjeta y descuentos: 274 px que no son de todas las
+         facturas. Si el PDF trae descuentos, este bloque se abre solo. -29 ago- -->
+    <button type="button" id="cc-btn-extras" onclick="toggleBloqueCompra('cc-bloque-extras','cc-btn-extras')"
+      style="width:100%;padding:11px;margin-bottom:8px;background:#F2F2F6;color:#37474F;border:1.5px solid #DCDCE4;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+      <span>💰 Envío, tarjeta y descuentos</span><span class="cc-flecha">›</span></button>
+    <div id="cc-bloque-extras" style="display:none">
     <label class="lbl">Costo de envío -shipping- -opcional</label>
     <input class="inp" id="cc-envio" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);renderICC()">
     <label class="lbl">Cargo por tarjeta de crédito -opcional</label>
@@ -37680,6 +37795,7 @@ function verHistorialCliente(cid, modo){
       <label style="font-size:12.5px;font-weight:800;color:#C62828;display:block;margin-bottom:5px">💸 DESCUENTOS -opcional, hasta 3</label>
       <div style="display:flex;gap:5px;margin-bottom:4px"><input class="inp" id="cc-desc1" type="text" placeholder="Por qué (ej: promoción)" autocomplete="off" style="flex:1;padding:7px 8px;font-size:12.5px;margin:0"><input class="inp" id="cc-descm1" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);pintarTotalCompra()" style="width:84px;padding:7px 4px;font-size:12.5px;text-align:center;margin:0"></div><div style="display:flex;gap:5px;margin-bottom:4px"><input class="inp" id="cc-desc2" type="text" placeholder="Por qué (ej: promoción)" autocomplete="off" style="flex:1;padding:7px 8px;font-size:12.5px;margin:0"><input class="inp" id="cc-descm2" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);pintarTotalCompra()" style="width:84px;padding:7px 4px;font-size:12.5px;text-align:center;margin:0"></div><div style="display:flex;gap:5px;margin-bottom:4px"><input class="inp" id="cc-desc3" type="text" placeholder="Por qué (ej: promoción)" autocomplete="off" style="flex:1;padding:7px 8px;font-size:12.5px;margin:0"><input class="inp" id="cc-descm3" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);pintarTotalCompra()" style="width:84px;padding:7px 4px;font-size:12.5px;text-align:center;margin:0"></div><div style="font-size:10.5px;color:#B71C1C;margin-top:2px">Escribe el número sin el menos. La app lo resta sola.</div>
     </div>
+    </div><!-- fin del bloque de envio, tarjeta y descuentos -->
     <div style="background:#EFEBE9;border-radius:8px;padding:12px;margin:8px 0">
       <div id="cc-desc-detalle"></div>
       <div style="display:flex;justify-content:space-between"><span>Total compra</span><span id="cctot" style="font-weight:700;font-size:18px;color:#5D4037">$0.00</span></div>
