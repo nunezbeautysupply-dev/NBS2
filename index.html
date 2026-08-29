@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260828a-OFICIAL-V2.0">
+<meta name="app-version" content="20260828b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2888,6 +2888,120 @@ function huellaFoto(foto){
 }
 
 // Devuelve una copia de los productos SIN las fotos -para mandar a la nube-
+// ═══════════════════════════════════════════════════════════════════
+//  ✍️ LAS FIRMAS VIAJAN POR SU PROPIO CAMINO  (28 ago 2026)
+//
+//  🔴 EL PROBLEMA QUE ESTO CURA. Las ventas de Sensei pesaban 1.473 KB y la nube
+//  no acepta más de 1.024 KB. La app las comprimía, pero solo bajaban a 1.063 KB
+//  — un 28%, cuando un archivo de ventas normal baja un 90%.
+//
+//  LA RAZÓN: dentro de cada venta iba la FIRMA del cliente, que es una imagen en
+//  texto. Una imagen YA viene comprimida, así que comprimirla otra vez no sirve
+//  de nada. Cada firma pesa unos 23 KB y no hay forma de encogerla.
+//
+//  LA CURA: exactamente la que ya tenían los PRODUCTOS desde hace tiempo. Sus
+//  fotos no viajan dentro de `np`: van por su propia colección `nbs_fotos`. A las
+//  ventas nunca se les hizo lo mismo. Ahora las firmas van por `nbs_firmas`, y a
+//  la nube sube solo el texto de las ventas — que sí se comprime de verdad.
+//
+//  🔒 EN EL TELÉFONO NO CAMBIA NADA: las firmas se siguen guardando dentro de la
+//  venta, como siempre. Esto es solo para el viaje a la nube.
+// ═══════════════════════════════════════════════════════════════════
+
+var CLAVE_INDICE_FIRMAS = 'nbs_firmas_subidas';
+
+function leerIndiceFirmas(){
+  try { return JSON.parse(localStorage.getItem(CLAVE_INDICE_FIRMAS) || '{}'); }
+  catch(e){ return {}; }
+}
+function guardarIndiceFirmas(i){
+  try { localStorage.setItem(CLAVE_INDICE_FIRMAS, JSON.stringify(i)); } catch(e){}
+}
+
+// Las ventas SIN la firma. Es lo que sube a la nube.
+function quitarFirmas(ventasL){
+  return (ventasL || []).map(function(v){
+    if(!v.firma) return v;
+    var copia = {};
+    for(var k in v){ if(k !== 'firma') copia[k] = v[k]; }
+    return copia;
+  });
+}
+
+// Los números de las ventas que SÍ tienen firma, para saber cuáles ir a buscar.
+function vidsConFirma(ventasL){
+  return (ventasL || []).filter(function(v){ return v.firma; }).map(function(v){ return String(v.id); });
+}
+
+// Sube a `nbs_firmas` solo las que cambiaron, igual que hace sincronizarFotos.
+function sincronizarFirmas(ventasL){
+  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  if(!navigator.onLine) return;
+  var indice = leerIndiceFirmas();
+  var pendientes = (ventasL || []).filter(function(v){
+    return v.firma && indice[String(v.id)] !== huellaFoto(v.firma);
+  });
+  if(!pendientes.length) return;
+  // De a 20 por tanda: una firma pesa ~23 KB y con señal de la calle no conviene
+  // mandar cincuenta de golpe.
+  pendientes.slice(0, 20).forEach(function(v){
+    var huella = huellaFoto(v.firma);
+    fbDb.collection('nbs_firmas').doc(String(v.id)).set({
+      firma: v.firma,
+      cliente: v.cn || '',
+      fecha: v.fecha || '',
+      hora: Date.now()
+    }).then(function(){
+      var i = leerIndiceFirmas();
+      i[String(v.id)] = huella;
+      guardarIndiceFirmas(i);
+    }).catch(function(e){
+      console.error('No se pudo subir la firma de la venta ' + v.id + ':', e);
+    });
+  });
+  console.log('Subiendo ' + Math.min(pendientes.length, 20) + ' firma(s) a la nube...');
+}
+
+// Y al revés: si este teléfono bajó ventas sin firma, se van a buscar.
+function descargarFirmasQueFaltan(listaVids){
+  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  if(!navigator.onLine || !listaVids || !listaVids.length) return;
+  var tengo = {};
+  try{
+    LS('nv', []).forEach(function(v){ if(v.firma) tengo[String(v.id)] = 1; });
+  }catch(e){}
+  var faltan = listaVids.filter(function(vid){ return !tengo[vid]; });
+  if(!faltan.length) return;
+  console.log('Bajando ' + Math.min(faltan.length, 20) + ' firma(s) de la nube...');
+  var promesas = faltan.slice(0, 20).map(function(vid){
+    return fbDb.collection('nbs_firmas').doc(vid).get().then(function(d){
+      if(d.exists && d.data() && d.data().firma) return { vid: vid, firma: d.data().firma };
+      return null;
+    }).catch(function(){ return null; });
+  });
+  Promise.all(promesas).then(function(res){
+    var buenas = res.filter(function(x){ return x; });
+    if(!buenas.length) return;
+    try{
+      var vs = LS('nv', []);
+      var mapa = {};
+      buenas.forEach(function(x){ mapa[x.vid] = x.firma; });
+      var cambio = false;
+      vs.forEach(function(v){
+        if(!v.firma && mapa[String(v.id)]){ v.firma = mapa[String(v.id)]; cambio = true; }
+      });
+      if(cambio){
+        if(!SS('nv', vs)){
+          console.error('No cupo al guardar las firmas bajadas: el telefono esta lleno.');
+          return;
+        }
+        ventas = LS('nv', []);
+        console.log('Se bajaron ' + buenas.length + ' firma(s).');
+      }
+    }catch(e){ console.error('No se pudieron guardar las firmas bajadas:', e); }
+  });
+}
+
 function quitarFotos(prods){
   return (prods || []).map(function(p){
     if(!p.foto) return p;
@@ -3480,6 +3594,21 @@ function sincronizarFotos(prods){
 
 // Cuando la nube manda los productos SIN fotos, se les vuelven a pegar las que ya tiene
 // este telefono -para no perderlas de vista-.
+// Lo mismo que pegarFotosQueYaTengo, pero para las firmas. La nube manda las ventas
+// sin firma; las que este telefono ya tenia se le vuelven a pegar para no perderlas,
+// y las que falten se bajan aparte. -28 ago-
+function pegarFirmasQueYaTengo(ventasDeLaNube){
+  var firmas = {};
+  try{
+    var local = LS('nv', []);
+    local.forEach(function(v){ if(v.firma) firmas[String(v.id)] = v.firma; });
+  }catch(e){}
+  (ventasDeLaNube || []).forEach(function(v){
+    if(!v.firma && firmas[String(v.id)]) v.firma = firmas[String(v.id)];
+  });
+  return ventasDeLaNube;
+}
+
 function pegarFotosQueYaTengo(prodsDeLaNube){
   var fotos = {};
   try{
@@ -3863,15 +3992,20 @@ function SS(k,v){
     // dejaban de subir. Ver "LAS FOTOS DE LOS PRODUCTOS VAN APARTE" mas arriba.
     var esProductos = (k === 'np' && Array.isArray(v));
     var esClientes = (k === 'ncl' && Array.isArray(v));
+    var esVentas = (k === 'nv' && Array.isArray(v));   // las firmas van aparte -28 ago-
     var doc = {
-      valor: JSON.stringify(esProductos ? quitarFotos(v) : (esClientes ? quitarFotosClientes(v) : v)),
+      valor: JSON.stringify(esProductos ? quitarFotos(v)
+                          : (esClientes ? quitarFotosClientes(v)
+                          : (esVentas ? quitarFirmas(v) : v))),
       actualizado: Date.now()
     };
     if(esProductos) doc.pidsConFoto = pidsConFoto(v); // para saber cuales fotos hay que bajar
+    if(esVentas) doc.vidsConFirma = vidsConFirma(v);  // idem con las firmas
     fbDb.collection('nbs_data').doc(k.replace(/\//g,'_')).set(doc).then(function(){
       quitarPendienteDeSubir(k);
       if(esProductos) sincronizarFotos(v);
       if(esClientes) sincronizarFotosClientes(v); // las fotos de clientes van aparte
+      if(esVentas) sincronizarFirmas(v);
     }).catch(function(e){
       console.error('No se pudo sincronizar "'+k+'" con la nube:', e);
       // Se queda marcado como pendiente: la app avisara y reintentara
@@ -17639,7 +17773,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260828a';
+var NOVEDADES_VERSION = '20260828b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -30897,6 +31031,15 @@ function cargarDatosDeLaNube(callback){
             if(data.pidsConFoto) setTimeout(function(){ descargarFotosQueFaltan(data.pidsConFoto); }, 3000);
           }catch(e){ console.error('No se pudieron pegar las fotos:', e); }
         }
+        // \u270d\ufe0f LAS VENTAS: se les vuelven a pegar las firmas que este telefono ya tenia,
+        // y las que falten se bajan de `nbs_firmas` en segundo plano. -28 ago-
+        if(doc.id === 'nv'){
+          try{
+            var vtas = pegarFirmasQueYaTengo(JSON.parse(_valorDelDoc));
+            valorFinal = JSON.stringify(vtas);
+            if(data.vidsConFirma) setTimeout(function(){ descargarFirmasQueFaltan(data.vidsConFirma); }, 3500);
+          }catch(e){ console.error('No se pudieron pegar las firmas:', e); }
+        }
         if(doc.id === 'ncl'){
           // Bajar las fotos de clientes que falten (van aparte, en su propia colección)
           setTimeout(function(){ descargarFotosClientesQueFaltan(); }, 4000);
@@ -31263,6 +31406,18 @@ function subirPendientes(){
         setTimeout(function(){ sincronizarFotos(pp); }, 500);
       }catch(e){}
     }
+    // \u270d\ufe0f LAS VENTAS, IGUAL: van SIN la firma. -28 ago-
+    // Una firma pesa ~23 KB, es una imagen y NO se comprime. Por eso sus 1.473 KB de
+    // ventas solo bajaban a 1.063 KB y no cabian en la nube. Las firmas viajan aparte,
+    // por la coleccion `nbs_firmas`, igual que las fotos de los productos.
+    if(k === 'nv'){
+      try{
+        var vv = JSON.parse(valor);
+        docPend.valor = JSON.stringify(quitarFirmas(vv));
+        docPend.vidsConFirma = vidsConFirma(vv);
+        setTimeout(function(){ sincronizarFirmas(vv); }, 500);
+      }catch(e){}
+    }
 
     // ═══ SE COMPRIME LO GRANDE (30 jul · rehecho el 28 ago) ═══
     // Firestore no acepta documentos de mas de 1 MB.
@@ -31320,6 +31475,7 @@ function subirPendientes(){
         if(z && z.length < docPend.valor.length && z.length < TOPE_NUBE){
           var dz = { zip: z, actualizado: docPend.actualizado };
           if(docPend.pidsConFoto) dz.pidsConFoto = docPend.pidsConFoto;
+          if(docPend.vidsConFirma) dz.vidsConFirma = docPend.vidsConFirma;
           // 🔑 Este catch es SOLO del envio comprimido: guarda SU error, no el del crudo.
           subirDoc(dz).then(alSubir).catch(function(e){
             apuntarFallo(e, 'comprimido (' + Math.round(z.length/1024) + ' KB)', z.length);
