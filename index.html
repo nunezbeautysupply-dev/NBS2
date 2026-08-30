@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260829h-OFICIAL-V2.0">
+<meta name="app-version" content="20260830a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18128,7 +18128,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260829h';
+var NOVEDADES_VERSION = '20260830a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -27610,6 +27610,18 @@ function pintarEstadoDeCuenta(){
           + 'Del cobro de $' + fmtNum(g.montoCobro) + ' se aplicaron $' + fmtNum(g.suma)
           + '. La diferencia ($' + fmtNum(g.montoCobro - g.suma) + ') quedó como crédito a favor.</div>';
       }
+      // \ud83d\udcac EL COMPROBANTE DE ESTE PAGO EN CONCRETO, sea de cuando sea. -Sensei, 30 ago-
+      // Antes el boton de abajo tomaba siempre el ULTIMO pago; no habia forma de mandarle
+      // el comprobante de un cobro de hace tres semanas.
+      var _cl = g.clave.replace(/'/g, "\\'");
+      h += '<div style="display:flex;gap:6px;margin-top:9px">'
+        + '<button onclick="event.stopPropagation();mandarComprobanteDeEstePago(\'' + _cl + '\', 1)" '
+        +   'style="flex:1;padding:9px 6px;background:#128C7E;color:#fff;border:none;border-radius:8px;'
+        +   'font-size:11.5px;font-weight:800;cursor:pointer">\ud83d\udcac Comprobante</button>'
+        + '<button onclick="event.stopPropagation();mandarComprobanteDeEstePago(\'' + _cl + '\', 0)" '
+        +   'style="flex:1;padding:9px 6px;background:#546E7A;color:#fff;border:none;border-radius:8px;'
+        +   'font-size:11.5px;font-weight:800;cursor:pointer">\u270f\ufe0f Solo el corto</button>'
+        + '</div>';
       h += '</div>';
     }
     h += '</div>';
@@ -27814,6 +27826,83 @@ function textoCortoParaCliente(cid, monto){
 
 // El corto desde el estado de cuenta: toma el ÚLTIMO cobro que le hizo, para poder
 // mandárselo cuando quiera y no solo justo después de cobrar.
+// 💬 EL COMPROBANTE DE UN PAGO CUALQUIERA  (Sensei, 30 ago)
+//
+// Sus palabras: "pero si quiero enviarle un mensaje a los pagos YA HECHOS en la app,
+// ¿no se puede usar esta vía?". Tenía razón: el botón de abajo tomaba siempre el
+// ÚLTIMO pago, así que no había forma de mandarle el comprobante de un cobro de hace
+// tres semanas. Ahora cada pago del estado de cuenta lleva sus propios botones.
+//
+// completo = 1 → el mensaje largo con el reparto.  completo = 0 → la línea corta.
+function mandarComprobanteDeEstePago(clave, completo){
+  var cid = window._estadoCuentaCid;
+  if(!cid) return;
+  var cobros = cobrosDelCliente(cid);
+  var g = null;
+  for(var i = 0; i < cobros.length; i++){ if(cobros[i].clave === clave) g = cobros[i]; }
+  if(!g){ alert('No encontré ese pago.'); return; }
+
+  var texto;
+  if(completo){
+    var detalle = (g.partes.length > 1)
+      ? g.partes.map(function(p){ return { monto: p.monto, fecha: p.fechaFactura }; })
+      : null;
+    texto = textoDeUnPago(cid, g, detalle);
+  } else {
+    texto = textoCortoParaCliente(cid, g.montoCobro);
+  }
+
+  // 🔑 Se le avisa de algo importante: el balance que sale es el de HOY, no el de aquel
+  // día. Si no se dice, se abre otra confusión igual a la que veníamos arreglando.
+  if(!confirm('Se le va a mandar esto:\n\n' + texto
+    + '\n\n⚠️ El balance que sale es el de HOY, no el de aquel día.\n\n¿Mandarlo?')) return;
+  mandarloAlCliente(cid, texto, 'Comprobante');
+}
+
+// El mensaje largo de un pago concreto: igual que el de después de cobrar, pero con la
+// FECHA de aquel pago y su número de recibo.
+function textoDeUnPago(cid, g, detalleFacturas){
+  clientes = LS('ncl', []);
+  ventas = LS('nv', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c) return '';
+
+  var debe = 0;
+  ventas.forEach(function(v){
+    if(String(v.cid) !== String(cid) || v.cancelada) return;
+    debe += cobradoYDebeDe(v).debe;
+  });
+  debe = Math.round(debe * 100) / 100;
+  var aFavor = parseFloat(c.creditoAFavor) || 0;
+
+  var t = [];
+  t.push('*NUNEZ BEAUTY SUPPLY*');
+  t.push('');
+  t.push('Hola ' + (c.nombre || nombreCl(c)) + ' 👋');
+  t.push('');
+  t.push('✅ Recibí tu pago de *$' + fmtNum(g.montoCobro) + '*');
+  t.push('📅 ' + g.fecha + (g.hora ? ' · ' + g.hora : ''));
+  if(g.recibo) t.push('🧾 Recibo ' + g.recibo);
+  var como = comoPagoElCobro(g);
+  if(como) t.push('💵 ' + como);
+  if(detalleFacturas && detalleFacturas.length > 1){
+    t.push('');
+    t.push('Lo apliqué así:');
+    detalleFacturas.forEach(function(d){
+      t.push('   • $' + fmtNum(d.monto) + ' → factura del ' + d.fecha);
+    });
+  }
+  t.push('');
+  t.push('━━━━━━━━━━━━━━━');
+  if(debe > 0.005) t.push('*Tu balance hoy: $' + fmtNum(debe) + '*');
+  else t.push('*Tu balance: $0.00 — al día* ✅');
+  if(aFavor > 0.005) t.push('Tienes $' + fmtNum(aFavor) + ' a favor para tu próxima compra.');
+  t.push('━━━━━━━━━━━━━━━');
+  t.push('');
+  t.push('Si algo no te cuadra, dímelo y lo revisamos juntos. 🙏');
+  return t.join('\n');
+}
+
 function compartirCortoDesdeEstado(){
   var cid = window._estadoCuentaCid;
   if(!cid) return;
