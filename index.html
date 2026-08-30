@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260830b-OFICIAL-V2.0">
+<meta name="app-version" content="20260830d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -7698,7 +7698,8 @@ function panelesDelSuplidor(id, s, comprasDelSup){
     var elTel = telLimpio || telCLimpio;
     acciones += '<a href="tel:' + elTel + '" style="flex:1;text-align:center;padding:9px;background:#E8F5E9;color:#2E7D32;'
       + 'border-radius:9px;font-size:12px;font-weight:800;text-decoration:none">📞 Llamar</a>';
-    acciones += '<a href="https://wa.me/' + (elTel.length === 10 ? '1' + elTel : elTel) + '" target="_blank" '
+    // Por el camino bueno, para que abra el WhatsApp BUSINESS en Android. -30 ago-
+    acciones += '<a href="' + _linkWhatsApp(elTel) + '" target="_blank" '
       + 'style="flex:1;text-align:center;padding:9px;background:#E8F5E9;color:#128C7E;border-radius:9px;font-size:12px;font-weight:800;text-decoration:none">💬 WhatsApp</a>';
   }
   if(dirCompleta){
@@ -18128,7 +18129,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260830b';
+var NOVEDADES_VERSION = '20260830d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -23204,16 +23205,20 @@ function cambiarWhatsAppApp(){
   try { if(window._clientePerfilActual != null) pintarPanelCliente(window._clientePerfilActual); } catch(e){}
 }
 
-function _linkWhatsApp(telLimpio){
+function _linkWhatsApp(telLimpio, texto){
   var num = String(telLimpio || '').replace(/[^0-9]/g, '');
   if(!num) return '#';
   if(num.length === 10) num = '1' + num;          // numeros de aqui, sin el 1
-  var normal = 'https://wa.me/' + num;
+  // \ud83d\udcac EL TEXTO -30 ago-. Antes esta funcion solo abria el chat; los comprobantes
+  // nuevos mandan mensaje, asi que ahora tambien lleva el texto por el camino bueno.
+  var t = String(texto || '');
+  var normal = 'https://wa.me/' + num + (t ? '?text=' + encodeURIComponent(t) : '');
   if(!esAndroid()) return normal;
   // Preferir el WhatsApp que el escogio; si no esta, cae al normal solo.
   var cual = LS('nbs_whatsapp_app', WA_NEGOCIO);
   if(!cual) return normal;
   return 'intent://send?phone=' + num
+    + (t ? '&text=' + encodeURIComponent(t) : '')
     + '#Intent;scheme=whatsapp;package=' + cual
     + ';S.browser_fallback_url=' + encodeURIComponent(normal) + ';end';
 }
@@ -23777,7 +23782,8 @@ function mandarPuntosPorWhatsApp(cid){
       + 'P\u00f3nselo en Sus datos y vuelve a intentarlo.');
     return;
   }
-  var url = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(r.texto);
+  // Por el camino bueno: abre el WhatsApp BUSINESS en Android. -30 ago-
+  var url = _linkWhatsApp(tel, r.texto);
   try { window.open(url, '_blank'); }
   catch(e){ location.href = url; }
 }
@@ -27940,9 +27946,31 @@ function mandarloAlCliente(cid, texto, queEs){
   var c = clientes.find(function(x){ return String(x.id) === String(cid); });
   var tel = c ? String(c.tel || '').replace(/[^0-9]/g, '') : '';
   if(tel){
-    if(tel.length === 10) tel = '1' + tel;
+    // \ud83d\udd34 ANTES aqui se armaba el wa.me a mano y por eso se abria el WhatsApp normal
+    // -o la pagina de la web-. La app YA tenia resuelto esto desde el 11 de agosto con
+    // _linkWhatsApp, que en Android abre el WhatsApp BUSINESS directo. Sensei lo vio:
+    // "yo tengo whatsapp business, y antes cuando tocaba enviar mensaje se abria directo".
+    // Tenia razon: el codigo nuevo no estaba usando lo que ya existia. -30 ago-
+    var enlace = _linkWhatsApp(tel, texto);
+
+    // \ud83d\udee1\ufe0f RED PARA LOS MENSAJES LARGOS. El estado de cuenta completo arma un enlace
+    // de unos 2.500 caracteres, y algunos Android los cortan: el mensaje llegaria a medias.
+    // Si se pasa del limite seguro, se COPIA el texto y se abre el chat vacio para pegarlo.
+    if(enlace.length > 1800){
+      try {
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(texto);
+          alert('\ud83d\udccb El mensaje es largo, as\u00ed que lo COPI\u00c9 completo.\n\n'
+            + 'Se va a abrir el chat de ' + (c && c.nombre ? c.nombre : 'tu cliente') + '.\n'
+            + 'Ah\u00ed solo mant\u00e9n el dedo en la casilla y dale PEGAR.');
+          window.location.href = _linkWhatsApp(tel);   // el chat, sin texto
+          return;
+        }
+      } catch(e){}
+    }
+
     try {
-      window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(texto), '_blank');
+      window.location.href = enlace;
       return;
     } catch(e){}
   }
