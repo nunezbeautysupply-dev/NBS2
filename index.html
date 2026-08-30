@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260830j-OFICIAL-V2.0">
+<meta name="app-version" content="20260830k-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4559,7 +4559,7 @@ var RECUADROS_ENCIMA = [
   { id: 'scanner-overlay' },
   { id: 'fact-edit-total-box' },
   { id: 'fact-acciones-overlay' },
-  { id: 'fact-edit-overlay',        cerrar: 'cerrarEdicionFactura' },
+  { id: 'fact-edit-overlay',        cerrar: 'cerrarFacturaEdit' },
   { id: 'editor-pago-overlay',      cerrar: 'cerrarEditorPago' },
   { id: 'devolucion-overlay',       cerrar: 'cerrarDevolucion' },
   { id: 'giftvip-ov' },
@@ -18153,7 +18153,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260830j';
+var NOVEDADES_VERSION = '20260830k';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -18964,6 +18964,16 @@ function avisosPendientes(){
 function abrirAsistente(){
   cerrarAsistente();
   _asistenteAbierto = true;
+
+  // \ud83d\udd04 LO PRIMERO: refrescar los datos. Sin esto el asistente habla de lo que hubiera
+  // en memoria cuando se cargo la app, no de lo que hay AHORA. -30 ago-
+  try {
+    clientes = LS('ncl', []);
+    ventas   = LS('nv', []);
+    compras  = LS('nc', []);
+    suplidores = LS('nsup', []);
+    loadProds();
+  } catch(e){ console.error('El asistente no pudo refrescar los datos:', e); }
 
   var ov = document.createElement('div');
   ov.id = 'asistente-ov';
