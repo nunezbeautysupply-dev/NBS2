@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260829g-OFICIAL-V2.0">
+<meta name="app-version" content="20260829h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18128,7 +18128,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260829g';
+var NOVEDADES_VERSION = '20260829h';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -27643,12 +27643,13 @@ function pintarEstadoDeCuenta(){
       + '</div>';
   });
 
-  h += '<div style="display:flex;gap:8px;margin-top:16px">'
-    + '<button onclick="compartirEstadoDeCuenta()" style="flex:1.3;padding:13px;background:#128C7E;color:#fff;'
-    +   'border:none;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer">💬 Mandárselo al cliente</button>'
-    + '<button onclick="cerrarEstadoDeCuenta()" style="flex:.7;padding:13px;background:#F0F0F2;color:#333;'
-    +   'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">Cerrar</button>'
-    + '</div>';
+  h += '<button onclick="compartirEstadoDeCuenta()" style="width:100%;padding:13px;margin-top:16px;background:#128C7E;color:#fff;'
+    +   'border:none;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer">\ud83d\udcac Mandarle el estado de cuenta completo</button>'
+    // \u270f\ufe0f Y el corto: cuanto pago y cuanto queda. Nada mas. -Sensei, 29 ago-
+    + '<button onclick="compartirCortoDesdeEstado()" style="width:100%;padding:12px;margin-top:8px;background:#546E7A;color:#fff;'
+    +   'border:none;border-radius:10px;font-size:12.5px;font-weight:800;cursor:pointer">\u270f\ufe0f Mandarle solo: cu\u00e1nto pag\u00f3 y cu\u00e1nto queda</button>'
+    + '<button onclick="cerrarEstadoDeCuenta()" style="width:100%;padding:12px;margin-top:8px;background:#F0F0F2;color:#333;'
+    +   'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">Cerrar</button>';
 
   caja.innerHTML = h;
 }
@@ -27790,6 +27791,44 @@ function textoEstadoDeCuenta(cid){
   return t.join('\n');
 }
 
+// ✏️ EL MENSAJE CORTO  (Sensei, 29 ago)
+//
+// Sus palabras: "quiero tener la opción de ponerle un mensaje que diga cuánto pagó y
+// cuánto queda pendiente, que el mensaje diga SOLO ESO, aparte de lo que ya hiciste".
+//
+// O sea: una línea y ya. Para el barbero que solo quiere saber en qué quedó. El
+// comprobante completo se queda como estaba: son dos botones distintos.
+function textoCortoParaCliente(cid, monto){
+  clientes = LS('ncl', []);
+  ventas = LS('nv', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c) return '';
+  var debe = 0;
+  ventas.forEach(function(v){
+    if(String(v.cid) !== String(cid) || v.cancelada) return;
+    debe += cobradoYDebeDe(v).debe;
+  });
+  debe = Math.round(debe * 100) / 100;
+  return 'Pagaste $' + fmtNum(monto) + ' — te queda pendiente $' + fmtNum(debe) + '.';
+}
+
+// El corto desde el estado de cuenta: toma el ÚLTIMO cobro que le hizo, para poder
+// mandárselo cuando quiera y no solo justo después de cobrar.
+function compartirCortoDesdeEstado(){
+  var cid = window._estadoCuentaCid;
+  if(!cid) return;
+  var cobros = cobrosDelCliente(cid);
+  if(!cobros.length){
+    alert('Este cliente todavía no te ha pagado nada, así que no hay un último pago que mandarle.\n\n'
+      + 'Usa el botón verde para mandarle el estado de cuenta completo.');
+    return;
+  }
+  var ultimo = cobros[0];   // ya vienen del más nuevo al más viejo
+  var texto = textoCortoParaCliente(cid, ultimo.montoCobro);
+  if(!confirm('Se le va a mandar esto:\n\n' + texto + '\n\n¿Mandarlo?')) return;
+  mandarloAlCliente(cid, texto, 'Mensaje corto');
+}
+
 function compartirEstadoDeCuenta(){
   var cid = window._estadoCuentaCid;
   if(!cid) return;
@@ -27832,6 +27871,8 @@ function ofrecerMensajeAlCliente(cid, tipo, monto, detalleFacturas){
     if(LS('nbs_avisar_cliente', '1') !== '1') return;   // se puede apagar
     var texto = textoParaCliente(cid, tipo, monto, detalleFacturas);
     if(!texto) return;
+    // El corto se arma ANTES de pintar, porque el HTML de abajo ya lo usa. -29 ago-
+    window._textoCortoCliente = (tipo === 'pago') ? textoCortoParaCliente(cid, monto) : '';
 
     var ov = document.getElementById('avisar-cliente-overlay');
     if(!ov){
@@ -27847,11 +27888,24 @@ function ofrecerMensajeAlCliente(cid, tipo, monto, detalleFacturas){
       + '<div style="background:#E7F6EF;border-radius:10px;padding:11px;font-size:12px;color:#222;'
       +   'white-space:pre-wrap;line-height:1.5;max-height:38vh;overflow:auto;margin-bottom:12px">'
       +   escaparHtml(texto) + '</div>'
-      + '<div style="display:flex;gap:8px">'
+      + '<div style="display:flex;gap:8px;margin-bottom:8px">'
       +   '<button onclick="mandarloAlCliente(' + _arg(cid) + ', window._textoAvisoCliente, \'Comprobante\');cerrarAvisoCliente()" '
-      +     'style="flex:1.3;padding:13px;background:#128C7E;color:#fff;border:none;border-radius:10px;'
-      +     'font-size:13.5px;font-weight:800;cursor:pointer">💬 Mandar</button>'
-      +   '<button onclick="cerrarAvisoCliente()" style="flex:.7;padding:13px;background:#F0F0F2;color:#333;'
+      +     'style="flex:1;padding:13px;background:#128C7E;color:#fff;border:none;border-radius:10px;'
+      +     'font-size:13.5px;font-weight:800;cursor:pointer">\ud83d\udcac Mandar el completo</button>'
+      + '</div>'
+      // \u270f\ufe0f EL CORTO: dos lineas y ya. Para el barbero que solo quiere saber en que
+      // quedo. Sensei: "que el mensaje diga SOLO ESO, aparte de lo que ya hiciste". -29 ago-
+      + (tipo === 'pago' && window._textoCortoCliente
+          ? '<div style="background:#F2F2F6;border-radius:9px;padding:9px 11px;margin-bottom:9px">'
+            + '<div style="font-size:10.5px;font-weight:800;color:#888;letter-spacing:.4px;margin-bottom:4px">O MANDA SOLO ESTO</div>'
+            + '<div style="font-size:12.5px;color:#222;margin-bottom:8px">' + escaparHtml(window._textoCortoCliente) + '</div>'
+            + '<button onclick="mandarloAlCliente(' + _arg(cid) + ', window._textoCortoCliente, \'Mensaje corto\');cerrarAvisoCliente()" '
+            +   'style="width:100%;padding:11px;background:#546E7A;color:#fff;border:none;border-radius:9px;'
+            +   'font-size:12.5px;font-weight:800;cursor:pointer">\u270f\ufe0f Mandar solo el corto</button>'
+            + '</div>'
+          : '')
+      + '<div style="display:flex;gap:8px">'
+      +   '<button onclick="cerrarAvisoCliente()" style="flex:1;padding:12px;background:#F0F0F2;color:#333;'
       +     'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">Ahora no</button>'
       + '</div>'
       + '<div onclick="apagarAvisoCliente()" style="text-align:center;font-size:11px;color:#999;'
