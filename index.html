@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260830a-OFICIAL-V2.0">
+<meta name="app-version" content="20260830b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18128,7 +18128,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260830a';
+var NOVEDADES_VERSION = '20260830b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -23947,6 +23947,15 @@ function pintarPanelCliente(cid){
   contDatos += '<button onclick="event.stopPropagation();editarCl(' + cid + ')" '
     + 'style="width:100%;margin-top:2px;padding:10px;background:#1565C0;color:#fff;border:none;'
     + 'border-radius:9px;font-size:12px;font-weight:800;cursor:pointer">\u270f\ufe0f Corregir estos datos</button>';
+
+  // \ud83e\uddfe EL ESTADO DE CUENTA, lo primero de la lista -Sensei, 29 ago-. Es lo que se le
+  // ensena al cliente cuando dice que pago una cantidad y la app ensena otra.
+  // \ud83d\udd34 El 30 ago Sensei aviso de que NO APARECIA: la funcion existia pero este boton
+  // nunca se llego a escribir -un parche murio a medias-. Aqui esta.
+  h += '<button onclick="event.stopPropagation();abrirEstadoDeCuenta(' + _arg(cid) + ')" '
+    + 'style="width:100%;padding:13px;margin-bottom:10px;background:#1a237e;color:#fff;border:none;'
+    + 'border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(26,35,126,.25)">'
+    + '\ud83e\uddfe Estado de cuenta \u00b7 todo su movimiento</button>';
 
   h += _filaPanel('datos', '\ud83d\udcc7', 'Sus datos',
     _tel ? escaparHtml(_tel.length > 15 ? _tel.slice(0, 15) : _tel) : (c.negocio ? 'ver ficha' : ''),
