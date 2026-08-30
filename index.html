@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260830k-OFICIAL-V2.0">
+<meta name="app-version" content="20260830l-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -6420,6 +6420,123 @@ function flash(id){
 
 // ===== MANUAL DE USUARIO =====
 var MANUAL_SECCIONES = [
+    { g:"DINERO", t:"\ud83e\uddfe Estado de cuenta del cliente", c:[
+    "## PARA QUE SIRVE",
+    "Es la pantalla que le ensenas al cliente cuando dice que pago una cantidad y la app ensena otra.",
+    "Trae TODO su movimiento: cada factura y cada pago, con su fecha, su hora y su numero de recibo.",
+    "## COMO SE LLEGA",
+    "[[ Clientes -> tocas el cliente\n         |\n         v\n  [Pedido] [Cobrar] [Vender]\n  +----------------------------+\n  | \ud83e\uddfe Estado de cuenta      |  <- el boton azul\n  +----------------------------+\n  \ud83d\udcc7 Sus datos ]]",
+    "## LO QUE VAS A VER",
+    "[[ LE FACTURE   ME PAGO     DEBE\n   $105.00     $80.00    $25.00 ]]",
+    "## \ud83d\udd11 LO MAS IMPORTANTE: EL PAGO COMPLETO",
+    "Cuando le cobras $80 y ese pago se reparte entre tres facturas, la app ANTES guardaba tres pagos sueltos: $35 aqui, $15 alla y $30 en otra.",
+    "!!Por eso el cliente decia 80 y el sistema ensenaba 35. Los dos tenian razon, mirando cosas distintas.",
+    "Ahora se ve como UN pago de $80. Y al tocarlo se abre y te ensena en que facturas se repartio:",
+    "[[ \ud83d\udcb5 SUS PAGOS (1)\n +------------------------------+\n | $80.00      se repartio en 3 |\n | 08/15/2026 . 10:30 AM . R260815 |\n | \ud83d\udcb5 Efectivo $80.00           |\n +------------------------------+\n | A QUE FACTURAS SE APLICO     |\n | #0101 . 07/10/2026   $35.00  |\n | #0102 . 07/20/2026   $15.00  |\n | #0103 . 08/01/2026   $30.00  |\n +------------------------------+ ]]",
+    "## EL NUMERO DE RECIBO",
+    "Cada cobro lleva ahora su numero, asi: R260829-1432-7. Todas las partes del mismo cobro llevan el MISMO numero, por eso la app sabe que fueron uno solo.",
+    "!!Los pagos de ANTES del 29 de agosto no tienen numero, porque no existia. Esos se juntan por FECHA, y la pantalla te lo avisa. Los de ahora en adelante salen exactos."
+    ]},
+
+    { g:"DINERO", t:"\ud83d\udcac El comprobante para el cliente", c:[
+    "## PARA QUE SIRVE",
+    "Para que quede constancia del balance para los dos. Si el cliente contesta, ahi queda por escrito que ambos vieron el mismo numero el mismo dia.",
+    "## CUANDO SALE",
+    "Solo. Despues de cada VENTA y de cada COBRO. Tu lo lees y decides si lo mandas: no se manda nada sin que lo veas.",
+    "## HAY DOS MENSAJES",
+    "[[ +--------------------------------+\n | [ \ud83d\udcac Mandar el completo ]      |\n |                                |\n | O MANDA SOLO ESTO              |\n | Hola Sr. Carlos, Pago de hoy...|\n | [ \u270f\ufe0f Mandar solo el corto ]    |\n | ------------------------------ |\n | OPCIONAL . solo si lo crees    |\n | necesario con este cliente     |\n | [ \u270d\ufe0f Que firme su balance ]    |\n |                                |\n | [ Ahora no ]                   |\n +--------------------------------+ ]]",
+    "## EL CORTO",
+    "[[ Hola Sr. Carlos,\n\nPago de hoy: $120.00\n\nGracias por su pago. Su nuevo\nbalance pendiente es de $142.00.\n\nFavor confirmar que esta de\nacuerdo. Gracias. ]]",
+    "El 'favor confirmar' es lo que convierte el mensaje en PRUEBA.",
+    "## EL COMPLETO",
+    "Lleva ademas la fecha, la hora, el numero de recibo, como te pago, y si el pago se repartio, a que facturas fue cada parte.",
+    "## MANDAR EL DE UN PAGO VIEJO",
+    "En el estado de cuenta, abres cualquier pago -de la fecha que sea- y ahi mismo tiene sus dos botones. Manda el mensaje de ESE pago, con SU fecha y SU recibo.",
+    "!!Ojo: el balance que sale en el mensaje es el de HOY, no el de aquel dia. La app te lo recuerda antes de mandarlo.",
+    "## SI ABRE EL WHATSAPP EQUIVOCADO",
+    "Menu -> Herramientas -> \ud83d\udce4 Mandar por WhatsApp. Ahi puedes cambiar a COPIAR Y PEGAR: la app copia el mensaje, abre el chat y tu lo pegas. Es un paso mas pero funciona seguro.",
+    "Y en Ajustes puedes escoger cual WhatsApp usar: el normal o el Business."
+    ]},
+
+    { g:"DINERO", t:"\u270d\ufe0f Que el cliente firme su balance", c:[
+    "## PARA QUE SIRVE",
+    "Es la prueba mas fuerte que existe: el cliente firma en tu telefono confirmando cuanto debe, delante de ti.",
+    "!!ES OPCIONAL. Hay clientes de confianza con los que esto no hace falta. Tu decides con quien lo usas.",
+    "## COMO SE USA",
+    "[[ 1. Le cobras como siempre\n        |\n        v\n 2. Sale el comprobante, y abajo:\n    OPCIONAL . solo si lo crees\n    necesario con este cliente\n    [ \u270d\ufe0f Que firme su balance ]\n        |\n        v\n 3. Le pasas el telefono\n        |\n        v\n 4. El lee y firma con el dedo\n        |\n        v\n 5. Tocas [ \u2713 Confirmado ] ]]",
+    "## LO QUE EL VE",
+    "[[ +----------------------------------+\n |  \u270d\ufe0f Confirmacion de balance      |\n |  Que el cliente lo lea y firme   |\n |                                  |\n |  Carlos Tavarez                  |\n |  LUXURY BARBER STUDIO            |\n |  Pago hoy          $120.00       |\n |  SU BALANCE        $142.00       |\n |                                  |\n |  +----------------------------+  |\n |  |     firma aqui             |  |\n |  +----------------------------+  |\n |  [ \ud83d\udd04 Borrar ] [ \u2713 Confirmado ] |\n +----------------------------------+ ]]",
+    "Queda guardado con la fecha, la hora, el balance exacto y su firma.",
+    "## FUNCIONA SIN INTERNET",
+    "No hace falta senal. Se guarda en el telefono y sube a la nube cuando haya.",
+    "## \ud83d\udccb QUIEN NO HA FIRMADO",
+    "Menu -> \u270d\ufe0f Balances sin confirmar",
+    "[[ 2 cliente(s) . $272.00\n\n Carlos Tavarez        $192.00\n LUXURY . confirmo $142.00\n         el 08/30/2026\n\n Jorge Duarte           $80.00\n GRAN VIA . nunca ha confirmado ]]",
+    "La app lo lleva sola: un cliente sale en la lista cuando DEBE dinero y su balance de HOY no coincide con el que firmo la ultima vez. Si le vendes otra vez, vuelve a hacer falta que confirme.",
+    "Tocas uno y vas directo a su ficha.",
+    "## PARA APAGARLO DEL TODO",
+    "Menu -> \ud83d\udd8b\ufe0f Pedir firma del balance. Desaparece de todas partes. El comprobante por WhatsApp sigue igual."
+    ]},
+
+    { g:"MERCANC\u00cdA", t:"\ud83d\ude9a Cierre de ruta \u2014 cuadrar la mercancia", c:[
+    "## PARA QUE SIRVE",
+    "Ya cuadrabas el DINERO con el Cuadre de Caja. Esto cuadra la MERCANCIA.",
+    "!!Un producto que se pierde no lo dice ningun numero de dinero: simplemente deja de estar, y meses despues el inventario no cuadra y nadie sabe cuando empezo.",
+    "## COMO SE LLEGA",
+    "Menu -> \ud83d\ude90 Control de la Van -> boton \ud83d\ude9a Cierre de ruta",
+    "## COMO SE USA",
+    "Al terminar el dia, cuentas lo que te quedo en la van y lo escribes. La app lo compara con lo que DEBERIA quedar.",
+    "[[ CONTADOS   FALTAN   SOBRAN\n   3/3         2         1\n\n \u26a0\ufe0f Te faltan 2 unidad(es)\n    A tu costo son $8.00\n\n Gel 700ml\n cargaste 24 . vendiste 4\n deberian quedar 20   [18]   -2\n\n Colonia 400ml\n deberian quedar 10   [11]   +1\n\n Wax\n deberian quedar 6    [ 6] cuadra ]]",
+    "## LO QUE MAS IMPORTA",
+    "Te dice CUANTO VALE lo que falta, a tu costo. No es lo mismo que falten 2 gomas que 2 clippers.",
+    "## NO TOCA NADA",
+    "Ni el inventario, ni las ventas, ni lo que cargaste en la van. Solo apunta lo que contaste y la diferencia, con su fecha."
+    ]},
+
+    { g:"DINERO", t:"\u21a9\ufe0f Devoluciones con motivo y foto", c:[
+    "## LO QUE CAMBIO",
+    "Ahora al devolver escoges el MOTIVO de una lista, y le puedes tomar FOTO a lo devuelto.",
+    "## LOS SIETE MOTIVOS",
+    "[[ \ud83d\udd27 Vino danado o defectuoso\n \u274c No era el que pidio\n \ud83d\udcc9 No se le vendio\n \ud83d\udcc5 Vencido o muy viejo\n \u2795 Le llego de mas\n \ud83d\ude41 No le gusto al cliente\n ... Otro motivo ]]",
+    "Se guarda por su clave, asi que mas adelante se pueden CONTAR: ver que te devuelven mas y por que.",
+    "## LA FOTO",
+    "Es opcional. Pero si hay discusion despues, la foto la resuelve.",
+    "El motivo y la foto salen luego en la ficha del cliente y en la lista de devoluciones. La foto se toca para verla grande."
+    ]},
+
+    { g:"HERRAMIENTAS", t:"\ud83e\udded Que uso mas \u2014 el record de uso", c:[
+    "## PARA QUE SIRVE",
+    "La app apunta cuantas veces abres cada pantalla. Con eso se decide QUE MERECE ESTAR EN EL INICIO, con datos y no adivinando.",
+    "## COMO SE LLEGA",
+    "Menu -> Herramientas -> \ud83e\udded Que uso mas",
+    "[[ \ud83d\udcca QUE USO MAS\n De 5 veces que has entrado:\n\n 1. Clientes - 3 veces (60%) . hoy\n 2. Catalogo - 1 vez (20%) . hoy\n 3. Pedidos Rapidos - 1 vez (20%) ]]",
+    "## LO QUE APUNTA Y LO QUE NO",
+    "Solo cuenta cuantas veces abres cada pantalla y cuando fue la ultima. NADA MAS. Ni lo que escribes, ni lo que vendes, ni nada que salga del telefono.",
+    "Se puede poner a cero cuando quieras."
+    ]},
+
+    { g:"SEGURIDAD", t:"\ud83d\udd19 El boton atras del telefono", c:[
+    "## COMO FUNCIONA",
+    "El boton atras del telefono va cerrando lo que tengas abierto, de uno en uno, en este orden:",
+    "[[ 1. El recuadro que este encima\n      (estado de cuenta, firma,\n       cierre de ruta, etc.)\n         |\n         v\n 2. El menu lateral, si esta abierto\n         |\n         v\n 3. Vuelve a la pantalla anterior\n         |\n         v\n 4. Y cuando ya no hay a donde\n    volver, PREGUNTA ]]",
+    "## EL LETRERO DE SALIR",
+    "[[ +--------------------------------+\n |             \ud83d\udeaa                 |\n |      \u00bfSalir de la app?         |\n |  Tu informacion ya esta        |\n |  guardada.                     |\n |                                |\n |  [ \u2714 No, quedarme aqui ]       |\n |  [ \ud83d\udeaa Si, salir de la app ]     |\n +--------------------------------+ ]]",
+    "!!Con este letrero abierto, el boton atras NO HACE NADA. Solo se sale tocando uno de los dos botones. Puedes darle a atras las veces que quieras sin miedo a que se cierre."
+    ]},
+
+    { g:"HERRAMIENTAS", t:"\ud83d\udd0e Como buscar en la app", c:[
+    "## UNA PALABRA",
+    "Sale TODO lo que la lleve, por donde sea: el nombre, el negocio, el telefono o la direccion.",
+    "[[ Escribes:  plainfield\n\n Salen:\n  . PLAINFIELD BARBERSHOP\n  . ELITE BARBERSHOP\n    (calle Plainfield)\n  . RD BARBER SHOP\n    (Plainfield Ave)\n  . PLAINFIELD BEAUTY ]]",
+    "## DOS O MAS PALABRAS",
+    "Sale solo lo que lleva la FRASE COMPLETA junta.",
+    "[[ Escribes:  plainfield barbershop\n\n Sale:\n  . PLAINFIELD BARBERSHOP\n\n Y ya. Los de la calle no. ]]",
+    "!!Si NINGUNO lleva la frase junta, se ensena lo de antes. Asi nunca te quedas sin resultados por afinar de mas.",
+    "## SIRVE EN TODAS PARTES",
+    "Clientes, catalogo, suplidores, la venta, los pedidos rapidos, las compras, la van, la lista de relleno... los 28 buscadores de la app.",
+    "## LO QUE NO CAMBIO",
+    "Buscar por dinero con el signo -escribes $10 y salen los de ese precio-, y el diccionario de tus palabras -escribes 'gelatina' y encuentra el gel-."
+    ]},
     { g:"INFORMES", t:"\ud83d\udcca Informe del 16 y 17 de agosto 2026", c:[
     "## LO PRIMERO, Y LO MAS IMPORTANTE",
     "Tus datos estan limpios. Te preocupaba haberle dado mal el balance a algun cliente. Se reviso tu informacion factura por factura y no hay ni un centavo fuera de sitio.",
@@ -7086,6 +7203,19 @@ function renderManual(q){
   var ICONO_GRUPO = { 'VENDER':'\ud83d\uded2', 'DINERO':'\ud83d\udcb0', 'REPORTES':'\ud83d\udcca',
                       'MERCANC\u00cdA':'\ud83d\udce6', 'SEGURIDAD':'\ud83d\udee1\ufe0f',
                       'HERRAMIENTAS':'\u2699\ufe0f' };
+
+  // \ud83d\udd04 SE ORDENAN POR GRUPO ANTES DE PINTAR -30 ago-. El rotulo grande solo sale
+  // cuando el grupo CAMBIA, asi que si las secciones vienen mezcladas salen rotulos
+  // repetidos -paso al meter las secciones nuevas-. Ordenando, cada uno sale UNA vez.
+  var ORDEN_GRUPOS = ['INFORMES', 'VENDER', 'DINERO', 'REPORTES', 'MERCANC\u00cdA', 'SEGURIDAD', 'HERRAMIENTAS'];
+  secciones = secciones.slice().sort(function(a, b){
+    var ia = ORDEN_GRUPOS.indexOf(a.g), ib = ORDEN_GRUPOS.indexOf(b.g);
+    if(ia < 0) ia = 99;
+    if(ib < 0) ib = 99;
+    if(ia !== ib) return ia - ib;
+    // Dentro del grupo, se respeta el orden en que estan escritas
+    return MANUAL_SECCIONES.indexOf(a) - MANUAL_SECCIONES.indexOf(b);
+  });
   var grupoAnterior = null;
   el.innerHTML = secciones.map(function(s, idx){
     var rotulo = '';
@@ -18153,7 +18283,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260830k';
+var NOVEDADES_VERSION = '20260830l';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
