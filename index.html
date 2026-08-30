@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260830d-OFICIAL-V2.0">
+<meta name="app-version" content="20260830h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -646,7 +646,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
       </div>
     </div>
     <button onclick="bloquearAhora()" style="width:100%;margin-top:8px;background:none;border:1px solid #546E7A;color:#546E7A;padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">🔒 Bloquear ahora</button>
-    <button onclick="cerrarSesionNBS()" style="width:100%;margin-top:8px;background:none;border:1px solid #e0574a;color:#e0574a;padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">🚪 Cerrar sesión</button></div><button onclick="toggleGrupoMenu('herramientas')" id="gm-t-herramientas" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:24px;flex-shrink:0">⚙️</span><span style="flex:1;font-size:17px;font-weight:900;color:#1a237e;letter-spacing:.4px">HERRAMIENTAS</span><span id="gm-f-herramientas" style="font-size:19px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-herramientas" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenu('p-docs')" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">📁</span></span>Mis Documentos<span class="mlb2-sub">guías y papeles guardados</span></button><button onclick="irMenu('p-academia')" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🎓</span></span>Academia<span class="mlb2-sub">aprender de negocio escuchando</span></button><button onclick="irMenu('p-manual')" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">📖</span></span>Manual de Usuario<span class="mlb2-sub">cómo se usa cada cosa</span></button><button onclick="verQueUsoMas();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🧭</span></span>Qué uso más<span class="mlb2-sub">las pantallas que más abres</span></button><button onclick="abrirConfigImpresora();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🖨️</span></span>Configurar Impresora</button><button onclick="traerLoNuevo();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🔄</span></span>Traer lo nuevo de la nube</button><button onclick="cambiarWhatsAppApp();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">💬</span></span>Cuál WhatsApp usar</button><button onclick="adminAccion('huerfanas');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🧹</span></span>Limpiar ventas huérfanas</button><button onclick="cerrarMenuLateral();setTimeout(verLogAtras,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🔧</span></span>Registro bot&oacute;n atr&aacute;s</button><button onclick="adminAccion('borrar');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon" style="background:var(--nbs-red-bg)"><span style="font-size:19px">⚠️</span></span><span style="color:var(--nbs-red-dark)">Borrar todos los datos</span></button></div></div>
+    <button onclick="cerrarSesionNBS()" style="width:100%;margin-top:8px;background:none;border:1px solid #e0574a;color:#e0574a;padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">🚪 Cerrar sesión</button></div><button onclick="toggleGrupoMenu('herramientas')" id="gm-t-herramientas" style="width:100%;display:flex;align-items:center;gap:9px;padding:12px 10px;margin-bottom:2px;background:#F4F6FB;border:none;border-left:4px solid var(--nbs-gold);border-radius:9px;cursor:pointer;text-align:left"><span style="font-size:24px;flex-shrink:0">⚙️</span><span style="flex:1;font-size:17px;font-weight:900;color:#1a237e;letter-spacing:.4px">HERRAMIENTAS</span><span id="gm-f-herramientas" style="font-size:19px;color:#8a90a8;font-weight:800">›</span></button><div id="gm-c-herramientas" style="display:none;padding:2px 0 8px 6px"><button onclick="irMenu('p-docs')" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">📁</span></span>Mis Documentos<span class="mlb2-sub">guías y papeles guardados</span></button><button onclick="irMenu('p-academia')" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🎓</span></span>Academia<span class="mlb2-sub">aprender de negocio escuchando</span></button><button onclick="irMenu('p-manual')" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">📖</span></span>Manual de Usuario<span class="mlb2-sub">cómo se usa cada cosa</span></button><button onclick="cambiarModoWhatsApp();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">📤</span></span>Mandar por WhatsApp<span class="mlb2-sub">directo, o copiar y pegar</span></button><button onclick="verQueUsoMas();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🧭</span></span>Qué uso más<span class="mlb2-sub">las pantallas que más abres</span></button><button onclick="abrirConfigImpresora();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🖨️</span></span>Configurar Impresora</button><button onclick="traerLoNuevo();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🔄</span></span>Traer lo nuevo de la nube</button><button onclick="cambiarWhatsAppApp();cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">💬</span></span>Cuál WhatsApp usar</button><button onclick="adminAccion('huerfanas');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🧹</span></span>Limpiar ventas huérfanas</button><button onclick="cerrarMenuLateral();setTimeout(verLogAtras,350)" class="mlb2"><span class="mlb2-icon"><span style="font-size:23px">🔧</span></span>Registro bot&oacute;n atr&aacute;s</button><button onclick="adminAccion('borrar');cerrarMenuLateral()" class="mlb2"><span class="mlb2-icon" style="background:var(--nbs-red-bg)"><span style="font-size:19px">⚠️</span></span><span style="color:var(--nbs-red-dark)">Borrar todos los datos</span></button></div></div>
 </div>
 
 
@@ -2073,7 +2073,7 @@ function descomprimirTexto(base64){
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var CLAVES_A_RESPALDAR = ['ncl','nv','nc','ncr','np','nsup','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','np_eliminados','nvisitas_barberos','historial_precios','rutas_por_dia',
-  'nvan','nrelleno','ncierres_ruta','nbs_uso_pantallas','nbs_avisar_cliente','nbs_facturas_emparejadas','nbs_correcciones_van',
+  'nvan','nrelleno','ncierres_ruta','nbs_uso_pantallas','nbs_avisar_cliente','nbs_wa_pegar','nbs_facturas_emparejadas','nbs_correcciones_van',
   // La LISTA de impresoras sí viaja a la nube. La que está ACTIVA no: eso es de cada
   // aparato -el teléfono puede usar la portátil y la PC la de escritorio-. -30 jul-
   'impresoras_lista',
@@ -4595,6 +4595,24 @@ var RECUADROS_ENCIMA = [
   { id: 'fidelidad-popup-overlay' },
   { id: 'ayuda-overlay',            cerrar: 'cerrarAyuda' },
   { id: 'logatras-ov' },
+  // \ud83d\udd34 LOS QUE FALTABAN -30 ago-. Los cuatro primeros son de estos dias; los diez
+  // siguientes llevaban tiempo igual. Con cualquiera abierto, el boton atras del telefono
+  // retrocedia por detras y acababa cerrando la app. Lo cazo un barrido que ahora es
+  // prueba fija: compara la lista con TODOS los recuadros que existen en el archivo.
+  { id: 'precios-nuevos-overlay',   cerrar: 'cerrarPreciosNuevos' },
+  { id: 'buscprof-ov',              cerrar: 'cerrarBuscadorProfundo' },
+  { id: 'borrados-ov',              cerrar: 'cerrarProductosBorrados' },
+  { id: 'cobped-overlay',           cerrar: 'cerrarCobroPedidos' },
+  { id: 'hist-avisos-overlay',      cerrar: 'cerrarHistorialAvisos' },
+  { id: 'revision-overlay',         cerrar: 'cerrarRevisionDiaria' },
+  { id: 'lst-overlay',              cerrar: 'cerrarListadoClientes' },
+  { id: 'msgvip-overlay',           cerrar: 'cerrarMensajeVIP' },
+  { id: 'pagosup-overlay',          cerrar: 'cerrarPagoSuplidor' },
+  { id: 'unif-marcas-ov',           cerrar: 'cerrarUnificarMarcas' },
+  { id: 'estado-cuenta-overlay',    cerrar: 'cerrarEstadoDeCuenta' },
+  { id: 'avisar-cliente-overlay',   cerrar: 'cerrarAvisoCliente' },
+  { id: 'editor-pago-compra',       cerrar: 'cerrarEditorPagoCompra' },
+  { id: 'cierre-ruta-overlay',      cerrar: 'cerrarCierreRuta' },
   { id: 'aviso-ov' }
 ];
 
@@ -4771,6 +4789,10 @@ function borrarRecordDeUso(){
 function ir(id, sinHistorial){
   // 📊 Apuntar que pantalla se abrio, para poder decidir el inicio con datos. -29 ago-
   try { apuntarUsoPantalla(id); } catch(e){}
+  // 🛡️ Y rellenar el colchon del boton atras. Antes solo se rellenaba al TOCAR la
+  // pantalla; si Sensei daba a atras varias veces seguidas sin tocar nada, se los comia
+  // todos y la app se cerraba. -30 ago-
+  try { _ultimoGuardian = 0; ponerGuardianAtras(); } catch(e){}
   if(!sinHistorial){
     var actual = pantallaActual();
     if(actual && actual !== id) historialPantallas.push(actual);
@@ -18129,7 +18151,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260830d';
+var NOVEDADES_VERSION = '20260830h';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -23220,6 +23242,9 @@ function _linkWhatsApp(telLimpio, texto){
   return 'intent://send?phone=' + num
     + (t ? '&text=' + encodeURIComponent(t) : '')
     + '#Intent;scheme=whatsapp;package=' + cual
+    // El texto tambien como "extra" del intent: es la forma que Android documenta, y en
+    // algunos telefonos es la UNICA que entiende. Se mandan las dos. -30 ago-
+    + (t ? ';S.text=' + encodeURIComponent(t) : '')
     + ';S.browser_fallback_url=' + encodeURIComponent(normal) + ';end';
 }
 
@@ -27712,7 +27737,7 @@ function textoParaCliente(cid, tipo, monto, detalleFacturas){
   var t = [];
   t.push('*NUNEZ BEAUTY SUPPLY*');
   t.push('');
-  t.push('Hola ' + (c.nombre || nombreCl(c)) + ' 👋');
+  t.push('Hola Sr. ' + (c.nombre || nombreCl(c)) + ' 👋');
   t.push('');
 
   if(tipo === 'pago'){
@@ -27836,7 +27861,24 @@ function textoCortoParaCliente(cid, monto){
     debe += cobradoYDebeDe(v).debe;
   });
   debe = Math.round(debe * 100) / 100;
-  return 'Pagaste $' + fmtNum(monto) + ' — te queda pendiente $' + fmtNum(debe) + '.';
+  var nom = String(c.nombre || nombreCl(c) || '').trim();
+
+  var t = [];
+  t.push('Hola Sr. ' + nom + ',');
+  t.push('');
+  t.push('Pago de hoy: $' + fmtNum(monto));
+  t.push('');
+  if(debe > 0.005){
+    t.push('Gracias por su pago. Su nuevo balance pendiente es de $' + fmtNum(debe) + '.');
+    t.push('');
+    t.push('Favor confirmar que está de acuerdo. Gracias.');
+  } else {
+    // Sin deuda no hay nada que confirmar mas que la buena noticia.
+    t.push('Gracias por su pago. Su cuenta queda en $0.00 — al día.');
+    t.push('');
+    t.push('Favor confirmar. Gracias.');
+  }
+  return t.join('\n');
 }
 
 // El corto desde el estado de cuenta: toma el ÚLTIMO cobro que le hizo, para poder
@@ -27893,7 +27935,7 @@ function textoDeUnPago(cid, g, detalleFacturas){
   var t = [];
   t.push('*NUNEZ BEAUTY SUPPLY*');
   t.push('');
-  t.push('Hola ' + (c.nombre || nombreCl(c)) + ' 👋');
+  t.push('Hola Sr. ' + (c.nombre || nombreCl(c)) + ' 👋');
   t.push('');
   t.push('✅ Recibí tu pago de *$' + fmtNum(g.montoCobro) + '*');
   t.push('📅 ' + g.fecha + (g.hora ? ' · ' + g.hora : ''));
@@ -27953,10 +27995,14 @@ function mandarloAlCliente(cid, texto, queEs){
     // Tenia razon: el codigo nuevo no estaba usando lo que ya existia. -30 ago-
     var enlace = _linkWhatsApp(tel, texto);
 
-    // \ud83d\udee1\ufe0f RED PARA LOS MENSAJES LARGOS. El estado de cuenta completo arma un enlace
-    // de unos 2.500 caracteres, y algunos Android los cortan: el mensaje llegaria a medias.
-    // Si se pasa del limite seguro, se COPIA el texto y se abre el chat vacio para pegarlo.
-    if(enlace.length > 1800){
+    // \ud83d\udee1\ufe0f LA RED. Dos motivos para usarla:
+    //   1. Los enlaces muy largos algunos Android los cortan.
+    //   2. Y hay telefonos -el de Sensei entre ellos- que rechazan el enlace en cuanto
+    //      lleva el mensaje dentro, y caen a la pagina web de WhatsApp. -30 ago-
+    // En los dos casos se hace lo mismo, que es lo que a el SI le funciona: se COPIA el
+    // texto entero y se abre el chat vacio para que lo pegue.
+    // Si el escogio copiar y pegar siempre, o el enlace es muy largo
+    if(LS('nbs_wa_pegar', '0') === '1' || enlace.length > 6000){
       try {
         if(navigator.clipboard && navigator.clipboard.writeText){
           navigator.clipboard.writeText(texto);
@@ -28044,6 +28090,24 @@ function ofrecerMensajeAlCliente(cid, tipo, monto, detalleFacturas){
 function cerrarAvisoCliente(){
   var ov = document.getElementById('avisar-cliente-overlay');
   if(ov) ov.style.display = 'none';
+}
+
+// \ud83d\udee1\ufe0f Si el telefono no acepta el mensaje dentro del enlace -a Sensei le pasa con
+// los cortos-, con esto SIEMPRE se copia el texto y se abre el chat vacio. Un paso mas,
+// pero funciona seguro. -30 ago-
+function cambiarModoWhatsApp(){
+  var pegando = (LS('nbs_wa_pegar', '0') === '1');
+  var msg = pegando
+    ? 'Ahora mismo la app COPIA el mensaje y abre el chat vac\u00edo, para que lo pegues.\n\n'
+      + '\u00bfVolver a mandarlo directo -sin pegar-?'
+    : 'Ahora mismo la app manda el mensaje DIRECTO al chat.\n\n'
+      + 'Si te est\u00e1 abriendo la p\u00e1gina web de WhatsApp en vez del Business, cambia a '
+      + 'COPIAR Y PEGAR: la app copia el mensaje, abre el chat y t\u00fa lo pegas.\n\n\u00bfCambiar?';
+  if(!confirm(msg)) return;
+  SS('nbs_wa_pegar', pegando ? '0' : '1');
+  avisoGrande(pegando
+    ? '\u2705 Los mensajes se mandan directo otra vez.'
+    : '\u2705 Ahora la app copia el mensaje y abre el chat.\n\nMant\u00e9n el dedo en la casilla y dale PEGAR.');
 }
 
 function apagarAvisoCliente(){
@@ -30662,7 +30726,7 @@ function profundidadGuardian(){
 // hay tantos guardianes como pasos haya dado, y puede tocar atras varias
 // veces seguidas sin tener que tocar la pantalla entremedio.
 var _ultimoGuardian = 0;
-var MIN_GUARDIANES = 6;
+var MIN_GUARDIANES = 20;
 logAtras('=== ABRIO LA APP | largo historial='+history.length
          +' | state='+(history.state?JSON.stringify(history.state):'null')
          +' | modo='+(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ? 'ICONO' : 'navegador')+' ===');   // colchon: aguanta 6 toques de atras seguidos sin tocar la pantalla
@@ -30712,6 +30776,18 @@ window.addEventListener('popstate', function(){
            +(_saliendoApp?' | SALIENDO':''));
   if(_saliendoApp) return;
 
+  // \ud83d\udee1\ufe0f CON EL LETRERO DE SALIR ABIERTO, ATRAS NO HACE NADA -Sensei, 30 ago-.
+  // Sus palabras: "ahi deberian haber dos opciones, quedarte o salir, pero TOCANDO las
+  // opciones". Se repone el guardian que se acaba de comer, para que pueda insistir todas
+  // las veces que quiera sin que la app se salga.
+  var _cajaSalir = document.getElementById('salir-box');
+  if(_cajaSalir && _cajaSalir.style.display === 'block'){
+    try { history.pushState({nbs:1, d:profundidadGuardian()+1}, '', window.location.href); }
+    catch(e){}
+    logAtras('  -> letrero abierto: atras ignorado, guardian repuesto');
+    return;
+  }
+
   // OJO: aqui NO se pone guardian. Un guardian creado dentro del propio evento de atras
   // no lleva toque del usuario, y Chrome lo descarta -ese fue el error de los intentos
   // anteriores-. Los guardianes buenos ya se pusieron con cada toque de Sensei mientras
@@ -30751,20 +30827,17 @@ function mostrarLetreroSalir(){
   ov.style.display = 'block';
   box.style.display = 'block';
 
-  // ═══ LA CLAVE (22 jul) ═══
-  // Android NO deja que una app web se cierre a si misma. Lo unico que la
-  // cierra es que el USUARIO toque atras estando en el BORDE del historial.
-  // Asi que al mostrar el letrero se deshacen todos los guardianes: la app
-  // queda en el borde. Entonces:
-  //   - si toca ATRAS  -> se cierra de una, sin mas pasos
-  //   - si toca "No, quedarme aqui" -> ese toque vuelve a poner los guardianes
-  var pasos = profundidadGuardian();
-  logAtras('LETRERO: deshaciendo '+pasos+' guardianes (queda en el borde)');
-  if(pasos > 0){
-    _saliendoApp = true;
-    try{ history.go(-pasos); }catch(e){}
-    setTimeout(function(){ _saliendoApp = false; }, 400);
-  }
+  // ═══ LA REGLA NUEVA (30 ago) ═══
+  // \ud83d\udd34 ANTES aqui se DESHACIAN todos los guardianes para dejar la app "en el borde",
+  // y asi el siguiente toque de atras la cerraba de una. Sensei lo cazo: "no deberia
+  // funcionar el boton de atras por ninguna razon de ahi para alla, ahi deberian haber dos
+  // opciones, quedarte o salir, pero TOCANDO las opciones". Tenia razon: el letrero
+  // preguntaba y el siguiente toque salia sin esperar la respuesta.
+  //
+  // AHORA los guardianes SE QUEDAN. Con el letrero abierto, cada toque de atras se come un
+  // guardian y no pasa nada mas -hay 20 de colchon, y se rellenan con cada toque suyo-.
+  // De aqui solo se sale TOCANDO un boton.
+  logAtras('LETRERO: se queda con ' + profundidadGuardian() + ' guardianes. Atras no hace nada.');
 }
 function cerrarLetreroSalir(){
   var ov = document.getElementById('salir-ov');
@@ -30776,26 +30849,39 @@ function cerrarLetreroSalir(){
   _ultimoGuardian = 0; ponerGuardianAtras();
 }
 function salirDeLaApp(){
-  // La app ya esta en el borde del historial -se deshicieron los guardianes al
-  // mostrar el letrero-. Aqui solo se le indica con letras grandes que toque
-  // atras, porque es lo unico que de verdad cierra una app web en Android.
+  // \ud83d\udeaa AHORA EL BOTON SI CIERRA -30 ago-. Antes solo ensenaba un cartel pidiendole
+  // que tocara atras, porque los guardianes se deshacian al abrir el letrero. Ya no se
+  // deshacen, asi que aqui se hace lo mismo pero DENTRO DE SU TOQUE: se quitan los
+  // guardianes y se retrocede. Como viene de un toque real, Android lo respeta y sale.
   var box = document.getElementById('salir-box');
   var ov  = document.getElementById('salir-ov');
   if(box) box.style.display = 'none';
   if(ov)  ov.style.display  = 'none';
-  logAtras('SALIR: mostrando aviso de tocar atras');
-  var av = document.getElementById('salir-aviso');
-  if(av) av.style.display = 'block';
-  // Si en 12 segundos no toco atras, se quita el aviso y se vuelve a proteger
-  // para que la app no quede desprotegida sin querer.
+
+  var pasos = profundidadGuardian();
+  logAtras('SALIR: quitando ' + pasos + ' guardianes y saliendo');
+  _saliendoApp = true;
+  try {
+    if(pasos > 0) history.go(-(pasos + 1));
+    else history.back();
+  } catch(e){}
+
+  // Si en 4 segundos seguimos aqui, es que el telefono no dejo salir. Se le dice
+  // con letras grandes que toque atras, y se vuelve a proteger la app.
   setTimeout(function(){
-    var a = document.getElementById('salir-aviso');
-    if(a && a.style.display === 'block'){
-      a.style.display = 'none';
-      _ultimoGuardian = 0; ponerGuardianAtras();
-      logAtras('SALIR: se acabo el tiempo, guardianes repuestos');
-    }
-  }, 12000);
+    _saliendoApp = false;
+    var av = document.getElementById('salir-aviso');
+    if(av) av.style.display = 'block';
+    logAtras('SALIR: no se pudo cerrar solo; aviso de tocar atras');
+    setTimeout(function(){
+      var a = document.getElementById('salir-aviso');
+      if(a && a.style.display === 'block'){
+        a.style.display = 'none';
+        _ultimoGuardian = 0; ponerGuardianAtras();
+        logAtras('SALIR: se acabo el tiempo, guardianes repuestos');
+      }
+    }, 12000);
+  }, 4000);
 }
 
 
@@ -38962,11 +39048,10 @@ function verHistorialCliente(cid, modo){
   <div style="font-size:44px;line-height:1">&#128682;</div>
   <div style="font-size:21px;font-weight:800;color:#1a237e;margin:10px 0 6px;line-height:1.25">&iquest;Salir de la app?</div>
   <div style="font-size:15px;color:#555;line-height:1.5;margin-bottom:14px">Tu informaci&oacute;n ya est&aacute; guardada.</div>
-  <div style="background:#eef0fb;border:1px solid #c9cef0;border-radius:12px;padding:12px 10px;margin-bottom:16px">
-    <div style="font-size:15.5px;color:#1a237e;font-weight:800;line-height:1.4">Para salir, toca <span style="font-size:19px">&#11013;&#65039;</span> ATR&Aacute;S otra vez</div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <button onclick="cerrarLetreroSalir()" style="width:100%;padding:17px;border:none;border-radius:13px;background:#1a237e;color:#fff;font-size:19px;font-weight:800;cursor:pointer">&#10004; No, quedarme aqu&iacute;</button>
+    <button onclick="salirDeLaApp()" style="width:100%;padding:15px;border:1.5px solid #c62828;border-radius:13px;background:#fff;color:#c62828;font-size:16px;font-weight:800;cursor:pointer">&#128682; S&iacute;, salir de la app</button>
   </div>
-  <button onclick="cerrarLetreroSalir()" style="width:100%;padding:17px;border:none;border-radius:13px;background:#1a237e;color:#fff;font-size:19px;font-weight:800;cursor:pointer;font-family:inherit">No, quedarme aqu&iacute;</button>
-</div>
 
 <!-- Panel de diagnostico del boton atras (temporal, para encontrar la falla) -->
 <div id="logatras-ov" onclick="cerrarLogAtras()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.75);z-index:99996"></div>
