@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260829f-OFICIAL-V2.0">
+<meta name="app-version" content="20260829g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2073,7 +2073,7 @@ function descomprimirTexto(base64){
 // ═══════════════════════════════════════════════════════════════════════════════
 
 var CLAVES_A_RESPALDAR = ['ncl','nv','nc','ncr','np','nsup','ngastos','ntarjetas','notrasdeudas','npedidos','ndevoluciones','np_eliminados','nvisitas_barberos','historial_precios','rutas_por_dia',
-  'nvan','nrelleno','ncierres_ruta','nbs_uso_pantallas','nbs_facturas_emparejadas','nbs_correcciones_van',
+  'nvan','nrelleno','ncierres_ruta','nbs_uso_pantallas','nbs_avisar_cliente','nbs_facturas_emparejadas','nbs_correcciones_van',
   // La LISTA de impresoras sí viaja a la nube. La que está ACTIVA no: eso es de cada
   // aparato -el teléfono puede usar la portátil y la PC la de escritorio-. -30 jul-
   'impresoras_lista',
@@ -15674,6 +15674,12 @@ function saveV(){
     +'</div>';
   ventaActual = ultV;
 
+  // 💬 El comprobante de la VENTA, con el balance al día. -Sensei, 29 ago-
+  // Solo si la venta tiene cliente: a un "cliente general" no hay a quién mandárselo.
+  try {
+    if(ultV && ultV.cid) setTimeout(function(){ ofrecerMensajeAlCliente(ultV.cid, 'venta', tot, null); }, 400);
+  } catch(e){}
+
   // Volver automaticamente a la pantalla correcta segun de donde vino esta venta
   var destino = window._vendiendoDesde;
   if(destino){
@@ -18122,7 +18128,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260829f';
+var NOVEDADES_VERSION = '20260829g';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -27384,6 +27390,503 @@ function etiquetaMetodoCompra(tipo){
 }
 
 // Lo que le queda debiendo una compra: su total menos lo que ya le pago.
+// \ud83e\uddfe Un numero de recibo distinto para cada cobro. Lleva la fecha delante para que se
+// lea y se ordene solo: R260829-1432-7. -29 ago-
+// ═══════════════════════════════════════════════════════════════════
+//  🧾 ESTADO DE CUENTA DEL CLIENTE  (29 ago 2026)
+//
+//  Sensei, textual: "estoy teniendo problemas con los clientes que me dicen que
+//  pagaron una cantidad y aparece otra en el sistema".
+//
+//  LA CAUSA: cuando un cobro se reparte entre varias facturas, la app guardaba
+//  un pago suelto en cada una. Un cobro de $80 quedaba como $35 aquí, $15 allá
+//  y $30 en otra. No había nada que dijera "esto fue UN pago de $80". El cliente
+//  decía 80, el sistema enseñaba 35, y los dos tenían razón.
+//
+//  ESTA PANTALLA junta todo el movimiento del cliente en una sola línea de
+//  tiempo: cada factura y cada COBRO COMPLETO. Al tocar un cobro se abre y
+//  enseña en qué facturas se repartió y cuánto a cada una.
+// ═══════════════════════════════════════════════════════════════════
+
+// Junta los pagos de un cliente por su número de recibo.
+// ⚠️ Los pagos de ANTES del 29 de agosto no tienen recibo. Para esos se agrupa
+// por FECHA — es lo mejor que se puede hacer sin inventar datos, y se avisa.
+function cobrosDelCliente(cid){
+  var vs = LS('nv', []).filter(function(v){ return String(v.cid) === String(cid); });
+  var porRecibo = {};
+
+  vs.forEach(function(v){
+    (v.pagosFactura || []).forEach(function(p, idx){
+      if(typeof p.monto !== 'number') return;
+      if(p.esDevolucion) return;
+      var clave = p.recibo ? ('R:' + p.recibo) : ('F:' + (p.fecha || '?') + '|' + (p.metodo || ''));
+      if(!porRecibo[clave]){
+        porRecibo[clave] = {
+          recibo: p.recibo || null,
+          conRecibo: !!p.recibo,
+          fecha: p.fecha || '',
+          hora: p.hora || '',
+          montoCobro: (typeof p.montoCobro === 'number') ? p.montoCobro : 0,
+          partes: [],
+          suma: 0
+        };
+      }
+      var g = porRecibo[clave];
+      g.partes.push({
+        vid: v.id, idx: idx, numFactura: v.numFactura || '', fechaFactura: v.fecha || '',
+        monto: p.monto, metodo: p.metodo || '', metodos: p.metodos || null, nota: p.nota || ''
+      });
+      g.suma = Math.round((g.suma + p.monto) * 100) / 100;
+      if(!g.hora && p.hora) g.hora = p.hora;
+    });
+  });
+
+  var lista = Object.keys(porRecibo).map(function(k){
+    var g = porRecibo[k];
+    // Si no venía apuntado cuánto fue el cobro completo, es la suma de sus partes
+    if(!g.montoCobro) g.montoCobro = g.suma;
+    g.clave = k;
+    return g;
+  });
+  lista.sort(function(a, b){
+    var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
+    return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
+  });
+  return lista;
+}
+
+// Cómo pagó: en cristiano, juntando las formas de pago de todas sus partes.
+function comoPagoElCobro(g){
+  var porTipo = {};
+  g.partes.forEach(function(p){
+    if(p.metodos && p.metodos.length){
+      p.metodos.forEach(function(m){
+        if(!m || !m.monto) return;
+        var et = (typeof METODOS_PAGO_LABELS !== 'undefined' && METODOS_PAGO_LABELS[m.tipo]) ? METODOS_PAGO_LABELS[m.tipo] : m.tipo;
+        porTipo[et] = Math.round(((porTipo[et] || 0) + m.monto) * 100) / 100;
+      });
+    } else if(p.metodo){
+      var et2 = (p.metodo === 'credito_cliente') ? 'Crédito a favor' : p.metodo;
+      porTipo[et2] = Math.round(((porTipo[et2] || 0) + p.monto) * 100) / 100;
+    }
+  });
+  var claves = Object.keys(porTipo);
+  if(!claves.length) return '';
+  return claves.map(function(k){ return k + ' $' + fmtNum(porTipo[k]); }).join(' · ');
+}
+
+function abrirEstadoDeCuenta(cid){
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c){ alert('No encontré ese cliente.'); return; }
+  window._estadoCuentaCid = cid;
+  window._cobroAbierto = null;
+
+  var ov = document.getElementById('estado-cuenta-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'estado-cuenta-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;'
+    + 'display:flex;align-items:flex-end;justify-content:center';
+  ov.innerHTML = '<div id="estado-cuenta-caja" style="background:#fff;width:100%;max-width:520px;'
+    + 'border-radius:16px 16px 0 0;padding:14px;max-height:94vh;overflow:auto"></div>';
+  pintarEstadoDeCuenta();
+}
+
+function cerrarEstadoDeCuenta(){
+  var ov = document.getElementById('estado-cuenta-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function toggleCobroEstado(clave){
+  window._cobroAbierto = (window._cobroAbierto === clave) ? null : clave;
+  pintarEstadoDeCuenta();
+}
+
+function pintarEstadoDeCuenta(){
+  var caja = document.getElementById('estado-cuenta-caja');
+  if(!caja) return;
+  var cid = window._estadoCuentaCid;
+  clientes = LS('ncl', []);
+  ventas = LS('nv', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c) return;
+
+  var vs = ventas.filter(function(v){ return String(v.cid) === String(cid); });
+  var cobros = cobrosDelCliente(cid);
+
+  // Los números de arriba
+  var totalFacturado = 0, totalDebe = 0;
+  vs.forEach(function(v){
+    if(v.cancelada) return;
+    totalFacturado += parseFloat(v.total) || 0;
+    totalDebe += cobradoYDebeDe(v).debe;
+  });
+  totalFacturado = Math.round(totalFacturado * 100) / 100;
+  totalDebe = Math.round(totalDebe * 100) / 100;
+  var totalCobrado = Math.round(cobros.reduce(function(a, g){ return a + g.suma; }, 0) * 100) / 100;
+  var creditoAFavor = parseFloat(c.creditoAFavor) || 0;
+  var hayViejos = cobros.some(function(g){ return !g.conRecibo; });
+
+  var h = '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px">'
+    + '<div style="min-width:0">'
+    +   '<div style="font-size:17px;font-weight:900;color:var(--nbs-ink);line-height:1.1">' + escaparHtml(nombreCl(c)) + '</div>'
+    +   '<div style="font-size:12px;color:var(--nbs-muted)">' + escaparHtml(c.negocio || '') + '</div>'
+    + '</div>'
+    + '<button onclick="cerrarEstadoDeCuenta()" style="background:#F0F0F2;border:none;border-radius:8px;'
+    +   'width:32px;height:32px;font-size:15px;cursor:pointer;flex-shrink:0">✕</button>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--nbs-muted);font-weight:800;letter-spacing:.5px;margin-bottom:10px">🧾 ESTADO DE CUENTA</div>';
+
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">'
+    + '<div style="background:#E3F2FD;border-radius:9px;padding:9px 6px;text-align:center">'
+    +   '<div style="font-size:9px;color:#666;font-weight:800">LE FACTURÉ</div>'
+    +   '<div style="font-size:15px;font-weight:900;color:#1565C0">$' + fmtNum(totalFacturado) + '</div></div>'
+    + '<div style="background:#E8F5E9;border-radius:9px;padding:9px 6px;text-align:center">'
+    +   '<div style="font-size:9px;color:#666;font-weight:800">ME PAGÓ</div>'
+    +   '<div style="font-size:15px;font-weight:900;color:#2E7D32">$' + fmtNum(totalCobrado) + '</div></div>'
+    + '<div style="background:' + (totalDebe > 0.005 ? '#FFEBEE' : '#E8F5E9') + ';border-radius:9px;padding:9px 6px;text-align:center">'
+    +   '<div style="font-size:9px;color:#666;font-weight:800">DEBE</div>'
+    +   '<div style="font-size:15px;font-weight:900;color:' + (totalDebe > 0.005 ? '#C62828' : '#2E7D32') + '">$' + fmtNum(totalDebe) + '</div></div>'
+    + '</div>';
+
+  if(creditoAFavor > 0.005){
+    h += '<div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:9px;padding:8px 11px;margin-bottom:10px;font-size:12.5px;font-weight:700;color:#8a6d00">'
+      + '💰 Tiene $' + fmtNum(creditoAFavor) + ' a favor, para su próxima compra.</div>';
+  }
+
+  // ── LOS COBROS ──
+  h += '<div style="font-size:11px;font-weight:800;color:var(--nbs-muted);letter-spacing:.5px;margin:14px 0 6px">'
+    + '💵 SUS PAGOS (' + cobros.length + ')</div>';
+
+  if(hayViejos){
+    h += '<div style="background:#FFF8E1;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:11px;color:#8a6d00;line-height:1.45">'
+      + '⚠️ Los pagos de antes del 29 de agosto no llevan número de recibo. Esos se agrupan por '
+      + 'fecha, así que si en un mismo día le cobraste dos veces, aquí salen juntos. Los de ahora '
+      + 'en adelante llevan su recibo y salen exactos.</div>';
+  }
+
+  if(!cobros.length){
+    h += '<div style="font-size:12.5px;color:var(--nbs-muted);padding:6px 0">Todavía no te ha pagado nada.</div>';
+  }
+
+  cobros.forEach(function(g){
+    var abierto = (window._cobroAbierto === g.clave);
+    var varias = g.partes.length > 1;
+    h += '<div style="border:1px solid ' + (abierto ? '#2E7D32' : 'var(--nbs-line)') + ';border-radius:10px;'
+      + 'margin-bottom:7px;overflow:hidden">'
+      + '<div onclick="toggleCobroEstado(\'' + g.clave.replace(/'/g, "\\'") + '\')" '
+      +   'style="display:flex;align-items:center;gap:10px;padding:10px 11px;cursor:pointer;'
+      +   'background:' + (abierto ? '#E8F5E9' : '#fff') + '">'
+      +   '<div style="flex:1;min-width:0">'
+      +     '<div style="font-size:14px;font-weight:900;color:#2E7D32">$' + fmtNum(g.montoCobro) + '</div>'
+      +     '<div style="font-size:11px;color:var(--nbs-muted);margin-top:1px">'
+      +       escaparHtml(g.fecha) + (g.hora ? ' · ' + escaparHtml(g.hora) : '')
+      +       (g.recibo ? ' · ' + escaparHtml(g.recibo) : '')
+      +     '</div>'
+      +     (comoPagoElCobro(g) ? '<div style="font-size:11px;color:#555;margin-top:2px">' + escaparHtml(comoPagoElCobro(g)) + '</div>' : '')
+      +   '</div>'
+      +   '<div style="text-align:right;flex-shrink:0">'
+      +     (varias ? '<div style="font-size:10.5px;font-weight:800;color:#1565C0">se repartió en ' + g.partes.length + '</div>' : '')
+      +     '<div style="font-size:14px;color:var(--nbs-muted)">' + (abierto ? '⌃' : '›') + '</div>'
+      +   '</div>'
+      + '</div>';
+
+    if(abierto){
+      h += '<div style="padding:9px 11px;background:#FAFAFC;border-top:1px solid var(--nbs-line)">'
+        + '<div style="font-size:10.5px;font-weight:800;color:var(--nbs-muted);margin-bottom:5px">A QUÉ FACTURAS SE APLICÓ</div>';
+      g.partes.forEach(function(p){
+        h += '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #F0F0F3">'
+          + '<span style="font-size:12px;color:var(--nbs-ink);flex:1;min-width:0">'
+          +   (p.numFactura ? '#' + escaparHtml(String(p.numFactura)) + ' · ' : '') + escaparHtml(p.fechaFactura)
+          + '</span>'
+          + '<span style="font-size:12.5px;font-weight:800;color:#2E7D32;flex-shrink:0">$' + fmtNum(p.monto) + '</span>'
+          + '</div>';
+      });
+      if(Math.abs(g.montoCobro - g.suma) > 0.005){
+        h += '<div style="font-size:11px;color:#8a6d00;margin-top:6px">'
+          + 'Del cobro de $' + fmtNum(g.montoCobro) + ' se aplicaron $' + fmtNum(g.suma)
+          + '. La diferencia ($' + fmtNum(g.montoCobro - g.suma) + ') quedó como crédito a favor.</div>';
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+  });
+
+  // ── LAS FACTURAS ──
+  var vsOrden = vs.slice().sort(function(a, b){
+    var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
+    return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
+  });
+  h += '<div style="font-size:11px;font-weight:800;color:var(--nbs-muted);letter-spacing:.5px;margin:16px 0 6px">'
+    + '📄 SUS FACTURAS (' + vsOrden.length + ')</div>';
+  vsOrden.forEach(function(v){
+    var debe = cobradoYDebeDe(v).debe;
+    var canc = !!v.cancelada;
+    var pagadaCon = (v.pagosFactura || []).filter(function(p){ return typeof p.monto === 'number' && !p.esDevolucion; });
+    var pagado = pagadaCon.reduce(function(a, p){ return a + p.monto; }, 0);
+    h += '<div onclick="event.stopPropagation();verFacturaProfesional(' + _arg(v.id) + ')" '
+      + 'style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;'
+      + 'border-bottom:1px solid #F2F2F5;cursor:pointer' + (canc ? ';opacity:.6' : '') + '">'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:12.5px;font-weight:700;color:var(--nbs-ink)' + (canc ? ';text-decoration:line-through' : '') + '">'
+      +     (v.numFactura ? '#' + escaparHtml(String(v.numFactura)) + ' · ' : '') + escaparHtml(v.fecha || '') + '</div>'
+      +   '<div style="font-size:10.5px;color:var(--nbs-muted)">'
+      +     ((v.items || []).length) + ' producto(s) · pagó $' + fmtNum(pagado) + ' de $' + fmtNum(v.total) + '</div>'
+      + '</div>'
+      + '<div style="text-align:right;flex-shrink:0">'
+      +   '<div style="font-size:13px;font-weight:900;color:' + (canc ? '#B71C1C' : (debe > 0.005 ? '#C62828' : '#2E7D32')) + '">'
+      +     (canc ? 'cancelada' : (debe > 0.005 ? '$' + fmtNum(debe) : 'pagada')) + '</div>'
+      + '</div>'
+      + '</div>';
+  });
+
+  h += '<div style="display:flex;gap:8px;margin-top:16px">'
+    + '<button onclick="compartirEstadoDeCuenta()" style="flex:1.3;padding:13px;background:#128C7E;color:#fff;'
+    +   'border:none;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer">💬 Mandárselo al cliente</button>'
+    + '<button onclick="cerrarEstadoDeCuenta()" style="flex:.7;padding:13px;background:#F0F0F2;color:#333;'
+    +   'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">Cerrar</button>'
+    + '</div>';
+
+  caja.innerHTML = h;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  💬 EL MENSAJE PARA EL CLIENTE  (29 ago 2026)
+//
+//  Sensei: "me gustaría que me pudieras preparar un mensaje automático para
+//  cada cliente cada vez que compre o pague, con su balance actual, para que así
+//  haya una transparencia con ellos y conmigo, y eso sirve de prueba de que
+//  estamos en la misma página en sus balances pendientes".
+//
+//  El mensaje se arma solo con lo que hay guardado. Él lo revisa y lo manda por
+//  WhatsApp. No se manda nada sin que él lo vea.
+// ═══════════════════════════════════════════════════════════════════
+
+// El texto que se le manda después de una VENTA o de un COBRO.
+// tipo: 'venta' o 'pago'.  monto: lo de esta operación.
+function textoParaCliente(cid, tipo, monto, detalleFacturas){
+  clientes = LS('ncl', []);
+  ventas = LS('nv', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c) return '';
+
+  var debe = 0;
+  ventas.forEach(function(v){
+    if(String(v.cid) !== String(cid) || v.cancelada) return;
+    debe += cobradoYDebeDe(v).debe;
+  });
+  debe = Math.round(debe * 100) / 100;
+  var aFavor = parseFloat(c.creditoAFavor) || 0;
+
+  var t = [];
+  t.push('*NUNEZ BEAUTY SUPPLY*');
+  t.push('');
+  t.push('Hola ' + (c.nombre || nombreCl(c)) + ' 👋');
+  t.push('');
+
+  if(tipo === 'pago'){
+    t.push('✅ Recibí tu pago de *$' + fmtNum(monto) + '*');
+    t.push('📅 ' + fechaHoy() + ' · ' + horaAhora());
+    if(detalleFacturas && detalleFacturas.length > 1){
+      t.push('');
+      t.push('Lo apliqué así:');
+      detalleFacturas.forEach(function(d){
+        t.push('   • $' + fmtNum(d.monto) + ' → factura del ' + d.fecha);
+      });
+    }
+  } else {
+    t.push('🧾 Te entregué mercancía por *$' + fmtNum(monto) + '*');
+    t.push('📅 ' + fechaHoy() + ' · ' + horaAhora());
+  }
+
+  t.push('');
+  t.push('━━━━━━━━━━━━━━━');
+  if(debe > 0.005){
+    t.push('*Tu balance ahora: $' + fmtNum(debe) + '*');
+  } else {
+    t.push('*Tu balance: $0.00 — al día* ✅');
+  }
+  if(aFavor > 0.005){
+    t.push('Tienes $' + fmtNum(aFavor) + ' a favor para tu próxima compra.');
+  }
+  t.push('━━━━━━━━━━━━━━━');
+  t.push('');
+  t.push('Si algo no te cuadra, dímelo hoy mismo y lo revisamos juntos. 🙏');
+  t.push('');
+  t.push('Gracias por tu compra.');
+  return t.join('\n');
+}
+
+// El estado de cuenta entero, en texto, para mandárselo cuando hay discusión.
+function textoEstadoDeCuenta(cid){
+  clientes = LS('ncl', []);
+  ventas = LS('nv', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c) return '';
+
+  var vs = ventas.filter(function(v){ return String(v.cid) === String(cid); });
+  var cobros = cobrosDelCliente(cid);
+  var facturado = 0, debe = 0;
+  vs.forEach(function(v){
+    if(v.cancelada) return;
+    facturado += parseFloat(v.total) || 0;
+    debe += cobradoYDebeDe(v).debe;
+  });
+  facturado = Math.round(facturado * 100) / 100;
+  debe = Math.round(debe * 100) / 100;
+  var cobrado = Math.round(cobros.reduce(function(a, g){ return a + g.suma; }, 0) * 100) / 100;
+
+  var t = [];
+  t.push('*NUNEZ BEAUTY SUPPLY*');
+  t.push('*ESTADO DE CUENTA*');
+  t.push(fechaHoy() + ' · ' + horaAhora());
+  t.push('');
+  t.push('Cliente: *' + nombreCl(c) + '*');
+  if(c.negocio) t.push(c.negocio);
+  t.push('');
+  t.push('━━━━━━━━━━━━━━━');
+  t.push('Total facturado:  $' + fmtNum(facturado));
+  t.push('Total pagado:     $' + fmtNum(cobrado));
+  t.push('*BALANCE:          $' + fmtNum(debe) + '*');
+  t.push('━━━━━━━━━━━━━━━');
+  t.push('');
+
+  // Las que deben
+  var conSaldo = vs.filter(function(v){ return !v.cancelada && esSaldoPendiente(cobradoYDebeDe(v).debe); });
+  if(conSaldo.length){
+    conSaldo.sort(function(a, b){
+      var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
+      return (fa ? fa.getTime() : 0) - (fb ? fb.getTime() : 0);
+    });
+    t.push('*FACTURAS PENDIENTES*');
+    conSaldo.forEach(function(v){
+      t.push('• ' + (v.fecha || '') + (v.numFactura ? ' #' + v.numFactura : '')
+        + ' — de $' + fmtNum(v.total) + ' debe *$' + fmtNum(cobradoYDebeDe(v).debe) + '*');
+    });
+    t.push('');
+  }
+
+  // Los pagos, del más nuevo al más viejo
+  if(cobros.length){
+    t.push('*TUS PAGOS*');
+    cobros.slice(0, 20).forEach(function(g){
+      var linea = '• ' + g.fecha + ' — $' + fmtNum(g.montoCobro);
+      if(g.recibo) linea += ' (' + g.recibo + ')';
+      t.push(linea);
+      if(g.partes.length > 1){
+        g.partes.forEach(function(p){
+          t.push('      $' + fmtNum(p.monto) + ' → factura del ' + p.fechaFactura);
+        });
+      }
+    });
+    if(cobros.length > 20) t.push('   ...y ' + (cobros.length - 20) + ' pago(s) más.');
+    t.push('');
+  }
+
+  t.push('Si algo no te cuadra, dímelo y lo revisamos juntos. 🙏');
+  return t.join('\n');
+}
+
+function compartirEstadoDeCuenta(){
+  var cid = window._estadoCuentaCid;
+  if(!cid) return;
+  var texto = textoEstadoDeCuenta(cid);
+  mandarloAlCliente(cid, texto, 'Estado de cuenta');
+}
+
+// Manda el texto por WhatsApp si hay teléfono; si no, lo copia.
+function mandarloAlCliente(cid, texto, queEs){
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  var tel = c ? String(c.tel || '').replace(/[^0-9]/g, '') : '';
+  if(tel){
+    if(tel.length === 10) tel = '1' + tel;
+    try {
+      window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(texto), '_blank');
+      return;
+    } catch(e){}
+  }
+  // Sin teléfono: se copia para que lo pegue donde quiera
+  try {
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(texto);
+      alert('📋 ' + queEs + ' copiado.\n\nEste cliente no tiene teléfono guardado, así que lo copié '
+        + 'para que lo pegues donde quieras.');
+      return;
+    }
+  } catch(e){}
+  avisoGrande(texto);
+}
+
+// ── El aviso que sale después de una venta o de un cobro ──
+// Se le enseña el mensaje ya armado y él decide si lo manda.
+function ofrecerMensajeAlCliente(cid, tipo, monto, detalleFacturas){
+  try {
+    if(!cid) return;
+    clientes = LS('ncl', []);
+    var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+    if(!c) return;
+    if(LS('nbs_avisar_cliente', '1') !== '1') return;   // se puede apagar
+    var texto = textoParaCliente(cid, tipo, monto, detalleFacturas);
+    if(!texto) return;
+
+    var ov = document.getElementById('avisar-cliente-overlay');
+    if(!ov){
+      ov = document.createElement('div');
+      ov.id = 'avisar-cliente-overlay';
+      document.body.appendChild(ov);
+    }
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;'
+      + 'display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:15px;max-width:420px;width:100%;max-height:88vh;overflow:auto">'
+      + '<div style="font-size:15px;font-weight:900;color:#128C7E;margin-bottom:3px">💬 Mándale el comprobante</div>'
+      + '<div style="font-size:11.5px;color:#888;margin-bottom:11px">Así queda constancia del balance para los dos.</div>'
+      + '<div style="background:#E7F6EF;border-radius:10px;padding:11px;font-size:12px;color:#222;'
+      +   'white-space:pre-wrap;line-height:1.5;max-height:38vh;overflow:auto;margin-bottom:12px">'
+      +   escaparHtml(texto) + '</div>'
+      + '<div style="display:flex;gap:8px">'
+      +   '<button onclick="mandarloAlCliente(' + _arg(cid) + ', window._textoAvisoCliente, \'Comprobante\');cerrarAvisoCliente()" '
+      +     'style="flex:1.3;padding:13px;background:#128C7E;color:#fff;border:none;border-radius:10px;'
+      +     'font-size:13.5px;font-weight:800;cursor:pointer">💬 Mandar</button>'
+      +   '<button onclick="cerrarAvisoCliente()" style="flex:.7;padding:13px;background:#F0F0F2;color:#333;'
+      +     'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">Ahora no</button>'
+      + '</div>'
+      + '<div onclick="apagarAvisoCliente()" style="text-align:center;font-size:11px;color:#999;'
+      +   'margin-top:9px;cursor:pointer;text-decoration:underline">No volver a ofrecerlo</div>'
+      + '</div>';
+    window._textoAvisoCliente = texto;
+  } catch(e){ console.error('No se pudo armar el mensaje al cliente:', e); }
+}
+
+function cerrarAvisoCliente(){
+  var ov = document.getElementById('avisar-cliente-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function apagarAvisoCliente(){
+  if(!confirm('¿Dejar de ofrecer el comprobante después de cada venta y cobro?\n\n'
+    + 'Lo puedes volver a prender en Ajustes.')) return;
+  SS('nbs_avisar_cliente', '0');
+  cerrarAvisoCliente();
+  alert('Listo. Ya no se ofrece solo.\n\nSiempre puedes mandarlo desde el estado de cuenta del cliente.');
+}
+
+function nuevoNumeroRecibo(){
+  var d = new Date();
+  var dosDig = function(n){ return (n < 10 ? '0' : '') + n; };
+  return 'R' + String(d.getFullYear()).slice(2) + dosDig(d.getMonth() + 1) + dosDig(d.getDate())
+       + '-' + dosDig(d.getHours()) + dosDig(d.getMinutes())
+       + '-' + Math.floor(Math.random() * 90 + 10);
+}
+
+function horaAhora(){
+  try { return new Date().toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true }); }
+  catch(e){ return ''; }
+}
+
 function saldoDeCompra(c){
   var total = parseFloat(c.total) || 0;
   var pagado = (c.pagosFactura || []).filter(function(p){ return typeof p.monto === 'number'; })
@@ -27915,6 +28418,8 @@ function confirmarPagoMultiple(vid, saldo){
     descontarCreditoUsado(venta.cid, filas);
     var detalle = filas.map(function(m){ return METODOS_PAGO_LABELS[m.tipo]+': $'+fmtNum(m.monto); }).join('\n');
     alert('✅ Pago de $'+fmtNum(total)+' aplicado correctamente.\n\n'+detalle);
+    // 💬 Se le ofrece el comprobante, para que quede constancia del balance. -29 ago-
+    try { ofrecerMensajeAlCliente(venta.cid, 'pago', total, null); } catch(e){}
     // Refrescar la pantalla DESPUES de cerrar el alert, con una pausa para que el telefono
     // alcance a actualizar bien y el balance nuevo se vea al instante (sin salir y entrar).
     setTimeout(function(){ abrirAbono(cxcClienteId); }, 50);
@@ -27942,6 +28447,12 @@ function confirmarPagoMultiple(vid, saldo){
   if(!confirm(msj)) return;
 
   var fechaPago = fechaHoy();
+  var horaPago = horaAhora();
+  // 🧾 TODAS las partes de este cobro llevan el MISMO numero de recibo, y todas apuntan
+  // cuanto fue el cobro COMPLETO. Asi el estado de cuenta puede ensenar "pago de $80" y, al
+  // tocarlo, en que facturas se repartio. Antes quedaban tres pagos sueltos sin nada que los
+  // uniera, y por eso el cliente decia 80 y el sistema ensenaba 35. -Sensei, 29 ago-
+  var _recibo = nuevoNumeroRecibo();
   var aplicados = 0;
   r.plan.forEach(function(p){
     var v = ventas.find(function(x){ return String(x.id) === String(p.id); });
@@ -27949,9 +28460,10 @@ function confirmarPagoMultiple(vid, saldo){
     if(!v.pagosFactura) v.pagosFactura = [];
     var monto = p.monto;
     // El sobrante YA NO se mete aqui -se guarda aparte como credito a favor-.
-    var pago = { monto: monto, fecha: fechaPago };
+    var pago = { pid: nuevoPagoId(), recibo: _recibo, montoCobro: total,
+                 monto: monto, fecha: fechaPago, hora: horaPago };
     if(p.esLaActual) pago.metodos = filas;
-    else pago.nota = 'Sobrante del pago de $'+fmtNum(total)+' aplicado a la factura más vieja';
+    else pago.nota = 'Parte del pago de $'+fmtNum(total)+' aplicado a la factura m\u00e1s vieja';
     v.pagosFactura.push(pago);
     aplicados++;
   });
@@ -27980,6 +28492,12 @@ function confirmarPagoMultiple(vid, saldo){
     resumen += '\n💰 $'+fmtNum(r.sinAplicar)+' quedó como CRÉDITO A FAVOR del cliente, para su próxima compra.';
   }
   alert(resumen);
+  // 💬 El comprobante, con el DETALLE de a que facturas fue cada parte. Justo lo que
+  // evita la discusion de "yo te pague 80 y ahi dice 35". -29 ago-
+  try {
+    var _detalle = r.plan.map(function(p){ return { monto: p.monto, fecha: p.fecha || fechaHoy() }; });
+    ofrecerMensajeAlCliente(venta.cid, 'pago', total, _detalle);
+  } catch(e){}
   // Refrescar la pantalla DESPUES de cerrar el alert, con una pausa, para que el balance
   // nuevo se vea al instante (sin salir y entrar).
   setTimeout(function(){ abrirAbono(cxcClienteId); }, 50);
