@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260830o-OFICIAL-V2.0">
+<meta name="app-version" content="20260902a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4870,6 +4870,7 @@ function ir(id, sinHistorial){
     llenarDataLists();
   }
   if(id==='p-comp'){
+    ponerHoyEnCampo('cc-fecha');   // 📅 la de hoy, lista para cambiarla -2 sep-
     loadProds();
     syncCCsup();
     window._pagoMetodos = window._pagoMetodos || {};
@@ -8230,6 +8231,9 @@ function verFacturaCompra(c, sid){
     payCard.className = 'card';
     payCard.innerHTML = '<div style="font-size:13px;font-weight:700;color:#5D4037;margin-bottom:8px">APLICAR PAGO A ESTA FACTURA</div>'
       +'<div style="font-size:12px;color:#aaa;margin-bottom:8px">Saldo pendiente: $'+fmtNum(saldo)+'</div>'
+      // 📅 QUÉ DÍA LE PAGASTE -2 sep-. Vale para los dos botones de abajo.
+      +'<div style="font-size:11px;color:#555;font-weight:700;margin-bottom:3px">📅 ¿QUÉ DÍA LE PAGASTE?</div>'
+      +'<input type="date" id="pagoc-fecha-'+c.id+'" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;font-size:13px;margin-bottom:8px">'
       +'<div style="display:flex;gap:8px;align-items:center">'
       +'<input type="text" inputmode="numeric" placeholder="0.00" id="pagocompra-'+c.id+'" value="0.00" style="flex:1;padding:6px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px;outline:none;font-family:sans-serif" onfocus="this.select()" oninput="formatoMoneda(this)">'
       // 🔴 ANTES ESTE PAGO SE GUARDABA SIN FORMA DE PAGO -19 ago-. Se apuntaba el monto y la
@@ -8240,6 +8244,7 @@ function verFacturaCompra(c, sid){
       +'<button id="btnpagocompra-'+c.id+'" style="padding:10px 14px;background:#5D4037;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">✓ Pagar</button>'
       +'</div>';
     el.appendChild(payCard);
+    (function(cid){ setTimeout(function(){ ponerHoyEnCampo('pagoc-fecha-' + cid); }, 0); })(c.id);
     // NUEVO: dos botones grandes para pagar TODO el saldo de un toque, eligiendo como.
     var pagarTodoCard = document.createElement('div');
     pagarTodoCard.className = 'card';
@@ -8262,7 +8267,7 @@ function verFacturaCompra(c, sid){
         var compraReal = compras.find(function(x){ return String(x.id) === String(c.id); });
         if(!compraReal) return;
         if(!compraReal.pagosFactura) compraReal.pagosFactura = [];
-        compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: saldo, fecha: fechaHoy(), metodo: metodo });
+        compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: saldo, fecha: fechaDelCampo('pagoc-fecha-' + c.id), metodo: metodo });
         SS('nc', compras);
         alert('\u2705 Factura pagada por completo ($'+fmtNum(saldo)+') con '+metodoLabel+'.');
         verSup(sid);
@@ -8282,7 +8287,7 @@ function verFacturaCompra(c, sid){
       if(!compraReal) return;
       if(!compraReal.pagosFactura) compraReal.pagosFactura = [];
       var _selMet = document.getElementById('metpagocompra-'+c.id);
-      compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaHoy(),
+      compraReal.pagosFactura.push({ pid: nuevoPagoId(), monto: monto, fecha: fechaDelCampo('pagoc-fecha-' + c.id),
                                      metodo: _selMet ? _selMet.value : 'efectivo' });
       SS('nc', compras);
       alert('Pago de $'+fmtNum(monto)+' aplicado correctamente');
@@ -11872,6 +11877,8 @@ function pintarCierreRuta(){
     +   'Cuenta lo que te quedó en la van y escríbelo. La app lo compara con lo que debería quedar.</div>';
 
   // El resumen, arriba y siempre a la vista
+  h += '<div style="font-size:11px;color:#555;font-weight:700;margin-bottom:3px">📅 ¿DE QUÉ DÍA ES ESTE CIERRE?</div>';
+  h += '<input type="date" id="cr-fecha" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;font-size:13px;margin-bottom:10px">';
   h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">'
     + '<div style="background:#F5F5F7;border-radius:9px;padding:8px 6px;text-align:center">'
     +   '<div style="font-size:9px;color:#888;font-weight:800">CONTADOS</div>'
@@ -11922,6 +11929,7 @@ function pintarCierreRuta(){
     + '</div>';
 
   caja.innerHTML = h;
+  setTimeout(function(){ ponerHoyEnCampo('cr-fecha'); }, 0);   // 📅 -2 sep-
 }
 
 function apuntarContadoRuta(pid, valor){
@@ -11966,7 +11974,7 @@ function guardarCierreRuta(){
   var cierres = LS('ncierres_ruta', []);
   cierres.push({
     id: Date.now(),
-    fecha: fechaHoy(),
+    fecha: fechaDelCampo('cr-fecha'),   // 📅 la que el escogio -2 sep-
     hora: new Date().toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true }),
     fechaCarga: (cargarDatosVan() || {}).fechaCarga || null,
     renglones: renglones,
@@ -13078,6 +13086,39 @@ function limpiarTexto(texto){
   var div = document.createElement('div');
   div.textContent = texto;
   return div.innerHTML.replace(/</g, '').replace(/>/g, '');
+}
+
+// 📅 PARA QUE SENSEI PUEDA ELEGIR LA FECHA EN TODO  (2 sep 2026)
+//
+// Sus palabras: "en todas partes donde vaya a entrar un dato debo tener la opción de
+// cambiar la fecha, aunque la fecha por defecto siempre sea la de ese día".
+//
+// El calendario del teléfono trabaja con AAAA-MM-DD; la app guarda MM/DD/AAAA.
+// Estas dos ayuditas traducen, y se usan en los siete sitios.
+
+// De AAAA-MM-DD —lo que da el calendario— a MM/DD/AAAA —lo que guarda la app—.
+// 🔑 Si viene vacío o raro devuelve HOY: nunca se guarda una fecha inválida.
+function fechaDelCampo(idCampo){
+  try {
+    var el = document.getElementById(idCampo);
+    if(!el || !el.value) return fechaHoy();
+    var p = String(el.value).split('-');
+    if(p.length !== 3) return fechaHoy();
+    var a = parseInt(p[0], 10), m = parseInt(p[1], 10), d = parseInt(p[2], 10);
+    if(!a || !m || !d || m < 1 || m > 12 || d < 1 || d > 31) return fechaHoy();
+    return (m < 10 ? '0' : '') + m + '/' + (d < 10 ? '0' : '') + d + '/' + a;
+  } catch(e){ return fechaHoy(); }
+}
+
+// Deja el campo con la fecha de HOY puesta, listo para cambiarla si hace falta.
+function ponerHoyEnCampo(idCampo){
+  try {
+    var el = document.getElementById(idCampo);
+    if(!el) return;
+    var d = new Date();
+    var mm = d.getMonth() + 1, dd = d.getDate();
+    el.value = d.getFullYear() + '-' + (mm < 10 ? '0' : '') + mm + '-' + (dd < 10 ? '0' : '') + dd;
+  } catch(e){}
 }
 
 function fechaHoy(){
@@ -16254,14 +16295,14 @@ function saveCC(){
   tot += costoEnvio + cargoTarjeta - descC.total;
 
   var pagosIniciales = [];
-  if(ini > 0) pagosIniciales.push({ monto: ini, fecha: fechaHoy(), nota: 'Pago inicial', metodos: metodosPago });
+  if(ini > 0) pagosIniciales.push({ monto: ini, fecha: fechaDelCampo('cc-fecha'), nota: 'Pago inicial', metodos: metodosPago });
 
   compras = LS('nc', []);
   compras.push({
     id: Date.now(), sid: sid, sn: sn, tipo: tipo,
     items: iCC.slice(), total: tot, envio: costoEnvio, cargoTarjeta: cargoTarjeta,
     descuentos: descC.lista,
-    fecha: fechaHoy(),
+    fecha: fechaDelCampo('cc-fecha'),   // 📅 la que el escogio -2 sep-
     hora: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}),
     pagosFactura: pagosIniciales,
     foto: document.getElementById('cc-foto-data').value || null
@@ -18283,7 +18324,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260830o';
+var NOVEDADES_VERSION = '20260902a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -20954,6 +20995,8 @@ function abrirEntregaPremioVIP(cid, grupoClave){
       +   'Si se lo das igual, su contador vuelve a <b>0</b> y empieza de nuevo desde hoy.'
       + '</div></div>';
   }
+  h += '<div style="font-size:11px;color:#555;font-weight:700;margin-bottom:3px">📅 ¿QUÉ DÍA LE ENTREGAS EL PREMIO?</div>';
+  h += '<input type="date" id="vip-fecha" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;font-size:13px;margin-bottom:12px">';
   h += '<div style="font-size:12px;font-weight:800;color:#6A1B9A;letter-spacing:.4px;margin-bottom:6px">\u00bfCU\u00c1L PRODUCTO LE DISTE?</div>';
 
   if(!candidatos.length){
@@ -20988,6 +21031,7 @@ function abrirEntregaPremioVIP(cid, grupoClave){
   }
   ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:15px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto">' + h + '</div>';
   ov.style.display = 'flex';
+  setTimeout(function(){ ponerHoyEnCampo('vip-fecha'); }, 0);   // 📅 -2 sep-
 }
 
 function escogerPremioVIP(pid){
@@ -21063,7 +21107,7 @@ function confirmarEntregaPremioVIP(){
       subtotal: 0,
       total: 0,
       ganancia: -costo,          // el regalo CUESTA: la ganancia baja
-      fecha: fechaHoy(),
+      fecha: fechaDelCampo('vip-fecha'),   // 📅 la que el escogio -2 sep-
       hora: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}),
       pagosFactura: [],
       esPremioVIP: true,
@@ -21097,7 +21141,7 @@ function confirmarEntregaPremioVIP(){
       C[j].vipCanjes.push({
         grupo: d.grupo, nombreGrupo: d.nombreGrupo,
         pid: String(p.id), producto: p.nombre, costo: costo,
-        fecha: fechaHoy(),
+        fecha: fechaDelCampo('vip-fecha'),   // 📅 la que el escogio -2 sep-
         hora: venta.hora,
         ventaId: venta.id,
         numero: C[j].vipCanjes.length + 1,
@@ -27053,10 +27097,13 @@ function pintarCreditoAFavor(cid, saldoReal){
   +     'Se van a usar <b>$' + fmtNum(seUsan) + '</b> para bajarle la deuda'
   +     (sobra > 0.005 ? '.<br>Le quedar\u00e1n <b>$' + fmtNum(sobra) + '</b> a favor.' : '.')
   +   '</div>'
+    +   '<div style="font-size:11px;color:#6D4C00;font-weight:700;margin-bottom:3px">📅 ¿QUÉ DÍA SE LO APLICAS?</div>'
+    +   '<input type="date" id="cred-fecha" style="width:100%;padding:9px;border:1px solid #E0C070;border-radius:8px;font-size:13px;margin-bottom:10px">'
   +   '<button onclick="usarCreditoAFavor(' + JSON.stringify(String(cid)) + ')" '
   +     'style="width:100%;padding:13px;background:#E65100;color:white;border:none;border-radius:10px;'
   +     'font-size:15px;font-weight:800;cursor:pointer">\ud83d\udcb3 Usar $' + fmtNum(seUsan) + ' de su cr\u00e9dito</button>'
   + '</div>';
+  setTimeout(function(){ ponerHoyEnCampo('cred-fecha'); }, 0);   // 📅 -2 sep-
 }
 
 // Aplica el crédito como pago, de la factura MÁS VIEJA a la más nueva.
@@ -27101,7 +27148,7 @@ function usarCreditoAFavor(cid){
     if(!v.pagosFactura) v.pagosFactura = [];
     v.pagosFactura.push({
       monto: pone,
-      fecha: fechaHoy(),
+      fecha: fechaDelCampo('cred-fecha'),   // 📅 la que el escogio -2 sep-
       metodo: 'credito_cliente',
       nota: 'Cr\u00e9dito a favor aplicado'
     });
@@ -27126,7 +27173,7 @@ function usarCreditoAFavor(cid){
       var vv = Vg.find(function(x){ return String(x.id) === String(t.id); });
       if(!vv) return;
       if(!vv.pagosFactura) vv.pagosFactura = [];
-      vv.pagosFactura.push({ monto: t.monto, fecha: fechaHoy(),
+      vv.pagosFactura.push({ monto: t.monto, fecha: fechaDelCampo('cred-fecha'),
                              metodo: 'credito_cliente', nota: 'Cr\u00e9dito a favor aplicado' });
     });
     SS('nv', Vg);
@@ -27370,6 +27417,9 @@ function abrirAbono(cid){
         pagoDiv.innerHTML = '<button type="button" onclick="pagarTodoEfectivo(\''+v.id+'\','+saldoFactura+')" style="width:100%;padding:13px;background:#00838F;color:white;border:none;border-radius:8px;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:10px">💵 Pagar todo en efectivo ($'+fmtNum(saldoFactura)+')</button>'
           +'<div style="font-size:11px;color:#6A1B9A;font-weight:700;margin-bottom:4px;letter-spacing:0.5px">💰 APLICAR PAGO</div>'
           +'<div style="font-size:12px;color:#aaa;margin-bottom:8px">Saldo pendiente: $'+fmtNum(saldoFactura)+'</div>'
+          // 📅 QUÉ DÍA TE PAGÓ -2 sep-. Viene la de hoy; se cambia si el pago fue otro día.
+          +'<div style="font-size:11px;color:#555;font-weight:700;margin-bottom:3px">📅 ¿QUÉ DÍA TE PAGÓ?</div>'
+          +'<input type="date" id="cxc-fecha-'+v.id+'" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;font-size:13px;margin-bottom:8px">'
           +'<div id="pago-metodos-'+v.id+'"></div>'
           +'<button type="button" onclick="agregarMetodoPago(\''+v.id+'\')" style="background:none;border:1px dashed #ccc;border-radius:8px;padding:6px 10px;font-size:11px;color:#6A1B9A;cursor:pointer;margin:4px 0 8px;width:100%">+ Agregar otra forma de pago</button>'
           +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
@@ -27381,6 +27431,8 @@ function abrirAbono(cid){
         var aplicarBtn = pagoDiv.querySelector('#btn-'+v.id);
         aplicarBtn.onclick = (function(vid, saldo){ return function(){ confirmarPagoMultiple(vid, saldo); }; })(v.id, saldoFactura);
         card.appendChild(pagoDiv);
+        // 📅 La fecha se pone al final, cuando la tarjeta ya esta en la pagina. -2 sep-
+        (function(vid){ setTimeout(function(){ ponerHoyEnCampo('cxc-fecha-' + vid); }, 0); })(v.id);
         renderMetodosPago(v.id);
       }
       el.appendChild(card);
@@ -28095,6 +28147,8 @@ function abrirConfirmacionBalance(cid, montoPagado){
     +   '</div>'
     + '</div>'
 
+    + '<div style="font-size:11px;color:#555;font-weight:700;margin-bottom:3px">📅 ¿De qué día es esta confirmación?</div>'
+    + '<input type="date" id="conf-fecha" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:8px;font-size:13px;margin-bottom:10px">'
     + '<div style="font-size:12px;color:#555;text-align:center;margin-bottom:8px">'
     +   'Firme aquí para confirmar que está de acuerdo con este balance</div>'
     + '<canvas id="firma-canvas" width="400" height="130" style="width:100%;height:130px;border:2px dashed #bbb;'
@@ -28112,6 +28166,7 @@ function abrirConfirmacionBalance(cid, montoPagado){
 
   // El mismo lienzo de siempre
   setTimeout(function(){ try { iniciarCanvasFirma(); } catch(e){} }, 60);
+  setTimeout(function(){ ponerHoyEnCampo('conf-fecha'); }, 0);   // 📅 -2 sep-
 }
 
 // \ud83d\udd15 Prender o apagar lo de la firma. Si a Sensei le estorba, desaparece de todas
@@ -28156,7 +28211,7 @@ function guardarConfirmacionBalance(){
     cid: d.cid,
     balance: d.debe,
     pagado: d.pagado,
-    fecha: fechaHoy(),
+    fecha: fechaDelCampo('conf-fecha'),   // 📅 la que el escogio -2 sep-
     hora: horaAhora(),
     firma: firma || null,
     como: 'firma'
@@ -29083,7 +29138,7 @@ function confirmarPagoMultiple(vid, saldo){
   // Caso normal: el pago cabe en esta factura
   if(total <= saldo + 0.01){
     if(!venta.pagosFactura) venta.pagosFactura = [];
-    venta.pagosFactura.push({ pid: nuevoPagoId(), monto: total, fecha: fechaHoy(), metodos: filas });
+    venta.pagosFactura.push({ pid: nuevoPagoId(), monto: total, fecha: fechaDelCampo('cxc-fecha-' + vid), metodos: filas });
     SS('nv', ventas);
     // Descontarle el credito que haya usado. Este es el camino NORMAL, el mas comun
     // — y era justo el que se quedaba sin descontar. -31 jul-
@@ -29118,7 +29173,7 @@ function confirmarPagoMultiple(vid, saldo){
   msj += '\n¿Aplicar así?';
   if(!confirm(msj)) return;
 
-  var fechaPago = fechaHoy();
+  var fechaPago = fechaDelCampo('cxc-fecha-' + vid);   // 📅 la que el escogio -2 sep-
   var horaPago = horaAhora();
   // 🧾 TODAS las partes de este cobro llevan el MISMO numero de recibo, y todas apuntan
   // cuanto fue el cobro COMPLETO. Asi el estado de cuenta puede ensenar "pago de $80" y, al
@@ -37851,13 +37906,16 @@ function abrirDevolucion(vid){
 
   // ── EL MOTIVO, DE LISTA ── para poder contarlos despues y ver que te devuelven mas
   var motivoBox = document.createElement('div');
-  motivoBox.innerHTML = '<label class="lbl">\u00bfPor qu\u00e9 lo devuelve?</label>'
+  motivoBox.innerHTML = '<label class="lbl">\ud83d\udcc5 \u00bfQu\u00e9 d\u00eda te lo devolvi\u00f3?</label>'
+    + '<input class="inp" type="date" id="dev-fecha" style="margin-bottom:8px">'
+    + '<label class="lbl">\u00bfPor qu\u00e9 lo devuelve?</label>'
     + '<select class="inp" id="dev-motivo" style="margin-bottom:8px">'
     +   MOTIVOS_DEVOLUCION.map(function(m){ return '<option value="'+m.id+'">'+m.texto+'</option>'; }).join('')
     + '</select>'
     + '<label class="lbl">Detalle (opcional)</label>'
     + '<input class="inp" id="dev-nota" type="text" placeholder="Lo que quieras apuntar de este caso">';
   wrap.appendChild(motivoBox);
+  setTimeout(function(){ ponerHoyEnCampo('dev-fecha'); }, 0);   // 📅 -2 sep-
 
   // ── LA FOTO DE PRUEBA ── se reusa el mismo mecanismo de las fotos de gastos y compras
   var fotoBox = document.createElement('div');
@@ -38117,7 +38175,7 @@ function procesarDevolucion(vid){
   var motivo = _elMot ? _elMot.value : '';
   var _elFoto = document.getElementById('dev-foto-data');
   var fotoDev = _elFoto ? _elFoto.value : '';
-  var fechaHoyStr = fechaHoy();
+  var fechaHoyStr = fechaDelCampo('dev-fecha');   // 📅 la que el escogio -2 sep-
   var horaHoyStr = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
 
   // Registrar en la bitacora de devoluciones/cambios -para el historial del cliente-
@@ -38946,6 +39004,9 @@ function verHistorialCliente(cid, modo){
       </select>
       <button id="btn-nuevo-sup-compra" type="button" onclick="crearSuplidorRapido()" style="background:#546E7A;color:white;border:none;border-radius:8px;padding:0 14px;cursor:pointer;font-size:20px;flex-shrink:0">+</button>
     </div>
+    <label class="lbl" style="margin-top:10px">📅 Fecha de la factura</label>
+    <input class="inp" type="date" id="cc-fecha" style="margin-bottom:4px">
+    <div style="font-size:10.5px;color:var(--nbs-muted);margin-bottom:8px">Viene puesta la de hoy. Cámbiala si la factura es de otro día.</div>
     <!-- 📎 SE RECOGE LO QUE NO SE USA TODOS LOS DIAS -Sensei, 29 ago-. Medido: la foto y
          los dos lectores ocupaban 228 px a la vista siempre. Nada se quito: se recogio. -->
     <button type="button" id="cc-btn-factura" onclick="toggleBloqueCompra('cc-bloque-factura','cc-btn-factura')"
