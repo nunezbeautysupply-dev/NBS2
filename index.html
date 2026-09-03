@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260902a-OFICIAL-V2.0">
+<meta name="app-version" content="20260902b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18324,7 +18324,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260902a';
+var NOVEDADES_VERSION = '20260902b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -35757,8 +35757,165 @@ function procesarPdfFactura(input){
   input.value = '';
 }
 
+// 📅 SACAR LA FECHA DE LA FACTURA DEL PDF  (2 sep 2026)
+//
+// Sensei: cuando lee una factura PDF de un suplidor, la fecha se pone con la de HOY —
+// pero la factura ES de otro día, y esa fecha VIENE IMPRESA en el papel.
+// Sería tonto que la escriba a mano teniendo el PDF delante.
+//
+// 🔑 Esto la busca en el texto del PDF. Si la encuentra, la pone. Si no, se queda la
+// de hoy y él la cambia — nunca se queda sin nada.
+
+var MESES_FACTURA = {
+  jan:1, january:1, ene:1, enero:1,
+  feb:2, february:2, febrero:2,
+  mar:3, march:3, marzo:3,
+  apr:4, april:4, abr:4, abril:4,
+  may:5, mayo:5,
+  jun:6, june:6, junio:6,
+  jul:7, july:7, julio:7,
+  aug:8, august:8, ago:8, agosto:8,
+  sep:9, sept:9, september:9, septiembre:9,
+  oct:10, october:10, octubre:10,
+  nov:11, november:11, noviembre:11,
+  dec:12, december:12, dic:12, diciembre:12
+};
+
+// ¿Es una fecha con sentido? Ni del futuro lejano ni de hace diez años.
+function _fechaTieneSentido(a, m, d){
+  if(!a || !m || !d) return false;
+  if(m < 1 || m > 12 || d < 1 || d > 31) return false;
+  var hoy = new Date();
+  var f = new Date(a, m - 1, d);
+  if(isNaN(f.getTime())) return false;
+  // \ud83d\udd11 new Date(2026,1,31) NO falla: se pasa solo al 3 de marzo. Si el dia que sale
+  // no es el que se pidio, esa fecha no existe -el 31 de febrero, el 31 de abril-. -2 sep-
+  if(f.getDate() !== d || (f.getMonth() + 1) !== m || f.getFullYear() !== a) return false;
+  // Hasta 3 días en el futuro (por husos horarios) y hasta 2 años atrás
+  var maxFuturo = new Date(hoy.getTime() + 3 * 86400000);
+  var minPasado = new Date(hoy.getFullYear() - 2, hoy.getMonth(), hoy.getDate());
+  return f <= maxFuturo && f >= minPasado;
+}
+
+function _mmddaaaa(a, m, d){
+  return (m < 10 ? '0' : '') + m + '/' + (d < 10 ? '0' : '') + d + '/' + a;
+}
+
+/**
+ * Busca la fecha de la factura en el texto del PDF.
+ * Devuelve MM/DD/AAAA, o null si no encontró ninguna con sentido.
+ *
+ * Da preferencia a las fechas que están JUNTO a una palabra como "Invoice Date"
+ * o "Fecha", porque un PDF trae varias fechas (vencimiento, impresión, envío).
+ */
+function fechaDeLaFactura(texto){
+  if(!texto) return null;
+  var T = String(texto);
+
+  // Las que van pegadas a un rótulo valen más: se buscan primero.
+  var rotulos = ['invoice date', 'fecha de factura', 'fecha factura', 'order date',
+                 'fecha de la factura', 'date of invoice', 'bill date', 'fecha:'];
+
+  var candidatas = [];   // { fecha:'MM/DD/AAAA', puntos: n }
+
+  function anotar(a, m, d, puntos){
+    if(!_fechaTieneSentido(a, m, d)) return;
+    candidatas.push({ fecha: _mmddaaaa(a, m, d), puntos: puntos });
+  }
+
+  // ── Formato 1: 08/28/2026 · 8-28-26 · 08.28.2026 ──
+  var re1 = /(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{2,4})/g;
+  var m1;
+  while((m1 = re1.exec(T))){
+    var p1 = parseInt(m1[1], 10), p2 = parseInt(m1[2], 10), a1 = parseInt(m1[3], 10);
+    if(a1 < 100) a1 += 2000;
+    var antes = T.slice(Math.max(0, m1.index - 40), m1.index).toLowerCase();
+    var puntos = 0;
+    rotulos.forEach(function(r){ if(antes.indexOf(r) >= 0) puntos += 10; });
+    // En Estados Unidos es MM/DD; si el primero pasa de 12, entonces era DD/MM
+    if(p1 > 12) anotar(a1, p2, p1, puntos);
+    else anotar(a1, p1, p2, puntos);
+  }
+
+  // ── Formato 2: 2026-08-28 (el que usan los sistemas) ──
+  var re2 = /(\d{4})\s*-\s*(\d{1,2})\s*-\s*(\d{1,2})/g;
+  var m2;
+  while((m2 = re2.exec(T))){
+    var antes2 = T.slice(Math.max(0, m2.index - 40), m2.index).toLowerCase();
+    var pt2 = 0;
+    rotulos.forEach(function(r){ if(antes2.indexOf(r) >= 0) pt2 += 10; });
+    anotar(parseInt(m2[1], 10), parseInt(m2[2], 10), parseInt(m2[3], 10), pt2);
+  }
+
+  // ── Formato 3: August 28, 2026 · 28 AUG 2026 · 28-Aug-26 ──
+  var re3 = /([A-Za-zÁÉÍÓÚáéíóú]{3,12})\.?\s*[\s\-]\s*(\d{1,2})\s*[,\s\-]\s*(\d{2,4})/g;
+  var m3;
+  while((m3 = re3.exec(T))){
+    var mes3 = MESES_FACTURA[m3[1].toLowerCase()];
+    if(!mes3) continue;
+    var a3 = parseInt(m3[3], 10);
+    if(a3 < 100) a3 += 2000;
+    var antes3 = T.slice(Math.max(0, m3.index - 40), m3.index).toLowerCase();
+    var pt3 = 2;   // los meses con letras casi nunca son otra cosa
+    rotulos.forEach(function(r){ if(antes3.indexOf(r) >= 0) pt3 += 10; });
+    anotar(a3, mes3, parseInt(m3[2], 10), pt3);
+  }
+
+  // ── Formato 3b: 28-Aug-26 · 28 AUG 2026 — aquí el DÍA va primero ──
+  // Lo usan varios suplidores, y sin esto se escapaba. -2 sep-
+  var re3b = /(\d{1,2})\s*[\s\-]\s*([A-Za-z\u00c1\u00c9\u00cd\u00d3\u00da\u00e1\u00e9\u00ed\u00f3\u00fa]{3,12})\.?\s*[\s\-,]\s*(\d{2,4})/g;
+  var m3b;
+  while((m3b = re3b.exec(T))){
+    var mes3b = MESES_FACTURA[m3b[2].toLowerCase()];
+    if(!mes3b) continue;
+    var a3b = parseInt(m3b[3], 10);
+    if(a3b < 100) a3b += 2000;
+    var antes3b = T.slice(Math.max(0, m3b.index - 40), m3b.index).toLowerCase();
+    var pt3b = 2;
+    rotulos.forEach(function(r){ if(antes3b.indexOf(r) >= 0) pt3b += 10; });
+    anotar(a3b, mes3b, parseInt(m3b[1], 10), pt3b);
+  }
+
+  // ── Formato 4: 28 de agosto de 2026 ──
+  var re4 = /(\d{1,2})\s+de\s+([A-Za-zÁÉÍÓÚáéíóú]{3,12})\s+de\s+(\d{4})/gi;
+  var m4;
+  while((m4 = re4.exec(T))){
+    var mes4 = MESES_FACTURA[m4[2].toLowerCase()];
+    if(!mes4) continue;
+    anotar(parseInt(m4[3], 10), mes4, parseInt(m4[1], 10), 3);
+  }
+
+  if(!candidatas.length) return null;
+
+  // Gana la que tenga más puntos; si empatan, la primera que salió en el papel
+  candidatas.sort(function(x, y){ return y.puntos - x.puntos; });
+  return candidatas[0].fecha;
+}
+
+// Para el aviso: pasa MM/DD/AAAA al formato del calendario, AAAA-MM-DD
+function _aFormatoCalendario(f){
+  var p = String(f || '').split('/');
+  if(p.length !== 3) return '';
+  return p[2] + '-' + p[0] + '-' + p[1];
+}
+
 function analizarFacturaYMostrar(lineas){
   var textoCompleto = lineas.map(function(l){ return l.texto; }).join('\n');
+
+  // \ud83d\udcc5 LA FECHA SALE DE LA PROPIA FACTURA -Sensei, 2 sep-. Su caso: lee el PDF de un
+  // suplidor y la fecha se ponia con la de HOY, cuando la factura es de dias antes y su
+  // fecha VIENE IMPRESA en el papel. Si se encuentra, se pone sola; si no, se queda la de
+  // hoy y el la cambia.
+  window._fechaDelPdf = null;
+  try {
+    var _f = fechaDeLaFactura(textoCompleto);
+    if(_f){
+      window._fechaDelPdf = _f;
+      var _campo = document.getElementById('cc-fecha');
+      if(_campo) _campo.value = _aFormatoCalendario(_f);
+    }
+  } catch(e){}
+
   var sup = detectarSuplidorFactura(textoCompleto);
   var supId = sup ? sup.id : 'desconocido';
   var ignorar = (sup && sup.ignorarLineas) || [];
@@ -35799,6 +35956,19 @@ function analizarFacturaYMostrar(lineas){
   pintarRevisionFactura();
 }
 
+// 📅 Si Sensei corrige la fecha en la pantalla de revision, se lleva al campo
+// de la compra, que es de donde sale al guardar. -2 sep-
+function cambiarFechaDeLaFactura(valor){
+  try {
+    var campo = document.getElementById('cc-fecha');
+    if(campo && valor) campo.value = valor;
+    if(valor){
+      var p = String(valor).split('-');
+      if(p.length === 3) window._fechaDelPdf = p[1] + '/' + p[2] + '/' + p[0];
+    }
+  } catch(e){}
+}
+
 function pintarRevisionFactura(){
   loadProds();
   var items = window._facturaItems || [];
@@ -35817,6 +35987,20 @@ function pintarRevisionFactura(){
     + '<button onclick="cerrarRevisionFactura()" style="flex-shrink:0;width:34px;height:34px;border:none;border-radius:9px;background:#f0f0f0;color:#666;font-size:20px;font-weight:800;cursor:pointer">✕</button>'
     + '</div>';
 
+  // 📅 LA FECHA QUE SE SACÓ DE LA FACTURA -2 sep-. Se enseña para que él la vea y,
+  // si el suplidor la puso mal, la corrija ahí mismo.
+  if(window._fechaDelPdf){
+    html += '<div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:9px;padding:9px;margin-bottom:10px">'
+      + '<div style="font-size:11px;color:#1565C0;font-weight:800;letter-spacing:.3px;margin-bottom:3px">📅 FECHA DE LA FACTURA</div>'
+      + '<input type="date" id="rev-fecha" value="' + escaparHtml(_aFormatoCalendario(window._fechaDelPdf)) + '" '
+      +   'onchange="cambiarFechaDeLaFactura(this.value)" '
+      +   'style="width:100%;padding:9px;border:1px solid #90CAF9;border-radius:8px;font-size:14px;font-weight:700;background:#fff">'
+      + '<div style="font-size:10.5px;color:#1565C0;margin-top:3px">La le\u00ed del PDF. Si est\u00e1 mal, c\u00e1mbiala aqu\u00ed.</div>'
+      + '</div>';
+  } else {
+    html += '<div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:9px;padding:9px;margin-bottom:10px;font-size:12px;color:#7A5C00">'
+      + '\ud83d\udcc5 No encontr\u00e9 la fecha en este PDF. Qued\u00f3 puesta la de <b>hoy</b> \u2014 c\u00e1mbiala abajo si la factura es de otro d\u00eda.</div>';
+  }
   // La comprobacion en conjunto
   if(cuadraGlobal === true){
     html += '<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:9px;padding:9px;margin-bottom:10px;font-size:12.5px;color:#2E7D32;font-weight:800">'
