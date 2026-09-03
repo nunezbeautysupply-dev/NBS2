@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260903a-OFICIAL-V2.0">
+<meta name="app-version" content="20260903b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18325,7 +18325,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260903a';
+var NOVEDADES_VERSION = '20260903b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -28351,6 +28351,38 @@ function cerrarSinConfirmar(){
   if(ov) ov.style.display = 'none';
 }
 
+// 📅 El último pago del cliente: cuánto y de qué día.  (3 sep 2026)
+// Sensei: "dice 'su pago de hoy' y debe decir 'este es su último pago'... porque si le
+// envío este mensaje hoy y fue la semana pasada que lo visité, solo le estoy enviando
+// el mensaje para que él pudiera tener su balance al día".
+// Devuelve null si nunca ha pagado.
+function ultimoPagoDelCliente(cid){
+  ventas = LS('nv', []);
+  var mejor = null;
+  ventas.forEach(function(v){
+    if(String(v.cid) !== String(cid) || v.cancelada) return;
+    (v.pagosFactura || []).forEach(function(p){
+      if(!p || p.esDevolucion) return;
+      var m = (typeof dinero === 'function') ? dinero(p.monto) : (parseFloat(p.monto) || 0);
+      if(!isFinite(m) || m <= 0.005) return;
+      var f = p.fecha || '';
+      // Si el pago se repartió entre facturas, el cobro COMPLETO es lo que él pagó
+      var completo = (typeof p.montoCobro === 'number' && p.montoCobro > 0) ? p.montoCobro : m;
+      var d = parsearFechaVenta(f);
+      var cuando = d ? d.getTime() : 0;
+      if(!mejor || cuando > mejor.cuando){
+        mejor = { monto: completo, fecha: f, cuando: cuando, recibo: p.recibo || null };
+      }
+    });
+  });
+  return mejor;
+}
+
+// ¿Ese pago es de HOY? Si lo es, el mensaje habla en presente.
+function _pagoEsDeHoy(fecha){
+  return String(fecha || '') === fechaHoy();
+}
+
 function textoCortoParaCliente(cid, monto){
   clientes = LS('ncl', []);
   ventas = LS('nv', []);
@@ -28367,17 +28399,39 @@ function textoCortoParaCliente(cid, monto){
   var t = [];
   t.push('Hola Sr. ' + nom + ',');
   t.push('');
-  t.push('Pago de hoy: $' + fmtNum(monto));
-  t.push('');
+
+  // 📅 QUÉ PAGO SE NOMBRA Y CÓMO — Sensei, 3 sep. "Pago de hoy" era falso cuando el
+  // pago fue días antes: él manda el mensaje después, solo para que el barbero tenga
+  // su balance al día. Ahora la app elige la frase según CUÁNDO fue el pago.
+  var _pg = null;
+  try { _pg = ultimoPagoDelCliente(cid); } catch(e){}
+  // Si viene un monto de un cobro que se acaba de hacer, ese manda.
+  var _montoDado = (typeof monto === 'number' && monto > 0.005) ? monto : null;
+
+  if(_montoDado){
+    // Le acaban de cobrar: se habla en presente, con el monto de ese cobro.
+    t.push('Recib\u00ed su pago de $' + fmtNum(_montoDado));
+    t.push('');
+  } else if(_pg && _pagoEsDeHoy(_pg.fecha)){
+    // El \u00faltimo pago es de hoy: tambi\u00e9n en presente, sin repetir la fecha.
+    t.push('Recib\u00ed su pago de $' + fmtNum(_pg.monto));
+    t.push('');
+  } else if(_pg){
+    // Fue otro d\u00eda: se dice CU\u00c1L y DE CU\u00c1NDO, para que no haya confusi\u00f3n.
+    t.push('Su \u00faltimo pago: $' + fmtNum(_pg.monto));
+    if(_pg.fecha) t.push('del ' + _pg.fecha);
+    t.push('');
+  }
+  // Si nunca ha pagado, no se habla de pagos: se va derecho al balance.
+
   if(debe > 0.005){
-    t.push('Gracias por su pago. Su nuevo balance pendiente es de $' + fmtNum(debe) + '.');
+    t.push('Su balance pendiente es de $' + fmtNum(debe) + '.');
     t.push('');
-    t.push('Favor confirmar que está de acuerdo. Gracias.');
+    t.push('Favor confirmar que est\u00e1 de acuerdo. Gracias.');
   } else {
-    // Sin deuda no hay nada que confirmar mas que la buena noticia.
-    t.push('Gracias por su pago. Su cuenta queda en $0.00 — al día.');
+    t.push('Su cuenta est\u00e1 al d\u00eda \u2014 no tiene balance pendiente.');
     t.push('');
-    t.push('Favor confirmar. Gracias.');
+    t.push('Gracias por su confianza.');
   }
   return t.join('\n');
 }
@@ -28604,22 +28658,9 @@ function mandarSuBalance(cid, completo){
     if(completo){
       texto = textoEstadoDeCuenta(cid);
     } else {
-      // El corto de siempre, pero sin hablar de un pago de hoy —aquí no hubo pago.
-      var debe = balanceDelCliente(cid);
-      var nom = String(c.nombre || nombreCl(c) || '').trim();
-      var t = [];
-      t.push('Hola Sr. ' + nom + ',');
-      t.push('');
-      if(debe > 0.005){
-        t.push('Su balance pendiente es de $' + fmtNum(debe) + '.');
-        t.push('');
-        t.push('Favor confirmar que est\u00e1 de acuerdo. Gracias.');
-      } else {
-        t.push('Su cuenta est\u00e1 al d\u00eda \u2014 no tiene balance pendiente.');
-        t.push('');
-        t.push('Gracias por su confianza.');
-      }
-      texto = t.join('\n');
+      // \ud83d\udd11 El mismo mensaje de siempre. Se le pasa 0 porque aqu\u00ed NO se le acaba de
+      // cobrar: as\u00ed nombra su \u00daLTIMO pago con su fecha, en vez de decir "pago de hoy".
+      texto = textoCortoParaCliente(cid, 0);
     }
   } catch(e){ avisoGrande('No pude armar el mensaje.'); return; }
 
