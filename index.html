@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260902b-OFICIAL-V2.0">
+<meta name="app-version" content="20260903a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4611,6 +4611,7 @@ var RECUADROS_ENCIMA = [
   { id: 'unif-marcas-ov',           cerrar: 'cerrarUnificarMarcas' },
   { id: 'confirmar-balance-overlay', cerrar: 'cerrarConfirmacionBalance' },
   { id: 'sinconf-overlay',          cerrar: 'cerrarSinConfirmar' },
+  { id: 'como-mandar-overlay',      cerrar: 'cerrarComoMandar' },
   { id: 'estado-cuenta-overlay',    cerrar: 'cerrarEstadoDeCuenta' },
   { id: 'avisar-cliente-overlay',   cerrar: 'cerrarAvisoCliente' },
   { id: 'editor-pago-compra',       cerrar: 'cerrarEditorPagoCompra' },
@@ -18324,7 +18325,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260902b';
+var NOVEDADES_VERSION = '20260903a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -23442,13 +23443,18 @@ function _linkWhatsApp(telLimpio, texto){
   // Preferir el WhatsApp que el escogio; si no esta, cae al normal solo.
   var cual = LS('nbs_whatsapp_app', WA_NEGOCIO);
   if(!cual) return normal;
+
+  // \ud83d\udd34 EL TEXTO, UNA SOLA VEZ -3 sep-. Antes viajaba TRES veces en el mismo enlace
+  // -en &text=, en ;S.text= y otra vez dentro del respaldo-: un mensaje de 149 letras
+  // hacia un enlace de 878 caracteres. Android tiene un limite y el enlace quedaba en
+  // el filo, asi que unas veces abria y otras daba error. Eso era el fallo intermitente
+  // que Sensei reportaba: "a veces me da error y tengo que darle para atras".
+  // El respaldo va SIN texto: si el WhatsApp escogido no esta, abre el chat, y el
+  // mensaje ya esta copiado en el portapapeles.
   return 'intent://send?phone=' + num
     + (t ? '&text=' + encodeURIComponent(t) : '')
     + '#Intent;scheme=whatsapp;package=' + cual
-    // El texto tambien como "extra" del intent: es la forma que Android documenta, y en
-    // algunos telefonos es la UNICA que entiende. Se mandan las dos. -30 ago-
-    + (t ? ';S.text=' + encodeURIComponent(t) : '')
-    + ';S.browser_fallback_url=' + encodeURIComponent(normal) + ';end';
+    + ';S.browser_fallback_url=' + encodeURIComponent('https://wa.me/' + num) + ';end';
 }
 
 function _arg(v){
@@ -24211,6 +24217,25 @@ function pintarPanelCliente(cid){
           : '\u2705 Firm\u00f3 su balance \u00b7 firmar de nuevo')
       + '</button>';
   }
+
+  // \ud83d\udce4 MANDARLE SU BALANCE, sin tener que venderle nada -3 sep-. Va desplegable:
+  // cerrado es un renglon, y al abrirlo salen las cuatro formas de mandarlo.
+  var _debeAhora2 = 0;
+  try { _debeAhora2 = balanceDelCliente(cid); } catch(e){}
+  var contMandar = '<div style="font-size:11.5px;color:var(--nbs-muted);margin-bottom:8px">'
+    + 'Se le manda su balance sin necesidad de venderle ni cobrarle nada.</div>'
+    + '<button onclick="event.stopPropagation();mandarSuBalance(' + _arg(cid) + ', 0)" '
+    +   'style="width:100%;padding:12px;margin-bottom:6px;background:#1a237e;color:#fff;border:none;'
+    +   'border-radius:10px;font-size:13px;font-weight:800;cursor:pointer">'
+    +   '\ud83d\udcac Su balance en corto</button>'
+    + '<button onclick="event.stopPropagation();mandarSuBalance(' + _arg(cid) + ', 1)" '
+    +   'style="width:100%;padding:11px;background:#fff;color:#1a237e;border:1.5px solid #b9bfe0;'
+    +   'border-radius:10px;font-size:12.5px;font-weight:800;cursor:pointer">'
+    +   '\ud83e\uddfe El estado de cuenta completo</button>';
+
+  h += _filaPanel('mandar', '\ud83d\udce4', 'Mandarle su balance',
+    (_debeAhora2 > 0.005 ? '$' + fmtNum(_debeAhora2) : 'al d\u00eda'),
+    (_debeAhora2 > 0.005 ? '#C62828' : '#2E7D32'), contMandar, null);
 
   h += _filaPanel('datos', '\ud83d\udcc7', 'Sus datos',
     _tel ? escaparHtml(_tel.length > 15 ? _tel.slice(0, 15) : _tel) : (c.negocio ? 'ver ficha' : ''),
@@ -27053,10 +27078,18 @@ function renderCxC(q){
           +'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--nbs-muted);margin-bottom:12px">'
           +'<span>Pagado: '+pct+'%</span><span>Pendiente: '+(100-pct)+'%</span></div>'
         : '')
-      +'<button style="width:100%;padding:10px;background:'+(c.saldoBruto>0.01?'var(--nbs-gold)':'#E65100')+';color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px">'+(c.saldoBruto>0.01?'💰Registrar pago':'👁️ Ver detalle')+'</button>';
+      +'<div style="display:flex;gap:6px">'
+    +'<button style="flex:1;padding:10px;background:'+(c.saldoBruto>0.01?'var(--nbs-gold)':'#E65100')+';color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px">'+(c.saldoBruto>0.01?'💰Registrar pago':'👁️ Ver detalle')+'</button>'
+    +'<button data-mandar="1" style="flex-shrink:0;width:46px;padding:10px 0;background:#fff;color:#1a237e;border:1.5px solid #b9bfe0;border-radius:9px;font-size:15px;cursor:pointer" title="Mandarle su balance">\ud83d\udce4</button>'
+    +'</div>';
     card.style.cursor='pointer';
     card.onclick=(function(cid){return function(){abrirAbono(cid);};})(c.cid);
     card.querySelector('button').onclick=(function(cid){return function(e){e.stopPropagation();abrirAbono(cid);};})(c.cid);
+    // \ud83d\udce4 El botoncito de mandarle el balance sin entrar en su ficha. -3 sep-
+    var _btnMandar = card.querySelector('[data-mandar]');
+    if(_btnMandar) _btnMandar.onclick = (function(cid){
+      return function(e){ e.stopPropagation(); mandarSuBalance(cid, 0); };
+    })(c.cid);
     el.appendChild(card);
   });
 }
@@ -28451,7 +28484,236 @@ function compartirEstadoDeCuenta(){
 }
 
 // Manda el texto por WhatsApp si hay teléfono; si no, lo copia.
+// ═══════════════════════════════════════════════════════════════════
+//  📤 CUATRO FORMAS DE MANDARLE EL MENSAJE AL CLIENTE  (3 sep 2026)
+//
+//  Sensei: "me gustaría poder copiarlo también... hay clientes que no tienen WhatsApp
+//  y tengo que enviárselo por mensaje regular, pero la opción de WhatsApp directa debe
+//  permanecer también".
+//
+//  🔑 WhatsApp y Texto son de UN TOQUE, grandes y lado a lado. Copiar y Compartir van
+//  debajo, más chicos. Y el mensaje SE COPIA SIEMPRE antes de abrir nada: así, si algo
+//  falla, él lo pega y no pierde el trabajo.
+// ═══════════════════════════════════════════════════════════════════
+
+// Copia al portapapeles y dice si pudo. Se usa antes de cada envío.
+function _copiarTexto(texto){
+  try {
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(String(texto || ''));
+      return true;
+    }
+  } catch(e){}
+  // Camino viejo, para navegadores que no tienen el moderno
+  try {
+    var ta = document.createElement('textarea');
+    ta.value = String(texto || '');
+    ta.style.cssText = 'position:fixed;top:-999px;left:-999px';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = document.execCommand('copy');
+    ta.remove();
+    return !!ok;
+  } catch(e){ return false; }
+}
+
+// El teléfono del cliente, limpio y con el 1 delante si hace falta.
+function _telDelCliente(cid){
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  var tel = c ? String(c.tel || '').replace(/[^0-9]/g, '') : '';
+  if(tel.length === 10) tel = '1' + tel;
+  return tel;
+}
+
+// ── LAS CUATRO FORMAS ──
+
+// 💬 WhatsApp — un toque. Igual que siempre, al Business si lo tiene puesto.
+function enviarPorWhatsAppACliente(cid, texto){
+  var tel = _telDelCliente(cid);
+  _copiarTexto(texto);                    // 🛡️ por si el enlace falla, ya lo tiene
+  cerrarComoMandar();
+  if(!tel){
+    avisoGrande('\ud83d\udccb Copi\u00e9 el mensaje.\n\nEste cliente no tiene tel\u00e9fono guardado, '
+      + 'as\u00ed que p\u00e9galo donde quieras.');
+    return;
+  }
+  if(LS('nbs_wa_pegar', '0') === '1'){
+    avisoGrande('\ud83d\udccb Copi\u00e9 el mensaje.\n\nSe abre el chat: mant\u00e9n el dedo en la casilla y dale PEGAR.');
+    try { window.location.href = _linkWhatsApp(tel); } catch(e){}
+    return;
+  }
+  try { window.location.href = _linkWhatsApp(tel, texto); } catch(e){}
+}
+
+// 💌 Mensaje de texto (SMS) — un toque también, como pidió Sensei.
+function enviarPorSMSACliente(cid, texto){
+  var tel = _telDelCliente(cid);
+  _copiarTexto(texto);
+  cerrarComoMandar();
+  if(!tel){
+    avisoGrande('\ud83d\udccb Copi\u00e9 el mensaje.\n\nEste cliente no tiene tel\u00e9fono guardado.');
+    return;
+  }
+  // El iPhone usa & y Android usa ? para el cuerpo del mensaje. Se manda el que toca.
+  var sep = esAndroid() ? '?' : '&';
+  try {
+    window.location.href = 'sms:+' + tel + sep + 'body=' + encodeURIComponent(String(texto || ''));
+  } catch(e){
+    avisoGrande('\ud83d\udccb No se pudo abrir Mensajes, pero el texto qued\u00f3 copiado.');
+  }
+}
+
+// 📋 Copiar
+function copiarMensajeDelCliente(texto){
+  var ok = _copiarTexto(texto);
+  cerrarComoMandar();
+  avisoGrande(ok
+    ? '\ud83d\udccb Copiado.\n\nP\u00e9galo donde quieras: Messenger, correo, un mensaje de texto...'
+    : 'No se pudo copiar en este navegador.');
+}
+
+// 📤 Compartir — el menú del propio teléfono
+function compartirMensajeDelCliente(cid, texto){
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  var nom = c ? nombreCl(c) : 'cliente';
+  _copiarTexto(texto);
+  cerrarComoMandar();
+  if(navigator.share){
+    navigator.share({ title: 'Balance de ' + nom, text: String(texto || '') })
+      .catch(function(){});
+    return;
+  }
+  avisoGrande('\ud83d\udccb Este tel\u00e9fono no tiene el men\u00fa de compartir, pero copi\u00e9 el mensaje.');
+}
+
+// ── LA PANTALLA QUE OFRECE LAS CUATRO ──
+// Sale al tocar cualquier botón de mandar. Enseña el mensaje para que lo lea antes.
+
+// 📤 Mandarle su balance sin venderle nada.  (3 sep 2026)
+// Sensei: "¿cómo puedo enviar el mensaje de balance a un cliente aunque no le esté
+// vendiendo en ese momento?".  completo=1 → el estado de cuenta; 0 → el corto.
+function mandarSuBalance(cid, completo){
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c){ avisoGrande('No encontr\u00e9 ese cliente.'); return; }
+
+  var texto = '';
+  try {
+    if(completo){
+      texto = textoEstadoDeCuenta(cid);
+    } else {
+      // El corto de siempre, pero sin hablar de un pago de hoy —aquí no hubo pago.
+      var debe = balanceDelCliente(cid);
+      var nom = String(c.nombre || nombreCl(c) || '').trim();
+      var t = [];
+      t.push('Hola Sr. ' + nom + ',');
+      t.push('');
+      if(debe > 0.005){
+        t.push('Su balance pendiente es de $' + fmtNum(debe) + '.');
+        t.push('');
+        t.push('Favor confirmar que est\u00e1 de acuerdo. Gracias.');
+      } else {
+        t.push('Su cuenta est\u00e1 al d\u00eda \u2014 no tiene balance pendiente.');
+        t.push('');
+        t.push('Gracias por su confianza.');
+      }
+      texto = t.join('\n');
+    }
+  } catch(e){ avisoGrande('No pude armar el mensaje.'); return; }
+
+  comoMandarloAlCliente(cid, texto, completo ? 'Estado de cuenta' : 'Balance');
+}
+
+function comoMandarloAlCliente(cid, texto, queEs){
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  var tel = _telDelCliente(cid);
+  window._textoParaMandar = String(texto || '');
+  window._cidParaMandar = cid;
+
+  var ov = document.getElementById('como-mandar-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'como-mandar-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:99999;'
+    + 'display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick = function(e){ if(e.target === ov) cerrarComoMandar(); };
+
+  var telBonito = tel ? fmtTelTexto(tel) : '';
+
+  var h = '<div style="background:#fff;width:100%;max-width:520px;border-radius:16px 16px 0 0;'
+    + 'padding:14px;max-height:88vh;overflow:auto">'
+
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">'
+    +   '<div style="font-size:15px;font-weight:900;color:#1a237e">\ud83d\udce4 \u00bfC\u00f3mo se lo mandas?</div>'
+    +   '<button onclick="cerrarComoMandar()" style="background:#F0F0F2;border:none;border-radius:8px;'
+    +     'width:32px;height:32px;font-size:15px;cursor:pointer">\u2715</button>'
+    + '</div>'
+    + '<div style="font-size:12.5px;font-weight:800;color:var(--nbs-ink)">' + escaparHtml(c ? nombreCl(c) : '') + '</div>'
+    + (telBonito ? '<div style="font-size:11.5px;color:var(--nbs-muted);margin-bottom:9px">' + escaparHtml(telBonito) + '</div>'
+                 : '<div style="font-size:11.5px;color:#C62828;margin-bottom:9px">\u26a0\ufe0f Sin tel\u00e9fono guardado</div>')
+
+    // El mensaje, para que lo lea antes de mandarlo
+    + '<div style="background:#F4F6FB;border:1px solid #d8dcee;border-radius:10px;padding:10px;'
+    +   'margin-bottom:12px;font-size:12px;color:#333;white-space:pre-wrap;max-height:150px;overflow:auto">'
+    +   escaparHtml(window._textoParaMandar) + '</div>';
+
+  // 💬 y 💌 grandes, lado a lado, un toque cada uno
+  h += '<div style="display:flex;gap:8px;margin-bottom:8px">'
+    +   '<button onclick="enviarPorWhatsAppACliente(' + _arg(cid) + ', window._textoParaMandar)" '
+    +     'style="flex:1;padding:15px 8px;background:#128C7E;color:#fff;border:none;border-radius:11px;'
+    +     'font-size:13.5px;font-weight:800;cursor:pointer">\ud83d\udcac WhatsApp</button>'
+    +   '<button onclick="enviarPorSMSACliente(' + _arg(cid) + ', window._textoParaMandar)" '
+    +     'style="flex:1;padding:15px 8px;background:#1565C0;color:#fff;border:none;border-radius:11px;'
+    +     'font-size:13.5px;font-weight:800;cursor:pointer">\ud83d\udc8c Texto</button>'
+    + '</div>';
+
+  // 📋 y 📤 debajo, más chicos
+  h += '<div style="display:flex;gap:8px">'
+    +   '<button onclick="copiarMensajeDelCliente(window._textoParaMandar)" '
+    +     'style="flex:1;padding:11px;background:#fff;color:#444;border:1.5px solid #ccc;border-radius:10px;'
+    +     'font-size:12.5px;font-weight:700;cursor:pointer">\ud83d\udccb Copiar</button>'
+    +   '<button onclick="compartirMensajeDelCliente(' + _arg(cid) + ', window._textoParaMandar)" '
+    +     'style="flex:1;padding:11px;background:#fff;color:#444;border:1.5px solid #ccc;border-radius:10px;'
+    +     'font-size:12.5px;font-weight:700;cursor:pointer">\ud83d\udce4 Compartir</button>'
+    + '</div>';
+
+  h += '<div style="font-size:10.5px;color:var(--nbs-muted);text-align:center;margin-top:9px">'
+    +   'El mensaje se copia solo antes de mandarlo, por si algo falla.</div>'
+    + '<button onclick="cerrarComoMandar()" style="width:100%;padding:12px;margin-top:10px;'
+    +   'background:#F0F0F2;color:#333;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Cancelar</button>'
+    + '</div>';
+
+  ov.innerHTML = h;
+  ov.style.display = 'flex';
+}
+
+function cerrarComoMandar(){
+  var ov = document.getElementById('como-mandar-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+// El teléfono con formato, para que se lea bien
+function fmtTelTexto(tel){
+  var t = String(tel || '').replace(/[^0-9]/g, '');
+  if(t.length === 11 && t[0] === '1') t = t.slice(1);
+  if(t.length !== 10) return String(tel || '');
+  return '+1 (' + t.slice(0, 3) + ') ' + t.slice(3, 6) + '-' + t.slice(6);
+}
+
 function mandarloAlCliente(cid, texto, queEs){
+  // \ud83d\udce4 Desde el 3 de sep esto OFRECE LAS CUATRO FORMAS -WhatsApp, Texto, Copiar y
+  // Compartir- en vez de irse derecho a WhatsApp. Sensei: "hay clientes que no tienen
+  // WhatsApp y tengo que enviarselo por mensaje regular".
+  // Asi todos los botones que ya existian pasan por el mismo sitio.
+  try { comoMandarloAlCliente(cid, texto, queEs); return; } catch(e){}
+
+  // Si eso fallara, se sigue por el camino viejo — nunca se queda sin mandar.
   clientes = LS('ncl', []);
   var c = clientes.find(function(x){ return String(x.id) === String(cid); });
   var tel = c ? String(c.tel || '').replace(/[^0-9]/g, '') : '';
