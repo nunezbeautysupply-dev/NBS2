@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260903e-OFICIAL-V2.0">
+<meta name="app-version" content="20260904a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4611,6 +4611,7 @@ var RECUADROS_ENCIMA = [
   { id: 'unif-marcas-ov',           cerrar: 'cerrarUnificarMarcas' },
   { id: 'confirmar-balance-overlay', cerrar: 'cerrarConfirmacionBalance' },
   { id: 'sinconf-overlay',          cerrar: 'cerrarSinConfirmar' },
+  { id: 'credito-aplicado-overlay', cerrar: 'cerrarCreditoAplicado' },
   { id: 'ajuste-vip-overlay',       cerrar: 'cerrarAjustePuntosVIP' },
   { id: 'como-mandar-overlay',      cerrar: 'cerrarComoMandar' },
   { id: 'estado-cuenta-overlay',    cerrar: 'cerrarEstadoDeCuenta' },
@@ -18732,7 +18733,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260903e';
+var NOVEDADES_VERSION = '20260904a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -27611,6 +27612,9 @@ function usarCreditoAFavor(cid){
   var credito = parseFloat(cls[idx].creditoAFavor) || 0;
   if(credito <= 0.005){ avisoGrande('Este cliente ya no tiene cr\u00e9dito a favor.'); return; }
 
+  var deudaAntes = 0;
+  try { deudaAntes = balanceDelCliente(cid); } catch(e){}
+
   var V = LS('nv', []);
   var suyas = V.filter(function(v){
     return String(v.cid) === String(cid) && v.tipo === 'credito' && !v.cancelada;
@@ -27630,11 +27634,6 @@ function usarCreditoAFavor(cid){
   var queda = credito, usado = 0, tocadas = [];
   suyas.forEach(function(v){
     if(queda <= 0.005) return;
-    var total = parseFloat(v.total) || 0;
-    var pagado = 0;
-    (v.pagosFactura || []).forEach(function(p){
-      if(!p.esDevolucion) pagado += parseFloat(p.monto) || 0;
-    });
     // 🔴 ESTO MUEVE DINERO: sin la regla unica, el credito a favor se le podia
     // aplicar a una factura de CONTADO que ya estaba pagada. -19 ago-
     var debe = cobradoYDebeDe(v).debe;
@@ -27642,16 +27641,13 @@ function usarCreditoAFavor(cid){
     var pone = Math.min(queda, debe);
     pone = Math.round(pone * 100) / 100;
     if(pone <= 0.005) return;
-    if(!v.pagosFactura) v.pagosFactura = [];
-    v.pagosFactura.push({
-      monto: pone,
-      fecha: fechaDelCampo('cred-fecha'),   // 📅 la que el escogio -2 sep-
-      metodo: 'credito_cliente',
-      nota: 'Cr\u00e9dito a favor aplicado'
-    });
     queda = Math.round((queda - pone) * 100) / 100;
     usado = Math.round((usado + pone) * 100) / 100;
-    tocadas.push({ id: v.id, monto: pone });
+    // 🔑 Se apunta TODO lo que hace falta para el aviso: cuánto debía esa factura
+    // antes, cuánto se le aplicó y cuánto le queda. -4 sep-
+    tocadas.push({ id: v.id, monto: pone, nf: v.numFactura || '', fecha: v.fecha || '',
+                   total: parseFloat(v.total) || 0, debiaAntes: debe,
+                   debeDespues: Math.round((debe - pone) * 100) / 100 });
   });
 
   if(usado <= 0.005){ avisoGrande('Este cliente no tiene facturas pendientes donde aplicar el cr\u00e9dito.'); return; }
@@ -27659,6 +27655,10 @@ function usarCreditoAFavor(cid){
   var texto = 'Se van a usar $' + fmtNum(usado) + ' del cr\u00e9dito a favor'
             + (tocadas.length > 1 ? ' en ' + tocadas.length + ' facturas' : '')
             + '.\n\n'
+            + tocadas.map(function(t){
+                return '\u2022 Factura #' + t.nf + ' \u2014 $' + fmtNum(t.monto);
+              }).join('\n')
+            + '\n\n'
             + (queda > 0.005 ? 'Le quedar\u00e1n $' + fmtNum(queda) + ' a favor.' : 'No le quedar\u00e1 cr\u00e9dito.')
             + '\n\n\u00bfConfirmas?';
   if(!confirm(texto)) return;
@@ -27670,24 +27670,123 @@ function usarCreditoAFavor(cid){
       var vv = Vg.find(function(x){ return String(x.id) === String(t.id); });
       if(!vv) return;
       if(!vv.pagosFactura) vv.pagosFactura = [];
-      vv.pagosFactura.push({ monto: t.monto, fecha: fechaDelCampo('cred-fecha'),
+      // 🔑 CON SU `pid`, como todos los demás pagos de la app. Sin él, el editor de
+      // pagos no puede identificarlo ni corregirlo. -4 sep-
+      vv.pagosFactura.push({ pid: nuevoPagoId(), monto: t.monto,
+                             fecha: fechaDelCampo('cred-fecha'),
                              metodo: 'credito_cliente', nota: 'Cr\u00e9dito a favor aplicado' });
     });
-    SS('nv', Vg);
+    if(!SS('nv', Vg)) return;      // SS ya avisa si no cupo
     ventas = LS('nv', []);
 
     var Cg = LS('ncl', []);
     var i2 = Cg.findIndex(function(x){ return String(x.id) === String(cid); });
-    if(i2 >= 0){ Cg[i2].creditoAFavor = queda; SS('ncl', Cg); }
+    if(i2 >= 0){
+      Cg[i2].creditoAFavor = queda;
+      Cg[i2].mod = Date.now();
+      if(!SS('ncl', Cg)) return;
+    }
     clientes = LS('ncl', []);
 
-    avisoGrande('\u2705 Se aplicaron $' + fmtNum(usado) + ' del cr\u00e9dito a favor.'
-      + (queda > 0.005 ? '\n\nLe quedan $' + fmtNum(queda) + ' a favor.' : ''));
+    var deudaDespues = 0;
+    try { deudaDespues = balanceDelCliente(cid); } catch(e){}
 
-    // repintar
-    try { abrirAbono(cid); } catch(e){}
+    // 📋 EL RESULTADO, CON TODO EL DETALLE -Sensei, 4 sep-: "cuando yo le de a usar
+    // crédito me debe llevar a la factura que se le aplica el crédito y mostrarme el
+    // balance completo del cliente, o cómo es que me voy a dar cuenta que quedó
+    // aplicado el pago".
+    mostrarCreditoAplicado(cid, usado, queda, tocadas, deudaAntes, deudaDespues);
+
+    // 🔑 Y NO SE LE SACA DE LA PANTALLA. Antes se llamaba a abrirAbono y DESPUÉS a
+    // renderCxC, que repintaba la lista encima y lo echaba fuera: parecía que no
+    // había pasado nada. Ahora se refresca la lista PRIMERO y se vuelve a su ficha.
     try { renderCxC(''); } catch(e){}
+    try { abrirAbono(cid); } catch(e){}
+    try { pintarPanelCliente(cid); } catch(e){}
   });
+}
+
+// 📋 El recuadro que enseña DÓNDE fue el crédito y cómo queda su balance.  (4 sep 2026)
+function mostrarCreditoAplicado(cid, usado, queda, tocadas, deudaAntes, deudaDespues){
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+
+  var ov = document.getElementById('credito-aplicado-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'credito-aplicado-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:99999;'
+    + 'display:flex;align-items:center;justify-content:center;padding:14px';
+  ov.onclick = function(e){ if(e.target === ov) cerrarCreditoAplicado(); };
+
+  var h = '<div style="background:#fff;border-radius:15px;padding:16px;max-width:440px;'
+    + 'width:100%;max-height:90vh;overflow:auto">'
+
+    + '<div style="font-size:16px;font-weight:900;color:#2E7D32;text-align:center;margin-bottom:3px">'
+    +   '\u2705 Cr\u00e9dito aplicado</div>'
+    + '<div style="font-size:13px;font-weight:800;color:var(--nbs-ink);text-align:center;margin-bottom:12px">'
+    +   escaparHtml(c ? nombreCl(c) : '') + '</div>'
+
+    + '<div style="background:#E8F5E9;border-radius:10px;padding:11px;text-align:center;margin-bottom:12px">'
+    +   '<div style="font-size:11px;color:#2E7D32;font-weight:800;letter-spacing:.4px">SE USARON</div>'
+    +   '<div style="font-size:26px;font-weight:900;color:#2E7D32;letter-spacing:-.6px">$'
+    +     fmtNum(usado) + '</div>'
+    + '</div>';
+
+  // Cada factura donde entró, con su antes y su después
+  h += '<div style="font-size:11px;font-weight:800;color:#555;letter-spacing:.4px;margin-bottom:6px">'
+    +   (tocadas.length > 1 ? 'SE APLIC\u00d3 EN ESTAS FACTURAS' : 'SE APLIC\u00d3 EN ESTA FACTURA') + '</div>';
+
+  tocadas.forEach(function(t){
+    h += '<div style="border:1.5px solid #A5D6A7;border-radius:10px;padding:10px;margin-bottom:8px">'
+      + '<div style="font-size:13px;font-weight:900;color:var(--nbs-ink);margin-bottom:5px">'
+      +   'Factura #' + escaparHtml(String(t.nf)) + ' \u00b7 ' + escaparHtml(String(t.fecha)) + '</div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:12px;color:#666;padding:2px 0">'
+      +   '<span>Deb\u00eda</span><span>$' + fmtNum(t.debiaAntes) + '</span></div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:12px;color:#2E7D32;'
+      +   'font-weight:800;padding:2px 0"><span>Se le aplic\u00f3</span><span>\u2212 $'
+      +   fmtNum(t.monto) + '</span></div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:13.5px;font-weight:900;'
+      +   'padding-top:5px;margin-top:4px;border-top:1px solid #E0E0E0;color:'
+      +   (t.debeDespues > 0.005 ? '#C62828' : '#2E7D32') + '">'
+      +   '<span>Ahora debe</span><span>$' + fmtNum(t.debeDespues) + '</span></div>'
+      + '<button onclick="cerrarCreditoAplicado();verFacturaProfesional(' + _arg(String(t.id)) + ')" '
+      +   'style="width:100%;margin-top:8px;padding:8px;background:#fff;color:#1a237e;'
+      +   'border:1.5px solid #b9bfe0;border-radius:8px;font-size:11.5px;font-weight:800;'
+      +   'cursor:pointer">\ud83d\udc41\ufe0f Ver la factura #' + escaparHtml(String(t.nf)) + '</button>'
+      + '</div>';
+  });
+
+  // El balance completo del cliente, que es lo que él pidió ver
+  h += '<div style="background:#F4F6FB;border:1px solid #d8dcee;border-radius:10px;'
+    +   'padding:11px;margin-top:4px">'
+    + '<div style="font-size:11px;font-weight:800;color:#1a237e;letter-spacing:.4px;margin-bottom:6px">'
+    +   'SU BALANCE AHORA</div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12.5px;color:#666;padding:2px 0">'
+    +   '<span>Deb\u00eda en total</span><span>$' + fmtNum(deudaAntes) + '</span></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:900;'
+    +   'padding:4px 0;color:' + (deudaDespues > 0.005 ? '#C62828' : '#2E7D32') + '">'
+    +   '<span>Ahora debe</span><span>$' + fmtNum(deudaDespues) + '</span></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12.5px;padding-top:5px;'
+    +   'margin-top:4px;border-top:1px solid #d8dcee;color:'
+    +   (queda > 0.005 ? '#E65100' : '#666') + ';font-weight:' + (queda > 0.005 ? '800' : '600') + '">'
+    +   '<span>Cr\u00e9dito que le queda</span><span>$' + fmtNum(queda) + '</span></div>'
+    + '</div>';
+
+  h += '<button onclick="cerrarCreditoAplicado()" style="width:100%;padding:13px;margin-top:12px;'
+    +   'background:#2E7D32;color:#fff;border:none;border-radius:10px;font-size:14px;'
+    +   'font-weight:800;cursor:pointer">\u2713 Entendido</button>'
+    + '</div>';
+
+  ov.innerHTML = h;
+  ov.style.display = 'flex';
+}
+
+function cerrarCreditoAplicado(){
+  var ov = document.getElementById('credito-aplicado-overlay');
+  if(ov) ov.style.display = 'none';
 }
 
 
