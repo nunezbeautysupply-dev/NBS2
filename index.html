@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260903d-OFICIAL-V2.0">
+<meta name="app-version" content="20260903e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5923,6 +5923,20 @@ function renderVIPLista(list){
             + (p.gratis > 0 ? '#AD1457' : '#ECEFF1') + ';color:' + (p.gratis > 0 ? '#fff' : '#546E7A') + ';'
             + 'border:none;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">'
             + (p.gratis > 0 ? '\ud83c\udf81 Ya se lo di' : '\ud83c\udf81 Darle el premio ahora') + '</button>'
+            // ✏️ AJUSTAR A MANO. Faltaba en esta pantalla: solo estaba en la ficha
+            // del cliente, y Sensei lo cazo mirando el Programa VIP. -3 sep-
+            +'<button onclick="abrirAjustePuntosVIP(' + JSON.stringify(String(c.id)) + ','
+            + JSON.stringify(String(p.claveGrupo || p.nombre)) + ')" '
+            + 'style="width:100%;margin-top:5px;padding:8px;background:#fff;color:#555;'
+            + 'border:1px solid #ccc;border-radius:9px;font-size:11.5px;font-weight:700;cursor:pointer">'
+            + '✏️ Ajustar estos puntos a mano</button>'
+            // Y el rastro del ultimo ajuste, si lo hubo
+            + (p.ajuste
+                ? '<div style="background:#FFF8E1;border-left:3px solid #FFB300;border-radius:6px;'
+                  + 'padding:6px 8px;margin-top:6px;font-size:10.5px;color:#7A5C00">'
+                  + '✏️ ' + escaparHtml(p.ajuste.fecha) + ': ' + p.ajuste.de + ' → ' + p.ajuste.a
+                  + '<br>“' + escaparHtml(p.ajuste.motivo) + '”</div>'
+                : '')
           +'</div>';
       });
 
@@ -11941,7 +11955,7 @@ function baseAyudaNBS(){
       r:'En el menú (☰) → "Compras". Eliges el suplidor, agregas los productos y cantidades, el costo, y si es de contado o crédito. Esto sube tu inventario.' },
     { t:'⭐ Programa VIP de clientes',
       k:'vip programa vip fidelidad premio regalo cliente frecuente lealtad inscribir vip quitar vip editar vip',
-      r:'En el menú (☰) → "Programa VIP". Inscribes un cliente desde su perfil. Al comprar 10 del mismo producto, el 11 va gratis.' },
+      r:'En el menú (☰) → "Programa VIP". Inscribes un cliente desde su perfil.\n\nAl comprar 10 de la MISMA MARCA y el MISMO TIPO —da igual el nombre—, el 11 va gratis.\n\nEjemplo: 10 colonias Immortal de nombres distintos ya son un premio. Las navajas de $5.00 cuentan 2 por 1.' },
     { t:'🗺️ Ruta de visitas por día',
       k:'ruta rutas visita visitas dia semana a quien visito lunes martes barberias del dia editar ruta cambiar ruta quitar de ruta agregar a ruta',
       r:'En el menú (☰) → "Ruta de Visitas". Organizas qué barberías visitar cada día de la semana. Buscas por nombre de barbería o barbero.' },
@@ -18718,7 +18732,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260903d';
+var NOVEDADES_VERSION = '20260903e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -40259,11 +40273,11 @@ function verHistorialCliente(cid, modo){
 <div id="p-vip" class="pg">
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:4px">⭐ Programa Lealtad VIP</h2>
-  <p style="font-size:12px;color:#aaa;margin-bottom:14px">Compra 10 del mismo producto ($10.00) y gana 1 gratis · Válido desde 15 de junio 2026</p>
+<p style="font-size:12px;color:#aaa;margin-bottom:14px">Compra 10 de la misma marca y el mismo tipo y gana 1 gratis · Cuenta desde junio 2026</p>
   <div style="background:linear-gradient(135deg,#880E4F,#AD1457);border-radius:12px;padding:14px;margin-bottom:14px;color:white">
     <div style="font-size:12px;opacity:0.8;margin-bottom:4px">REGLA DEL PROGRAMA</div>
-    <div style="font-size:14px;font-weight:600">🛒 10 compras del mismo producto → 🎁 1 producto GRATIS</div>
-    <div style="font-size:11px;opacity:0.7;margin-top:4px">Solo aplica a productos con precio $10.00</div>
+    <div style="font-size:14px;font-weight:600">🛒 10 de la misma MARCA y el mismo TIPO → 🎁 1 GRATIS</div>
+    <div style="font-size:11px;opacity:0.7;margin-top:4px">Productos de $10.00 · las navajas de $5.00 cuentan 2 por 1</div>
   </div>
 
   <div style="background:#FCE4EC;border-radius:10px;padding:12px;margin-bottom:14px;text-align:center">
