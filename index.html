@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260904b-OFICIAL-V2.0">
+<meta name="app-version" content="20260904c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18733,7 +18733,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260904b';
+var NOVEDADES_VERSION = '20260904c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -29089,7 +29089,10 @@ function compartirCortoDesdeEstado(){
   }
   var ultimo = cobros[0];   // ya vienen del más nuevo al más viejo
   var texto = textoCortoParaCliente(cid, ultimo.montoCobro);
-  if(!confirm('Se le va a mandar esto:\n\n' + texto + '\n\n¿Mandarlo?')) return;
+  // \ud83d\udd34 SE QUITA EL confirm -4 sep-. En Android, un letrero con TODO el mensaje dentro
+  // a veces no se dibuja, devuelve "no" y la funcion se corta en seco: parecia que el
+  // boton no hacia nada. Y ademas sobraba: la pantalla de "¿Como se lo mandas?" YA
+  // enseña el mensaje antes de mandarlo. Eran dos avisos para lo mismo.
   mandarloAlCliente(cid, texto, 'Mensaje corto');
 }
 
@@ -29243,7 +29246,10 @@ function comoMandarloAlCliente(cid, texto, queEs){
     ov.id = 'como-mandar-overlay';
     document.body.appendChild(ov);
   }
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:99999;'
+  // \ud83d\udd34 EL NIVEL SUBE A 100001 -4 sep-. Estaba en 99999, EMPATADO con el estado de
+  // cuenta: al abrirlo desde ahi salia DETRAS y Sensei no veia nada. "Cuando toco
+  // enviar mensaje no funcionan ninguna de las dos opciones".
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:100001;'
     + 'display:flex;align-items:flex-end;justify-content:center';
   ov.onclick = function(e){ if(e.target === ov) cerrarComoMandar(); };
 
