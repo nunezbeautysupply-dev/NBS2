@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260906b-OFICIAL-V2.0">
+<meta name="app-version" content="20260906c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18781,7 +18781,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260906b';
+var NOVEDADES_VERSION = '20260906c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -21781,14 +21781,28 @@ function darRegaloFidelidad(cid){
 // Version liviana de agruparPosiblesDuplicados para UN cliente -se usa al abrir su
 // perfil, para avisar EN EL MOMENTO si hay otra copia suya con deuda escondida-.
 function posiblesDuplicadosDe(c, listaClientes){
-  var keyNombre = normalizarTextoBusqueda((c.nombre||'')+' '+(c.apellido||''));
+  // \ud83d\udd11 EL MISMO NOMBRE NO BASTA -6 sep-. Sensei: "son dos clientes distintos porque
+  // son de dos barberias diferentes... no tiene logica la confusion de la app".
+  // Sus dos Jose Rodriguez: apodo, negocio, direccion y telefono TODO distinto.
+  // Se avisa solo si comparten TELEFONO, o el nombre Y (el negocio o la direccion).
+  var nom = normalizarTextoBusqueda((c.nombre||'')+' '+(c.apellido||''));
   var tel = (c.tel||'').replace(/\D/g,'');
+  var neg = normalizarTextoBusqueda(c.negocio||'');
+  var dir = normalizarTextoBusqueda(c.dir||'');
   return listaClientes.filter(function(x){
     if(String(x.id) === String(c.id)) return false;
-    var xKey = normalizarTextoBusqueda((x.nombre||'')+' '+(x.apellido||''));
-    if(keyNombre && xKey === keyNombre) return true;
+    // \u260e\ufe0f El telefono manda: mismo numero es la misma persona
     var xTel = (x.tel||'').replace(/\D/g,'');
-    if(tel && tel.length>=7 && xTel === tel) return true;
+    if(tel && tel.length >= 7 && xTel === tel) return true;
+    var xNom = normalizarTextoBusqueda((x.nombre||'')+' '+(x.apellido||''));
+    if(!nom || xNom !== nom) return false;
+    // Mismo nombre: hace falta ademas el mismo negocio o la misma direccion
+    var xNeg = normalizarTextoBusqueda(x.negocio||'');
+    if(neg && xNeg && neg === xNeg) return true;
+    var xDir = normalizarTextoBusqueda(x.dir||'');
+    if(dir && xDir && dir === xDir) return true;
+    // Si ninguno de los dos tiene negocio, direccion ni telefono, el nombre es lo unico
+    if(!neg && !dir && !tel && !xNeg && !xDir && !xTel) return true;
     return false;
   });
 }
@@ -24081,12 +24095,43 @@ function _renglonPedidos(K){
 // ── 💰 CRÉDITO A FAVOR, editable ──
 function _renglonCredito(K){
   var c = K.dinero.credito;
+  // \ud83d\udd11 \u00bfHay d\u00f3nde aplicarlo? Solo se ofrece si de verdad debe algo. -6 sep-
+  var _debe = 0;
+  try { _debe = balanceDelCliente(K.cliente.id); } catch(e){}
+  var _seUsan = Math.min(c, _debe);
+  var _sobra = Math.round((c - _seUsan) * 100) / 100;
+
   var cont = _sub(
     '<div style="font-size:11.5px;color:var(--nbs-muted);line-height:1.6;margin-bottom:9px">'
     + (c > 0.005
-        ? 'Este cliente tiene <b>$' + fmtNum(c) + '</b> a su favor. Se le descuenta solo en su pr\u00f3xima compra.'
+        ? 'Este cliente tiene <b>$' + fmtNum(c) + '</b> a su favor.'
         : 'Este cliente no tiene cr\u00e9dito a favor. Le queda a favor cuando te paga de m\u00e1s o cuando devuelve algo que ya hab\u00eda pagado.')
     + '</div>'
+    // \ud83d\udcb3 EL BOT\u00d3N DE APLICARLO, aqu\u00ed mismo -6 sep-. Antes solo estaba en Cuentas
+    // por Cobrar: el rengl\u00f3n llevaba hasta aqu\u00ed y no dejaba hacer nada.
+    + (_seUsan > 0.005
+        ? '<div style="background:#FFF8E1;border:1.5px solid #FFD54F;border-radius:10px;padding:11px;margin-bottom:9px">'
+          + '<div style="font-size:12px;color:#6D4C00;line-height:1.5;margin-bottom:8px">'
+          +   'Se van a usar <b>$' + fmtNum(_seUsan) + '</b> para bajarle la deuda de <b>$'
+          +   fmtNum(_debe) + '</b>.'
+          +   (_sobra > 0.005 ? '<br>Le quedar\u00e1n <b>$' + fmtNum(_sobra) + '</b> a favor.' : '')
+          + '</div>'
+          + '<div style="font-size:10.5px;color:#6D4C00;font-weight:700;margin-bottom:3px">'
+          +   '\ud83d\udcc5 \u00bfQU\u00c9 D\u00cdA SE LO APLICAS?</div>'
+          + '<input type="date" id="cred-fecha" '
+          +   'style="width:100%;padding:9px;border:1px solid #E0C070;border-radius:8px;'
+          +   'font-size:13px;margin-bottom:9px">'
+          + '<button onclick="event.stopPropagation();usarCreditoAFavor(' + _arg(K.cliente.id) + ')" '
+          +   'style="width:100%;padding:13px;background:#E65100;color:#fff;border:none;'
+          +   'border-radius:10px;font-size:14.5px;font-weight:800;cursor:pointer">'
+          +   '\ud83d\udcb3 Usar $' + fmtNum(_seUsan) + ' de su cr\u00e9dito</button>'
+          + '</div>'
+        : (c > 0.005
+            ? '<div style="background:#F4F6FB;border-radius:9px;padding:10px;margin-bottom:9px;'
+              + 'font-size:11.5px;color:var(--nbs-muted);line-height:1.5">'
+              + 'No debe nada, as\u00ed que no hay d\u00f3nde aplicarlo. Se le descontar\u00e1 solo en su '
+              + 'pr\u00f3xima compra.</div>'
+            : ''))
     + '<button onclick="event.stopPropagation();cambiarCreditoAFavor(' + _arg(K.cliente.id) + ')" '
     +   'style="width:100%;padding:10px;background:#fff;border:1.5px solid var(--nbs-gold);'
     +   'color:var(--nbs-gold-dark);border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">'
@@ -27850,9 +27895,20 @@ function usarCreditoAFavor(cid){
     // 🔑 Y NO SE LE SACA DE LA PANTALLA. Antes se llamaba a abrirAbono y DESPUÉS a
     // renderCxC, que repintaba la lista encima y lo echaba fuera: parecía que no
     // había pasado nada. Ahora se refresca la lista PRIMERO y se vuelve a su ficha.
-    try { renderCxC(''); } catch(e){}
-    try { abrirAbono(cid); } catch(e){}
-    try { pintarPanelCliente(cid); } catch(e){}
+    // \ud83d\udd11 SE VUELVE A DONDE ESTABA, con el balance YA AL D\u00cdA. -6 sep-
+    // Si vino de la FICHA del cliente, se queda en la ficha y se repinta la cabecera
+    // para que el "DEBE" de arriba baje de $20 a $15. Antes siempre acababa en
+    // Cuentas por Cobrar, y el balance de la ficha se quedaba viejo.
+    var _enLaFicha = false;
+    try { _enLaFicha = (pantallaActual() === 'p-cl-perfil'); } catch(e){}
+    if(_enLaFicha){
+      try { verCl(cid); } catch(e){}
+      try { pintarPanelCliente(cid); } catch(e){}
+    } else {
+      try { renderCxC(''); } catch(e){}
+      try { abrirAbono(cid); } catch(e){}
+      try { pintarPanelCliente(cid); } catch(e){}
+    }
   });
 }
 
@@ -31061,17 +31117,38 @@ function agruparPosiblesDuplicados(listaClientes){
   function unir(a,b){ var ra=raiz(a), rb=raiz(b); if(ra!==rb) padre[ra]=rb; }
   listaClientes.forEach(function(c){ raiz(c.id); });
 
-  var porNombre = {}, porTel = {};
+  // \ud83d\udd11 EL MISMO NOMBRE NO BASTA -6 sep-. Dos barberos pueden llamarse igual y no
+  // tener nada que ver: distinto negocio, distinta direccion, distinto telefono.
+  // Se juntan solo si comparten TELEFONO, o si ademas del nombre comparten el negocio
+  // o la direccion.
+  var porTel = {}, porNegocio = {}, porDir = {};
   listaClientes.forEach(function(c){
-    var keyNombre = normalizarTextoBusqueda((c.nombre||'')+' '+(c.apellido||''));
-    if(keyNombre){
-      if(porNombre[keyNombre]) unir(c.id, porNombre[keyNombre]);
-      else porNombre[keyNombre] = c.id;
-    }
+    // \u260e\ufe0f El telefono manda: dos fichas con el mismo numero son la misma persona.
     var tel = (c.tel||'').replace(/\D/g,'');
     if(tel && tel.length >= 7){
       if(porTel[tel]) unir(c.id, porTel[tel]);
       else porTel[tel] = c.id;
+    }
+    var nom = normalizarTextoBusqueda((c.nombre||'')+' '+(c.apellido||''));
+    if(!nom) return;
+    // \ud83c\udfea Mismo nombre Y mismo negocio
+    var neg = normalizarTextoBusqueda(c.negocio||'');
+    if(neg){
+      var kN = nom + '|' + neg;
+      if(porNegocio[kN]) unir(c.id, porNegocio[kN]);
+      else porNegocio[kN] = c.id;
+    }
+    // \ud83d\udccd Mismo nombre Y misma direccion
+    var dir = normalizarTextoBusqueda(c.dir||'');
+    if(dir){
+      var kD = nom + '|' + dir;
+      if(porDir[kD]) unir(c.id, porDir[kD]);
+      else porDir[kD] = c.id;
+    }
+    // Si no tiene NI negocio NI direccion NI telefono, el nombre es lo unico que hay
+    if(!neg && !dir && !tel){
+      if(porNegocio['solo|' + nom]) unir(c.id, porNegocio['solo|' + nom]);
+      else porNegocio['solo|' + nom] = c.id;
     }
   });
 
