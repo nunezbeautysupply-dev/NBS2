@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260906a-OFICIAL-V2.0">
+<meta name="app-version" content="20260906b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18781,7 +18781,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260906a';
+var NOVEDADES_VERSION = '20260906b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -24430,6 +24430,9 @@ var VIP_ANIMOS = [
 ];
 
 // El primer nombre nada más, como pidió.
+// \ud83d\udcb5 Desplegar el reparto de un pago en la ficha del cliente.  (6 sep 2026)
+// Sensei: "necesito que el pago se vea el monto completo y que cuando yo lo toque se
+// despliegue hacia abajo y ahi si me muestre a que facturas se les aplico".
 function primerNombreDe(cl){
   if(!cl) return '';
   var n = String(cl.nombre || '').trim().split(/\s+/)[0] || '';
@@ -24557,6 +24560,15 @@ function verMensajeVIP(cid){
 function cerrarMensajeVIP(){
   var ov = document.getElementById('msgvip-overlay');
   if(ov) ov.style.display = 'none';
+}
+
+function desplegarPagoCliente(idDetalle, idFlecha){
+  var d = document.getElementById(idDetalle);
+  if(!d) return;
+  var abierto = d.style.display !== 'none';
+  d.style.display = abierto ? 'none' : 'block';
+  var f = document.getElementById(idFlecha);
+  if(f) f.style.transform = abierto ? '' : 'rotate(90deg)';
 }
 
 function pintarPanelCliente(cid){
@@ -24978,6 +24990,8 @@ function pintarPanelCliente(cid){
       _pagos.push({
         vid: v.id, idx: i,
         fecha: p.fecha || v.fecha, monto: monto,
+        recibo: p.recibo || null,
+        montoCobro: (typeof p.montoCobro === 'number' && p.montoCobro > 0) ? p.montoCobro : 0,
         factura: v.numFactura || String(v.id).slice(-4),
         totalFactura: parseFloat(v.total) || 0,
         metodo: (p.metodos && p.metodos.length)
@@ -24990,56 +25004,132 @@ function pintarPanelCliente(cid){
     if(v.tipo === 'contado' && !(v.pagosFactura || []).length && !v.modificada && !v.ajustadaPorDevolucion){
       _pagos.push({ vid: v.id, idx: null,
                     fecha: v.fecha, monto: parseFloat(v.total) || 0,
+                    recibo: null, montoCobro: 0,
                     factura: v.numFactura || String(v.id).slice(-4),
                     totalFactura: parseFloat(v.total) || 0,
                     metodo: '', nota: 'Pag\u00f3 al momento' });
     }
   });
-  _pagos.sort(function(a, b){
+
+  // \ud83d\udd11 SE JUNTAN LAS PARTES DEL MISMO COBRO -6 sep-. Si le cobras $30 y se reparte
+  // entre dos facturas, el cliente pag\u00f3 UNA vez $30: eso es lo que tiene que ver Sensei
+  // de un vistazo. El reparto va escondido hasta que lo toque.
+  var _porCobro = {}, _cobros = [];
+  _pagos.forEach(function(p){
+    // Sin recibo -los pagos viejos- cada uno va suelto, o se mezclar\u00edan dos pagos
+    // distintos del mismo d\u00eda a la misma factura.
+    var clave = p.recibo ? ('R:' + p.recibo) : ('S:' + p.vid + '|' + p.idx + '|' + p.fecha);
+    if(!_porCobro[clave]){
+      _porCobro[clave] = { fecha: p.fecha, recibo: p.recibo, metodo: p.metodo,
+                           nota: p.nota, completo: 0, suma: 0, partes: [] };
+      _cobros.push(_porCobro[clave]);
+    }
+    var g = _porCobro[clave];
+    g.partes.push(p);
+    g.suma = Math.round((g.suma + p.monto) * 100) / 100;
+    if(p.montoCobro > g.completo) g.completo = p.montoCobro;
+    if(!g.metodo && p.metodo) g.metodo = p.metodo;
+  });
+  // Si no se guard\u00f3 el monto del cobro completo, se usa la suma de sus partes
+  _cobros.forEach(function(g){ if(!g.completo) g.completo = g.suma; });
+
+  _cobros.sort(function(a, b){
     var fa = parsearFechaVenta(a.fecha), fb = parsearFechaVenta(b.fecha);
     return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
   });
+
   var _totalPagado = Math.round(_pagos.reduce(function(x, p){ return x + p.monto; }, 0) * 100) / 100;
 
-  if(_pagos.length){
+  if(_cobros.length){
     var contPagos = _sub(
       '<div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:800;'
       +   'padding:0 0 7px;border-bottom:1px solid #EEE;margin-bottom:7px">'
       +   '<span style="color:var(--nbs-muted)">TE HA PAGADO EN TOTAL</span>'
       +   '<span style="color:var(--nbs-green-text)">$' + fmtNum(_totalPagado) + '</span></div>'
-      + _pagos.slice(0, 30).map(function(p){
-          return '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;'
-            + 'padding:7px 0;border-bottom:1px solid #F4F4F8">'
+      + _cobros.slice(0, 30).map(function(g, gi){
+          var repartido = g.partes.length > 1;
+          var idDet = 'pago-det-' + cid + '-' + gi;
+          var idFle = 'pago-fle-' + cid + '-' + gi;
+
+          // ── EL RENGLÓN: el MONTO COMPLETO primero, que es lo que le preguntan ──
+          var fila = '<div ' + (repartido
+                ? 'onclick="event.stopPropagation();desplegarPagoCliente(' + _arg(idDet) + ',' + _arg(idFle) + ')" style="cursor:pointer;'
+                : 'style="')
+            + 'display:flex;justify-content:space-between;align-items:flex-start;gap:8px;'
+            + 'padding:8px 0;border-bottom:1px solid #F4F4F8">'
             + '<div style="flex:1;min-width:0">'
-            +   '<div style="font-size:12.5px;font-weight:700;color:var(--nbs-ink)">'
-            +     escaparHtml(p.fecha || '') + '</div>'
+            +   '<div style="font-size:13px;font-weight:800;color:var(--nbs-ink)">'
+            +     escaparHtml(g.fecha || '') + '</div>'
             +   '<div style="font-size:10.5px;color:var(--nbs-muted);margin-top:1px">'
-            +     'factura ' + escaparHtml(String(p.factura))
-            +     (p.metodo ? ' \u00b7 ' + escaparHtml(p.metodo) : '')
-            +     (p.nota ? ' \u00b7 ' + escaparHtml(String(p.nota).slice(0, 30)) : '')
+            +     (repartido
+                    ? 'se reparti\u00f3 en ' + g.partes.length + ' facturas'
+                    : 'factura ' + escaparHtml(String(g.partes[0].factura)))
+            +     (g.metodo ? ' \u00b7 ' + escaparHtml(g.metodo) : '')
             +   '</div>'
             + '</div>'
-            + '<div style="font-size:13.5px;font-weight:900;color:var(--nbs-green-text);flex-shrink:0">+$'
-            +   fmtNum(p.monto) + '</div>'
-            // ✏️ y 🗑️ para corregir el pago desde aquí mismo. -15 ago-
-            + (p.idx !== null && p.idx !== undefined
-                ? '<button onclick="event.stopPropagation();editarPagoDesdeCuenta(' + _arg(p.vid) + ',' + p.idx + ',' + _arg(K.cliente.id) + ')" '
+            + '<div style="font-size:14.5px;font-weight:900;color:var(--nbs-green-text);flex-shrink:0">+$'
+            +   fmtNum(g.completo) + '</div>';
+
+          if(repartido){
+            // La flechita, para que se vea que se abre
+            fila += '<div id="' + idFle + '" style="color:#bbb;font-size:15px;flex-shrink:0;'
+              + 'transition:transform .15s">\u203a</div>';
+          } else {
+            // Sin repartir: los botones van en el propio renglón, como siempre
+            var p0 = g.partes[0];
+            fila += (p0.idx !== null && p0.idx !== undefined
+                ? '<button onclick="event.stopPropagation();editarPagoDesdeCuenta(' + _arg(p0.vid) + ',' + p0.idx + ',' + _arg(K.cliente.id) + ')" '
                   + 'style="background:#FFF8E1;border:1px solid #F9A825;border-radius:7px;padding:6px 9px;'
                   + 'font-size:12px;cursor:pointer;flex-shrink:0" title="Corregir este pago">\u270f\ufe0f</button>'
-                  + '<button onclick="event.stopPropagation();borrarPagoDesdeCuenta(' + _arg(p.vid) + ',' + p.idx + ',' + _arg(K.cliente.id) + ')" '
+                  + '<button onclick="event.stopPropagation();borrarPagoDesdeCuenta(' + _arg(p0.vid) + ',' + p0.idx + ',' + _arg(K.cliente.id) + ')" '
                   + 'style="background:#FFEBEE;border:1px solid #C62828;border-radius:7px;padding:6px 9px;'
                   + 'font-size:12px;cursor:pointer;flex-shrink:0" title="Borrar este pago">\ud83d\uddd1\ufe0f</button>'
-                : '<button onclick="event.stopPropagation();verFacturaProfesional(' + _arg(p.vid) + ')" '
-                  + 'style="background:#EEE;border:1px solid #DDD;border-radius:7px;padding:6px 9px;'
-                  + 'font-size:12px;cursor:pointer;flex-shrink:0" title="Ver la factura">\ud83d\udc41\ufe0f</button>')
-            + '</div>';
+                : '<button onclick="event.stopPropagation();verFacturaProfesional(' + _arg(p0.vid) + ')" '
+                  + 'style="background:#F4F6FB;border:1px solid #b9bfe0;border-radius:7px;padding:6px 9px;'
+                  + 'font-size:12px;cursor:pointer;flex-shrink:0" title="Ver la factura">\ud83d\udc41\ufe0f</button>');
+          }
+          fila += '</div>';
+
+          // ── EL DETALLE, ESCONDIDO HASTA QUE LO TOQUE ──
+          if(repartido){
+            fila += '<div id="' + idDet + '" style="display:none;background:#F7F9FC;'
+              + 'border-left:3px solid var(--nbs-green-text);border-radius:0 8px 8px 0;'
+              + 'padding:8px 10px;margin:0 0 7px 4px">'
+              + '<div style="font-size:9.5px;font-weight:800;color:var(--nbs-muted);'
+              +   'letter-spacing:.4px;margin-bottom:5px">SE APLIC\u00d3 AS\u00cd</div>'
+              + g.partes.map(function(p){
+                  return '<div style="display:flex;justify-content:space-between;align-items:center;'
+                    + 'gap:7px;padding:5px 0;border-bottom:1px solid #EAEEF5">'
+                    + '<div style="flex:1;min-width:0;font-size:12px;color:var(--nbs-ink);font-weight:600">'
+                    +   'Factura #' + escaparHtml(String(p.factura)) + '</div>'
+                    + '<div style="font-size:12.5px;font-weight:800;color:var(--nbs-ink);flex-shrink:0">$'
+                    +   fmtNum(p.monto) + '</div>'
+                    + (p.idx !== null && p.idx !== undefined
+                        ? '<button onclick="event.stopPropagation();editarPagoDesdeCuenta(' + _arg(p.vid) + ',' + p.idx + ',' + _arg(K.cliente.id) + ')" '
+                          + 'style="background:#FFF8E1;border:1px solid #F9A825;border-radius:6px;padding:4px 7px;'
+                          + 'font-size:11px;cursor:pointer;flex-shrink:0" title="Corregir esta parte">\u270f\ufe0f</button>'
+                          + '<button onclick="event.stopPropagation();borrarPagoDesdeCuenta(' + _arg(p.vid) + ',' + p.idx + ',' + _arg(K.cliente.id) + ')" '
+                          + 'style="background:#FFEBEE;border:1px solid #C62828;border-radius:6px;padding:4px 7px;'
+                          + 'font-size:11px;cursor:pointer;flex-shrink:0" title="Borrar esta parte">\ud83d\uddd1\ufe0f</button>'
+                        : '')
+                    + '</div>';
+                }).join('')
+              // Si sobró algo del cobro, se dice: si no, las partes no cuadran con el total
+              + (g.completo - g.suma > 0.005
+                  ? '<div style="display:flex;justify-content:space-between;padding:5px 0;'
+                    + 'font-size:11.5px;color:#E65100;font-weight:700">'
+                    + '<span>Qued\u00f3 a su favor</span><span>$' + fmtNum(g.completo - g.suma) + '</span></div>'
+                  : '')
+              + '</div>';
+          }
+          return fila;
         }).join('')
-      + (_pagos.length > 30
+      + (_cobros.length > 30
           ? '<div style="font-size:10.5px;color:var(--nbs-muted);text-align:center;padding:6px">y '
-            + (_pagos.length - 30) + ' pago(s) m\u00e1s</div>' : '')
+            + (_cobros.length - 30) + ' pago(s) m\u00e1s</div>' : '')
     );
     h += _filaPanel('pagos', '\ud83d\udcb5', 'Sus pagos',
-      String(_pagos.length) + ' \u00b7 $' + fmtNum(_totalPagado), null, contPagos, 'irACobrarCliente(' + _arg(cid) + ')');
+      String(_cobros.length) + ' \u00b7 $' + fmtNum(_totalPagado), null, contPagos, 'irACobrarCliente(' + _arg(cid) + ')');
   }
 
   // ── 🏦 LOS RENGLONES NUEVOS DE LA CUENTA (15 ago) ──
