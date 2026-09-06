@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260904d-OFICIAL-V2.0">
+<meta name="app-version" content="20260904e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18734,7 +18734,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260904d';
+var NOVEDADES_VERSION = '20260904e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -29118,6 +29118,7 @@ function compartirEstadoDeCuenta(){
 // ═══════════════════════════════════════════════════════════════════
 
 // Copia al portapapeles y dice si pudo. Se usa antes de cada envío.
+var _contadorRecibo = 0;
 function _copiarTexto(texto){
   try {
     if(navigator.clipboard && navigator.clipboard.writeText){
@@ -29477,9 +29478,17 @@ function apagarAvisoCliente(){
 function nuevoNumeroRecibo(){
   var d = new Date();
   var dosDig = function(n){ return (n < 10 ? '0' : '') + n; };
+  // \ud83d\udd11 El contador sube SIEMPRE: dos cobros seguidos no pueden compartir numero
+  // aunque caigan en el mismo minuto. Antes eran dos cifras al azar -90 posibles-, y
+  // con dos barberos seguidos en la misma barberia se podian repetir: la app los
+  // juntaba como UN SOLO cobro. -4 sep-
+  _contadorRecibo++;
+  // El contador NO da la vuelta: si diera, dos recibos del mismo segundo volverian a
+  // repetirse. Con 4 cifras hay de sobra para cualquier dia de trabajo.
+  var sufijo = String(_contadorRecibo).padStart(4, '0');
   return 'R' + String(d.getFullYear()).slice(2) + dosDig(d.getMonth() + 1) + dosDig(d.getDate())
-       + '-' + dosDig(d.getHours()) + dosDig(d.getMinutes())
-       + '-' + Math.floor(Math.random() * 90 + 10);
+       + '-' + dosDig(d.getHours()) + dosDig(d.getMinutes()) + dosDig(d.getSeconds())
+       + '-' + sufijo;
 }
 
 function horaAhora(){
@@ -31827,6 +31836,46 @@ function guardarEdicionFactura(vid){
       nota: 'Pago original antes de agregar producto(s)'
     });
     mensajeExtra = '\n\n⚠️ Como ya se habían pagado $'+fmtNum(totalAntes)+' de esta factura, el producto nuevo agregó $'+fmtNum(diferencia)+' que el cliente TODAVÍA DEBE. La factura ahora aparece como "a crédito" con ese saldo pendiente en Cuentas por Cobrar.';
+  }
+
+  // \ud83d\udd34 Y SI EL TOTAL BAJA POR DEBAJO DE LO YA PAGADO, el sobrante va al CREDITO A
+  // FAVOR del cliente. Antes se perdia. -4 sep-
+  var _pagado = 0;
+  (ventas[idx].pagosFactura || []).forEach(function(pp){
+    if(pp && !pp.esDevolucion) _pagado += (typeof dinero === 'function') ? dinero(pp.monto) : (parseFloat(pp.monto) || 0);
+  });
+  _pagado = Math.round(_pagado * 100) / 100;
+  if(_pagado > totalDespues + 0.005){
+    var _sobra = Math.round((_pagado - totalDespues) * 100) / 100;
+    var _cls = LS('ncl', []);
+    var _jc = _cls.findIndex(function(x){ return String(x.id) === String(ventas[idx].cid); });
+    if(_jc >= 0){
+      _cls[_jc].creditoAFavor = Math.round(((parseFloat(_cls[_jc].creditoAFavor) || 0) + _sobra) * 100) / 100;
+      _cls[_jc].mod = Date.now();
+      SS('ncl', _cls);
+      clientes = LS('ncl', []);
+
+      // \ud83d\udd11 Y SE BAJA EL PAGO A LO QUE DE VERDAD CUBRE ESTA FACTURA. Si no, el
+      // sobrante quedaria contado DOS VECES: en la factura y en el credito.
+      var _falta = _sobra;
+      for(var _q = (ventas[idx].pagosFactura || []).length - 1; _q >= 0 && _falta > 0.005; _q--){
+        var _pg = ventas[idx].pagosFactura[_q];
+        if(!_pg || _pg.esDevolucion) continue;
+        var _m = (typeof dinero === 'function') ? dinero(_pg.monto) : (parseFloat(_pg.monto) || 0);
+        var _quito = Math.min(_m, _falta);
+        _pg.monto = Math.round((_m - _quito) * 100) / 100;
+        _pg.notaAjuste = 'Se le quitaron $' + fmtNum(_quito) + ' al bajar el total; fueron a credito a favor';
+        _falta = Math.round((_falta - _quito) * 100) / 100;
+      }
+      // Los pagos que quedaron en cero se van: no aportan nada y ensucian el historial.
+      ventas[idx].pagosFactura = (ventas[idx].pagosFactura || []).filter(function(_x){
+        return _x.esDevolucion || ((parseFloat(_x.monto) || 0) > 0.005);
+      });
+      mensajeExtra += '\n\n\u26a0\ufe0f Esta factura ten\u00eda $' + fmtNum(_pagado)
+        + ' pagados y ahora es de $' + fmtNum(totalDespues) + '.\n\nLos $' + fmtNum(_sobra)
+        + ' que sobran se le pusieron como CR\u00c9DITO A FAVOR a '
+        + nombreCl(_cls[_jc]) + '.';
+    }
   }
 
   SS('nv', ventas);
