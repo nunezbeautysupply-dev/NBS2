@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260904f-OFICIAL-V2.0">
+<meta name="app-version" content="20260905a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3936,6 +3936,11 @@ function SS(k,v){
   // Devuelve si de verdad se pudo guardar. Nadie usaba el resultado de SS, asi que
   // agregarlo no rompe nada — lo necesita el puente de traer cambios. -4 ago-
   var _seGuardoBien = false;
+  // \u26a1 Si cambian las ventas, los clientes o los productos, el cajon del VIP deja de
+  // valer: se vacia para que los puntos se calculen de nuevo. -5 sep-
+  if(k === 'nv' || k === 'ncl' || k === 'np'){
+    try { if(typeof vaciarCajonVIP === 'function') vaciarCajonVIP(); } catch(e){}
+  }
   try{
     // 🔑 PRIMERO se sacan las imagenes, DESPUES se sella. En ese orden, y no al
     // reves: `sellarCambios` compara lo nuevo contra lo guardado, y si uno tuviera
@@ -4611,6 +4616,7 @@ var RECUADROS_ENCIMA = [
   { id: 'unif-marcas-ov',           cerrar: 'cerrarUnificarMarcas' },
   { id: 'confirmar-balance-overlay', cerrar: 'cerrarConfirmacionBalance' },
   { id: 'sinconf-overlay',          cerrar: 'cerrarSinConfirmar' },
+  { id: 'estado-fechas-overlay',    cerrar: 'cerrarEstadoPorFechas' },
   { id: 'aviso-backup-overlay',     cerrar: 'cerrarAvisoConBackup' },
   { id: 'credito-aplicado-overlay', cerrar: 'cerrarCreditoAplicado' },
   { id: 'ajuste-vip-overlay',       cerrar: 'cerrarAjustePuntosVIP' },
@@ -5573,20 +5579,61 @@ function deshacerAjustePuntosVIP(cid, idAjuste){
   avisoGrande('\u21a9\ufe0f Ajuste deshecho. Los puntos vuelven como estaban.');
 }
 
-function calcVIP(cid){
+// \u26a1 EL CAJON DEL VIP -5 sep-. Se llena UNA vez y sirve para todos los clientes.
+// Antes cada llamada a calcVIP leia el disco y recorria las 613 ventas enteras: con
+// 161 clientes eran 98.693 vueltas y el asistente tardaba segundos.
+// \ud83d\udd11 NO cambia ni un calculo: los mismos datos, buscados de otra forma.
+var _cajonVIP = null;
+
+// Una huella barata de los datos: si cambia, el cajon deja de valer. Solo mira el
+// largo del texto guardado, no lo recorre — cuesta casi nada.
+function _huellaDatosVIP(){
+  try {
+    return (localStorage.getItem('nv') || '').length + '|'
+         + (localStorage.getItem('ncl') || '').length + '|'
+         + (localStorage.getItem('np') || '').length;
+  } catch(e){ return String(Date.now()); }
+}
+
+function _abrirCajonVIP(){
+  // \ud83d\udd11 Se rehace si los datos cambiaron -aunque los hayan cambiado sin pasar por
+  // SS- o si pasaron mas de 3 segundos.
+  var _h = _huellaDatosVIP();
+  if(_cajonVIP && _cajonVIP.huella === _h && (Date.now() - _cajonVIP.cuando) < 3000){
+    return _cajonVIP;
+  }
   loadProds();
   ventas = LS('nv', []);
+  var porCliente = {}, porId = {};
+  ventas.forEach(function(v){
+    var k = String(v.cid);
+    if(!porCliente[k]) porCliente[k] = [];
+    porCliente[k].push(v);
+  });
+  (LS('ncl', []) || []).forEach(function(c){ porId[String(c.id)] = c; });
+  var prods = {};
+  (productos || []).forEach(function(p){ prods[String(p.id)] = p; });
+  _cajonVIP = { cuando: Date.now(), huella: _h, ventas: porCliente, clientes: porId, prods: prods };
+  return _cajonVIP;
+}
+
+// Se vacia solo cuando algo cambia, para no dar puntos viejos.
+function vaciarCajonVIP(){ _cajonVIP = null; }
+
+function calcVIP(cid){
+  var _cj = _abrirCajonVIP();
   var conteo = {};
 
   // Las cuentas de CONSIGNACION no entran al programa: son productos dejados para
   // que se paguen segun se vendan, no compras del barbero. -5 ago, lo pidio Sensei-
-  var _cliVIP = LS('ncl', []).find(function(x){ return String(x.id) === String(cid); });
+  var _cliVIP = _cj.clientes[String(cid)];
   if(!clienteCuentaVIP(_cliVIP)) return conteo;
 
   // \ud83d\udcc5 RETROACTIVO DESDE JUNIO 2026 -Sensei, 3 sep-: "quiero que estas nuevas reglas
   // sean retroactivas desde junio con todos los clientes que ya hayan comprado desde
   // ese tiempo". Lo de antes de junio no cuenta.
-  var ventasC = ventas.filter(function(v){
+  // \u26a1 Solo SUS ventas, del cajon: no las 613 de todos.
+  var ventasC = (_cj.ventas[String(cid)] || []).filter(function(v){
     if(String(v.cid)!==String(cid) || v.cancelada) return false;
     var f = parsearFechaVenta(v.fecha);
     return f ? (f >= VIP_DESDE) : false;
@@ -18734,7 +18781,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260904f';
+var NOVEDADES_VERSION = '20260905a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -24687,6 +24734,18 @@ function pintarPanelCliente(cid){
     (_debeAhora2 > 0.005 ? '$' + fmtNum(_debeAhora2) : 'al d\u00eda'),
     (_debeAhora2 > 0.005 ? '#C62828' : '#2E7D32'), contMandar, null);
 
+  // \ud83d\udcca ESTADO POR FECHAS -Sensei, 5 sep-: "un reporte donde se vea cada factura y
+  // cada pago por orden de fecha, y que yo pueda tocar cada uno para verlo con detalle".
+  h += '<div onclick="abrirEstadoPorFechas(' + _arg(cid) + ')" '
+    + 'style="display:flex;align-items:center;gap:10px;padding:13px 12px;border-bottom:1px solid #EEE;cursor:pointer">'
+    + '<div style="font-size:19px">\ud83d\udcca</div>'
+    + '<div style="flex:1"><div style="font-size:14.5px;font-weight:900;color:var(--nbs-ink);'
+    +   'letter-spacing:-.2px">Estado por fechas</div></div>'
+    + '<div style="font-size:11.5px;color:var(--nbs-muted);margin-right:4px">todo su movimiento</div>'
+    + '<div style="background:#EEEEF5;border-radius:50%;width:24px;height:24px;display:flex;'
+    +   'align-items:center;justify-content:center;color:#5A5A66;font-size:14px">\u203a</div>'
+    + '</div>';
+
   h += _filaPanel('datos', '\ud83d\udcc7', 'Sus datos',
     _tel ? escaparHtml(_tel.length > 15 ? _tel.slice(0, 15) : _tel) : (c.negocio ? 'ver ficha' : ''),
     null, contDatos, 'editarCl(' + _arg(cid) + ')');
@@ -29196,6 +29255,20 @@ function copiarMensajeDelCliente(texto){
 }
 
 // 📤 Compartir — el menú del propio teléfono
+// ═══════════════════════════════════════════════════════════════════
+//  📊 ESTADO POR FECHAS  (5 sep 2026)
+//
+//  Sensei: "necesito un reporte donde se vea cada factura y cada pago por orden de
+//  fecha y que yo pueda tocar cada uno para verlo con todos sus detalles... y poder
+//  enviarle un estado al cliente donde vea todo lo que ha comprado y todo lo que ha
+//  pagado de acuerdo a las fechas que yo elija".
+//
+//  Y para el mensaje al cliente: "cada compra, y a cada compra que se le vea cada pago
+//  aplicado... y si el último pago le cae a esa factura y a otra, que también se vea el
+//  total de ese pago y la distribución, para que el cliente esté claro".
+// ═══════════════════════════════════════════════════════════════════
+
+// De MM/DD/AAAA a un número que se puede ordenar y comparar. 0 si la fecha viene mal.
 function compartirMensajeDelCliente(cid, texto){
   clientes = LS('ncl', []);
   var c = clientes.find(function(x){ return String(x.id) === String(cid); });
@@ -29233,6 +29306,552 @@ function mandarSuBalance(cid, completo){
   } catch(e){ avisoGrande('No pude armar el mensaje.'); return; }
 
   comoMandarloAlCliente(cid, texto, completo ? 'Estado de cuenta' : 'Balance');
+}
+
+function _fechaNum(f) {
+  var d = null;
+  try { d = parsearFechaVenta(f); } catch (e) {}
+  return d ? d.getTime() : 0;
+}
+
+/**
+ * Todo el movimiento de un cliente entre dos fechas, en orden.
+ * Devuelve facturas, pagos y devoluciones mezclados y ordenados por fecha.
+ */
+function movimientoEntreFechas(cid, desde, hasta) {
+  ventas = LS('nv', []);
+  var dN = desde ? _fechaNum(desde) : 0;
+  var hN = hasta ? _fechaNum(hasta) + 86399000 : Infinity;   // hasta el final de ese día
+
+  var lista = [], facturado = 0, pagado = 0, devuelto = 0;
+  var porRecibo = {};   // para juntar las partes de un mismo cobro
+
+  ventas.forEach(function (v) {
+    if (String(v.cid) !== String(cid)) return;
+
+    var fv = _fechaNum(v.fecha);
+    var dentroFactura = fv >= dN && fv <= hN;
+    if (dentroFactura && !v.cancelada) {
+      facturado += (typeof dinero === 'function') ? dinero(v.total) : (parseFloat(v.total) || 0);
+    }
+    if (dentroFactura) {
+      lista.push({
+        tipo: v.cancelada ? 'cancelada' : 'factura',
+        cuando: fv, fecha: v.fecha, hora: v.hora || '',
+        vid: v.id, nf: v.numFactura || String(v.id),
+        monto: (typeof dinero === 'function') ? dinero(v.total) : (parseFloat(v.total) || 0),
+        items: (v.items || []).length,
+        tipoPago: v.tipo || '',
+        debe: v.cancelada ? 0 : cobradoYDebeDe(v).debe
+      });
+    }
+
+    // Los pagos van por su PROPIA fecha, que puede caer en otro rango que la factura
+    (v.pagosFactura || []).forEach(function (p) {
+      if (!p) return;
+      var fp = _fechaNum(p.fecha || v.fecha);
+      if (fp < dN || fp > hN) return;
+      var m = (typeof dinero === 'function') ? dinero(p.monto) : (parseFloat(p.monto) || 0);
+      if (!isFinite(m) || m <= 0.005) return;
+
+      if (p.esDevolucion) {
+        devuelto += m;
+        lista.push({ tipo: 'devolucion', cuando: fp, fecha: p.fecha || v.fecha,
+                     vid: v.id, nf: v.numFactura || String(v.id), monto: m, pid: p.pid || '' });
+        return;
+      }
+
+      pagado += m;
+      // 🔑 Las partes de un mismo cobro se juntan: el cliente pagó UNA vez, aunque se
+      // repartiera en varias facturas. Sin recibo, cada pago va suelto.
+      // Con recibo, las partes del mismo cobro se juntan. Sin recibo -los pagos de antes
+      // del 29 ago- cada uno va SUELTO: si no, dos pagos del mismo dia a la misma
+      // factura se mezclarian en uno y se veria "#0053 · #0053". -5 sep-
+      var clave = p.recibo ? ('R:' + p.recibo)
+                           : ('S:' + v.id + '|' + (p.pid || (fp + '|' + m)));
+      if (!porRecibo[clave]) {
+        porRecibo[clave] = {
+          tipo: 'pago', cuando: fp, fecha: p.fecha || v.fecha,
+          recibo: p.recibo || null,
+          completo: (typeof p.montoCobro === 'number' && p.montoCobro > 0) ? p.montoCobro : 0,
+          metodo: p.metodo || (p.metodos ? 'varios' : ''),
+          partes: [], suma: 0
+        };
+        lista.push(porRecibo[clave]);
+      }
+      var g = porRecibo[clave];
+      g.partes.push({ vid: v.id, nf: v.numFactura || String(v.id), monto: m,
+                      totalFactura: (typeof dinero === 'function') ? dinero(v.total) : (parseFloat(v.total) || 0) });
+      g.suma = Math.round((g.suma + m) * 100) / 100;
+      if (!g.completo) g.completo = g.suma;
+    });
+  });
+
+  // Del más viejo al más nuevo, como se lee un extracto
+  lista.sort(function (a, b) { return a.cuando - b.cuando; });
+
+  var r2 = function (x) { return Math.round(x * 100) / 100; };
+  return {
+    lista: lista,
+    facturado: r2(facturado),
+    pagado: r2(pagado),
+    devuelto: r2(devuelto),
+    // El balance TOTAL del cliente, no solo el del rango: es lo que de verdad debe hoy
+    debeHoy: (function () { try { return balanceDelCliente(cid); } catch (e) { return 0; } })()
+  };
+}
+
+/**
+ * 📄 EL TEXTO PARA EL CLIENTE.
+ * Cada compra con SUS pagos aplicados debajo, y al final el detalle de cada pago
+ * entero con su reparto — que es lo que Sensei pidió para que el barbero lo entienda.
+ */
+function textoEstadoPorFechas(cid, desde, hasta) {
+  clientes = LS('ncl', []);
+  var c = clientes.find(function (x) { return String(x.id) === String(cid); });
+  if (!c) return '';
+  var m = movimientoEntreFechas(cid, desde, hasta);
+
+  var t = [];
+  t.push('NUNEZ BEAUTY SUPPLY');
+  t.push('Estado de cuenta');
+  t.push('');
+  t.push(nombreCl(c));
+  if (c.negocio) t.push(c.negocio);
+  t.push('Del ' + (desde || 'principio') + ' al ' + (hasta || 'hoy'));
+  t.push('');
+  t.push('--------------------------------');
+
+  // ── LO QUE COMPRÓ, con sus pagos debajo ──
+  var facturas = m.lista.filter(function (x) { return x.tipo === 'factura'; });
+  if (!facturas.length) {
+    t.push('No hay compras en esas fechas.');
+  } else {
+    t.push('LO QUE COMPRO');
+    t.push('');
+    facturas.forEach(function (f) {
+      t.push('Factura #' + f.nf + '  ·  ' + f.fecha);
+      t.push('   Total: $' + fmtNum(f.monto));
+      // 🔑 Cada pago que se le aplicó a ESTA factura
+      var suyos = [];
+      m.lista.forEach(function (x) {
+        if (x.tipo !== 'pago') return;
+        (x.partes || []).forEach(function (pt) {
+          if (String(pt.vid) === String(f.vid)) suyos.push({ fecha: x.fecha, monto: pt.monto });
+        });
+      });
+      if (suyos.length) {
+        t.push('   Pagos aplicados:');
+        suyos.forEach(function (s) {
+          t.push('     ' + s.fecha + '   $' + fmtNum(s.monto));
+        });
+      } else {
+        t.push('   Sin pagos todavia.');
+      }
+      t.push(f.debe > 0.005 ? '   QUEDA: $' + fmtNum(f.debe) : '   PAGADA');
+      t.push('');
+    });
+  }
+
+  // ── CADA PAGO ENTERO, CON SU REPARTO ──
+  var pagos = m.lista.filter(function (x) { return x.tipo === 'pago'; });
+  if (pagos.length) {
+    t.push('--------------------------------');
+    t.push('SUS PAGOS');
+    t.push('');
+    pagos.forEach(function (p) {
+      t.push('Pago del ' + p.fecha + '   $' + fmtNum(p.completo));
+      if (p.partes.length > 1) {
+        // 🔑 Lo que Sensei pidió: que se vea el pago entero Y cómo se repartió
+        t.push('   Se aplico asi:');
+        p.partes.forEach(function (pt) {
+          t.push('     $' + fmtNum(pt.monto) + '  ->  Factura #' + pt.nf);
+        });
+        var sobra = Math.round((p.completo - p.suma) * 100) / 100;
+        if (sobra > 0.005) t.push('     $' + fmtNum(sobra) + '  ->  quedo a su favor');
+      } else if (p.partes.length === 1) {
+        t.push('   A la factura #' + p.partes[0].nf);
+      }
+      t.push('');
+    });
+  }
+
+  var dev = m.lista.filter(function (x) { return x.tipo === 'devolucion'; });
+  if (dev.length) {
+    t.push('--------------------------------');
+    t.push('DEVOLUCIONES');
+    dev.forEach(function (d) {
+      t.push('   ' + d.fecha + '   $' + fmtNum(d.monto) + '   (factura #' + d.nf + ')');
+    });
+    t.push('');
+  }
+
+  t.push('--------------------------------');
+  t.push('EN ESTAS FECHAS');
+  t.push('   Le facture:  $' + fmtNum(m.facturado));
+  t.push('   Me pago:     $' + fmtNum(m.pagado));
+  if (m.devuelto > 0.005) t.push('   Devolvio:    $' + fmtNum(m.devuelto));
+  t.push('');
+  t.push(m.debeHoy > 0.005
+    ? 'SU BALANCE HOY: $' + fmtNum(m.debeHoy)
+    : 'SU CUENTA ESTA AL DIA');
+  t.push('');
+  t.push('Gracias por su confianza.');
+  return t.join('\n');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  📊 LA PANTALLA DEL ESTADO POR FECHAS  (5 sep 2026)
+//  Cada renglón se toca y se abre con todo el detalle.
+// ═══════════════════════════════════════════════════════════════════
+function abrirEstadoPorFechas(cid){
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c){ avisoGrande('No encontr\u00e9 ese cliente.'); return; }
+  window._estadoFechasCid = cid;
+
+  // Por defecto: los \u00faltimos 3 meses, que es lo que suele querer ver
+  var hoy = new Date();
+  var atras = new Date(hoy.getFullYear(), hoy.getMonth() - 3, hoy.getDate());
+  var aISO = function(d){
+    var mm = d.getMonth() + 1, dd = d.getDate();
+    return d.getFullYear() + '-' + (mm < 10 ? '0' : '') + mm + '-' + (dd < 10 ? '0' : '') + dd;
+  };
+  window._efDesde = window._efDesde || aISO(atras);
+  window._efHasta = window._efHasta || aISO(hoy);
+
+  var ov = document.getElementById('estado-fechas-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'estado-fechas-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:100002;'
+    + 'display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick = function(e){ if(e.target === ov) cerrarEstadoPorFechas(); };
+  ov.style.display = 'flex';
+  pintarEstadoPorFechas();
+}
+
+function cerrarEstadoPorFechas(){
+  var ov = document.getElementById('estado-fechas-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+// Los atajos de fechas, para no tener que escribirlas
+function rangoRapidoEstado(cual){
+  var hoy = new Date();
+  var aISO = function(d){
+    var mm = d.getMonth() + 1, dd = d.getDate();
+    return d.getFullYear() + '-' + (mm < 10 ? '0' : '') + mm + '-' + (dd < 10 ? '0' : '') + dd;
+  };
+  if(cual === 'mes'){
+    window._efDesde = aISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+    window._efHasta = aISO(hoy);
+  } else if(cual === 'mespasado'){
+    window._efDesde = aISO(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1));
+    window._efHasta = aISO(new Date(hoy.getFullYear(), hoy.getMonth(), 0));
+  } else if(cual === 'ano'){
+    window._efDesde = aISO(new Date(hoy.getFullYear(), 0, 1));
+    window._efHasta = aISO(hoy);
+  } else {   // todo
+    window._efDesde = '2020-01-01';
+    window._efHasta = aISO(hoy);
+  }
+  pintarEstadoPorFechas();
+}
+
+function cambiarFechaEstado(cual, valor){
+  if(cual === 'desde') window._efDesde = valor;
+  else window._efHasta = valor;
+  pintarEstadoPorFechas();
+}
+
+// De AAAA-MM-DD a MM/DD/AAAA, que es como guarda las fechas la app
+function _aFechaApp(iso){
+  var p = String(iso || '').split('-');
+  if(p.length !== 3) return '';
+  return p[1] + '/' + p[2] + '/' + p[0];
+}
+
+function pintarEstadoPorFechas(){
+  var ov = document.getElementById('estado-fechas-overlay');
+  if(!ov) return;
+  var cid = window._estadoFechasCid;
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c) return;
+
+  var desde = _aFechaApp(window._efDesde), hasta = _aFechaApp(window._efHasta);
+  var m = movimientoEntreFechas(cid, desde, hasta);
+
+  var h = '<div style="background:#fff;width:100%;max-width:520px;border-radius:16px 16px 0 0;'
+    + 'padding:14px;max-height:92vh;overflow:auto">'
+
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+    +   '<div><div style="font-size:16px;font-weight:900;color:var(--nbs-ink)">'
+    +     escaparHtml(nombreCl(c)) + '</div>'
+    +     (c.negocio ? '<div style="font-size:12px;color:var(--nbs-muted)">' + escaparHtml(c.negocio) + '</div>' : '')
+    +     '<div style="font-size:11.5px;font-weight:800;color:#1a237e;margin-top:2px">'
+    +       '\ud83d\udcca ESTADO POR FECHAS</div></div>'
+    +   '<button onclick="cerrarEstadoPorFechas()" style="background:#F0F0F2;border:none;'
+    +     'border-radius:9px;width:34px;height:34px;font-size:16px;cursor:pointer">\u2715</button>'
+    + '</div>'
+
+    // Las fechas que él elige
+    + '<div style="display:flex;gap:8px;margin-bottom:8px">'
+    +   '<div style="flex:1"><div style="font-size:10.5px;font-weight:800;color:#555;margin-bottom:2px">DESDE</div>'
+    +     '<input type="date" value="' + escaparHtml(window._efDesde) + '" '
+    +     'onchange="cambiarFechaEstado(\'desde\', this.value)" '
+    +     'style="width:100%;padding:8px;border:1px solid #ccc;border-radius:8px;font-size:12.5px"></div>'
+    +   '<div style="flex:1"><div style="font-size:10.5px;font-weight:800;color:#555;margin-bottom:2px">HASTA</div>'
+    +     '<input type="date" value="' + escaparHtml(window._efHasta) + '" '
+    +     'onchange="cambiarFechaEstado(\'hasta\', this.value)" '
+    +     'style="width:100%;padding:8px;border:1px solid #ccc;border-radius:8px;font-size:12.5px"></div>'
+    + '</div>'
+
+    + '<div style="display:flex;gap:5px;margin-bottom:11px">'
+    +   ['mes|Este mes','mespasado|Mes pasado','ano|Este a\u00f1o','todo|Todo'].map(function(x){
+          var p = x.split('|');
+          return '<button onclick="rangoRapidoEstado(\'' + p[0] + '\')" '
+            + 'style="flex:1;padding:7px 2px;background:#fff;color:#1a237e;border:1px solid #b9bfe0;'
+            + 'border-radius:7px;font-size:10.5px;font-weight:700;cursor:pointer">' + p[1] + '</button>';
+        }).join('')
+    + '</div>';
+
+  // Los tres números del rango
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">'
+    + [['LE FACTUR\u00c9', m.facturado, '#1565C0', '#E3F2FD'],
+       ['ME PAG\u00d3',    m.pagado,    '#2E7D32', '#E8F5E9'],
+       ['DEBE HOY',     m.debeHoy,   m.debeHoy > 0.005 ? '#C62828' : '#2E7D32',
+                                     m.debeHoy > 0.005 ? '#FFEBEE' : '#E8F5E9']]
+      .map(function(x){
+        return '<div style="background:' + x[3] + ';border-radius:10px;padding:9px;text-align:center">'
+          + '<div style="font-size:9.5px;font-weight:800;color:' + x[2] + ';letter-spacing:.3px">' + x[0] + '</div>'
+          + '<div style="font-size:16px;font-weight:900;color:' + x[2] + '">$' + fmtNum(x[1]) + '</div></div>';
+      }).join('')
+    + '</div>';
+
+  // ── EL MOVIMIENTO, POR ORDEN DE FECHA Y TOCABLE ──
+  h += '<div style="font-size:11px;font-weight:800;color:#555;letter-spacing:.4px;margin-bottom:6px">'
+    +   'TODO SU MOVIMIENTO \u00b7 ' + m.lista.length + ' cosa(s)</div>';
+
+  if(!m.lista.length){
+    h += '<div style="background:#F4F6FB;border-radius:10px;padding:16px;text-align:center;'
+      +  'font-size:12.5px;color:var(--nbs-muted)">No hay movimiento en esas fechas.</div>';
+  } else {
+    m.lista.forEach(function(x, i){
+      var ico, col, tit, sub, mon;
+      if(x.tipo === 'factura' || x.tipo === 'cancelada'){
+        ico = '\ud83e\uddfe'; col = x.tipo === 'cancelada' ? '#999' : '#1565C0';
+        tit = 'Factura #' + x.nf + (x.tipo === 'cancelada' ? ' \u00b7 CANCELADA' : '');
+        sub = x.items + ' producto(s)' + (x.debe > 0.005 ? ' \u00b7 debe $' + fmtNum(x.debe) : ' \u00b7 pagada');
+        mon = '$' + fmtNum(x.monto);
+      } else if(x.tipo === 'pago'){
+        ico = '\ud83d\udcb5'; col = '#2E7D32';
+        tit = 'Pago' + (x.partes.length > 1 ? ' \u00b7 se reparti\u00f3 en ' + x.partes.length : '');
+        sub = x.partes.map(function(pt){ return '#' + pt.nf; }).join(' \u00b7 ');
+        mon = '$' + fmtNum(x.completo);
+      } else {
+        ico = '\u21a9\ufe0f'; col = '#E65100';
+        tit = 'Devoluci\u00f3n'; sub = 'de la factura #' + x.nf;
+        mon = '\u2212 $' + fmtNum(x.monto);
+      }
+      h += '<div onclick="verDetalleMovimiento(' + i + ')" '
+        + 'style="display:flex;align-items:center;gap:9px;padding:10px;border:1px solid #E4E4EC;'
+        + 'border-left:3px solid ' + col + ';border-radius:9px;margin-bottom:6px;cursor:pointer">'
+        + '<div style="font-size:17px">' + ico + '</div>'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:12.5px;font-weight:800;color:var(--nbs-ink)">' + escaparHtml(tit) + '</div>'
+        +   '<div style="font-size:10.5px;color:var(--nbs-muted)">' + escaparHtml(x.fecha + ' \u00b7 ' + sub) + '</div>'
+        + '</div>'
+        + '<div style="font-size:13.5px;font-weight:900;color:' + col + '">' + mon + '</div>'
+        + '<div style="color:#bbb;font-size:15px">\u203a</div>'
+        + '</div>';
+    });
+  }
+
+  // Los botones de mandárselo
+  h += '<div style="display:flex;gap:8px;margin-top:12px">'
+    + '<button onclick="mandarEstadoPorFechas()" style="flex:1;padding:13px 6px;background:#128C7E;'
+    +   'color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;cursor:pointer">'
+    +   '\ud83d\udce4 Mand\u00e1rselo</button>'
+    + '<button onclick="pdfEstadoPorFechas()" style="flex:1;padding:13px 6px;background:#1a237e;'
+    +   'color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;cursor:pointer">'
+    +   '\ud83d\udcc4 Hacer PDF</button>'
+    + '</div>'
+    + '<button onclick="cerrarEstadoPorFechas()" style="width:100%;padding:12px;margin-top:7px;'
+    +   'background:#F0F0F2;color:#333;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Cerrar</button>'
+    + '</div>';
+
+  ov.innerHTML = h;
+  window._efLista = m.lista;
+}
+
+// 👁️ El detalle de un renglón, al tocarlo.  (5 sep 2026)
+function verDetalleMovimiento(i){
+  var x = (window._efLista || [])[i];
+  if(!x) return;
+
+  if(x.tipo === 'factura' || x.tipo === 'cancelada'){
+    // La factura completa, que ya sabe pintarla la app
+    cerrarEstadoPorFechas();
+    try { verFacturaProfesional(String(x.vid)); } catch(e){
+      avisoGrande('No pude abrir esa factura.');
+    }
+    return;
+  }
+
+  if(x.tipo === 'pago'){
+    // 🔑 EL PAGO ENTERO CON SU REPARTO, que es lo que Sensei pidió que se vea claro
+    var t = ['\ud83d\udcb5 PAGO DEL ' + x.fecha, ''];
+    t.push('Total del pago: $' + fmtNum(x.completo));
+    if(x.metodo) t.push('Forma: ' + (METODOS_PAGO_LABELS[x.metodo] || x.metodo));
+    if(x.recibo) t.push('Recibo: ' + x.recibo);
+    t.push('');
+    if(x.partes.length > 1){
+      t.push('SE APLIC\u00d3 AS\u00cd:');
+      x.partes.forEach(function(pt){
+        t.push('  \u2022 $' + fmtNum(pt.monto) + '  \u2192  Factura #' + pt.nf
+             + '  (de $' + fmtNum(pt.totalFactura) + ')');
+      });
+      var sobra = Math.round((x.completo - x.suma) * 100) / 100;
+      if(sobra > 0.005){
+        t.push('  \u2022 $' + fmtNum(sobra) + '  \u2192  qued\u00f3 a su favor');
+      }
+    } else if(x.partes.length === 1){
+      t.push('Se aplic\u00f3 a la factura #' + x.partes[0].nf
+           + ' (de $' + fmtNum(x.partes[0].totalFactura) + ')');
+    }
+    avisoGrande(t.join('\n'));
+    return;
+  }
+
+  // Devolución
+  avisoGrande('\u21a9\ufe0f DEVOLUCI\u00d3N DEL ' + x.fecha + '\n\n'
+    + 'Monto: $' + fmtNum(x.monto) + '\n'
+    + 'De la factura #' + x.nf + '\n\n'
+    + 'Se le descont\u00f3 de lo que deb\u00eda.');
+}
+
+// 📤 Mandarle el estado por las cuatro formas de siempre
+function mandarEstadoPorFechas(){
+  var cid = window._estadoFechasCid;
+  if(!cid) return;
+  var texto = textoEstadoPorFechas(cid, _aFechaApp(window._efDesde), _aFechaApp(window._efHasta));
+  cerrarEstadoPorFechas();
+  mandarloAlCliente(cid, texto, 'Estado por fechas');
+}
+
+// 📄 El mismo estado, pero en PDF para imprimir o mandar como archivo
+function pdfEstadoPorFechas(){
+  var cid = window._estadoFechasCid;
+  if(!cid) return;
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  var desde = _aFechaApp(window._efDesde), hasta = _aFechaApp(window._efHasta);
+  var m = movimientoEntreFechas(cid, desde, hasta);
+
+  var facturas = m.lista.filter(function(x){ return x.tipo === 'factura'; });
+  var pagos = m.lista.filter(function(x){ return x.tipo === 'pago'; });
+
+  var h = '<html><head><meta charset="utf-8"><title>Estado de cuenta</title><style>'
+    + 'body{font-family:Arial,Helvetica,sans-serif;color:#222;margin:26px;font-size:13px}'
+    + '.cab{text-align:center;border-bottom:3px solid #1a237e;padding-bottom:10px;margin-bottom:16px}'
+    + '.cab h1{margin:0;font-size:20px;color:#1a237e;letter-spacing:1px}'
+    + '.cab p{margin:3px 0;font-size:11px;color:#666}'
+    + '.cli{background:#F4F6FB;border-radius:8px;padding:11px;margin-bottom:16px}'
+    + '.cli b{font-size:15px;color:#1a237e}'
+    + 'h2{font-size:13px;color:#1a237e;border-bottom:1px solid #ccc;padding-bottom:4px;margin:18px 0 9px}'
+    + '.f{border:1px solid #ddd;border-radius:7px;padding:9px;margin-bottom:9px}'
+    + '.f .t{font-weight:bold;font-size:13px}'
+    + '.f .l{display:flex;justify-content:space-between;font-size:11.5px;color:#555;padding:1px 0}'
+    + '.f .q{font-weight:bold;border-top:1px solid #eee;margin-top:5px;padding-top:4px}'
+    + '.p{border-left:3px solid #2E7D32;background:#F6FBF7;padding:9px;margin-bottom:9px;border-radius:0 7px 7px 0}'
+    + '.tot{background:#1a237e;color:#fff;border-radius:8px;padding:12px;margin-top:16px}'
+    + '.tot .l{display:flex;justify-content:space-between;padding:2px 0;font-size:12.5px}'
+    + '.tot .g{font-size:16px;font-weight:bold;border-top:1px solid rgba(255,255,255,.3);'
+    +   'margin-top:6px;padding-top:6px}'
+    + '</style></head><body>'
+
+    + '<div class="cab"><h1>NUNEZ BEAUTY SUPPLY</h1>'
+    + '<p>964 Atwells Ave, Providence, Rhode Island 02909 &nbsp;·&nbsp; 401-305-0188</p>'
+    + '<p style="font-weight:bold;color:#1a237e;font-size:13px">ESTADO DE CUENTA</p></div>'
+
+    + '<div class="cli"><b>' + escaparHtml(nombreCl(c)) + '</b><br>'
+    + (c.negocio ? escaparHtml(c.negocio) + '<br>' : '')
+    + '<span style="font-size:11px;color:#666">Del ' + escaparHtml(desde)
+    + ' al ' + escaparHtml(hasta) + '</span></div>';
+
+  h += '<h2>LO QUE COMPRO</h2>';
+  if(!facturas.length){
+    h += '<p style="color:#888;font-size:12px">No hay compras en esas fechas.</p>';
+  } else {
+    facturas.forEach(function(f){
+      h += '<div class="f"><div class="t">Factura #' + escaparHtml(String(f.nf))
+        + ' &nbsp;·&nbsp; ' + escaparHtml(f.fecha) + '</div>'
+        + '<div class="l"><span>Total de la compra</span><b>$' + fmtNum(f.monto) + '</b></div>';
+      var suyos = [];
+      pagos.forEach(function(x){
+        (x.partes || []).forEach(function(pt){
+          if(String(pt.vid) === String(f.vid)) suyos.push({ fecha: x.fecha, monto: pt.monto });
+        });
+      });
+      if(suyos.length){
+        h += '<div style="font-size:10.5px;color:#2E7D32;font-weight:bold;margin-top:5px">PAGOS APLICADOS</div>';
+        suyos.forEach(function(s){
+          h += '<div class="l"><span>' + escaparHtml(s.fecha) + '</span><span>$' + fmtNum(s.monto) + '</span></div>';
+        });
+      }
+      h += '<div class="l q"><span>' + (f.debe > 0.005 ? 'Queda' : 'PAGADA') + '</span>'
+        + '<span style="color:' + (f.debe > 0.005 ? '#C62828' : '#2E7D32') + '">$'
+        + fmtNum(f.debe) + '</span></div></div>';
+    });
+  }
+
+  if(pagos.length){
+    h += '<h2>SUS PAGOS</h2>';
+    pagos.forEach(function(p){
+      h += '<div class="p"><div class="t">Pago del ' + escaparHtml(p.fecha)
+        + ' &nbsp;·&nbsp; <span style="color:#2E7D32">$' + fmtNum(p.completo) + '</span></div>';
+      if(p.partes.length > 1){
+        h += '<div style="font-size:10.5px;color:#666;margin-top:4px">SE APLICO ASI</div>';
+        p.partes.forEach(function(pt){
+          h += '<div class="l"><span>Factura #' + escaparHtml(String(pt.nf)) + '</span>'
+            + '<span>$' + fmtNum(pt.monto) + '</span></div>';
+        });
+        var sobra = Math.round((p.completo - p.suma) * 100) / 100;
+        if(sobra > 0.005){
+          h += '<div class="l"><span>Quedo a su favor</span><span>$' + fmtNum(sobra) + '</span></div>';
+        }
+      } else if(p.partes.length === 1){
+        h += '<div class="l"><span>A la factura #' + escaparHtml(String(p.partes[0].nf)) + '</span>'
+          + '<span>$' + fmtNum(p.partes[0].monto) + '</span></div>';
+      }
+      h += '</div>';
+    });
+  }
+
+  h += '<div class="tot">'
+    + '<div class="l"><span>Le facture en estas fechas</span><span>$' + fmtNum(m.facturado) + '</span></div>'
+    + '<div class="l"><span>Me pago</span><span>$' + fmtNum(m.pagado) + '</span></div>'
+    + (m.devuelto > 0.005 ? '<div class="l"><span>Devolvio</span><span>$' + fmtNum(m.devuelto) + '</span></div>' : '')
+    + '<div class="l g"><span>' + (m.debeHoy > 0.005 ? 'SU BALANCE HOY' : 'SU CUENTA ESTA AL DIA')
+    + '</span><span>$' + fmtNum(m.debeHoy) + '</span></div></div>'
+    + '<p style="text-align:center;font-size:10.5px;color:#888;margin-top:18px">'
+    + 'Gracias por su confianza</p></body></html>';
+
+  try {
+    var w = window.open('', '_blank');
+    if(!w){ avisoGrande('El telefono bloqueo la ventana. Permite las ventanas emergentes y vuelve a intentar.'); return; }
+    w.document.write(h);
+    w.document.close();
+    setTimeout(function(){ try { w.print(); } catch(e){} }, 400);
+  } catch(e){
+    avisoGrande('No pude abrir el PDF: ' + e.message);
+  }
 }
 
 function comoMandarloAlCliente(cid, texto, queEs){
@@ -32136,9 +32755,15 @@ logAtras('=== ABRIO LA APP | largo historial='+history.length
          +' | state='+(history.state?JSON.stringify(history.state):'null')
          +' | modo='+(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ? 'ICONO' : 'navegador')+' ===');   // colchon: aguanta 6 toques de atras seguidos sin tocar la pantalla
 
+// \ud83d\udee1\ufe0f Con menos de estos guardianes se considera que la proteccion esta BAJA:
+// se repone sin freno y el letrero de salir sale antes de llegar a cero. -4 sep-
+var GUARDIANES_BAJOS = 6;
+
 function ponerGuardianAtras(){
   var ahora = Date.now();
-  if(ahora - _ultimoGuardian < 250) return;   // un toque = una recarga, no tres
+  // \ud83d\udd11 El freno de 250 ms evita llenar el historial con toques repetidos, PERO no
+  // debe aplicarse cuando la proteccion esta baja: ahi lo urgente es reponer. -4 sep-
+  if(ahora - _ultimoGuardian < 250 && profundidadGuardian() > GUARDIANES_BAJOS) return;
   _ultimoGuardian = ahora;
   // Se RELLENA hasta tener MIN_GUARDIANES. Todos se crean aqui dentro, dentro
   // del toque real del usuario, asi que Chrome los respeta todos. Con 6 de
@@ -32193,10 +32818,28 @@ window.addEventListener('popstate', function(){
     return;
   }
 
-  // OJO: aqui NO se pone guardian. Un guardian creado dentro del propio evento de atras
-  // no lleva toque del usuario, y Chrome lo descarta -ese fue el error de los intentos
-  // anteriores-. Los guardianes buenos ya se pusieron con cada toque de Sensei mientras
-  // navegaba, y hay uno por cada paso que dio.
+  // \ud83d\udd34 SI QUEDAN POCOS GUARDIANES, SE ABRE EL LETRERO YA -4 sep-.
+  // Antes se esperaba a que se acabaran, y ahi Android cerraba la app. Sensei lo
+  // reportaba desde hacia tiempo: "se sigue saliendo aunque le dé muchas veces".
+  // Ahora nunca se llega a cero: en cuanto la proteccion baja, se pregunta.
+  var _quedan = profundidadGuardian();
+  if(_quedan <= GUARDIANES_BAJOS){
+    // Se repone lo que se pueda antes de nada. Aunque Chrome descarte alguno por no
+    // venir de un toque, cualquiera que entre es un cierre menos.
+    try {
+      for(var _g = _quedan; _g < GUARDIANES_BAJOS + 4; _g++){
+        history.pushState({nbs:1, d:_g + 1}, '', window.location.href);
+      }
+    } catch(e){}
+    logAtras('  -> quedaban ' + _quedan + ' guardianes: se abre el letrero de salir');
+    try { mostrarLetreroSalir(); } catch(e){}
+    return;
+  }
+
+  // OJO: aqui NO se pone guardian en el caso normal. Un guardian creado dentro del
+  // propio evento de atras no lleva toque del usuario, y Chrome lo descarta -ese fue el
+  // error de los intentos anteriores-. Los guardianes buenos ya se pusieron con cada
+  // toque de Sensei mientras navegaba, y hay uno por cada paso que dio.
 
   // 🔑 EL BOTON DEL TELEFONO HACE EXACTAMENTE LO MISMO QUE EL DE LA APP.
   // Los dos llaman a `unPasoAtras()`: UN TOQUE = UN PELDAÑO. -Sensei, 12 ago-
