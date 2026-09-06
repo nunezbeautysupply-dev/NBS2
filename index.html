@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260904c-OFICIAL-V2.0">
+<meta name="app-version" content="20260904d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4611,6 +4611,7 @@ var RECUADROS_ENCIMA = [
   { id: 'unif-marcas-ov',           cerrar: 'cerrarUnificarMarcas' },
   { id: 'confirmar-balance-overlay', cerrar: 'cerrarConfirmacionBalance' },
   { id: 'sinconf-overlay',          cerrar: 'cerrarSinConfirmar' },
+  { id: 'aviso-backup-overlay',     cerrar: 'cerrarAvisoConBackup' },
   { id: 'credito-aplicado-overlay', cerrar: 'cerrarCreditoAplicado' },
   { id: 'ajuste-vip-overlay',       cerrar: 'cerrarAjustePuntosVIP' },
   { id: 'como-mandar-overlay',      cerrar: 'cerrarComoMandar' },
@@ -18733,7 +18734,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260904c';
+var NOVEDADES_VERSION = '20260904d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -33671,8 +33672,25 @@ function reintentarYDecirmeElError(){
     if(!nombres.length && despues === 0){
       t.push('\u2705 SUBIO TODO. Ya no queda nada pendiente.');
     } else if(!nombres.length && despues > 0){
-      t.push('\u26a0\ufe0f Quedan ' + despues + ' pendientes pero NINGUNO dio error.');
-      t.push('Puede que todavia esten subiendo. Espera 10 segundos y toca otra vez.');
+      t.push('\u23f3 Quedan ' + despues + ' pendientes y NINGUNO dio error todavia.');
+      t.push('');
+      // \ud83d\udd11 DECIRLE QUE ES LO QUE ESTA ATASCADO Y CUANTO PESA. -4 sep-
+      var _atascados = nombresPendientesDeSubir();
+      if(_atascados.length){
+        t.push('LO QUE FALTA POR SUBIR:');
+        _atascados.slice(0, 8).forEach(function(k){
+          var kb = 0;
+          try { kb = Math.round((localStorage.getItem(k) || '').length / 1024); } catch(e){}
+          t.push('\u2022 ' + nombreBonitoDeClave(k) + '   (' + kb + ' KB)');
+        });
+        t.push('');
+      }
+      t.push('Puede que sigan subiendo. La app avisa sola en cuanto');
+      t.push('terminen, o te dira el error si lo hay.');
+      t.push('');
+      t.push('\ud83d\udee1\ufe0f TUS DATOS NO SE PIERDEN: estan guardados en el');
+      t.push('telefono. Si quieres estar tranquilo, baja un backup');
+      t.push('desde el Menu, en SEGURIDAD.');
     } else {
       t.push('\ud83d\udd34 ESTAS NO PUDIERON SUBIR:\n');
       nombres.slice(0, 6).forEach(function(k){
@@ -33689,8 +33707,45 @@ function reintentarYDecirmeElError(){
       if(nombres.length > 6) t.push('...y ' + (nombres.length - 6) + ' mas.');
       t.push('MANDAME ESTA PANTALLA.');
     }
-    avisoGrande(t.join('\n'));
-  }, 6000);
+    // \ud83d\udee1\ufe0f Y el rescate: si no sube, que pueda guardar sus datos igual. -4 sep-
+    if(despues > 0){
+      mostrarAvisoConBackup(t.join('\n'));
+    } else {
+      avisoGrande(t.join('\n'));
+    }
+  }, 22000);   // \u23f1\ufe0f 22 s: el tope del envio son 20, hay que esperarlo o no se ve el fallo
+}
+
+// \ud83d\udcbe Un aviso con boton para bajar el backup. Se usa cuando algo no sube a la nube:
+// asi Sensei puede guardar sus datos en un archivo aunque la nube este fallando. -4 sep-
+function mostrarAvisoConBackup(texto){
+  var ov = document.getElementById('aviso-backup-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'aviso-backup-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2000002;'
+    + 'display:flex;align-items:center;justify-content:center;padding:14px';
+  ov.onclick = function(e){ if(e.target === ov) cerrarAvisoConBackup(); };
+  ov.innerHTML = '<div style="background:#fff;border-radius:15px;padding:16px;max-width:440px;'
+    + 'width:100%;max-height:88vh;overflow:auto">'
+    + '<div style="font-size:12.5px;color:#222;white-space:pre-wrap;line-height:1.5">'
+    +   escaparHtml(String(texto || '')) + '</div>'
+    + '<button onclick="cerrarAvisoConBackup();exportD()" style="width:100%;padding:13px;'
+    +   'margin-top:14px;background:#E65100;color:#fff;border:none;border-radius:10px;'
+    +   'font-size:14px;font-weight:800;cursor:pointer">'
+    +   '\ud83d\udcbe Bajar un backup ahora mismo</button>'
+    + '<button onclick="cerrarAvisoConBackup()" style="width:100%;padding:12px;margin-top:8px;'
+    +   'background:#1a237e;color:#fff;border:none;border-radius:10px;font-size:13.5px;'
+    +   'font-weight:800;cursor:pointer">Entendido</button>'
+    + '</div>';
+  ov.style.display = 'flex';
+}
+
+function cerrarAvisoConBackup(){
+  var ov = document.getElementById('aviso-backup-overlay');
+  if(ov) ov.style.display = 'none';
 }
 
 function probarLaNubePiezaPorPieza(){
@@ -33918,7 +33973,13 @@ function subirPendientes(){
       return fbDb.collection('nbs_data').doc(k.replace(/\//g,'_')).set(d);
     };
     var TOPE_NUBE = 1000000;   // 1 MB con un margen
+    // \u23f1\ufe0f Se declaran ANTES que apuntarFallo, que las usa. -4 sep-
+    var _yaContesto = false;
+    var _relojColgado = null;
+
     var apuntarFallo = function(e, comoFue, bytes){
+      _yaContesto = true;
+      try { clearTimeout(_relojColgado); } catch(e2){}
       try {
         var fallos = JSON.parse(localStorage.getItem('nbs_fallos_subida') || '{}');
         fallos[k] = {
@@ -33933,7 +33994,20 @@ function subirPendientes(){
         localStorage.setItem('nbs_fallos_subida', JSON.stringify(fallos));
       } catch(e2){}
     };
+    // \u23f1\ufe0f EL TOPE DE TIEMPO -4 sep-. Si en 20 segundos no subio NI dio error, se
+    // apunta como colgado. Antes se quedaba esperando callado para siempre.
+    _relojColgado = setTimeout(function(){
+      if(_yaContesto) return;
+      _yaContesto = true;
+      apuntarFallo({ code: 'se-colgo',
+        message: 'Pasaron 20 segundos y la nube no contesto ni con exito ni con error. '
+               + 'Puede ser señal muy debil o que el envio se quedo a medias.' },
+        'se colgo', docPend.valor.length);
+      try { actualizarAvisoPendientes(); } catch(e){}
+    }, 20000);
+
     var alSubir = function(){
+      _yaContesto = true; clearTimeout(_relojColgado);
       quitarPendienteDeSubir(k);
       try {
         var okf = JSON.parse(localStorage.getItem('nbs_fallos_subida') || '{}');
