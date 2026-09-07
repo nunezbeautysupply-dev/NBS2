@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260906d-OFICIAL-V2.0">
+<meta name="app-version" content="20260906e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18782,7 +18782,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260906d';
+var NOVEDADES_VERSION = '20260906e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -25355,12 +25355,46 @@ function verCl(id){
       + '<div style="font-size:14.5px;font-weight:900;margin-top:2px;color:' + (col || 'var(--nbs-ink)') + ';'
       +   'overflow:hidden;text-overflow:ellipsis">' + v + '</div></div>';
   };
+  // \ud83d\udcb0 EL CR\u00c9DITO A FAVOR, VISIBLE ARRIBA -6 sep-. Solo sale cuando lo tiene, para
+  // no ocupar sitio de balde. Se toca y lleva derecho a aplicarlo.
+  var _credArriba = 0;
+  try {
+    var _cCred = clientes.find(function(x){ return String(x.id) === String(id); });
+    _credArriba = parseFloat(_cCred && _cCred.creditoAFavor) || 0;
+  } catch(e){}
+
+  // \ud83d\udcb0 EL CR\u00c9DITO, EN EL MISMO CUADRO -6 sep-. Sensei: "si existe debe estar
+  // visible as\u00ed como su balance pendiente". Sale una quinta casilla, en naranja y justo
+  // al lado de DEBE, solo cuando de verdad tiene cr\u00e9dito.
   h += '<div style="display:flex;gap:6px;margin-top:12px">'
     + n('COMPR\u00d3', '$' + fmtNum(D.comprado))
     + n('DEBE', '$' + fmtNum(D.debe), D.debe > 0.005 ? 'var(--nbs-red-text)' : 'var(--nbs-ink)')
+    + (_credArriba > 0.005 ? n('A FAVOR', '$' + fmtNum(_credArriba), '#E65100') : '')
     + n('TE DEJA', '$' + fmtNum(D.ganancia), 'var(--nbs-green-text)')
     + n('\u00daLTIMA', D.diasDesde === null ? '\u2014' : (D.diasDesde + ' d'))
     + '</div>';
+
+  if(_credArriba > 0.005){
+    h += '<div onclick="irACobrarCliente(' + _arg(id) + ')" '
+      + 'style="display:flex;align-items:center;gap:9px;background:#FFF8E1;'
+      + 'border:1.5px solid #FFD54F;border-radius:10px;padding:10px 12px;margin-top:8px;'
+      + 'cursor:pointer">'
+      + '<div style="font-size:19px">\ud83d\udcb0</div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:9.5px;font-weight:800;color:#8A6D00;letter-spacing:.4px">'
+      +     'TIENE A SU FAVOR</div>'
+      +   '<div style="font-size:18px;font-weight:900;color:#E65100;line-height:1.1">$'
+      +     fmtNum(_credArriba) + '</div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:#8A6D00;font-weight:700;text-align:right;'
+      +   'line-height:1.3">'
+      + (D.debe > 0.005 ? 'toca para<br>usarlo' : 'se le usa en<br>su pr\u00f3xima compra')
+      + '</div>'
+      + (D.debe > 0.005
+          ? '<div style="color:#E65100;font-size:16px;font-weight:900">\u203a</div>'
+          : '')
+      + '</div>';
+  }
 
   // Los tres botones de siempre
   h += '<div style="display:flex;gap:6px;margin-top:11px">'
@@ -33007,14 +33041,14 @@ function profundidadGuardian(){
 // hay tantos guardianes como pasos haya dado, y puede tocar atras varias
 // veces seguidas sin tener que tocar la pantalla entremedio.
 var _ultimoGuardian = 0;
-var MIN_GUARDIANES = 20;
+var MIN_GUARDIANES = 30;
 logAtras('=== ABRIO LA APP | largo historial='+history.length
          +' | state='+(history.state?JSON.stringify(history.state):'null')
          +' | modo='+(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ? 'ICONO' : 'navegador')+' ===');   // colchon: aguanta 6 toques de atras seguidos sin tocar la pantalla
 
 // \ud83d\udee1\ufe0f Con menos de estos guardianes se considera que la proteccion esta BAJA:
 // se repone sin freno y el letrero de salir sale antes de llegar a cero. -4 sep-
-var GUARDIANES_BAJOS = 6;
+var GUARDIANES_BAJOS = 10;
 
 function ponerGuardianAtras(){
   var ahora = Date.now();
@@ -33093,10 +33127,13 @@ window.addEventListener('popstate', function(){
     return;
   }
 
-  // OJO: aqui NO se pone guardian en el caso normal. Un guardian creado dentro del
-  // propio evento de atras no lleva toque del usuario, y Chrome lo descarta -ese fue el
-  // error de los intentos anteriores-. Los guardianes buenos ya se pusieron con cada
-  // toque de Sensei mientras navegaba, y hay uno por cada paso que dio.
+  // \ud83d\udee1\ufe0f SE REPONE EN CADA ATRAS, SIEMPRE -6 sep-. Antes solo se reponia cuando
+  // quedaban pocos, y no bastaba: cada atras gasta uno, y el navegador descarta algunos
+  // de los que se crean aqui dentro. La cuenta bajaba mas rapido de lo que subia y la
+  // app acababa cerrandose sola. Un pushState de mas no molesta; quedarse sin colchon
+  // cierra la app y Sensei pierde el trabajo.
+  try { history.pushState({nbs:1, d:_quedan + 1}, '', window.location.href); }
+  catch(e){}
 
   // 🔑 EL BOTON DEL TELEFONO HACE EXACTAMENTE LO MISMO QUE EL DE LA APP.
   // Los dos llaman a `unPasoAtras()`: UN TOQUE = UN PELDAÑO. -Sensei, 12 ago-
