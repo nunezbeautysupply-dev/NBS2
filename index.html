@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260906c-OFICIAL-V2.0">
+<meta name="app-version" content="20260906d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4616,6 +4616,7 @@ var RECUADROS_ENCIMA = [
   { id: 'unif-marcas-ov',           cerrar: 'cerrarUnificarMarcas' },
   { id: 'confirmar-balance-overlay', cerrar: 'cerrarConfirmacionBalance' },
   { id: 'sinconf-overlay',          cerrar: 'cerrarSinConfirmar' },
+  { id: 'pin-overlay',              cerrar: 'cerrarPinRecuadro' },
   { id: 'estado-fechas-overlay',    cerrar: 'cerrarEstadoPorFechas' },
   { id: 'aviso-backup-overlay',     cerrar: 'cerrarAvisoConBackup' },
   { id: 'credito-aplicado-overlay', cerrar: 'cerrarCreditoAplicado' },
@@ -5966,7 +5967,7 @@ function renderVIPLista(list){
           // Sensei lo pidio el 6 ago: a algunos clientes ya les habia hablado del
           // programa antes de que la app llevara la cuenta, y quiere quedar bien con
           // ellos aunque el contador no este completo. -6 ago-
-          +'<button onclick="abrirEntregaPremioVIP(' + JSON.stringify(String(c.id)) + ','
+          +'<button onclick="abrirEntregaPremioVIP(' + _arg(String(c.id)) + ','
             + JSON.stringify(String(p.claveGrupo || p.nombre)) + ')" '
             + 'style="width:100%;margin-top:8px;padding:10px;background:'
             + (p.gratis > 0 ? '#AD1457' : '#ECEFF1') + ';color:' + (p.gratis > 0 ? '#fff' : '#546E7A') + ';'
@@ -5974,7 +5975,7 @@ function renderVIPLista(list){
             + (p.gratis > 0 ? '\ud83c\udf81 Ya se lo di' : '\ud83c\udf81 Darle el premio ahora') + '</button>'
             // ✏️ AJUSTAR A MANO. Faltaba en esta pantalla: solo estaba en la ficha
             // del cliente, y Sensei lo cazo mirando el Programa VIP. -3 sep-
-            +'<button onclick="abrirAjustePuntosVIP(' + JSON.stringify(String(c.id)) + ','
+            +'<button onclick="abrirAjustePuntosVIP(' + _arg(String(c.id)) + ','
             + JSON.stringify(String(p.claveGrupo || p.nombre)) + ')" '
             + 'style="width:100%;margin-top:5px;padding:8px;background:#fff;color:#555;'
             + 'border:1px solid #ccc;border-radius:9px;font-size:11.5px;font-weight:700;cursor:pointer">'
@@ -5996,7 +5997,7 @@ function renderVIPLista(list){
           + '<div style="font-size:11px;font-weight:800;color:#AD1457;letter-spacing:.4px;margin-bottom:6px">'
           + '\ud83c\udf81 PREMIOS ENTREGADOS (' + _canjes.length + ')</div>';
         _canjes.slice(-6).reverse().forEach(function(k){
-          html += '<div onclick="mostrarComprobantePremioVIP(' + JSON.stringify(String(c.id)) + ','
+          html += '<div onclick="mostrarComprobantePremioVIP(' + _arg(String(c.id)) + ','
             + JSON.stringify(String(k.ventaId)) + ')" '
             + 'style="display:flex;justify-content:space-between;align-items:center;background:#FCE4EC;'
             + 'border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:pointer">'
@@ -10752,7 +10753,7 @@ function renderMargenProductos(){
   h += '<div style="display:flex;gap:5px;margin-bottom:10px">'
     + ops.map(function(o){
         var act = (_margenOrden === o[0]);
-        return '<button onclick="cambiarOrdenMargen(' + JSON.stringify(o[0]) + ')" style="flex:1;padding:8px 4px;'
+        return '<button onclick="cambiarOrdenMargen(' + _arg(o[0]) + ')" style="flex:1;padding:8px 4px;'
           + 'background:' + (act ? '#6A1B9A' : '#F0F0F2') + ';color:' + (act ? '#fff' : 'var(--nbs-ink)')
           + ';border:none;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">' + o[1] + '</button>';
       }).join('')
@@ -10771,7 +10772,7 @@ function renderMargenProductos(){
     var col = p.sinCosto ? '#546E7A'
             : (p.gan <= 0 ? '#C62828' : (p.margen < 20 ? '#E65100' : (p.margen >= 45 ? '#2E7D32' : '#1565C0')));
     var pct = Math.max(0, Math.min(100, p.margen));
-    return '<div onclick="editarProductoDesdeMargen(' + JSON.stringify(String(p.id)) + ')" '
+    return '<div onclick="editarProductoDesdeMargen(' + _arg(String(p.id)) + ')" '
       + 'style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 11px;margin-bottom:6px;cursor:pointer">'
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
       +   '<div style="flex:1;min-width:0">'
@@ -18781,7 +18782,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260906c';
+var NOVEDADES_VERSION = '20260906d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -21503,7 +21504,7 @@ function abrirEntregaPremioVIP(cid, grupoClave){
   } else {
     h += '<div style="max-height:230px;overflow-y:auto;margin-bottom:12px">';
     candidatos.forEach(function(p){
-      h += '<button onclick="escogerPremioVIP(' + JSON.stringify(String(p.id)) + ')" '
+      h += '<button onclick="escogerPremioVIP(' + _arg(String(p.id)) + ')" '
         + 'id="prem-op-' + p.id + '" class="prem-op" '
         + 'style="width:100%;text-align:left;background:#fff;border:1.5px solid #e5e7eb;border-radius:9px;'
         + 'padding:10px 11px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
@@ -25904,6 +25905,20 @@ function toggleOtraCat(i){
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  🔒 EL RECUADRO DEL PIN  (6 sep 2026)
+//
+//  🔴 EL FALLO QUE ARREGLA, y era grave: `verificarPIN` usaba `prompt()`, y en el
+//  teléfono de Sensei Chrome NO LO DIBUJA. Sin recuadro no escribe el PIN, la función
+//  se corta en seco, y él veía que "no pasa nada" — sin error, sin aviso, sin nada.
+//
+//  ⚠️ Y no era solo el crédito: `protegerConHuella` protege **20 sitios** que mueven
+//  dinero. Con el prompt bloqueado, NINGUNO funcionaba.
+//
+//  🔑 La seguridad NO cambia: sigue pidiendo el mismo PIN, con el mismo límite de
+//  intentos. Lo único que cambia es que ahora SE VE.
+// ═══════════════════════════════════════════════════════════════════
+
 function abrirOpcionesFotoMarca(i){
   var tieneFoto = !!(document.getElementById('epml-foto-data-'+i).value);
   var overlay = document.getElementById('foto-acciones-overlay');
@@ -26405,12 +26420,87 @@ function guardarTodosLosProductosDeMarca(){
     + '\nVolviste al catálogo.');
 }
 
-function verificarPIN(callback){
-  var pin = prompt('Ingresa el PIN de administrador:');
-  if(pin === null) return;
-  if(verificarPinConLimite(pin)){
-    callback();
+function pedirPinConRecuadro(motivo, alAcertar){
+  var ov = document.getElementById('pin-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'pin-overlay';
+    document.body.appendChild(ov);
   }
+  window._pinCallback = alAcertar;
+
+  // 🔑 z-index 2000005: por encima de TODO lo demás de la app. El recuadro del PIN
+  // aparece encima de otros recuadros -el del crédito, el de cobrar-, así que si
+  // quedara detrás volveríamos al mismo problema.
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2000005;'
+    + 'display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.onclick = function(e){ if(e.target === ov) cerrarPinRecuadro(); };
+
+  ov.innerHTML = '<div style="background:#fff;border-radius:15px;padding:18px;max-width:380px;width:100%">'
+    + '<div style="font-size:16px;font-weight:900;color:#1a237e;text-align:center;margin-bottom:4px">'
+    +   '\ud83d\udd12 Confirma con tu PIN</div>'
+    + (motivo
+        ? '<div style="font-size:12.5px;color:var(--nbs-muted);text-align:center;line-height:1.5;'
+          + 'margin-bottom:13px">' + escaparHtml(String(motivo)) + '</div>'
+        : '<div style="margin-bottom:13px"></div>')
+    + '<input type="password" id="pin-campo" inputmode="numeric" autocomplete="off" '
+    +   'placeholder="PIN" '
+    +   'style="width:100%;padding:15px;border:2px solid #ccc;border-radius:11px;'
+    +   'font-size:22px;text-align:center;letter-spacing:6px;font-weight:800">'
+    + '<div id="pin-aviso" style="font-size:12px;color:#C62828;font-weight:700;'
+    +   'text-align:center;min-height:17px;margin-top:6px"></div>'
+    + '<button onclick="comprobarPinRecuadro()" style="width:100%;padding:14px;margin-top:8px;'
+    +   'background:#1a237e;color:#fff;border:none;border-radius:11px;font-size:15px;'
+    +   'font-weight:800;cursor:pointer">\u2713 Confirmar</button>'
+    + '<button onclick="cerrarPinRecuadro()" style="width:100%;padding:12px;margin-top:7px;'
+    +   'background:#F0F0F2;color:#333;border:none;border-radius:10px;font-size:13.5px;'
+    +   'font-weight:700;cursor:pointer">Cancelar</button>'
+    + '</div>';
+
+  ov.style.display = 'flex';
+  setTimeout(function(){
+    var c = document.getElementById('pin-campo');
+    if(c){
+      c.focus();
+      // Entrar con la tecla, para el que escribe con teclado
+      c.onkeydown = function(e){ if(e.key === 'Enter') comprobarPinRecuadro(); };
+    }
+  }, 90);
+}
+
+function cerrarPinRecuadro(){
+  var ov = document.getElementById('pin-overlay');
+  if(ov) ov.style.display = 'none';
+  window._pinCallback = null;
+}
+
+function comprobarPinRecuadro(){
+  var c = document.getElementById('pin-campo');
+  var av = document.getElementById('pin-aviso');
+  var pin = c ? c.value : '';
+  if(!pin){
+    if(av) av.textContent = 'Escribe tu PIN.';
+    return;
+  }
+  // 🔑 EL MISMO control de siempre, con su límite de intentos. No se relaja nada.
+  if(verificarPinConLimite(pin)){
+    var cb = window._pinCallback;
+    cerrarPinRecuadro();
+    if(typeof cb === 'function'){
+      try { cb(); } catch(e){ console.error('PIN ok pero la accion fallo:', e); }
+    }
+  } else {
+    if(av) av.textContent = 'PIN incorrecto.';
+    if(c){ c.value = ''; c.focus(); }
+  }
+}
+
+function verificarPIN(callback, motivo){
+  // \ud83d\udd34 ANTES ERA UN prompt() Y EL TELEFONO NO LO DIBUJABA -6 sep-. Sensei tocaba
+  // "Usar el credito" y no pasaba NADA: ni error, ni aviso. Y esto protege 20 sitios
+  // que mueven dinero, asi que ninguno funcionaba.
+  // La seguridad no cambia: el mismo PIN y el mismo limite de intentos.
+  pedirPinConRecuadro(motivo || 'Esta accion mueve dinero.', callback);
 }
 
 // Protege una accion peligrosa (borrar cliente, borrar pago, etc.) pidiendo SOLO la huella
@@ -27792,7 +27882,7 @@ function pintarCreditoAFavor(cid, saldoReal){
   +   '</div>'
     +   '<div style="font-size:11px;color:#6D4C00;font-weight:700;margin-bottom:3px">📅 ¿QUÉ DÍA SE LO APLICAS?</div>'
     +   '<input type="date" id="cred-fecha" style="width:100%;padding:9px;border:1px solid #E0C070;border-radius:8px;font-size:13px;margin-bottom:10px">'
-  +   '<button onclick="usarCreditoAFavor(' + JSON.stringify(String(cid)) + ')" '
+  +   '<button onclick="usarCreditoAFavor(' + _arg(String(cid)) + ')" '
   +     'style="width:100%;padding:13px;background:#E65100;color:white;border:none;border-radius:10px;'
   +     'font-size:15px;font-weight:800;cursor:pointer">\ud83d\udcb3 Usar $' + fmtNum(seUsan) + ' de su cr\u00e9dito</button>'
   + '</div>';
