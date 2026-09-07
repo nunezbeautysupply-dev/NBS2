@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>NBS · Haz tu pedido</title>
+<!--
+  📦 CATÁLOGO DE PEDIDOS DE NBS  (7 sep 2026)
+
+  Sensei: "quiero poder poner todas las fotos de cada artículo, porque el artículo con
+  fotos vendería mucho más fácil: la descripción muchas veces el cliente no la entiende,
+  pero si ve la foto la puede elegir sin ni siquiera tener que leer".
+
+  🔑 VA APARTE DE NBS2, como él pidió, para que el peso de las fotos no afecte a la app
+  con la que trabaja en la ruta. A NBS2 solo viaja el PEDIDO.
+
+  Las fotos NO están dentro de este archivo: se cargan de `fotos_XX.json` solo cuando el
+  barbero baja hasta ellas. Así el catálogo abre al instante aunque haya 599 productos.
+-->
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+       background:#F4F5F9;color:#1A1B2E;padding-bottom:96px}
+  .cab{background:#0B1020;color:#fff;padding:12px 14px;position:sticky;top:0;z-index:50;
+       box-shadow:0 2px 10px rgba(0,0,0,.18)}
+  .cab h1{margin:0;font-size:16px;letter-spacing:.5px;font-weight:900}
+  .cab .neg{font-size:12px;color:#D0A73C;font-weight:700;margin-top:1px}
+  .buscar{width:100%;padding:11px 13px;border:none;border-radius:10px;font-size:15px;
+          margin-top:9px;background:#fff}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding:9px 14px;background:#fff;
+         position:sticky;top:104px;z-index:49;border-bottom:1px solid #E6E6EE}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;padding:7px 13px;border-radius:20px;border:1.5px solid #D5D5E0;
+        background:#fff;font-size:12.5px;font-weight:700;color:#555;cursor:pointer;white-space:nowrap}
+  .chip.on{background:#0B1020;color:#fff;border-color:#0B1020}
+  .lista{padding:10px}
+  .p{display:flex;gap:11px;background:#fff;border-radius:12px;padding:10px;margin-bottom:8px;
+     align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .fo{width:70px;height:70px;border-radius:9px;background:#EEEFF5;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer}
+  .fo img{width:100%;height:100%;object-fit:cover}
+  .fo .sinf{font-size:9px;color:#9A9AAE;text-align:center;padding:3px;line-height:1.25;font-weight:700}
+  .inf{flex:1;min-width:0}
+  .nom{font-size:13.5px;font-weight:800;line-height:1.3}
+  .mar{font-size:10.5px;color:#8A8A9E;font-weight:700;letter-spacing:.3px;margin-top:2px}
+  .pre{font-size:16px;font-weight:900;color:#0B7A3B;margin-top:3px}
+  .ctl{display:flex;align-items:center;gap:7px;flex-shrink:0}
+  .bmas{width:38px;height:38px;border-radius:10px;border:none;background:#0B1020;color:#fff;
+        font-size:20px;font-weight:700;cursor:pointer}
+  .bmen{width:32px;height:32px;border-radius:9px;border:1.5px solid #D5D5E0;background:#fff;
+        font-size:17px;cursor:pointer;color:#555}
+  .cant{font-size:16px;font-weight:900;min-width:20px;text-align:center}
+  .barra{position:fixed;left:0;right:0;bottom:0;background:#0B7A3B;color:#fff;padding:12px 14px;
+         display:none;align-items:center;gap:11px;z-index:60;box-shadow:0 -3px 14px rgba(0,0,0,.22)}
+  .barra.on{display:flex}
+  .barra .t{flex:1;min-width:0}
+  .barra .t1{font-size:12px;opacity:.9}
+  .barra .t2{font-size:18px;font-weight:900}
+  .barra button{padding:12px 18px;border:none;border-radius:11px;background:#fff;color:#0B7A3B;
+                font-size:14.5px;font-weight:900;cursor:pointer}
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:200;display:none;
+      align-items:center;justify-content:center;padding:16px}
+  .ov.on{display:flex}
+  .ov img{max-width:100%;max-height:74vh;border-radius:12px}
+  .ov .cierra{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.2);color:#fff;
+              border:none;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer}
+  .ov .pie{position:absolute;bottom:26px;left:16px;right:16px;color:#fff;text-align:center;
+           font-size:14px;font-weight:700}
+  .car{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:150;display:none;
+       align-items:flex-end;justify-content:center}
+  .car.on{display:flex}
+  .carcaja{background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;
+           padding:15px;max-height:88vh;overflow:auto}
+  .cl{display:flex;justify-content:space-between;align-items:center;gap:9px;
+      padding:9px 0;border-bottom:1px solid #F0F0F6}
+  .vacio{text-align:center;padding:44px 20px;color:#9A9AAE;font-size:14px}
+</style>
+</head>
+<body>
+
+<div class="cab">
+  <h1>🧴 NUNEZ BEAUTY SUPPLY</h1>
+  <div class="neg" id="negocio">Cargando…</div>
+  <input class="buscar" id="q" placeholder="🔍 Buscar producto o marca…" oninput="pintar()">
+</div>
+
+<div class="chips" id="chips"></div>
+<div class="lista" id="lista"><div class="vacio">Cargando el catálogo…</div></div>
+
+<div class="barra" id="barra">
+  <div class="t">
+    <div class="t1" id="bt1">0 productos</div>
+    <div class="t2" id="bt2">$0.00</div>
+  </div>
+  <button onclick="verCarrito()">Ver pedido</button>
+</div>
+
+<div class="ov" id="ovFoto" onclick="cerrarFoto()">
+  <button class="cierra" onclick="cerrarFoto()">✕</button>
+  <img id="ovImg" src="" alt="">
+  <div class="pie" id="ovPie"></div>
+</div>
+
+<div class="car" id="car" onclick="if(event.target===this)cerrarCarrito()">
+  <div class="carcaja" id="carcaja"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  EL CATÁLOGO
+// ═══════════════════════════════════════════════════════════════════
+var PRODS = [], CLIENTES = [], YO = null;
+var CARRO = {};            // id → cuantos
+var FOTOS = {};            // id → la imagen, se llena poco a poco
+var TROZOS_FOTOS = 5;      // cuántos archivos de fotos hay
+var _trozosPedidos = {};   // para no pedir el mismo dos veces
+var FILTRO = 'todo';
+
+// Las categorías se agrupan: él tiene "ACCESORIOS" y "Accesorios" por separado
+var GRUPOS = [
+  ['todo',     'Todo',        null],
+  ['pelo',     'Para el pelo',  /pelo|gel|wax|cream|shampoo/i],
+  ['colonias', 'Colonias',      /colonia|after shave/i],
+  ['maquinas', 'Máquinas',      /maquina|máquina|reemplazo|cargador/i],
+  ['navajas',  'Navajas',       /navaja|afeitar/i],
+  ['acces',    'Accesorios',    /accesorio|peine|cepillo|capa|jacket|guante|papel|porta/i],
+  ['otros',    'Otros',         null]
+];
+
+function dinero(n){ return '$' + (Math.round(n*100)/100).toFixed(2); }
+
+// ── Cargar los datos ──
+fetch('productos.json').then(function(r){ return r.json(); }).then(function(d){
+  PRODS = d.productos || [];
+  CLIENTES = d.clientes || [];
+  // 🔑 Cada barbería entra con SU link: ?c=<su codigo>
+  var cod = new URLSearchParams(location.search).get('c');
+  YO = CLIENTES.find(function(x){ return String(x.id) === String(cod); }) || null;
+  document.getElementById('negocio').textContent = YO
+    ? (YO.neg || YO.n) : 'Haz tu pedido';
+  // Los que más se venden primero: lo que el barbero busca suele estar arriba
+  PRODS.sort(function(a,b){ return (b.v||0) - (a.v||0); });
+  pintarChips();
+  pintar();
+  cargarCarritoGuardado();
+}).catch(function(e){
+  document.getElementById('lista').innerHTML =
+    '<div class="vacio">No pude cargar el catálogo.<br>Revisa tu conexión y vuelve a entrar.</div>';
+});
+
+function pintarChips(){
+  document.getElementById('chips').innerHTML = GRUPOS.map(function(g){
+    return '<div class="chip' + (FILTRO===g[0]?' on':'') + '" onclick="filtrar(\'' + g[0] + '\')">'
+      + g[1] + '</div>';
+  }).join('');
+}
+function filtrar(k){ FILTRO = k; pintarChips(); pintar(); window.scrollTo(0,0); }
+
+function delGrupo(p, k){
+  if(k === 'todo') return true;
+  var g = GRUPOS.find(function(x){ return x[0] === k; });
+  var txt = (p.c || '') + ' ' + (p.n || '');
+  if(k === 'otros'){
+    // Lo que no cae en ningún grupo con patrón
+    return !GRUPOS.some(function(x){ return x[2] && x[2].test(txt); });
+  }
+  return g && g[2] ? g[2].test(txt) : false;
+}
+
+function pintar(){
+  var q = (document.getElementById('q').value || '').toLowerCase().trim();
+  var lista = PRODS.filter(function(p){
+    if(p.oculto) return false;
+    if(!delGrupo(p, FILTRO)) return false;
+    if(!q) return true;
+    return (p.n + ' ' + p.m).toLowerCase().indexOf(q) >= 0;
+  });
+
+  if(!lista.length){
+    document.getElementById('lista').innerHTML =
+      '<div class="vacio">No encontré nada con eso.<br>Prueba con otra palabra.</div>';
+    return;
+  }
+
+  document.getElementById('lista').innerHTML = lista.map(function(p){
+    var n = CARRO[p.id] || 0;
+    return '<div class="p">'
+      + '<div class="fo" data-id="' + p.id + '" onclick="verFoto(\'' + p.id + '\')">'
+      +   (p.tf
+            ? '<img data-foto="' + p.id + '" alt="">'
+            : '<div class="sinf">SIN<br>FOTO</div>')
+      + '</div>'
+      + '<div class="inf">'
+      +   '<div class="nom">' + esc(p.n) + '</div>'
+      +   (p.m ? '<div class="mar">' + esc(p.m) + '</div>' : '')
+      +   '<div class="pre">' + dinero(p.pr) + '</div>'
+      + '</div>'
+      + '<div class="ctl">'
+      +   (n > 0
+            ? '<button class="bmen" onclick="menos(\'' + p.id + '\')">−</button>'
+              + '<div class="cant">' + n + '</div>'
+            : '')
+      +   '<button class="bmas" onclick="mas(\'' + p.id + '\')">+</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  mirarFotosQueSeVen();
+}
+
+function esc(t){
+  return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  🔑 LAS FOTOS: se bajan cuando el barbero llega a ellas, no antes.
+//  Así el catálogo abre al instante aunque haya 599 productos.
+// ═══════════════════════════════════════════════════════════════════
+function mirarFotosQueSeVen(){
+  var faltan = [];
+  document.querySelectorAll('img[data-foto]').forEach(function(im){
+    if(im.src) return;
+    var r = im.getBoundingClientRect();
+    // Un poco antes de que aparezca, para que no se vea el hueco
+    if(r.top < window.innerHeight + 400 && r.bottom > -400){
+      var id = im.getAttribute('data-foto');
+      if(FOTOS[id]) im.src = FOTOS[id];
+      else faltan.push(id);
+    }
+  });
+  if(faltan.length) bajarTrozosQueFalten();
+}
+
+function bajarTrozosQueFalten(){
+  for(var i = 0; i < TROZOS_FOTOS; i++){
+    if(_trozosPedidos[i]) continue;
+    _trozosPedidos[i] = true;
+    (function(n){
+      fetch('fotos_' + (n < 10 ? '0' : '') + n + '.json')
+        .then(function(r){ return r.json(); })
+        .then(function(g){
+          for(var k in g) FOTOS[k] = g[k];
+          // Se colocan las que acaban de llegar
+          document.querySelectorAll('img[data-foto]').forEach(function(im){
+            if(im.src) return;
+            var id = im.getAttribute('data-foto');
+            if(FOTOS[id]) im.src = FOTOS[id];
+          });
+        })
+        .catch(function(){ _trozosPedidos[n] = false; });
+    })(i);
+  }
+}
+window.addEventListener('scroll', mirarFotosQueSeVen, { passive: true });
+
+function verFoto(id){
+  var p = PRODS.find(function(x){ return x.id === id; });
+  if(!p || !p.tf || !FOTOS[id]) return;
+  document.getElementById('ovImg').src = FOTOS[id];
+  document.getElementById('ovPie').textContent = p.n + '  ·  ' + dinero(p.pr);
+  document.getElementById('ovFoto').classList.add('on');
+}
+function cerrarFoto(){ document.getElementById('ovFoto').classList.remove('on'); }
+
+// ═══════════════════════════════════════════════════════════════════
+//  EL CARRITO
+//  🔑 SIN CANDADO DE STOCK -Sensei lo pidió el 30 jul-: su inventario no está
+//  al día, así que bloquear por existencias le impedía pedir cosas que sí tiene.
+// ═══════════════════════════════════════════════════════════════════
+function mas(id){ CARRO[id] = (CARRO[id]||0) + 1; guardarCarrito(); pintar(); barra(); }
+function menos(id){
+  CARRO[id] = (CARRO[id]||0) - 1;
+  if(CARRO[id] <= 0) delete CARRO[id];
+  guardarCarrito(); pintar(); barra();
+}
+function barra(){
+  var n = 0, t = 0;
+  for(var k in CARRO){
+    var p = PRODS.find(function(x){ return x.id === k; });
+    if(!p) continue;
+    n += CARRO[k]; t += CARRO[k] * p.pr;
+  }
+  var b = document.getElementById('barra');
+  if(n > 0){
+    b.classList.add('on');
+    document.getElementById('bt1').textContent = n + (n === 1 ? ' producto' : ' productos');
+    document.getElementById('bt2').textContent = dinero(t);
+  } else b.classList.remove('on');
+}
+function guardarCarrito(){
+  try { localStorage.setItem('nbs_carro', JSON.stringify(CARRO)); } catch(e){}
+}
+function cargarCarritoGuardado(){
+  try {
+    CARRO = JSON.parse(localStorage.getItem('nbs_carro') || '{}');
+    pintar(); barra();
+  } catch(e){ CARRO = {}; }
+}
+
+function verCarrito(){
+  var items = [];
+  var t = 0;
+  for(var k in CARRO){
+    var p = PRODS.find(function(x){ return x.id === k; });
+    if(!p) continue;
+    items.push({ p: p, n: CARRO[k] });
+    t += CARRO[k] * p.pr;
+  }
+  if(!items.length) return;
+  document.getElementById('carcaja').innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">'
+    +   '<div style="font-size:17px;font-weight:900">🛒 Tu pedido</div>'
+    +   '<button onclick="cerrarCarrito()" style="background:#F0F0F6;border:none;border-radius:9px;'
+    +     'width:34px;height:34px;font-size:16px;cursor:pointer">✕</button></div>'
+    + items.map(function(x){
+        return '<div class="cl">'
+          + '<div style="flex:1;min-width:0">'
+          +   '<div style="font-size:13px;font-weight:700">' + esc(x.p.n) + '</div>'
+          +   '<div style="font-size:11px;color:#8A8A9E">' + x.n + ' × ' + dinero(x.p.pr) + '</div>'
+          + '</div>'
+          + '<div style="font-weight:900;font-size:14px">' + dinero(x.n * x.p.pr) + '</div>'
+          + '<button class="bmen" onclick="menos(\'' + x.p.id + '\');verCarrito()">−</button>'
+          + '</div>';
+      }).join('')
+    + '<div style="display:flex;justify-content:space-between;padding:13px 0 4px;'
+    +   'font-size:19px;font-weight:900;border-top:2px solid #0B1020;margin-top:9px">'
+    +   '<span>TOTAL</span><span style="color:#0B7A3B">' + dinero(t) + '</span></div>'
+    + '<button onclick="enviarPedido()" style="width:100%;padding:15px;margin-top:12px;'
+    +   'background:#0B7A3B;color:#fff;border:none;border-radius:12px;font-size:16px;'
+    +   'font-weight:900;cursor:pointer">📤 Enviar mi pedido</button>'
+    + '<button onclick="cerrarCarrito()" style="width:100%;padding:12px;margin-top:7px;'
+    +   'background:#F0F0F6;color:#333;border:none;border-radius:10px;font-size:13.5px;'
+    +   'font-weight:700;cursor:pointer">Seguir pidiendo</button>';
+  document.getElementById('car').classList.add('on');
+}
+function cerrarCarrito(){ document.getElementById('car').classList.remove('on'); }
+
+// ═══════════════════════════════════════════════════════════════════
+//  📤 ENVIAR EL PEDIDO
+//  Va por WhatsApp -Sensei lo quiso mantener- y además queda guardado para que
+//  NBS2 lo recoja y le salga la alerta dentro de la app.
+// ═══════════════════════════════════════════════════════════════════
+var WHATSAPP_NBS = '14013050188';
+
+function enviarPedido(){
+  var items = [], t = 0;
+  for(var k in CARRO){
+    var p = PRODS.find(function(x){ return x.id === k; });
+    if(!p) continue;
+    items.push({ pid: p.id, nombre: p.n, cant: CARRO[k], precio: p.pr });
+    t += CARRO[k] * p.pr;
+  }
+  if(!items.length) return;
+
+  var pedido = {
+    id: 'PED' + Date.now(),
+    cid: YO ? YO.id : null,
+    cliente: YO ? YO.n : '(sin identificar)',
+    negocio: YO ? YO.neg : '',
+    fecha: new Date().toLocaleDateString('en-US'),
+    hora: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}),
+    items: items,
+    total: Math.round(t * 100) / 100,
+    estado: 'nuevo'
+  };
+
+  // Se guarda aquí para que NBS2 lo recoja
+  try {
+    var pend = JSON.parse(localStorage.getItem('nbs_pedidos_web') || '[]');
+    pend.push(pedido);
+    localStorage.setItem('nbs_pedidos_web', JSON.stringify(pend));
+  } catch(e){}
+
+  // Y el mensaje de WhatsApp, con el pedido escrito
+  var t2 = ['*PEDIDO NBS*', ''];
+  if(YO){ t2.push(YO.n); if(YO.neg) t2.push(YO.neg); t2.push(''); }
+  items.forEach(function(x){
+    t2.push(x.cant + ' × ' + x.nombre + '   ' + dinero(x.cant * x.precio));
+  });
+  t2.push('');
+  t2.push('TOTAL: ' + dinero(pedido.total));
+  t2.push('');
+  t2.push('Codigo: ' + pedido.id);
+
+  var txt = encodeURIComponent(t2.join('\n'));
+  CARRO = {}; guardarCarrito(); pintar(); barra(); cerrarCarrito();
+
+  alert('✅ Tu pedido se envió.\n\nTotal: ' + dinero(pedido.total)
+      + '\n\nSe abrirá WhatsApp para confirmarlo.');
+  location.href = 'https://wa.me/' + WHATSAPP_NBS + '?text=' + txt;
+}
+</script>
+</body>
+</html>
