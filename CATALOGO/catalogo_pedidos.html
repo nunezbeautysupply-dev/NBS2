@@ -105,6 +105,30 @@
   <div class="carcaja" id="carcaja"></div>
 </div>
 
+<!-- 🌉 EL PUENTE A NBS2: el pedido viaja por aquí y a Sensei le sale la alerta -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+// 🔑 El MISMO Firebase de NBS2, pero el barbero entra como INVITADO: solo puede DEJAR
+// un pedido en el buzón. No puede leer, borrar ni tocar nada de Sensei.
+var _fbListo = false, _fbDb = null;
+try {
+  firebase.initializeApp({
+    apiKey: "AIzaSyBqtoMWt9DTMmSN-RR5MUagRIuH7B_Bjbw",
+    authDomain: "nbs2-b641a.firebaseapp.com",
+    projectId: "nbs2-b641a",
+    storageBucket: "nbs2-b641a.firebasestorage.app",
+    messagingSenderId: "946975018761",
+    appId: "1:946975018761:web:6dea81efb50b993ca3cdd8"
+  });
+  _fbDb = firebase.firestore();
+  firebase.auth().signInAnonymously()
+    .then(function(){ _fbListo = true; })
+    .catch(function(e){ console.warn('sin nube, el pedido ira solo por WhatsApp', e); });
+} catch(e){ console.warn('sin nube', e); }
+</script>
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 //  EL CATÁLOGO
@@ -365,12 +389,25 @@ function enviarPedido(){
     estado: 'nuevo'
   };
 
-  // Se guarda aquí para que NBS2 lo recoja
+  // Copia en el propio telefono, por si acaso
   try {
     var pend = JSON.parse(localStorage.getItem('nbs_pedidos_web') || '[]');
     pend.push(pedido);
     localStorage.setItem('nbs_pedidos_web', JSON.stringify(pend));
   } catch(e){}
+
+  // 🌉 Y AL BUZÓN DE NBS2, para que a Sensei le salte la alerta. Si falla, no pasa
+  // nada: el WhatsApp sale igual y el pedido le llega por ahí.
+  if(_fbListo && _fbDb){
+    try {
+      _fbDb.collection('nbs_pedidos_web').doc(pedido.id).set({
+        cid: pedido.cid, cliente: pedido.cliente, negocio: pedido.negocio,
+        fecha: pedido.fecha, hora: pedido.hora,
+        items: pedido.items, total: pedido.total,
+        estado: 'nuevo', cuando: Date.now()
+      }).catch(function(e){ console.warn('no subio el pedido', e); });
+    } catch(e){}
+  }
 
   // Y el mensaje de WhatsApp, con el pedido escrito
   var t2 = ['*PEDIDO NBS*', ''];

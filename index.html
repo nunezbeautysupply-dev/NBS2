@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260907a-OFICIAL-V2.0">
+<meta name="app-version" content="20260908a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -665,6 +665,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
   <button class="mb2" onclick="ir('p-cl')"><span class="mb2-icon" style="background:#EAF1FB"><span style="font-size:10px;font-weight:800;color:#2C5AA0;letter-spacing:0.3px">CL</span></span>Clientes<span class="mb2-chev">›</span></button>
   <button class="mb2" onclick="ir('p-vip')"><span class="mb2-icon" style="background:#FBEAF2"><span style="font-size:10px;font-weight:800;color:#9D174D;letter-spacing:0.3px">VIP</span></span>Programa Lealtad VIP<span class="mb2-chev">›</span></button>
   <button class="mb2" id="btn-cat" onclick="irProtegido('p-cat')"><span class="mb2-icon" style="background:#E6F4F3"><span style="font-size:10px;font-weight:800;color:#0F766E;letter-spacing:0.3px">CA</span></span>Catálogo<span class="mb2-chev">›</span></button>
+  <button class="mb2" onclick="verPedidosDelCatalogo()"><span class="mb2-icon" style="background:#FFF3E0"><span style="font-size:13px">🔔</span></span>Pedidos del catálogo<span id="chivato-pedidos-web" style="display:none;background:#C62828;color:#fff;border-radius:11px;min-width:22px;height:22px;align-items:center;justify-content:center;font-size:11.5px;font-weight:900;margin-left:auto;padding:0 6px"></span><span class="mb2-arrow">›</span></button>
   <button class="mb2" onclick="ir('p-ped')"><span class="mb2-icon"><span style="font-size:10px;font-weight:800;color:var(--nbs-gold-dark);letter-spacing:0.3px">PR</span></span>Pedidos rápidos<span class="mb2-chev">›</span></button>
   <button class="mb2" onclick="window._vendiendoDesde=null;ir('p-v')"><span class="mb2-icon" style="background:#EAF3E2"><span style="font-size:10px;font-weight:800;color:#3B6D11;letter-spacing:0.3px">VE</span></span>Vender<span class="mb2-chev">›</span></button>
   <button class="mb2" onclick="ir('p-cxc')"><span class="mb2-icon" style="background:#FBECEC"><span style="font-size:10px;font-weight:800;color:#993C1D;letter-spacing:0.3px">CC</span></span>Cuentas por Cobrar / Facturas<span class="mb2-chev">›</span></button>
@@ -4617,6 +4618,8 @@ var RECUADROS_ENCIMA = [
   { id: 'unif-marcas-ov',           cerrar: 'cerrarUnificarMarcas' },
   { id: 'confirmar-balance-overlay', cerrar: 'cerrarConfirmacionBalance' },
   { id: 'sinconf-overlay',          cerrar: 'cerrarSinConfirmar' },
+  { id: 'pedido-nuevo-overlay',     cerrar: 'cerrarAvisoPedidoNuevo' },
+  { id: 'pedidos-web-overlay',      cerrar: 'cerrarPedidosWeb' },
   { id: 'fotorapido-overlay',       cerrar: 'cerrarFotosRapido' },
   { id: 'pin-overlay',              cerrar: 'cerrarPinRecuadro' },
   { id: 'estado-fechas-overlay',    cerrar: 'cerrarEstadoPorFechas' },
@@ -18921,7 +18924,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260907a';
+var NOVEDADES_VERSION = '20260908a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -39465,6 +39468,288 @@ function revisarRecordatorioBackup(){
 
 // Se apunta la llegada; si pasan 40 minutos y no marcó ni vendió, se le dice.
 var MINUTOS_SIN_MARCAR = 40;
+
+// ═══════════════════════════════════════════════════════════════════
+//  🌉 LOS PEDIDOS QUE LLEGAN DEL CATÁLOGO  (8 sep 2026)
+//
+//  Sensei: "en la app también debes poner una alerta cada vez que entra un pedido, y
+//  que me salga una ventana para yo tocarla y entrar a ese pedido de una vez, pero con
+//  la opción de dejarlo pendiente también por si en ese momento no puedo sacarlo".
+//
+//  🔑 El barbero pide desde el catálogo → el pedido cae en el buzón de la nube →
+//  NBS2 lo recoge y le sale la ventana. El WhatsApp sigue llegando igual.
+// ═══════════════════════════════════════════════════════════════════
+
+var CLAVE_PEDIDOS_WEB = 'nbs_pedidos_web_vistos';
+var _pedidosWebNuevos = [];
+
+// Los pedidos que ya vio, para no avisarle dos veces del mismo
+function pedidosWebVistos(){
+  try { return JSON.parse(localStorage.getItem(CLAVE_PEDIDOS_WEB) || '{}'); }
+  catch(e){ return {}; }
+}
+function apuntarPedidoVisto(id, como){
+  var v = pedidosWebVistos();
+  v[id] = como || 'visto';
+  try { localStorage.setItem(CLAVE_PEDIDOS_WEB, JSON.stringify(v)); } catch(e){}
+}
+
+/**
+ * Mira el buzón y avisa si hay pedidos nuevos.
+ * Se llama sola al arrancar y cada 2 minutos.
+ */
+function revisarPedidosDelCatalogo(alTerminar){
+  if(typeof fbDb === 'undefined' || typeof fbAuth === 'undefined' || !fbAuth.currentUser){
+    if(alTerminar) alTerminar([]);
+    return;
+  }
+  fbDb.collection('nbs_pedidos_web')
+    .where('estado', '==', 'nuevo')
+    .get()
+    .then(function(snap){
+      var vistos = pedidosWebVistos();
+      var nuevos = [];
+      snap.forEach(function(doc){
+        var p = doc.data() || {};
+        p.id = doc.id;
+        // Los que ya despachó o dejó pendiente no vuelven a saltar
+        if(vistos[p.id] === 'hecho') return;
+        nuevos.push(p);
+      });
+      // El más nuevo primero
+      nuevos.sort(function(a, b){ return (b.cuando || 0) - (a.cuando || 0); });
+      _pedidosWebNuevos = nuevos;
+      // Solo salta la ventana con los que NO ha visto todavía
+      var sinVer = nuevos.filter(function(p){ return !vistos[p.id]; });
+      if(sinVer.length) mostrarAvisoPedidoNuevo(sinVer[0], sinVer.length);
+      try { actualizarChivatoPedidos(); } catch(e){}
+      if(alTerminar) alTerminar(nuevos);
+    })
+    .catch(function(e){
+      console.warn('no pude mirar el buzon de pedidos', e);
+      if(alTerminar) alTerminar([]);
+    });
+}
+
+/**
+ * 🔔 LA VENTANA que pidió Sensei: se toca y entra al pedido, o lo deja pendiente.
+ */
+function mostrarAvisoPedidoNuevo(p, cuantos){
+  var ov = document.getElementById('pedido-nuevo-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'pedido-nuevo-overlay';
+    document.body.appendChild(ov);
+  }
+  window._pedidoWebActual = p;
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000004;'
+    + 'display:flex;align-items:center;justify-content:center;padding:14px';
+  ov.onclick = function(e){ if(e.target === ov) dejarPedidoPendiente(); };
+
+  var lista = (p.items || []).slice(0, 6).map(function(it){
+    return '<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;'
+      + 'font-size:12.5px;color:var(--nbs-ink)">'
+      + '<span style="flex:1;min-width:0">' + it.cant + ' \u00d7 ' + escaparHtml(String(it.nombre || '')) + '</span>'
+      + '<span style="font-weight:700;flex-shrink:0">$' + fmtNum((it.cant || 0) * (it.precio || 0)) + '</span>'
+      + '</div>';
+  }).join('');
+  var mas = (p.items || []).length > 6
+    ? '<div style="font-size:11px;color:var(--nbs-muted);padding-top:3px">y '
+      + ((p.items || []).length - 6) + ' m\u00e1s\u2026</div>' : '';
+
+  ov.innerHTML = '<div style="background:#fff;border-radius:15px;padding:16px;max-width:430px;'
+    + 'width:100%;max-height:88vh;overflow:auto">'
+
+    + '<div style="text-align:center;margin-bottom:11px">'
+    +   '<div style="font-size:30px">\ud83d\udd14</div>'
+    +   '<div style="font-size:17px;font-weight:900;color:#E65100">PEDIDO NUEVO</div>'
+    +   (cuantos > 1
+          ? '<div style="font-size:12px;color:var(--nbs-muted);margin-top:2px">y '
+            + (cuantos - 1) + ' m\u00e1s esperando</div>' : '')
+    + '</div>'
+
+    + '<div style="background:#FFF8E1;border:1.5px solid #FFD54F;border-radius:11px;'
+    +   'padding:12px;margin-bottom:11px">'
+    +   '<div style="font-size:15px;font-weight:900;color:var(--nbs-ink)">'
+    +     escaparHtml(String(p.cliente || 'Cliente')) + '</div>'
+    +   (p.negocio ? '<div style="font-size:12.5px;color:#7A5C00;font-weight:700">'
+                   + escaparHtml(String(p.negocio)) + '</div>' : '')
+    +   '<div style="font-size:11px;color:#7A5C00;margin-top:3px">'
+    +     escaparHtml(String(p.fecha || '')) + ' \u00b7 ' + escaparHtml(String(p.hora || '')) + '</div>'
+    + '</div>'
+
+    + '<div style="border:1px solid #E4E4EC;border-radius:10px;padding:11px;margin-bottom:11px">'
+    +   '<div style="font-size:10.5px;font-weight:800;color:var(--nbs-muted);'
+    +     'letter-spacing:.4px;margin-bottom:5px">'
+    +     (p.items || []).length + ' PRODUCTO(S)</div>'
+    +   lista + mas
+    +   '<div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:6px;'
+    +     'border-top:2px solid #1a237e;font-size:17px;font-weight:900">'
+    +     '<span>TOTAL</span><span style="color:var(--nbs-green-text)">$'
+    +     fmtNum(p.total || 0) + '</span></div>'
+    + '</div>'
+
+    + '<button onclick="prepararPedidoWeb()" style="width:100%;padding:15px;background:#1a237e;'
+    +   'color:#fff;border:none;border-radius:12px;font-size:15.5px;font-weight:900;cursor:pointer">'
+    +   '\ud83d\udce6 Prepararlo ahora</button>'
+    + '<button onclick="dejarPedidoPendiente()" style="width:100%;padding:13px;margin-top:8px;'
+    +   'background:#fff;color:#E65100;border:1.5px solid #FFB74D;border-radius:11px;'
+    +   'font-size:13.5px;font-weight:800;cursor:pointer">'
+    +   '\u23f3 Dejarlo pendiente</button>'
+    + '</div>';
+
+  ov.style.display = 'flex';
+  try { sonidoRecordatorio(); } catch(e){}
+}
+
+function cerrarAvisoPedidoNuevo(){
+  var ov = document.getElementById('pedido-nuevo-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+/**
+ * 📦 Prepararlo ahora: se mete en su lista de pedidos y se marca como despachado.
+ */
+function prepararPedidoWeb(){
+  var p = window._pedidoWebActual;
+  if(!p) return;
+  cerrarAvisoPedidoNuevo();
+
+  // Se pasa a la lista de pedidos de siempre, para prepararlo como cualquier otro
+  var P = LS('npedidos', []);
+  P.push({
+    id: Date.now(),
+    cid: p.cid,
+    cn: p.cliente,
+    negocio: p.negocio || '',
+    fecha: p.fecha || fechaHoy(),
+    items: (p.items || []).map(function(it){
+      return { pid: it.pid, nombre: it.nombre, cant: it.cant, precio: it.precio };
+    }),
+    total: p.total || 0,
+    deWeb: true,
+    idWeb: p.id,
+    mod: Date.now()
+  });
+  if(!SS('npedidos', P)) return;
+
+  apuntarPedidoVisto(p.id, 'hecho');
+  marcarPedidoEnLaNube(p.id, 'despachado');
+  try { actualizarChivatoPedidos(); } catch(e){}
+
+  avisoGrande('\ud83d\udce6 El pedido de ' + (p.cliente || '') + ' est\u00e1 en tu lista.\n\n'
+    + 'Lo prepras y lo llevas en la ruta.');
+  try { ir('p-ped'); } catch(e){}
+}
+
+/**
+ * ⏳ Dejarlo pendiente: se cierra, pero NO se pierde. Sigue en la lista de nuevos y el
+ * robot se lo recuerda.
+ */
+function dejarPedidoPendiente(){
+  var p = window._pedidoWebActual;
+  cerrarAvisoPedidoNuevo();
+  if(!p) return;
+  apuntarPedidoVisto(p.id, 'pendiente');
+  try { actualizarChivatoPedidos(); } catch(e){}
+  avisoGrande('\u23f3 Lo dejo pendiente.\n\nNo se pierde: lo tienes en \ud83d\udd14 Pedidos del cat\u00e1logo, '
+    + 'en el men\u00fa, y el robot te lo recuerda.');
+}
+
+// Se apunta en la nube cómo quedó, para que no vuelva a saltar en otro aparato
+function marcarPedidoEnLaNube(id, estado){
+  if(typeof fbDb === 'undefined' || !fbAuth || !fbAuth.currentUser) return;
+  try {
+    fbDb.collection('nbs_pedidos_web').doc(String(id))
+      .update({ estado: estado, cuandoAtendido: Date.now() })
+      .catch(function(){});
+  } catch(e){}
+}
+
+/**
+ * 📋 La lista de todos los pedidos del catálogo que están esperando.
+ */
+function verPedidosDelCatalogo(){
+  revisarPedidosDelCatalogo(function(){
+    var ov = document.getElementById('pedidos-web-overlay');
+    if(!ov){
+      ov = document.createElement('div');
+      ov.id = 'pedidos-web-overlay';
+      document.body.appendChild(ov);
+    }
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:100004;'
+      + 'display:flex;align-items:flex-end;justify-content:center';
+    ov.onclick = function(e){ if(e.target === ov) cerrarPedidosWeb(); };
+
+    var h = '<div style="background:#fff;width:100%;max-width:520px;border-radius:16px 16px 0 0;'
+      + 'padding:15px;max-height:88vh;overflow:auto">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">'
+      +   '<div style="font-size:16px;font-weight:900;color:var(--nbs-ink)">'
+      +     '\ud83d\udd14 Pedidos del cat\u00e1logo</div>'
+      +   '<button onclick="cerrarPedidosWeb()" style="background:#F0F0F2;border:none;'
+      +     'border-radius:9px;width:34px;height:34px;font-size:16px;cursor:pointer">\u2715</button>'
+      + '</div>';
+
+    if(!_pedidosWebNuevos.length){
+      h += '<div style="background:#F4F6FB;border-radius:11px;padding:22px;text-align:center;'
+        + 'font-size:13.5px;color:var(--nbs-muted)">No hay pedidos esperando.<br><br>'
+        + 'Cuando un barbero pida desde su cat\u00e1logo, te aparece aqu\u00ed.</div>';
+    } else {
+      var vistos = pedidosWebVistos();
+      h += _pedidosWebNuevos.map(function(p, i){
+        var pend = vistos[p.id] === 'pendiente';
+        return '<div onclick="abrirPedidoWebDeLaLista(' + i + ')" '
+          + 'style="border:1px solid #E4E4EC;border-left:4px solid '
+          +   (pend ? '#E65100' : '#2E7D32') + ';border-radius:10px;padding:11px;'
+          +   'margin-bottom:8px;cursor:pointer">'
+          + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
+          +   '<div style="flex:1;min-width:0">'
+          +     '<div style="font-size:13.5px;font-weight:900">'
+          +       escaparHtml(String(p.cliente || '')) + '</div>'
+          +     (p.negocio ? '<div style="font-size:11px;color:var(--nbs-muted)">'
+                           + escaparHtml(String(p.negocio)) + '</div>' : '')
+          +     '<div style="font-size:11px;color:var(--nbs-muted);margin-top:2px">'
+          +       escaparHtml(String(p.fecha || '')) + ' \u00b7 ' + (p.items || []).length + ' producto(s)'
+          +       (pend ? ' \u00b7 <b style="color:#E65100">PENDIENTE</b>' : '') + '</div>'
+          +   '</div>'
+          +   '<div style="font-size:15px;font-weight:900;color:var(--nbs-green-text)">$'
+          +     fmtNum(p.total || 0) + '</div>'
+          + '</div></div>';
+      }).join('');
+    }
+
+    h += '<button onclick="cerrarPedidosWeb()" style="width:100%;padding:12px;margin-top:8px;'
+      +   'background:#F0F0F2;color:#333;border:none;border-radius:10px;font-size:13px;'
+      +   'font-weight:700;cursor:pointer">Cerrar</button></div>';
+    ov.innerHTML = h;
+    ov.style.display = 'flex';
+  });
+}
+
+function cerrarPedidosWeb(){
+  var ov = document.getElementById('pedidos-web-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function abrirPedidoWebDeLaLista(i){
+  var p = _pedidosWebNuevos[i];
+  if(!p) return;
+  cerrarPedidosWeb();
+  mostrarAvisoPedidoNuevo(p, 1);
+}
+
+// 🔔 El numerito rojo del menú, para que se vea sin entrar
+function actualizarChivatoPedidos(){
+  var n = _pedidosWebNuevos.length;
+  var e = document.getElementById('chivato-pedidos-web');
+  if(!e) return;
+  e.textContent = n > 0 ? String(n) : '';
+  e.style.display = n > 0 ? 'flex' : 'none';
+}
+
+// Se mira el buzón al arrancar y cada 2 minutos
+setTimeout(function(){ try { revisarPedidosDelCatalogo(); } catch(e){} }, 6000);
+setInterval(function(){ try { revisarPedidosDelCatalogo(); } catch(e){} }, 120000);
 
 function revisarBarberiaSinMarcar(){
   try {
