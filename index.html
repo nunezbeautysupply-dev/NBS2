@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260908b-OFICIAL-V2.0">
+<meta name="app-version" content="20260908c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18925,7 +18925,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260908b';
+var NOVEDADES_VERSION = '20260908c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -36722,6 +36722,31 @@ function abrirRepProducto(){
   pintarRepProducto();
 }
 
+// La lista de productos que coinciden. Aparte, para poder repintarla sola.  (8 sep)
+function _listaProdRep(){
+  loadProds();
+  var q = (window._repProdBusca || '').toLowerCase().trim();
+  if(!q){
+    return '<div style="background:#F4F6FB;border-radius:10px;padding:20px;text-align:center;'
+      + 'font-size:13px;color:var(--nbs-muted)">Escribe el nombre del producto que quieres mirar.</div>';
+  }
+  var hallados = productos.filter(function(p){
+    return !p.eliminado && (p.nombre || '').toLowerCase().indexOf(q) >= 0;
+  }).slice(0, 12);
+  if(!hallados.length){
+    return '<div style="padding:18px;text-align:center;color:var(--nbs-muted);font-size:13px">'
+      + 'No encontr\u00e9 ning\u00fan producto con eso.</div>';
+  }
+  return hallados.map(function(p){
+    return '<div onclick="elegirProdRep(' + _arg(String(p.id)) + ')" '
+      + 'style="padding:11px;border:1px solid #E4E4EC;border-radius:9px;margin-bottom:6px;'
+      + 'cursor:pointer;font-size:13px;font-weight:700">' + escaparHtml(p.nombre)
+      + (p.marca ? '<div style="font-size:10.5px;color:var(--nbs-muted);font-weight:600">'
+                  + escaparHtml(p.marca) + '</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
 function pintarRepProducto(){
   loadProds();
   var q = (window._repProdBusca || '').toLowerCase().trim();
@@ -36731,25 +36756,8 @@ function pintarRepProducto(){
     + 'margin-bottom:9px">';
 
   if(!window._repProdElegido){
-    if(!q){
-      cuerpo += '<div style="background:#F4F6FB;border-radius:10px;padding:20px;text-align:center;'
-        + 'font-size:13px;color:var(--nbs-muted)">Escribe el nombre del producto que quieres mirar.</div>';
-    } else {
-      var hallados = productos.filter(function(p){
-        return !p.eliminado && (p.nombre || '').toLowerCase().indexOf(q) >= 0;
-      }).slice(0, 12);
-      cuerpo += hallados.length
-        ? hallados.map(function(p){
-            return '<div onclick="elegirProdRep(' + _arg(String(p.id)) + ')" '
-              + 'style="padding:11px;border:1px solid #E4E4EC;border-radius:9px;margin-bottom:6px;'
-              + 'cursor:pointer;font-size:13px;font-weight:700">' + escaparHtml(p.nombre)
-              + (p.marca ? '<div style="font-size:10.5px;color:var(--nbs-muted);font-weight:600">'
-                          + escaparHtml(p.marca) + '</div>' : '')
-              + '</div>';
-          }).join('')
-        : '<div style="padding:18px;text-align:center;color:var(--nbs-muted);font-size:13px">'
-          + 'No encontr\u00e9 ning\u00fan producto con eso.</div>';
-    }
+    // La lista va en su propia caja, para poder cambiarla sin tocar el campo de escribir
+    cuerpo += '<div id="rep-resultados">' + _listaProdRep() + '</div>';
   } else {
     var p = productos.find(function(x){ return String(x.id) === String(window._repProdElegido); });
     if(p){
@@ -36797,14 +36805,15 @@ function pintarRepProducto(){
   _cajaReporte('\ud83d\udcca Cu\u00e1nto vend\u00ed de\u2026', cuerpo);
 }
 
+// \ud83d\udd11 SOLO SE REPINTA LA LISTA, no la pantalla entera. Si se repintara todo, el
+// campo de escribir se destruir\u00eda con cada letra y el teclado se cerrar\u00eda y abrir\u00eda:
+// eso era el "pesta\u00f1eo" que report\u00f3 Sensei. -8 sep-
 function buscarProdRep(v){
   window._repProdBusca = v;
   window._repProdElegido = null;
-  var c = document.getElementById('rep-cuerpo');
-  if(c){ pintarRepProducto(); setTimeout(function(){
-    var i = document.getElementById('rep-buscar-prod');
-    if(i){ i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
-  }, 30); }
+  var caja = document.getElementById('rep-resultados');
+  if(caja) caja.innerHTML = _listaProdRep();
+  else pintarRepProducto();
 }
 
 function elegirProdRep(id){
