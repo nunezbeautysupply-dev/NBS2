@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260908c-OFICIAL-V2.0">
+<meta name="app-version" content="20260908f-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18925,7 +18925,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260908c';
+var NOVEDADES_VERSION = '20260908f';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34154,7 +34154,13 @@ function bloquearApp(){
   var hayHuella = !!localStorage.getItem(CLAVE_HUELLA_ID);
   if(hayHuella){
     if(b1) b1.style.display = 'none';
-    if(b2) b2.style.display = 'none';
+    // \ud83d\udd11 El enlace de correo y contrase\u00f1a NO se esconde NUNCA. El 8 sep la app se
+    // qued\u00f3 colgada esperando un lector que no contest\u00f3, y sin este enlace no hab\u00eda
+    // forma de entrar: tuvo que usar el modo inc\u00f3gnito.
+    if(b2){
+      b2.style.display = '';
+      b2.style.marginTop = '26px';
+    }
     if(msg) msg.textContent = 'Pon tu huella para entrar...';
     // Pequena pausa para que la pantalla alcance a dibujarse antes de pedirla
     setTimeout(function(){ desbloquearConHuella(); }, 350);
@@ -34207,6 +34213,7 @@ function desbloquearConHuella(){
       timeout: 60000
     }
   }).then(function(){
+    clearTimeout(window._relojHuella);
     // La huella fue verificada por el propio telefono antes de devolver esto
     window._appBloqueada = false;
     registrarActividad();
@@ -34222,11 +34229,25 @@ function desbloquearConHuella(){
       });
     }
   }).catch(function(e){
+    clearTimeout(window._relojHuella);
     console.error('No se pudo verificar la huella:', e);
     errorEl.textContent = 'No se reconoció la huella.';
     errorEl.style.display = 'block';
     mostrarOpcionesDeBloqueo();   // aqui si aparecen el boton y la contraseña
   });
+
+  // \ud83d\udd11 EL TERCER CAMINO, el que faltaba -8 sep-. Si el lector NUNCA contesta -ni
+  // acierta ni falla-, la app se quedaba colgada con los botones escondidos y Sensei no
+  // pod\u00eda entrar de ninguna forma. A los 8 segundos salen las otras opciones.
+  clearTimeout(window._relojHuella);
+  window._relojHuella = setTimeout(function(){
+    if(!window._appBloqueada) return;                 // ya entr\u00f3, no hay nada que hacer
+    var b = document.getElementById('btn-huella');
+    if(b && b.style.display !== 'none') return;       // los botones ya est\u00e1n a la vista
+    var msg = document.getElementById('bloqueo-msg');
+    if(msg) msg.textContent = 'El lector de huella no respondi\u00f3';
+    mostrarOpcionesDeBloqueo();
+  }, window._msRelojHuella || 8000);
 }
 
 function usarContrasenaEnVezDeHuella(){
@@ -36638,6 +36659,8 @@ function _cajaReporte(titulo, cuerpo, extra){
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:100005;'
     + 'display:flex;align-items:flex-end;justify-content:center';
   ov.onclick = function(e){ if(e.target === ov) cerrarReporte(); };
+  // \ud83d\udd11 La ventana NO cambia de tama\u00f1o al escribir: si creciera, arrastrar\u00eda el
+  // campo hacia arriba y se le escapar\u00eda a Sensei mientras teclea. -8 sep-
   ov.innerHTML = '<div style="background:#fff;width:100%;max-width:540px;'
     + 'border-radius:16px 16px 0 0;padding:15px;max-height:92vh;overflow:auto">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
@@ -36727,8 +36750,11 @@ function _listaProdRep(){
   loadProds();
   var q = (window._repProdBusca || '').toLowerCase().trim();
   if(!q){
-    return '<div style="background:#F4F6FB;border-radius:10px;padding:20px;text-align:center;'
-      + 'font-size:13px;color:var(--nbs-muted)">Escribe el nombre del producto que quieres mirar.</div>';
+    // Ocupa parecido a la lista, para que la ventana no d\u00e9 un salto al escribir la
+    // primera letra
+    return '<div style="background:#F4F6FB;border-radius:10px;padding:34px 20px;'
+      + 'text-align:center;font-size:13px;color:var(--nbs-muted)">'
+      + 'Escribe el nombre del producto que quieres mirar.</div>';
   }
   var hallados = productos.filter(function(p){
     return !p.eliminado && (p.nombre || '').toLowerCase().indexOf(q) >= 0;
@@ -36756,8 +36782,10 @@ function pintarRepProducto(){
     + 'margin-bottom:9px">';
 
   if(!window._repProdElegido){
-    // La lista va en su propia caja, para poder cambiarla sin tocar el campo de escribir
-    cuerpo += '<div id="rep-resultados">' + _listaProdRep() + '</div>';
+    // \ud83d\udd11 La lista tiene ALTO FIJO y hace scroll dentro: as\u00ed la ventana no crece al
+    // salir los resultados, y el campo de escribir NO SE MUEVE. -8 sep-
+    cuerpo += '<div id="rep-resultados" style="height:44vh;overflow-y:auto;'
+      + '-webkit-overflow-scrolling:touch">' + _listaProdRep() + '</div>';
   } else {
     var p = productos.find(function(x){ return String(x.id) === String(window._repProdElegido); });
     if(p){
