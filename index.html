@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260908a-OFICIAL-V2.0">
+<meta name="app-version" content="20260908b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4618,6 +4618,7 @@ var RECUADROS_ENCIMA = [
   { id: 'unif-marcas-ov',           cerrar: 'cerrarUnificarMarcas' },
   { id: 'confirmar-balance-overlay', cerrar: 'cerrarConfirmacionBalance' },
   { id: 'sinconf-overlay',          cerrar: 'cerrarSinConfirmar' },
+  { id: 'reporte-overlay',          cerrar: 'cerrarReporte' },
   { id: 'pedido-nuevo-overlay',     cerrar: 'cerrarAvisoPedidoNuevo' },
   { id: 'pedidos-web-overlay',      cerrar: 'cerrarPedidosWeb' },
   { id: 'fotorapido-overlay',       cerrar: 'cerrarFotosRapido' },
@@ -18924,7 +18925,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260908a';
+var NOVEDADES_VERSION = '20260908b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -36582,6 +36583,597 @@ function imprimirReporteGastos(){
   imprimirReporte('Reporte de Gastos', contenido, 'Reporte de Gastos — NBS');
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  📊 LOS 7 REPORTES  (8 sep 2026)
+//
+//  Sensei pidió el de producto por fechas, y un análisis dijo qué más le faltaba.
+//  El hallazgo más gordo: 246 productos con stock sin vender en 60 días — $26.355
+//  de su dinero dormido, el 42% de su inventario.
+//
+//  🔑 TODO SE CUENTA DESDE LAS FACTURAS, que es el registro de verdad.
+// ═══════════════════════════════════════════════════════════════════
+
+var _rangoRep = { desde: null, hasta: null };
+
+// El rango por defecto: los últimos 3 meses
+function _rangoPorDefecto(){
+  if(_rangoRep.desde) return;
+  var h = new Date();
+  var d = new Date(h.getFullYear(), h.getMonth() - 3, h.getDate());
+  var iso = function(x){
+    var m = x.getMonth() + 1, dd = x.getDate();
+    return x.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (dd < 10 ? '0' : '') + dd;
+  };
+  _rangoRep.desde = iso(d);
+  _rangoRep.hasta = iso(h);
+}
+
+function _aFechaApp2(iso){
+  var p = String(iso || '').split('-');
+  return p.length === 3 ? (p[1] + '/' + p[2] + '/' + p[0]) : '';
+}
+
+// Las ventas del rango, ya filtradas. Todo lo demás se calcula de aquí.
+function _ventasDelRango(){
+  _rangoPorDefecto();
+  var d = parsearFechaVenta(_aFechaApp2(_rangoRep.desde));
+  var h = parsearFechaVenta(_aFechaApp2(_rangoRep.hasta));
+  var dN = d ? d.getTime() : 0;
+  var hN = h ? h.getTime() + 86399000 : Infinity;
+  return LS('nv', []).filter(function(v){
+    if(v.cancelada) return false;
+    var f = parsearFechaVenta(v.fecha);
+    return f && f.getTime() >= dN && f.getTime() <= hN;
+  });
+}
+
+// El armazón que comparten todos: cabecera, fechas y atajos
+function _cajaReporte(titulo, cuerpo, extra){
+  var ov = document.getElementById('reporte-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'reporte-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:100005;'
+    + 'display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick = function(e){ if(e.target === ov) cerrarReporte(); };
+  ov.innerHTML = '<div style="background:#fff;width:100%;max-width:540px;'
+    + 'border-radius:16px 16px 0 0;padding:15px;max-height:92vh;overflow:auto">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +   '<div style="font-size:16px;font-weight:900;color:var(--nbs-ink)">' + titulo + '</div>'
+    +   '<button onclick="cerrarReporte()" style="background:#F0F0F2;border:none;border-radius:9px;'
+    +     'width:34px;height:34px;font-size:16px;cursor:pointer">\u2715</button>'
+    + '</div>'
+    + (extra === 'sinFechas' ? '' : _cajaFechas())
+    + '<div id="rep-cuerpo">' + cuerpo + '</div>'
+    + '<button onclick="cerrarReporte()" style="width:100%;padding:12px;margin-top:10px;'
+    +   'background:#F0F0F2;color:#333;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Cerrar</button>'
+    + '</div>';
+  ov.style.display = 'flex';
+}
+
+function _cajaFechas(){
+  _rangoPorDefecto();
+  return '<div style="display:flex;gap:8px;margin-bottom:7px">'
+    + '<div style="flex:1"><div style="font-size:10px;font-weight:800;color:#555">DESDE</div>'
+    +   '<input type="date" value="' + _rangoRep.desde + '" onchange="cambiarRangoRep(\'desde\',this.value)" '
+    +   'style="width:100%;padding:7px;border:1px solid #ccc;border-radius:7px;font-size:12px"></div>'
+    + '<div style="flex:1"><div style="font-size:10px;font-weight:800;color:#555">HASTA</div>'
+    +   '<input type="date" value="' + _rangoRep.hasta + '" onchange="cambiarRangoRep(\'hasta\',this.value)" '
+    +   'style="width:100%;padding:7px;border:1px solid #ccc;border-radius:7px;font-size:12px"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:4px;margin-bottom:11px">'
+    + ['mes|Este mes','mespasado|Mes pasado','ano|Este a\u00f1o','todo|Todo'].map(function(x){
+        var p = x.split('|');
+        return '<button onclick="atajoRangoRep(\'' + p[0] + '\')" style="flex:1;padding:6px 2px;'
+          + 'background:#fff;color:#1a237e;border:1px solid #b9bfe0;border-radius:6px;'
+          + 'font-size:10px;font-weight:700;cursor:pointer">' + p[1] + '</button>';
+      }).join('')
+    + '</div>';
+}
+
+function cambiarRangoRep(cual, v){
+  _rangoRep[cual] = v;
+  if(window._repActual) window._repActual();
+}
+
+function atajoRangoRep(cual){
+  var h = new Date();
+  var iso = function(x){
+    var m = x.getMonth() + 1, d = x.getDate();
+    return x.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d;
+  };
+  if(cual === 'mes'){ _rangoRep.desde = iso(new Date(h.getFullYear(), h.getMonth(), 1)); _rangoRep.hasta = iso(h); }
+  else if(cual === 'mespasado'){
+    _rangoRep.desde = iso(new Date(h.getFullYear(), h.getMonth() - 1, 1));
+    _rangoRep.hasta = iso(new Date(h.getFullYear(), h.getMonth(), 0));
+  }
+  else if(cual === 'ano'){ _rangoRep.desde = iso(new Date(h.getFullYear(), 0, 1)); _rangoRep.hasta = iso(h); }
+  else { _rangoRep.desde = '2020-01-01'; _rangoRep.hasta = iso(h); }
+  if(window._repActual) window._repActual();
+}
+
+function cerrarReporte(){
+  var ov = document.getElementById('reporte-overlay');
+  if(ov) ov.style.display = 'none';
+  window._repActual = null;
+}
+
+// Tres números grandes, que se repiten en varios reportes
+function _tresNumeros(datos){
+  return '<div style="display:grid;grid-template-columns:repeat(' + datos.length + ',1fr);'
+    + 'gap:6px;margin-bottom:12px">'
+    + datos.map(function(d){
+        return '<div style="background:' + d[3] + ';border-radius:10px;padding:10px;text-align:center">'
+          + '<div style="font-size:9.5px;font-weight:800;color:' + d[2] + '">' + d[0] + '</div>'
+          + '<div style="font-size:17px;font-weight:900;color:' + d[2] + '">' + d[1] + '</div></div>';
+      }).join('')
+    + '</div>';
+}
+
+
+// ═══ ① CUÁNTO VENDÍ DE UN PRODUCTO ═══════════════════════════════
+// El que pidió Sensei: buscar un producto, elegir fechas, y ver cuánto vendió.
+function abrirRepProducto(){
+  window._repProdElegido = window._repProdElegido || null;
+  window._repActual = pintarRepProducto;
+  pintarRepProducto();
+}
+
+function pintarRepProducto(){
+  loadProds();
+  var q = (window._repProdBusca || '').toLowerCase().trim();
+  var cuerpo = '<input id="rep-buscar-prod" value="' + escaparHtml(window._repProdBusca || '') + '" '
+    + 'placeholder="\ud83d\udd0d Buscar el producto..." oninput="buscarProdRep(this.value)" '
+    + 'style="width:100%;padding:11px;border:1.5px solid #ccc;border-radius:9px;font-size:14px;'
+    + 'margin-bottom:9px">';
+
+  if(!window._repProdElegido){
+    if(!q){
+      cuerpo += '<div style="background:#F4F6FB;border-radius:10px;padding:20px;text-align:center;'
+        + 'font-size:13px;color:var(--nbs-muted)">Escribe el nombre del producto que quieres mirar.</div>';
+    } else {
+      var hallados = productos.filter(function(p){
+        return !p.eliminado && (p.nombre || '').toLowerCase().indexOf(q) >= 0;
+      }).slice(0, 12);
+      cuerpo += hallados.length
+        ? hallados.map(function(p){
+            return '<div onclick="elegirProdRep(' + _arg(String(p.id)) + ')" '
+              + 'style="padding:11px;border:1px solid #E4E4EC;border-radius:9px;margin-bottom:6px;'
+              + 'cursor:pointer;font-size:13px;font-weight:700">' + escaparHtml(p.nombre)
+              + (p.marca ? '<div style="font-size:10.5px;color:var(--nbs-muted);font-weight:600">'
+                          + escaparHtml(p.marca) + '</div>' : '')
+              + '</div>';
+          }).join('')
+        : '<div style="padding:18px;text-align:center;color:var(--nbs-muted);font-size:13px">'
+          + 'No encontr\u00e9 ning\u00fan producto con eso.</div>';
+    }
+  } else {
+    var p = productos.find(function(x){ return String(x.id) === String(window._repProdElegido); });
+    if(p){
+      var uds = 0, plata = 0, gan = 0, porCli = {};
+      _ventasDelRango().forEach(function(v){
+        (v.items || []).forEach(function(it){
+          if(String(it.pid) !== String(p.id)) return;
+          var c = Number(it.cant) || 0;
+          uds += c;
+          plata += c * (parseFloat(it.precio) || 0);
+          gan += c * ((parseFloat(it.precio) || 0) - (parseFloat(it.costo) || 0));
+          var k = v.cn || String(v.cid);
+          porCli[k] = (porCli[k] || 0) + c;
+        });
+      });
+      var quienes = Object.keys(porCli).sort(function(a, b){ return porCli[b] - porCli[a]; });
+      cuerpo += '<div style="background:#FFF8E1;border:1.5px solid #FFD54F;border-radius:10px;'
+        +   'padding:11px;margin-bottom:11px">'
+        +   '<div style="font-size:14px;font-weight:900">' + escaparHtml(p.nombre) + '</div>'
+        +   (p.marca ? '<div style="font-size:11px;color:#7A5C00;font-weight:700">' + escaparHtml(p.marca) + '</div>' : '')
+        +   '<button onclick="elegirProdRep(null)" style="margin-top:7px;padding:6px 11px;'
+        +     'background:#fff;border:1px solid #E0C070;border-radius:7px;font-size:11px;'
+        +     'font-weight:700;cursor:pointer">\ud83d\udd04 Buscar otro</button>'
+        + '</div>'
+        + _tresNumeros([
+            ['VENDISTE', uds + ' u.', '#1565C0', '#E3F2FD'],
+            ['COBRASTE', '$' + fmtNum(plata), '#2E7D32', '#E8F5E9'],
+            ['TE DEJ\u00d3', '$' + fmtNum(gan), '#E65100', '#FFF3E0']
+          ]);
+      if(quienes.length){
+        cuerpo += '<div style="font-size:11px;font-weight:800;color:#555;margin-bottom:6px">'
+          + 'QUI\u00c9N LO COMPR\u00d3 \u00b7 ' + quienes.length + ' cliente(s)</div>'
+          + quienes.slice(0, 15).map(function(k){
+              return '<div style="display:flex;justify-content:space-between;padding:6px 0;'
+                + 'border-bottom:1px solid #F4F4F8;font-size:12.5px">'
+                + '<span>' + escaparHtml(k) + '</span>'
+                + '<b>' + porCli[k] + '</b></div>';
+            }).join('');
+      } else {
+        cuerpo += '<div style="padding:16px;text-align:center;color:var(--nbs-muted);font-size:13px">'
+          + 'No vendiste nada de este producto en esas fechas.</div>';
+      }
+    }
+  }
+  _cajaReporte('\ud83d\udcca Cu\u00e1nto vend\u00ed de\u2026', cuerpo);
+}
+
+function buscarProdRep(v){
+  window._repProdBusca = v;
+  window._repProdElegido = null;
+  var c = document.getElementById('rep-cuerpo');
+  if(c){ pintarRepProducto(); setTimeout(function(){
+    var i = document.getElementById('rep-buscar-prod');
+    if(i){ i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+  }, 30); }
+}
+
+function elegirProdRep(id){
+  window._repProdElegido = id;
+  pintarRepProducto();
+}
+
+
+// ═══ ② DINERO DORMIDO ════════════════════════════════════════════
+// 🔑 EL MÁS VALIOSO. En sus datos: 246 productos con stock sin vender en 60 días,
+// $26.355 parados — el 42% de su inventario.
+function abrirRepDormido(){
+  window._repActual = null;
+  loadProds();
+  var dias = window._repDiasDormido || 60;
+  var corte = Date.now() - dias * 86400000;
+  var vendidos = {};
+  LS('nv', []).forEach(function(v){
+    if(v.cancelada) return;
+    var f = parsearFechaVenta(v.fecha);
+    if(!f || f.getTime() < corte) return;
+    (v.items || []).forEach(function(it){ if(it.pid) vendidos[String(it.pid)] = true; });
+  });
+  var parados = productos.filter(function(p){
+    return !p.eliminado && (p.stock || 0) > 0 && !vendidos[String(p.id)]
+        && !/balance inicial/i.test(p.nombre || '');
+  }).map(function(p){
+    return { n: p.nombre || '', m: p.marca || '', stock: p.stock || 0,
+             costo: parseFloat(p.costo) || 0,
+             plata: (p.stock || 0) * (parseFloat(p.costo) || 0) };
+  }).sort(function(a, b){ return b.plata - a.plata; });
+
+  var total = parados.reduce(function(a, x){ return a + x.plata; }, 0);
+  var invTotal = productos.filter(function(p){ return !p.eliminado; })
+    .reduce(function(a, p){ return a + (p.stock || 0) * (parseFloat(p.costo) || 0); }, 0);
+  var pct = invTotal > 0 ? Math.round(total / invTotal * 100) : 0;
+
+  var cuerpo = '<div style="display:flex;gap:5px;margin-bottom:11px">'
+    + [30, 60, 90, 180].map(function(d){
+        return '<button onclick="window._repDiasDormido=' + d + ';abrirRepDormido()" '
+          + 'style="flex:1;padding:7px 2px;background:' + (d === dias ? '#1a237e' : '#fff') + ';'
+          + 'color:' + (d === dias ? '#fff' : '#1a237e') + ';border:1px solid #b9bfe0;'
+          + 'border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">' + d + ' d\u00edas</button>';
+      }).join('')
+    + '</div>'
+    + '<div style="background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:11px;padding:13px;'
+    +   'margin-bottom:12px;text-align:center">'
+    +   '<div style="font-size:11px;font-weight:800;color:#C62828">DINERO DORMIDO</div>'
+    +   '<div style="font-size:27px;font-weight:900;color:#C62828">$' + fmtNum(total) + '</div>'
+    +   '<div style="font-size:12px;color:#C62828;margin-top:3px">'
+    +     parados.length + ' producto(s) sin venderse en ' + dias + ' d\u00edas'
+    +     '<br>es el <b>' + pct + '%</b> de tu inventario</div>'
+    + '</div>';
+
+  cuerpo += parados.length
+    ? '<div style="font-size:11px;font-weight:800;color:#555;margin-bottom:6px">'
+      + 'LO QUE M\u00c1S PLATA TIENE PARADA</div>'
+      + parados.slice(0, 25).map(function(x){
+          return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;'
+            + 'padding:8px 0;border-bottom:1px solid #F4F4F8">'
+            + '<div style="flex:1;min-width:0">'
+            +   '<div style="font-size:12.5px;font-weight:700">' + escaparHtml(x.n) + '</div>'
+            +   '<div style="font-size:10.5px;color:var(--nbs-muted)">' + x.stock + ' en stock'
+            +     (x.m ? ' \u00b7 ' + escaparHtml(x.m) : '') + '</div>'
+            + '</div>'
+            + '<div style="font-size:13px;font-weight:900;color:#C62828">$' + fmtNum(x.plata) + '</div>'
+            + '</div>';
+        }).join('')
+      + (parados.length > 25 ? '<div style="font-size:11px;color:var(--nbs-muted);text-align:center;'
+          + 'padding:8px">y ' + (parados.length - 25) + ' m\u00e1s\u2026</div>' : '')
+    : '<div style="padding:20px;text-align:center;color:#2E7D32;font-size:14px;font-weight:700">'
+      + '\ud83c\udf89 Todo lo que tienes en stock se ha vendido en estos ' + dias + ' d\u00edas.</div>';
+
+  _cajaReporte('\ud83d\udc80 Dinero dormido', cuerpo, 'sinFechas');
+}
+
+
+// ═══ ③ MES A MES ═════════════════════════════════════════════════
+function abrirRepMeses(){
+  window._repActual = null;
+  var meses = {};
+  LS('nv', []).forEach(function(v){
+    if(v.cancelada) return;
+    var f = parsearFechaVenta(v.fecha);
+    if(!f) return;
+    var k = f.getFullYear() + '-' + (f.getMonth() < 9 ? '0' : '') + (f.getMonth() + 1);
+    if(!meses[k]) meses[k] = { vend: 0, gan: 0, n: 0 };
+    meses[k].vend += (typeof dinero === 'function') ? dinero(v.total) : (parseFloat(v.total) || 0);
+    meses[k].gan += parseFloat(v.ganancia) || 0;
+    meses[k].n++;
+  });
+  var claves = Object.keys(meses).sort().reverse();
+  var NOM = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+             'septiembre','octubre','noviembre','diciembre'];
+  var maxV = Math.max.apply(null, claves.map(function(k){ return meses[k].vend; }).concat([1]));
+
+  var cuerpo = claves.map(function(k, i){
+    var m = meses[k];
+    var p = k.split('-');
+    var antes = claves[i + 1] ? meses[claves[i + 1]].vend : 0;
+    var sube = antes > 0 ? Math.round((m.vend - antes) / antes * 100) : null;
+    return '<div style="padding:11px;border:1px solid #E4E4EC;border-radius:10px;margin-bottom:7px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+      +   '<div><div style="font-size:13.5px;font-weight:900;text-transform:capitalize">'
+      +     NOM[parseInt(p[1], 10) - 1] + ' ' + p[0] + '</div>'
+      +     '<div style="font-size:10.5px;color:var(--nbs-muted)">' + m.n + ' factura(s)</div></div>'
+      +   '<div style="text-align:right">'
+      +     '<div style="font-size:16px;font-weight:900;color:#1565C0">$' + fmtNum(m.vend) + '</div>'
+      +     '<div style="font-size:11px;color:#2E7D32;font-weight:700">te dej\u00f3 $' + fmtNum(m.gan) + '</div>'
+      +   '</div>'
+      + '</div>'
+      + '<div style="height:7px;background:#EEF0F6;border-radius:4px;margin-top:7px;overflow:hidden">'
+      +   '<div style="height:100%;width:' + Math.round(m.vend / maxV * 100) + '%;background:#1565C0"></div>'
+      + '</div>'
+      + (sube !== null
+          ? '<div style="font-size:11px;font-weight:700;margin-top:5px;color:'
+            + (sube >= 0 ? '#2E7D32' : '#C62828') + '">'
+            + (sube >= 0 ? '\u25b2 subi\u00f3 ' : '\u25bc baj\u00f3 ') + Math.abs(sube)
+            + '% contra el mes anterior</div>'
+          : '')
+      + '</div>';
+  }).join('');
+
+  _cajaReporte('\ud83d\udcc8 Mes a mes',
+    cuerpo || '<div style="padding:20px;text-align:center;color:var(--nbs-muted)">Sin ventas todav\u00eda.</div>',
+    'sinFechas');
+}
+
+
+// ═══ ④ POR DÍA DE LA SEMANA ══════════════════════════════════════
+// En sus datos: sábado $10.985 y viernes $10.314, contra lunes $572. Sirve para
+// decidir dónde poner el esfuerzo.
+function abrirRepDias(){
+  window._repActual = pintarRepDias;
+  pintarRepDias();
+}
+
+function pintarRepDias(){
+  var NOM = ['Domingo','Lunes','Martes','Mi\u00e9rcoles','Jueves','Viernes','S\u00e1bado'];
+  var dias = [0,0,0,0,0,0,0], cuenta = [0,0,0,0,0,0,0];
+  _ventasDelRango().forEach(function(v){
+    var f = parsearFechaVenta(v.fecha);
+    if(!f) return;
+    var d = f.getDay();
+    dias[d] += (typeof dinero === 'function') ? dinero(v.total) : (parseFloat(v.total) || 0);
+    cuenta[d]++;
+  });
+  var max = Math.max.apply(null, dias.concat([1]));
+  var total = dias.reduce(function(a, x){ return a + x; }, 0);
+  var orden = [1,2,3,4,5,6,0];   // de lunes a domingo
+
+  var cuerpo = orden.map(function(d){
+    var pct = total > 0 ? Math.round(dias[d] / total * 100) : 0;
+    return '<div style="margin-bottom:9px">'
+      + '<div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px">'
+      +   '<b>' + NOM[d] + '</b>'
+      +   '<span><b style="color:#1565C0">$' + fmtNum(dias[d]) + '</b>'
+      +     '<span style="color:var(--nbs-muted);font-size:11px"> \u00b7 ' + pct + '%</span></span>'
+      + '</div>'
+      + '<div style="height:11px;background:#EEF0F6;border-radius:6px;overflow:hidden">'
+      +   '<div style="height:100%;width:' + Math.round(dias[d] / max * 100) + '%;'
+      +     'background:' + (dias[d] === max ? '#2E7D32' : '#1565C0') + '"></div>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--nbs-muted);margin-top:2px">'
+      +   cuenta[d] + ' factura(s)</div>'
+      + '</div>';
+  }).join('');
+
+  _cajaReporte('\ud83d\udcc5 Por d\u00eda de la semana', cuerpo);
+}
+
+
+// ═══ ⑤ GANANCIA REAL ═════════════════════════════════════════════
+// Vendido − costo − gastos = lo que de verdad te queda. No lo tenía en ningún sitio.
+function abrirRepGanancia(){
+  window._repActual = pintarRepGanancia;
+  pintarRepGanancia();
+}
+
+function pintarRepGanancia(){
+  var V = _ventasDelRango();
+  var vendido = 0, costo = 0, cobrado = 0;
+  V.forEach(function(v){
+    vendido += (typeof dinero === 'function') ? dinero(v.total) : (parseFloat(v.total) || 0);
+    cobrado += cobradoYDebeDe(v).cobrado;
+    (v.items || []).forEach(function(it){
+      costo += (Number(it.cant) || 0) * (parseFloat(it.costo) || 0);
+    });
+  });
+
+  // Los gastos del mismo rango
+  var d = parsearFechaVenta(_aFechaApp2(_rangoRep.desde));
+  var h = parsearFechaVenta(_aFechaApp2(_rangoRep.hasta));
+  var dN = d ? d.getTime() : 0, hN = h ? h.getTime() + 86399000 : Infinity;
+  var gastos = 0, porTipo = {};
+  LS('ngastos', []).forEach(function(g){
+    var f = parsearFechaVenta(g.fecha);
+    if(!f || f.getTime() < dN || f.getTime() > hN) return;
+    var m = (typeof dinero === 'function') ? dinero(g.monto) : (parseFloat(g.monto) || 0);
+    gastos += m;
+    var k = g.categoria || 'otros';
+    porTipo[k] = (porTipo[k] || 0) + m;
+  });
+
+  var bruta = vendido - costo;
+  var neta = bruta - gastos;
+  var margen = vendido > 0 ? Math.round(neta / vendido * 100) : 0;
+
+  var fila = function(t, v, col, gordo){
+    return '<div style="display:flex;justify-content:space-between;padding:' + (gordo ? '9px' : '5px')
+      + ' 0;font-size:' + (gordo ? '16px' : '13px') + ';font-weight:' + (gordo ? '900' : '600') + ';'
+      + (gordo ? 'border-top:2px solid #1a237e;margin-top:5px;' : '')
+      + 'color:' + (col || 'var(--nbs-ink)') + '">'
+      + '<span>' + t + '</span><span>$' + fmtNum(v) + '</span></div>';
+  };
+
+  var cuerpo = '<div style="border:1px solid #E4E4EC;border-radius:11px;padding:13px;margin-bottom:11px">'
+    + fila('Vendiste', vendido, '#1565C0')
+    + fila('\u2212 lo que te cost\u00f3', costo, '#8A8A9E')
+    + fila('= ganancia de la mercanc\u00eda', bruta, '#2E7D32')
+    + fila('\u2212 gastos del negocio', gastos, '#E65100')
+    + fila('TE QUEDA', neta, neta >= 0 ? '#2E7D32' : '#C62828', true)
+    + '<div style="text-align:center;font-size:11.5px;color:var(--nbs-muted);margin-top:5px">'
+    +   'de cada $100 que vendes, te quedan <b>$' + margen + '</b></div>'
+    + '</div>'
+    + '<div style="background:#F4F6FB;border-radius:10px;padding:11px;margin-bottom:11px">'
+    +   '<div style="display:flex;justify-content:space-between;font-size:12.5px">'
+    +     '<span>De lo vendido, ya cobraste</span><b>$' + fmtNum(cobrado) + '</b></div>'
+    +   '<div style="display:flex;justify-content:space-between;font-size:12.5px;margin-top:3px;'
+    +     'color:#C62828"><span>Te queda por cobrar</span><b>$' + fmtNum(vendido - cobrado) + '</b></div>'
+    + '</div>';
+
+  var tipos = Object.keys(porTipo).sort(function(a, b){ return porTipo[b] - porTipo[a]; });
+  if(tipos.length){
+    cuerpo += '<div style="font-size:11px;font-weight:800;color:#555;margin-bottom:6px">'
+      + 'EN QU\u00c9 SE FUERON LOS GASTOS</div>'
+      + tipos.map(function(k){
+          return '<div style="display:flex;justify-content:space-between;padding:5px 0;'
+            + 'border-bottom:1px solid #F4F4F8;font-size:12.5px">'
+            + '<span style="text-transform:capitalize">' + escaparHtml(k) + '</span>'
+            + '<b>$' + fmtNum(porTipo[k]) + '</b></div>';
+        }).join('');
+  }
+
+  _cajaReporte('\ud83d\udcb5 Ganancia real', cuerpo);
+}
+
+
+// ═══ ⑥ QUIÉN TE COMPRA MÁS ═══════════════════════════════════════
+function abrirRepClientes(){
+  window._repActual = pintarRepClientes;
+  pintarRepClientes();
+}
+
+function pintarRepClientes(){
+  clientes = LS('ncl', []);
+  var porCli = {};
+  _ventasDelRango().forEach(function(v){
+    var k = String(v.cid);
+    if(!porCli[k]) porCli[k] = { vend: 0, gan: 0, n: 0, nombre: v.cn || '' };
+    porCli[k].vend += (typeof dinero === 'function') ? dinero(v.total) : (parseFloat(v.total) || 0);
+    porCli[k].gan += parseFloat(v.ganancia) || 0;
+    porCli[k].n++;
+  });
+  var lista = Object.keys(porCli).map(function(k){
+    var c = clientes.find(function(x){ return String(x.id) === k; });
+    return { k: k, nombre: c ? nombreCl(c) : (porCli[k].nombre || '(sin nombre)'),
+             negocio: c ? (c.negocio || '') : '',
+             vend: porCli[k].vend, gan: porCli[k].gan, n: porCli[k].n };
+  }).sort(function(a, b){ return b.vend - a.vend; });
+
+  var total = lista.reduce(function(a, x){ return a + x.vend; }, 0);
+  var max = lista.length ? lista[0].vend : 1;
+
+  var cuerpo = _tresNumeros([
+      ['CLIENTES', String(lista.length), '#1565C0', '#E3F2FD'],
+      ['VENDIDO', '$' + fmtNum(total), '#2E7D32', '#E8F5E9'],
+      ['PROMEDIO', '$' + fmtNum(lista.length ? total / lista.length : 0), '#E65100', '#FFF3E0']
+    ])
+    + lista.slice(0, 30).map(function(x, i){
+        return '<div onclick="cerrarReporte();verCl(' + _arg(x.k) + ')" '
+          + 'style="padding:9px 0;border-bottom:1px solid #F4F4F8;cursor:pointer">'
+          + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
+          +   '<div style="flex:1;min-width:0">'
+          +     '<div style="font-size:12.5px;font-weight:800">'
+          +       (i < 3 ? ['\ud83e\udd47','\ud83e\udd48','\ud83e\udd49'][i] + ' ' : '')
+          +       escaparHtml(x.nombre) + '</div>'
+          +     (x.negocio ? '<div style="font-size:10.5px;color:var(--nbs-muted)">'
+                           + escaparHtml(x.negocio) + '</div>' : '')
+          +     '<div style="font-size:10px;color:var(--nbs-muted)">' + x.n + ' factura(s) \u00b7 te dej\u00f3 $'
+          +       fmtNum(x.gan) + '</div>'
+          +   '</div>'
+          +   '<div style="font-size:14px;font-weight:900;color:#1565C0">$' + fmtNum(x.vend) + '</div>'
+          + '</div>'
+          + '<div style="height:5px;background:#EEF0F6;border-radius:3px;margin-top:5px;overflow:hidden">'
+          +   '<div style="height:100%;width:' + Math.round(x.vend / max * 100) + '%;background:#1565C0"></div>'
+          + '</div></div>';
+      }).join('');
+
+  _cajaReporte('\ud83c\udfea Qui\u00e9n te compra m\u00e1s',
+    cuerpo || '<div style="padding:20px;text-align:center;color:var(--nbs-muted)">Sin ventas en esas fechas.</div>');
+}
+
+
+// ═══ ⑦ QUÉ REPONER ═══════════════════════════════════════════════
+// Lo que más sale y ya queda poco: para no quedarse sin lo que de verdad vende.
+function abrirRepReponer(){
+  window._repActual = pintarRepReponer;
+  pintarRepReponer();
+}
+
+function pintarRepReponer(){
+  loadProds();
+  var vend = {};
+  _ventasDelRango().forEach(function(v){
+    (v.items || []).forEach(function(it){
+      if(!it.pid) return;
+      vend[String(it.pid)] = (vend[String(it.pid)] || 0) + (Number(it.cant) || 0);
+    });
+  });
+  var dias = Math.max(1, Math.round((
+      (parsearFechaVenta(_aFechaApp2(_rangoRep.hasta)) || new Date()).getTime()
+    - (parsearFechaVenta(_aFechaApp2(_rangoRep.desde)) || new Date()).getTime()
+  ) / 86400000));
+
+  var lista = productos.filter(function(p){
+    return !p.eliminado && (vend[String(p.id)] || 0) > 0
+        && !/balance inicial/i.test(p.nombre || '');
+  }).map(function(p){
+    var u = vend[String(p.id)];
+    var porDia = u / dias;
+    var stock = p.stock || 0;
+    // Cuántos días aguanta con lo que le queda, al ritmo al que se vende
+    var aguanta = porDia > 0 ? Math.round(stock / porDia) : 999;
+    return { n: p.nombre || '', m: p.marca || '', u: u, stock: stock, aguanta: aguanta,
+             costo: parseFloat(p.costo) || 0 };
+  }).filter(function(x){ return x.aguanta <= 30; })
+    .sort(function(a, b){ return a.aguanta - b.aguanta; });
+
+  var cuerpo = '<div style="background:#FFF3E0;border-radius:10px;padding:11px;margin-bottom:11px;'
+    + 'font-size:12px;color:#E65100;line-height:1.5">'
+    + 'Lo que m\u00e1s sale y ya te queda poco. Los d\u00edas son a tu ritmo de venta '
+    + 'de estas fechas.</div>';
+
+  cuerpo += lista.length
+    ? lista.slice(0, 30).map(function(x){
+        var urg = x.aguanta <= 7;
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;'
+          + 'padding:9px;border:1px solid ' + (urg ? '#EF9A9A' : '#E4E4EC') + ';'
+          + 'border-left:4px solid ' + (urg ? '#C62828' : '#F9A825') + ';'
+          + 'border-radius:9px;margin-bottom:6px">'
+          + '<div style="flex:1;min-width:0">'
+          +   '<div style="font-size:12.5px;font-weight:800">' + escaparHtml(x.n) + '</div>'
+          +   '<div style="font-size:10.5px;color:var(--nbs-muted)">'
+          +     'vendiste ' + x.u + ' \u00b7 te quedan ' + x.stock + '</div>'
+          + '</div>'
+          + '<div style="text-align:right;flex-shrink:0">'
+          +   '<div style="font-size:14px;font-weight:900;color:' + (urg ? '#C62828' : '#E65100') + '">'
+          +     (x.stock === 0 ? 'SIN' : x.aguanta + ' d') + '</div>'
+          +   '<div style="font-size:9.5px;color:var(--nbs-muted)">'
+          +     (x.stock === 0 ? 'se acab\u00f3' : 'te aguanta') + '</div>'
+          + '</div></div>';
+      }).join('')
+    : '<div style="padding:20px;text-align:center;color:#2E7D32;font-size:14px;font-weight:700">'
+      + '\u2705 De momento no te falta nada urgente.</div>';
+
+  _cajaReporte('\ud83d\udce6 Qu\u00e9 reponer', cuerpo);
+}
+
 function exportarPanoramaPDF(){
   var contenido = document.getElementById('panorama-contenido');
   if(!contenido){ alert('No hay datos para exportar.'); return; }
@@ -37204,6 +37796,43 @@ function navegarANegocio(nombreNegocio){
   window.open(url, '_blank');
 }
 
+// \u2705 Arreglar una fecha mal escrita, en todos los sitios donde est\u00e9.  (8 sep 2026)
+// El caso real: la factura #0009 de Jorge Duarte ten\u00eda "6/17/2026" en vez de
+// "06/17/2026", y se descolgaba de su mes en los reportes.
+function arreglarUnaFecha(vieja, nueva){
+  if(!confirm('\u00bfCambiar la fecha?\n\n' + vieja + '  \u2192  ' + nueva)) return;
+  var tocadas = 0;
+
+  var V = LS('nv', []);
+  V.forEach(function(v){
+    if(v.fecha === vieja){ v.fecha = nueva; v.mod = Date.now(); tocadas++; }
+    (v.pagosFactura || []).forEach(function(p){
+      if(p && p.fecha === vieja){ p.fecha = nueva; tocadas++; }
+    });
+  });
+  if(tocadas) SS('nv', V);
+
+  var G = LS('ngastos', []);
+  var tg = 0;
+  G.forEach(function(g){ if(g.fecha === vieja){ g.fecha = nueva; tg++; } });
+  if(tg){ SS('ngastos', G); tocadas += tg; }
+
+  var C = LS('nc', []);
+  var tc = 0;
+  C.forEach(function(c){
+    if(c.fecha === vieja){ c.fecha = nueva; tc++; }
+    (c.pagosFactura || []).forEach(function(p){
+      if(p && p.fecha === vieja){ p.fecha = nueva; tc++; }
+    });
+  });
+  if(tc){ SS('nc', C); tocadas += tc; }
+
+  ventas = LS('nv', []);
+  avisoGrande('\u2705 Arreglado.\n\n' + vieja + '  \u2192  ' + nueva
+    + '\n\nSe cambi\u00f3 en ' + tocadas + ' sitio(s).');
+  try { revisarFechasSospechosas(); } catch(e){}
+}
+
 function revisarFechasSospechosas(){
   var problemas = [];
 
@@ -37219,6 +37848,16 @@ function revisarFechasSospechosas(){
       return;
     }
     var mes = parseInt(partes[0]), dia = parseInt(partes[1]), anio = parseInt(partes[2]);
+    // \ud83d\udd11 Le faltan los ceros: "6/17/2026" en vez de "06/17/2026". parseInt la lee
+    // bien, pero al cortarla por posici\u00f3n se descuadra y la factura se sale de su mes.
+    if(partes[0].length !== 2 || partes[1].length !== 2 || partes[2].length !== 4){
+      problemas.push({ origen: origen, detalle: detalle, fecha: fechaStr,
+        razon: 'Le faltan ceros: deber\u00eda ser MM/DD/AAAA con dos d\u00edgitos en mes y d\u00eda',
+        arreglable: (mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31 && anio >= 2020 && anio <= 2035)
+          ? (mes < 10 ? '0' : '') + mes + '/' + (dia < 10 ? '0' : '') + dia + '/' + anio
+          : null });
+      return;
+    }
     if(mes > 12){
       problemas.push({ origen: origen, detalle: detalle, fecha: fechaStr, razon: 'El primer número ('+mes+') es mayor a 12 -no puede ser un mes-, esta fecha puede estar invertida' });
     } else if(anio < 2020 || anio > 2035){
@@ -37275,7 +37914,16 @@ function revisarFechasSospechosas(){
       card.style.cssText = 'background:#FAFAFA;border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid #FFCDD2';
       card.innerHTML = '<div style="font-size:13px;font-weight:800;color:#1a237e">'+pr.origen+' · '+pr.detalle+'</div>'
         +'<div style="font-size:12px;color:#333;margin-top:4px">📅 Fecha guardada: <b>'+pr.fecha+'</b></div>'
-        +'<div style="font-size:11px;color:#C62828;margin-top:2px">'+pr.razon+'</div>';
+        +'<div style="font-size:11px;color:#C62828;margin-top:2px">'+pr.razon+'</div>'
+        // ✅ Si la fecha se puede deducir sola, se ofrece arreglarla de un toque. -8 sep-
+        + (pr.arreglable
+            ? '<div style="font-size:11.5px;color:#2E7D32;font-weight:700;margin-top:6px">'
+              + 'Deber\u00eda ser: <b>' + pr.arreglable + '</b></div>'
+              + '<button onclick="arreglarUnaFecha(' + _arg(String(pr.fecha)) + ',' + _arg(String(pr.arreglable)) + ')" '
+              + 'style="width:100%;margin-top:6px;padding:9px;background:#2E7D32;color:#fff;border:none;'
+              + 'border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">'
+              + '\u2713 Arreglarla a ' + pr.arreglable + '</button>'
+            : '');
       wrap.appendChild(card);
     });
   }
@@ -41827,6 +42475,13 @@ function verHistorialCliente(cid, modo){
 <div id="p-rpt" class="pg">
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">📊 Reportes</h2>
+  <button onclick="abrirRepProducto()" style="width:100%;padding:13px;margin-bottom:8px;background:#E3F2FD;color:#1565C0;border:1.5px solid #1565C033;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">📊</span><span style="flex:1"><span style="display:block">Cuánto vendí de…</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Un producto, entre las fechas que elijas</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepDormido()" style="width:100%;padding:13px;margin-bottom:8px;background:#FFEBEE;color:#C62828;border:1.5px solid #C6282833;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">💀</span><span style="flex:1"><span style="display:block">Dinero dormido</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Lo que tienes parado y no se vende</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepGanancia()" style="width:100%;padding:13px;margin-bottom:8px;background:#E8F5E9;color:#2E7D32;border:1.5px solid #2E7D3233;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">💵</span><span style="flex:1"><span style="display:block">Ganancia real</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Vendido menos costo menos gastos</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepMeses()" style="width:100%;padding:13px;margin-bottom:8px;background:#F3E5F5;color:#6A1B9A;border:1.5px solid #6A1B9A33;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">📈</span><span style="flex:1"><span style="display:block">Mes a mes</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Cómo va creciendo tu negocio</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepDias()" style="width:100%;padding:13px;margin-bottom:8px;background:#E0F2F1;color:#00695C;border:1.5px solid #00695C33;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">📅</span><span style="flex:1"><span style="display:block">Por día de la semana</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Qué días te dejan más</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepClientes()" style="width:100%;padding:13px;margin-bottom:8px;background:#FFF3E0;color:#E65100;border:1.5px solid #E6510033;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">🏪</span><span style="flex:1"><span style="display:block">Quién te compra más</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Tus barberías ordenadas</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepReponer()" style="width:100%;padding:13px;margin-bottom:8px;background:#FFFDE7;color:#F9A825;border:1.5px solid #F9A82533;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">📦</span><span style="flex:1"><span style="display:block">Qué reponer</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Lo que más sale y ya queda poco</span></span><span style="opacity:.5">›</span></button>
   <button onclick="mostrarMargenProductos()" style="width:100%;padding:12px;background:#6A1B9A;color:white;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:12px">📊 Margen por producto — cuánto te deja cada uno</button>
   <button onclick="mostrarReporteClientes('ganancia')" style="width:100%;padding:12px;background:#1a237e;color:white;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:8px">📊 Reporte por Cliente (comprado, pagado y ganancia)</button>
     <button onclick="revisarFechasSospechosas()" style="width:100%;padding:10px;background:#FFF3E0;color:#E65100;border:1px solid #FFCC80;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:14px">🔍 Revisar si hay fechas guardadas con formato incorrecto</button>
