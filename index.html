@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260908h-OFICIAL-V2.0">
+<meta name="app-version" content="20260908i-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18930,7 +18930,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260908h';
+var NOVEDADES_VERSION = '20260908i';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34227,6 +34227,7 @@ function desbloquearConHuella(){
     }
   }).then(function(){
     clearTimeout(window._relojHuella);
+    localStorage.removeItem('nbs_fallos_huella');   // entro bien: se olvida lo anterior
     // La huella fue verificada por el propio telefono antes de devolver esto
     window._appBloqueada = false;
     registrarActividad();
@@ -34244,7 +34245,38 @@ function desbloquearConHuella(){
   }).catch(function(e){
     clearTimeout(window._relojHuella);
     console.error('No se pudo verificar la huella:', e);
-    errorEl.textContent = 'No se reconoció la huella.';
+
+    // \ud83d\udd11 \u00bfEs que fall\u00f3 el dedo, o es que ESTA HUELLA YA NO EXISTE en el telefono?
+    // Si la credencial no existe, reintentar con ella no sirve de NADA: hay que
+    // borrarla y registrar una nueva. Antes se dejaba guardada y Sensei tocaba
+    // "Intentar de nuevo" una y otra vez sin que pasara nada. -8 sep-
+    var texto = String((e && (e.name + ' ' + e.message)) || '');
+    var yaNoExiste = /NotAllowedError|InvalidStateError|NotSupportedError|no credentials|not found/i.test(texto);
+
+    // Se cuentan los fallos seguidos: si falla 3 veces, la huella no sirve aunque el
+    // error no lo diga claro
+    var fallos = (parseInt(localStorage.getItem('nbs_fallos_huella') || '0', 10) || 0) + 1;
+    localStorage.setItem('nbs_fallos_huella', String(fallos));
+
+    if(yaNoExiste || fallos >= 3){
+      // \ud83d\uddd1\ufe0f SE BORRA la huella que ya no sirve, para no seguir dando vueltas
+      localStorage.removeItem(CLAVE_HUELLA_ID);
+      localStorage.removeItem('nbs_fallos_huella');
+      try { actualizarBotonHuella(); } catch(e2){}
+      var m3 = document.getElementById('bloqueo-msg');
+      if(m3) m3.textContent = 'Esta huella ya no sirve en este tel\u00e9fono';
+      errorEl.innerHTML = 'Entra con tu <b>correo y contrase\u00f1a</b>, y vuelve a '
+        + 'activar la huella en el men\u00fa, en SEGURIDAD.';
+      errorEl.style.display = 'block';
+      var bh = document.getElementById('btn-huella');
+      if(bh) bh.style.display = 'none';       // reintentar no sirve de nada
+      var bc = document.getElementById('btn-contrasena');
+      if(bc){ bc.style.display = ''; bc.style.marginTop = '26px'; }
+      logAtras('HUELLA: la credencial ya no existe, se borro');
+      return;
+    }
+
+    errorEl.textContent = 'No se reconoci\u00f3 la huella. Prueba otra vez.';
     errorEl.style.display = 'block';
     mostrarOpcionesDeBloqueo();   // aqui si aparecen el boton y la contraseña
   });
