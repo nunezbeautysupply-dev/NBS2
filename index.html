@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260908f-OFICIAL-V2.0">
+<meta name="app-version" content="20260908h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4618,6 +4618,7 @@ var RECUADROS_ENCIMA = [
   { id: 'unif-marcas-ov',           cerrar: 'cerrarUnificarMarcas' },
   { id: 'confirmar-balance-overlay', cerrar: 'cerrarConfirmacionBalance' },
   { id: 'sinconf-overlay',          cerrar: 'cerrarSinConfirmar' },
+  { id: 'guardadia-overlay',        cerrar: 'cerrarGuardarElDia' },
   { id: 'reporte-overlay',          cerrar: 'cerrarReporte' },
   { id: 'pedido-nuevo-overlay',     cerrar: 'cerrarAvisoPedidoNuevo' },
   { id: 'pedidos-web-overlay',      cerrar: 'cerrarPedidosWeb' },
@@ -12580,6 +12581,10 @@ function guardarCierreRuta(){
     msg += '\nQueda apuntado con la fecha de hoy.';
   }
   alert(msg);
+  // \ud83d\udcbe Y se le recuerda guardar el d\u00eda. Lo pidi\u00f3 el 8 sep, despu\u00e9s de quedarse
+  // fuera de la app: "imag\u00ednate que yo pierda todos mis datos, es como perder el
+  // negocio". El backup en su correo sobrevive al tel\u00e9fono y a la nube.
+  setTimeout(function(){ try { avisarGuardarElDia(); } catch(e){} }, 400);
 }
 
 function renderVan(q){
@@ -18925,7 +18930,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260908f';
+var NOVEDADES_VERSION = '20260908h';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34082,8 +34087,16 @@ function activarHuella(){
       alert('Este dispositivo o navegador no tiene huella digital disponible. Necesitas un teléfono con lector de huella configurado, usando Chrome.');
       return;
     }
+    // \ud83d\udd11 La huella se ata a un identificador FIJO DEL APARATO, NO al correo de la
+    // sesion. Antes usaba el correo: si la sesion cambiaba, la huella dejaba de
+    // coincidir y sal\u00eda "No se reconoci\u00f3 la huella". -8 sep-
+    var idFijo = localStorage.getItem('nbs_id_aparato');
+    if(!idFijo){
+      idFijo = 'nbs-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem('nbs_id_aparato', idFijo);
+    }
     var correo = (fbAuth.currentUser && fbAuth.currentUser.email) ? fbAuth.currentUser.email : 'usuario';
-    var idUsuario = new TextEncoder().encode(correo.substring(0,32));
+    var idUsuario = new TextEncoder().encode(idFijo.substring(0, 32));
     navigator.credentials.create({
       publicKey: {
         challenge: retoAleatorio(),
@@ -40789,6 +40802,93 @@ function moverRutaArriba(diaKey, idx){
 }
 
 // ===== HISTORIAL DE PRECIOS (registrar automáticamente) =====
+
+// ═══════════════════════════════════════════════════════════════════
+//  💾 GUARDA TU DÍA  (8 sep 2026)
+//
+//  Sensei, tras quedarse fuera de la app: "imagínate que yo pierda todos mis datos,
+//  es como perder el negocio. Y eso sería perderlo todo."
+//
+//  🔑 Al terminar el cierre de ruta le recuerda bajar su backup, con lo que vendió hoy
+//  y cuánto lleva sin bajar uno. Un archivo en su correo es indestructible: sobrevive
+//  al teléfono, a la nube y a cualquier fallo de la app.
+// ═══════════════════════════════════════════════════════════════════
+function avisarGuardarElDia(){
+  var mins = 9999;
+  try { mins = minutosSinRespaldar(); } catch(e){}
+  var dias = mins >= 9999 ? 99 : Math.floor(mins / 1440);
+  var urgente = dias >= 2;
+
+  // Lo que vendió hoy, para que vea qué es lo que está en juego
+  var hoy = fechaHoy(), vendido = 0, facturas = 0;
+  try {
+    LS('nv', []).forEach(function(v){
+      if(v.cancelada || v.fecha !== hoy) return;
+      vendido += (typeof dinero === 'function') ? dinero(v.total) : (parseFloat(v.total) || 0);
+      facturas++;
+    });
+  } catch(e){}
+
+  var ov = document.getElementById('guardadia-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'guardadia-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2000003;'
+    + 'display:flex;align-items:center;justify-content:center;padding:15px';
+  ov.onclick = function(e){ if(e.target === ov) cerrarGuardarElDia(); };
+
+  ov.innerHTML = '<div style="background:#fff;border-radius:15px;padding:18px;max-width:410px;width:100%">'
+    + '<div style="text-align:center;margin-bottom:12px">'
+    +   '<div style="font-size:34px">\ud83d\udcbe</div>'
+    +   '<div style="font-size:17px;font-weight:900;color:var(--nbs-ink)">GUARDA TU D\u00cdA</div>'
+    + '</div>'
+
+    + (facturas > 0
+        ? '<div style="background:#E8F5E9;border-radius:10px;padding:11px;margin-bottom:9px;'
+          + 'text-align:center">'
+          + '<div style="font-size:11px;font-weight:800;color:#2E7D32">HOY VENDISTE</div>'
+          + '<div style="font-size:22px;font-weight:900;color:#2E7D32">$' + fmtNum(vendido) + '</div>'
+          + '<div style="font-size:11.5px;color:#2E7D32">en ' + facturas + ' factura(s)</div>'
+          + '</div>'
+        : '')
+
+    + '<div style="background:' + (urgente ? '#FFEBEE' : '#F4F6FB') + ';border-radius:10px;'
+    +   'padding:11px;margin-bottom:11px;text-align:center">'
+    +   '<div style="font-size:13px;font-weight:800;color:' + (urgente ? '#C62828' : '#555') + '">'
+    +     (mins >= 9999
+            ? '\u26a0\ufe0f Nunca has bajado un backup'
+            : (dias >= 1
+                ? 'Tu \u00faltimo backup fue hace ' + dias + ' d\u00eda(s)'
+                : 'Tu \u00faltimo backup fue hoy'))
+    +   '</div>'
+    + '</div>'
+
+    + '<div style="font-size:12.5px;color:var(--nbs-muted);line-height:1.55;margin-bottom:13px;'
+    +   'text-align:center">Si pierdes el tel\u00e9fono, <b>este archivo es tu negocio</b>.<br>'
+    +   'B\u00e1jalo y m\u00e1ndalo a tu WhatsApp o a tu correo.</div>'
+
+    + '<button onclick="bajarBackupDelDia()" style="width:100%;padding:15px;background:#1a237e;'
+    +   'color:#fff;border:none;border-radius:12px;font-size:15.5px;font-weight:900;cursor:pointer">'
+    +   '\ud83d\udcbe Bajar mi backup</button>'
+    + '<button onclick="cerrarGuardarElDia()" style="width:100%;padding:12px;margin-top:8px;'
+    +   'background:#F0F0F2;color:#555;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Ahora no</button>'
+    + '</div>';
+  ov.style.display = 'flex';
+}
+
+function cerrarGuardarElDia(){
+  var ov = document.getElementById('guardadia-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function bajarBackupDelDia(){
+  cerrarGuardarElDia();
+  try { exportD(); } catch(e){ avisoGrande('No pude bajar el backup: ' + e.message); }
+}
+
 function registrarCambioPrecio(nombre, precioAntes, precioDespues){
   if(precioAntes === precioDespues) return;
   var historial = LS('historial_precios',[]);

@@ -105,29 +105,21 @@
   <div class="carcaja" id="carcaja"></div>
 </div>
 
-<!-- 🌉 EL PUENTE A NBS2: el pedido viaja por aquí y a Sensei le sale la alerta -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!--
+  🔴 EL CATÁLOGO NO ENTRA A FIREBASE — 8 sep 2026.
+
+  ANTES entraba como invitado (signInAnonymously) al MISMO Firebase de NBS2. Y como el
+  catálogo vive en el MISMO SITIO que la app, esa sesión de invitado PISABA la sesión
+  de Sensei. Su huella, que se registra atada a su correo, quedaba apuntando a un
+  usuario que ya no coincidía: "No se reconoció la huella".
+
+  Él lo detectó: "el problema SI viene después de que hiciste lo de los reportes". Tenía
+  razón — el puente entró en esa misma entrega.
+
+  🔑 REGLA: el catálogo NUNCA toca la sesión de Sensei. El pedido va por WhatsApp.
+-->
 <script>
-// 🔑 El MISMO Firebase de NBS2, pero el barbero entra como INVITADO: solo puede DEJAR
-// un pedido en el buzón. No puede leer, borrar ni tocar nada de Sensei.
-var _fbListo = false, _fbDb = null;
-try {
-  firebase.initializeApp({
-    apiKey: "AIzaSyBqtoMWt9DTMmSN-RR5MUagRIuH7B_Bjbw",
-    authDomain: "nbs2-b641a.firebaseapp.com",
-    projectId: "nbs2-b641a",
-    storageBucket: "nbs2-b641a.firebasestorage.app",
-    messagingSenderId: "946975018761",
-    appId: "1:946975018761:web:6dea81efb50b993ca3cdd8"
-  });
-  _fbDb = firebase.firestore();
-  firebase.auth().signInAnonymously()
-    .then(function(){ _fbListo = true; })
-    .catch(function(e){ console.warn('sin nube, el pedido ira solo por WhatsApp', e); });
-} catch(e){ console.warn('sin nube', e); }
-</script>
+var _fbListo = false, _fbDb = null;   // a propósito: sin nube</script>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
