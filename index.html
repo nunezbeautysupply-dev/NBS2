@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260908i-OFICIAL-V2.0">
+<meta name="app-version" content="20260908j-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18930,7 +18930,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260908i';
+var NOVEDADES_VERSION = '20260908j';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -26694,7 +26694,11 @@ function protegerConHuella(callback){
     navigator.credentials.get({
       publicKey: {
         challenge: retoAleatorio(),
-        allowCredentials: [{ type:'public-key', id: base64ABuffer(idHuella) }],
+        // \ud83d\udd11 `transports:['internal']` le dice a Android que la huella est\u00e1 EN ESTE
+        // TELEFONO. Sin esto buscaba llaves externas -USB, NFC-, no encontraba ninguna
+        // y fallaba SIN ABRIR EL LECTOR. -8 sep-
+        allowCredentials: [{ type:'public-key', id: base64ABuffer(idHuella),
+                             transports: ['internal'] }],
         userVerification: 'required',
         timeout: 60000
       }
@@ -33014,7 +33018,11 @@ function borrarTodo(){
     navigator.credentials.get({
       publicKey: {
         challenge: retoAleatorio(),
-        allowCredentials: [{ type:'public-key', id: base64ABuffer(idHuella) }],
+        // \ud83d\udd11 `transports:['internal']` le dice a Android que la huella est\u00e1 EN ESTE
+        // TELEFONO. Sin esto buscaba llaves externas -USB, NFC-, no encontraba ninguna
+        // y fallaba SIN ABRIR EL LECTOR. -8 sep-
+        allowCredentials: [{ type:'public-key', id: base64ABuffer(idHuella),
+                             transports: ['internal'] }],
         userVerification: 'required',
         timeout: 60000
       }
@@ -33176,9 +33184,6 @@ function copiarLogAtras(){
 function hayGuardian(){
   return !!(history.state && history.state.nbs);
 }
-function profundidadGuardian(){
-  return (history.state && history.state.nbs) ? (history.state.d || 1) : 0;
-}
 
 // ── ERROR DEL 3er INTENTO, corregido aqui ──
 // Antes decia: "si ya hay un guardian, no pongas otro". El problema es que
@@ -33189,49 +33194,46 @@ function profundidadGuardian(){
 // hay tantos guardianes como pasos haya dado, y puede tocar atras varias
 // veces seguidas sin tener que tocar la pantalla entremedio.
 var _ultimoGuardian = 0;
-var MIN_GUARDIANES = 30;
-logAtras('=== ABRIO LA APP | largo historial='+history.length
-         +' | state='+(history.state?JSON.stringify(history.state):'null')
-         +' | modo='+(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ? 'ICONO' : 'navegador')+' ===');   // colchon: aguanta 6 toques de atras seguidos sin tocar la pantalla
+// ═══════════════════════════════════════════════════════════════════
+//  🔙 EL BOTÓN ATRÁS — SIN COLCHÓN  (8 sep 2026)
+//
+//  🔴 POR QUÉ SE REHIZO ENTERO. Sensei, tras tres arreglos fallidos: "la app se sigue
+//  cerrando cuando le doy para atrás, eso nunca lo has podido arreglar". Y además:
+//  "le doy a salir de la app y no hace nada".
+//
+//  LOS DOS FALLOS VENÍAN DEL MISMO SITIO — el colchón de 30 pasos falsos:
+//    · ATRÁS gastaba un paso cada vez. Cuando se acababan, Android cerraba la app.
+//      Y rellenar el colchón no bastaba: Chrome descarta los pasos que no vienen de
+//      un toque del usuario, así que bajaba más rápido de lo que subía.
+//    · SALIR hacía history.go(-31) para saltarse el colchón entero, y Chrome descarta
+//      un salto tan grande: no hacía nada.
+//
+//  🔑 LA CURA: NO HAY COLCHÓN. Un solo paso, que se repone SIEMPRE en cada atrás.
+//  Con uno basta, porque nunca se llega a gastar el último.
+// ═══════════════════════════════════════════════════════════════════
 
-// \ud83d\udee1\ufe0f Con menos de estos guardianes se considera que la proteccion esta BAJA:
-// se repone sin freno y el letrero de salir sale antes de llegar a cero. -4 sep-
-var GUARDIANES_BAJOS = 10;
-
-function ponerGuardianAtras(){
-  var ahora = Date.now();
-  // \ud83d\udd11 El freno de 250 ms evita llenar el historial con toques repetidos, PERO no
-  // debe aplicarse cuando la proteccion esta baja: ahi lo urgente es reponer. -4 sep-
-  if(ahora - _ultimoGuardian < 250 && profundidadGuardian() > GUARDIANES_BAJOS) return;
-  _ultimoGuardian = ahora;
-  // Se RELLENA hasta tener MIN_GUARDIANES. Todos se crean aqui dentro, dentro
-  // del toque real del usuario, asi que Chrome los respeta todos. Con 6 de
-  // colchon, Sensei puede tocar atras 6 veces seguidas sin tocar la pantalla
-  // entremedio y la app nunca se queda sin proteccion.
-  var antes = profundidadGuardian(), largoAntes = history.length;
-  var d = antes, vueltas = 0, errores = 0;
-  while(d < MIN_GUARDIANES && vueltas < MIN_GUARDIANES){
-    d++; vueltas++;
-    try{ history.pushState({nbs:1, d:d}, '', window.location.href); }
-    catch(e){ errores++; break; }
-  }
-  logAtras('TOQUE: guardianes '+antes+'->'+profundidadGuardian()
-           +' | puestos '+vueltas+(errores?' | ERRORES '+errores:'')
-           +' | largo historial '+largoAntes+'->'+history.length);
+// Se pone el único paso que hace falta. Se llama al arrancar y tras cada atrás.
+function profundidadGuardian(){
+  try { return (history.state && history.state.nbs) ? 1 : 0; } catch(e){ return 0; }
 }
 
-// EN CADA TOQUE REAL del usuario. Es lo unico que Chrome respeta.
-// Se usa captura (true) para que corra siempre, aunque el boton haga otra cosa.
-['pointerdown','touchstart','mousedown','click','keydown'].forEach(function(ev){
-  document.addEventListener(ev, ponerGuardianAtras, true);
-});
+var MIN_GUARDIANES = 1;      // ya no hay colchón: un solo paso
+var GUARDIANES_BAJOS = 1;
 
+function ponerGuardianAtras(){
+  try {
+    // Si el estado que hay ya es nuestro, no hace falta poner otro
+    if(history.state && history.state.nbs) return;
+    history.pushState({ nbs: 1 }, '', window.location.href);
+  } catch(e){}
+}
+
+// Cuántos pasos nuestros quedan. Con el sistema nuevo solo interesa si hay 0 o más.
 function menuLateralAbierto(){
   var m = document.getElementById('menu-lateral');
   return !!(m && m.style.display && m.style.display !== 'none');
 }
 
-// Hay algo a donde volver? -una subvista, una pantalla anterior, o no estamos en Inicio-
 function hayADondeVolver(){
   if(historialPantallas && historialPantallas.length) return true;
   var actual = pantallaActual();
@@ -33240,76 +33242,51 @@ function hayADondeVolver(){
 }
 
 window.addEventListener('popstate', function(){
-  logAtras('ATRAS: prof='+profundidadGuardian()+' | largo='+history.length
-           +' | pantalla='+pantallaActual()+' | pila='+(historialPantallas?historialPantallas.length:'?')
-           +(_saliendoApp?' | SALIENDO':''));
+  logAtras('ATRAS: pantalla=' + pantallaActual() + ' | largo=' + history.length
+           + (_saliendoApp ? ' | SALIENDO' : ''));
   if(_saliendoApp) return;
 
-  // \ud83d\udee1\ufe0f CON EL LETRERO DE SALIR ABIERTO, ATRAS NO HACE NADA -Sensei, 30 ago-.
-  // Sus palabras: "ahi deberian haber dos opciones, quedarte o salir, pero TOCANDO las
-  // opciones". Se repone el guardian que se acaba de comer, para que pueda insistir todas
-  // las veces que quiera sin que la app se salga.
-  var _cajaSalir = document.getElementById('salir-box');
-  if(_cajaSalir && _cajaSalir.style.display === 'block'){
-    try { history.pushState({nbs:1, d:profundidadGuardian()+1}, '', window.location.href); }
-    catch(e){}
-    logAtras('  -> letrero abierto: atras ignorado, guardian repuesto');
-    return;
-  }
+  // 🔑 LO PRIMERO Y SIEMPRE: se repone el paso que Android acaba de gastar. Así nunca
+  // se llega a cero, y la app NO PUEDE cerrarse sola. -8 sep-
+  ponerGuardianAtras();
 
-  // \ud83d\udd34 SI QUEDAN POCOS GUARDIANES, SE ABRE EL LETRERO YA -4 sep-.
-  // Antes se esperaba a que se acabaran, y ahi Android cerraba la app. Sensei lo
-  // reportaba desde hacia tiempo: "se sigue saliendo aunque le dé muchas veces".
-  // Ahora nunca se llega a cero: en cuanto la proteccion baja, se pregunta.
-  var _quedan = profundidadGuardian();
-  if(_quedan <= GUARDIANES_BAJOS){
-    // Se repone lo que se pueda antes de nada. Aunque Chrome descarte alguno por no
-    // venir de un toque, cualquiera que entre es un cierre menos.
-    try {
-      for(var _g = _quedan; _g < GUARDIANES_BAJOS + 4; _g++){
-        history.pushState({nbs:1, d:_g + 1}, '', window.location.href);
-      }
-    } catch(e){}
-    logAtras('  -> quedaban ' + _quedan + ' guardianes: se abre el letrero de salir');
-    try { mostrarLetreroSalir(); } catch(e){}
-    return;
-  }
-
-  // \ud83d\udee1\ufe0f SE REPONE EN CADA ATRAS, SIEMPRE -6 sep-. Antes solo se reponia cuando
-  // quedaban pocos, y no bastaba: cada atras gasta uno, y el navegador descarta algunos
-  // de los que se crean aqui dentro. La cuenta bajaba mas rapido de lo que subia y la
-  // app acababa cerrandose sola. Un pushState de mas no molesta; quedarse sin colchon
-  // cierra la app y Sensei pierde el trabajo.
-  try { history.pushState({nbs:1, d:_quedan + 1}, '', window.location.href); }
-  catch(e){}
-
-  // 🔑 EL BOTON DEL TELEFONO HACE EXACTAMENTE LO MISMO QUE EL DE LA APP.
-  // Los dos llaman a `unPasoAtras()`: UN TOQUE = UN PELDAÑO. -Sensei, 12 ago-
-  //
-  // 🔴 ANTES esto revisaba SEIS recuadros escritos a mano, y la app tiene 49. Con una
-  // factura abierta el boton "no hacia nada" visible: retrocedia por detras, y a la
-  // cuarta vez se acababa el historial y Android CERRABA LA APP. Lo cazo Sensei.
-  var seMovio = false;
-  try { seMovio = unPasoAtras(); } catch(e){ logAtras('  -> ERROR: '+String(e).slice(0,60)); }
-
-  if(seMovio){
-    logAtras('  -> un paso atras');
-    return;
-  }
-
-  // Ya no hay a donde retroceder: preguntar antes de salir.
-  // Se usa un letrero PROPIO de la app -no el confirm() de Android- porque ese congela
-  // la app y estorba con la navegacion.
+  // ① ¿Está abierto el letrero de salir? Atrás no hace nada: que toque una opción.
   var caja = document.getElementById('salir-box');
   if(caja && caja.style.display === 'block'){
-    logAtras('  -> ya estaba el letrero de salir');
+    logAtras('  -> letrero abierto, atras ignorado');
     return;
   }
-  logAtras('  -> LETRERO SALIR');
+
+  // ② ¿Hay algún recuadro encima? Se cierra ese y ya.
+  for(var i = 0; i < RECUADROS_ENCIMA.length; i++){
+    var r = RECUADROS_ENCIMA[i];
+    var el = document.getElementById(r.id);
+    if(el && (el.style.display === 'flex' || el.style.display === 'block')){
+      logAtras('  -> cerrando ' + r.id);
+      try { window[r.cerrar](); } catch(e){ el.style.display = 'none'; }
+      return;
+    }
+  }
+
+  // ③ ¿El menú lateral abierto? Se cierra.
+  if(menuLateralAbierto()){
+    logAtras('  -> cerrando el menu');
+    try { cerrarMenu(); } catch(e){}
+    return;
+  }
+
+  // ④ ¿Estamos en una pantalla que no es Inicio? Se vuelve atrás en la app.
+  if(hayADondeVolver()){
+    logAtras('  -> volviendo a la pantalla anterior');
+    try { volverAtras(); } catch(e){ try { ir('p-inicio'); } catch(e2){} }
+    return;
+  }
+
+  // ⑤ Estamos en Inicio y no hay nada abierto: se pregunta si quiere salir.
+  logAtras('  -> en inicio: se pregunta si sale');
   mostrarLetreroSalir();
 });
 
-// ── Letrero propio para salir de la app (botones grandes y legibles) ──
 function mostrarLetreroSalir(){
   var ov = document.getElementById('salir-ov');
   var box = document.getElementById('salir-box');
@@ -33329,6 +33306,7 @@ function mostrarLetreroSalir(){
   // De aqui solo se sale TOCANDO un boton.
   logAtras('LETRERO: se queda con ' + profundidadGuardian() + ' guardianes. Atras no hace nada.');
 }
+
 function cerrarLetreroSalir(){
   var ov = document.getElementById('salir-ov');
   var box = document.getElementById('salir-box');
@@ -33338,40 +33316,36 @@ function cerrarLetreroSalir(){
   // guardianes de colchon de una vez.
   _ultimoGuardian = 0; ponerGuardianAtras();
 }
-function salirDeLaApp(){
-  // \ud83d\udeaa AHORA EL BOTON SI CIERRA -30 ago-. Antes solo ensenaba un cartel pidiendole
-  // que tocara atras, porque los guardianes se deshacian al abrir el letrero. Ya no se
-  // deshacen, asi que aqui se hace lo mismo pero DENTRO DE SU TOQUE: se quitan los
-  // guardianes y se retrocede. Como viene de un toque real, Android lo respeta y sale.
-  var box = document.getElementById('salir-box');
-  var ov  = document.getElementById('salir-ov');
-  if(box) box.style.display = 'none';
-  if(ov)  ov.style.display  = 'none';
 
-  var pasos = profundidadGuardian();
-  logAtras('SALIR: quitando ' + pasos + ' guardianes y saliendo');
+function salirDeLaApp(){
+  // \ud83d\udd11 SIN COLCHON, salir es simple: se quita el paso nuestro y se va -8 sep-.
+  // Antes hacia history.go(-31) para saltarse los 30 guardianes de golpe, y Chrome
+  // descarta un salto tan grande: por eso "no hacia nada" y sallia el letrero otra vez.
   _saliendoApp = true;
+  cerrarLetreroSalir();
+  logAtras('SALIR: se pidio salir de la app');
+
+  // \u2460 Si la app se abrio desde su icono, window.close() la cierra de verdad
   try {
-    if(pasos > 0) history.go(-(pasos + 1));
-    else history.back();
+    window.close();
   } catch(e){}
 
-  // Si en 4 segundos seguimos aqui, es que el telefono no dejo salir. Se le dice
-  // con letras grandes que toque atras, y se vuelve a proteger la app.
+  // \u2461 Y si no se cerro -en el navegador normal no siempre deja-, se retrocede
+  // UN paso, que es el nuestro. Eso saca al usuario de la app.
   setTimeout(function(){
+    if(!_saliendoApp) return;
+    try { history.back(); } catch(e){}
+  }, 120);
+
+  // \u2462 Si a los 900 ms sigue aqui, es que el navegador no deja salir. Se le dice
+  // la verdad en vez de dejarlo mirando una pantalla que no hace nada.
+  setTimeout(function(){
+    if(!_saliendoApp) return;
     _saliendoApp = false;
-    var av = document.getElementById('salir-aviso');
-    if(av) av.style.display = 'block';
-    logAtras('SALIR: no se pudo cerrar solo; aviso de tocar atras');
-    setTimeout(function(){
-      var a = document.getElementById('salir-aviso');
-      if(a && a.style.display === 'block'){
-        a.style.display = 'none';
-        _ultimoGuardian = 0; ponerGuardianAtras();
-        logAtras('SALIR: se acabo el tiempo, guardianes repuestos');
-      }
-    }, 12000);
-  }, 4000);
+    ponerGuardianAtras();
+    avisoGrande('El navegador no deja que la app se cierre sola.\n\n'
+      + 'Cierra la pesta\u00f1a o desliza la app hacia arriba para sacarla.');
+  }, 900);
 }
 
 
@@ -34221,7 +34195,10 @@ function desbloquearConHuella(){
   navigator.credentials.get({
     publicKey: {
       challenge: retoAleatorio(),
-      allowCredentials: [{ type:'public-key', id: base64ABuffer(idGuardado) }],
+      // \ud83d\udd11 `transports:['internal']`: la huella est\u00e1 EN ESTE TELEFONO. Sin esto
+      // Android buscaba llaves externas y fallaba SIN ABRIR EL LECTOR. -8 sep-
+      allowCredentials: [{ type:'public-key', id: base64ABuffer(idGuardado),
+                           transports: ['internal'] }],
       userVerification: 'required',
       timeout: 60000
     }
