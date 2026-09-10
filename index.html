@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260908j-OFICIAL-V2.0">
+<meta name="app-version" content="20260908k-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -511,6 +511,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     <p id="bloqueo-msg" style="font-size:15px;color:#666;margin-bottom:22px;font-weight:600">Pon tu huella para entrar...</p>
     <button id="btn-huella" onclick="desbloquearConHuella()" class="btn" style="width:100%;background:var(--nbs-gold,#D4A017);color:white;padding:14px;font-weight:700;border:none;border-radius:10px;cursor:pointer;font-size:15px">👆 Desbloquear con huella</button>
     <p id="bloqueo-error" style="color:#c0392b;font-size:13px;margin-top:12px;display:none"></p>
+    <button id="btn-pin-bloqueo" onclick="entrarConPinDesdeBloqueo()" style="background:#F4F6FB;border:1.5px solid #b9bfe0;color:#1a237e;font-size:15px;font-weight:800;padding:13px 20px;border-radius:11px;cursor:pointer;margin-top:14px;width:100%;max-width:340px">🔢 Entrar con mi PIN</button>
     <button id="btn-contrasena" onclick="usarContrasenaEnVezDeHuella()" style="background:none;border:none;color:#888;font-size:13px;margin-top:16px;cursor:pointer;text-decoration:underline">Usar correo y contraseña</button>
   </div>
 </div>
@@ -2558,15 +2559,24 @@ function iniciarCopiasAutomaticas(){
       // Al SALIR de la app (mandarla a segundo plano): si hay huella registrada y el usuario
       // activó el bloqueo inmediato, se marca para bloquear en cuanto vuelva -aunque sean segundos-.
       if(bloqueoInmediatoActivado() && hayHuellaRegistrada() && typeof fbAuth !== 'undefined' && fbAuth.currentUser && !window._appBloqueada){
-        try{ localStorage.setItem(CLAVE_BLOQUEO_INMEDIATO_PENDIENTE, '1'); }catch(e){}
+        // \ud83d\udd11 Se apunta CU\u00c1NDO sali\u00f3. Al volver se mira cu\u00e1nto tard\u00f3: si vuelve en
+        // menos de 30 segundos, NO se le pide nada. Antes se le ped\u00eda la huella aunque
+        // volviera en 2 segundos de mirar el WhatsApp, con el cliente delante. -8 sep-
+        try{ localStorage.setItem(CLAVE_BLOQUEO_INMEDIATO_PENDIENTE, String(Date.now())); }catch(e){}
       }
     }
     if(document.visibilityState === 'visible'){
       // Al VOLVER: si quedó marcado el bloqueo inmediato, se bloquea la app de una vez (pide huella).
-      if(localStorage.getItem(CLAVE_BLOQUEO_INMEDIATO_PENDIENTE) === '1' && hayHuellaRegistrada() && typeof fbAuth !== 'undefined' && fbAuth.currentUser && !window._appBloqueada){
+      var _cuandoSalio = parseInt(localStorage.getItem(CLAVE_BLOQUEO_INMEDIATO_PENDIENTE) || '0', 10);
+      if(_cuandoSalio > 0 && hayHuellaRegistrada() && typeof fbAuth !== 'undefined' && fbAuth.currentUser && !window._appBloqueada){
         try{ localStorage.removeItem(CLAVE_BLOQUEO_INMEDIATO_PENDIENTE); }catch(e){}
-        bloquearApp();
-        return; // no seguir con las copias mientras está bloqueada
+        // \ud83d\udd11 SOLO se bloquea si estuvo fuera M\u00c1S DE 30 SEGUNDOS. -8 sep-
+        var _fuera = Date.now() - _cuandoSalio;
+        if(_fuera >= SEGUNDOS_PARA_BLOQUEAR * 1000){
+          bloquearApp();
+          return; // no seguir con las copias mientras está bloqueada
+        }
+        // Volvi\u00f3 enseguida: entra directo, sin pedirle nada
       }
       // Copia local del teléfono (siempre, refresca la hora aunque no haya cambios)
       hacerCopiaLocalSiCambio();
@@ -18930,7 +18940,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260908j';
+var NOVEDADES_VERSION = '20260908k';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34020,6 +34030,10 @@ function iniciarAppDespuesDeLogin(){
 // Si no hay huella registrada, se vuelve al comportamiento de siempre: cerrar sesion de
 // verdad y pedir correo y contraseña.
 var CLAVE_HUELLA_ID = 'nbs_huella_credencial';
+// \u23f1\ufe0f Cu\u00e1ntos segundos puede estar fuera de la app sin que se le pida la huella.
+// Sensei lo pidi\u00f3 el 8 sep: sale a mirar el WhatsApp y vuelve, y no quiere teclear
+// nada para seguir vendiendo.
+var SEGUNDOS_PARA_BLOQUEAR = 30;
 
 function bufferABase64(buffer){
   var bytes = new Uint8Array(buffer);
@@ -34140,7 +34154,7 @@ function bloquearApp(){
   var msg = document.getElementById('bloqueo-msg');
   var hayHuella = !!localStorage.getItem(CLAVE_HUELLA_ID);
   if(hayHuella){
-    if(b1) b1.style.display = 'none';
+    if(b1) b1.style.display = '';   // \ud83d\udd11 sale YA: si el lector falla, no espera -8 sep-
     // \ud83d\udd11 El enlace de correo y contrase\u00f1a NO se esconde NUNCA. El 8 sep la app se
     // qued\u00f3 colgada esperando un lector que no contest\u00f3, y sin este enlace no hab\u00eda
     // forma de entrar: tuvo que usar el modo inc\u00f3gnito.
@@ -34269,7 +34283,20 @@ function desbloquearConHuella(){
     var msg = document.getElementById('bloqueo-msg');
     if(msg) msg.textContent = 'El lector de huella no respondi\u00f3';
     mostrarOpcionesDeBloqueo();
-  }, window._msRelojHuella || 8000);
+  }, window._msRelojHuella || 2000);
+}
+
+// \ud83d\udd11 ENTRAR CON EL PIN, sin depender del lector ni del correo. -8 sep-
+function entrarConPinDesdeBloqueo(){
+  pedirPinConRecuadro('Entra a tu app con el PIN.', function(){
+    window._appBloqueada = false;
+    localStorage.removeItem('nbs_fallos_huella');
+    var pb = document.getElementById('pantalla-bloqueo');
+    if(pb) pb.style.display = 'none';
+    var ac = document.getElementById('app-contenido');
+    if(ac) ac.style.display = 'block';
+    try { logAtras('ENTRO con el PIN'); } catch(e){}
+  });
 }
 
 function usarContrasenaEnVezDeHuella(){
