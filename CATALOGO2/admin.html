@@ -112,14 +112,17 @@
 <div class="lista" id="lista"><div class="vacio">Cargando…</div></div>
 
 <div class="pie">
-  <button class="add" onclick="abrirNuevo()">➕ Agregar</button>
-  <button class="save" onclick="guardarTodo()">💾 Guardar cambios</button>
+  <button class="add" onclick="abrirNuevo()">➕ Producto</button>
+  <button class="add" onclick="abrirCombos()" style="border-color:#6A1B9A;color:#6A1B9A">📦 Packs</button>
+  <button class="save" onclick="guardarTodo()">💾 Guardar</button>
 </div>
+
+<div class="ov" id="ovCombos"><div class="caja" id="cajaCombos" style="max-width:460px"></div></div>
 
 <div class="ov" id="ovEdit"><div class="caja" id="cajaEdit"></div></div>
 
 <script>
-var PRODS = [], CLIENTES = [], FOTOS = {}, CAMBIOS = false;
+var PRODS = [], CLIENTES = [], FOTOS = {}, CAMBIOS = false, COMBOS = [];
 var FILTRO = 'todos', BUSCA = '';
 var AJUSTES = { descuento: 10, whatsapp: '14013050188' };
 
@@ -154,6 +157,7 @@ Promise.all([
   PRODS = x[0].productos || [];
   CLIENTES = x[0].clientes || [];
   if(x[0].ajustes) AJUSTES = x[0].ajustes;
+  COMBOS = x[0].combos || [];
   for(var i = 1; i < x.length; i++) for(var k in x[i]) FOTOS[k] = x[i][k];
   document.getElementById('desc').value = AJUSTES.descuento;
   document.getElementById('wa').value = AJUSTES.whatsapp;
@@ -328,6 +332,9 @@ function abrirEditar(i){
     + '<div class="btns"><button class="ok" onclick="guardarEdit()">✓ Guardar</button>'
     +   '<button class="no" onclick="cerrarEdit()">Cancelar</button></div>';
   cambiarTipoPromo();
+  var sel0 = document.getElementById('ePromo');
+  if(sel0 && sel0.value === 'lleva') sugerirFraseLleva();
+  else if(sel0 && sel0.value === 'cantidad') sugerirFrase();
   verContado();
   document.getElementById('ovEdit').classList.add('on');
 }
@@ -379,18 +386,113 @@ function cambiarTipoPromo(){
       + 'border-radius:7px;text-align:center;font-weight:800;margin:0">'
       + ' y paga <input id="pPaga" type="number" min="1" value="' + (pm.paga || 2)
       + '" style="width:62px;padding:7px;border:1.5px solid #E0C070;border-radius:7px;'
-      + 'text-align:center;font-weight:800;margin:0"></div>';
+      + 'text-align:center;font-weight:800;margin:0" oninput="sugerirFraseLleva()"></div>'
+      + campoFrase(pm);
   } else if(sel.value === 'cantidad'){
     caja.innerHTML = '<div style="display:flex;gap:8px;align-items:center;font-size:13px;'
       + 'font-weight:700;flex-wrap:wrap">Desde <input id="pDesde" type="number" min="2" value="'
       + (pm.desde || 5) + '" style="width:62px;padding:7px;border:1.5px solid #E0C070;'
-      + 'border-radius:7px;text-align:center;font-weight:800;margin:0">'
+      + 'border-radius:7px;text-align:center;font-weight:800;margin:0" oninput="sugerirFrase()">'
       + ' le sale a $<input id="pPrecio" type="number" step="0.01" value="'
       + (pm.precio || 8) + '" style="width:80px;padding:7px;border:1.5px solid #E0C070;'
-      + 'border-radius:7px;text-align:center;font-weight:800;margin:0"> c/u</div>';
+      + 'border-radius:7px;text-align:center;font-weight:800;margin:0" oninput="sugerirFrase()"> c/u</div>'
+      + campoFrase(pm);
   } else {
     caja.innerHTML = '';
   }
+  // Se refrescan las sugerencias del tipo elegido
+  if(sel.value === 'lleva') sugerirFraseLleva();
+  else if(sel.value === 'cantidad') sugerirFrase();
+}
+
+// 📢 EL CAMPO DE LA FRASE. Es lo ÚNICO que ve el barbero: los números quedan escondidos.
+function campoFrase(pm){
+  return '<div style="font-size:10.5px;font-weight:900;color:#E65100;margin-top:11px">'
+    +   '📢 CÓMO SE LO DICES AL BARBERO</div>'
+    + '<input id="pFrase" value="' + (pm.frase || '').replace(/"/g,'&quot;') + '" '
+    +   'placeholder="COMPRA 6 Y PAGA 5" oninput="verFrase()" '
+    +   'style="width:100%;padding:11px;border:2px solid #FF9800;border-radius:9px;'
+    +   'font-size:14px;font-weight:900;text-transform:uppercase;margin-top:4px">'
+    + '<div style="font-size:10.5px;color:#7A5C00;margin-top:5px">'
+    +   '💡 Toca una para ponerla:</div>'
+    + '<div id="sugerencias" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px"></div>'
+    + '<div style="background:#fff;border:1.5px dashed #FF9800;border-radius:9px;'
+    +   'padding:9px;margin-top:9px;text-align:center">'
+    +   '<div style="font-size:9.5px;color:#7A5C00;font-weight:800">ASÍ LO VERÁ ÉL</div>'
+    +   '<div id="verFrase" style="font-size:15px;font-weight:900;color:#E65100;margin-top:3px">'
+    +   '</div></div>';
+}
+
+// 💡 Las frases que se le ofrecen, calculadas con SUS números
+function sugerirFrase(){
+  var caja = document.getElementById('sugerencias');
+  if(!caja) return;
+  var desde = parseInt((document.getElementById('pDesde')||{}).value, 10) || 0;
+  var precio = parseFloat((document.getElementById('pPrecio')||{}).value) || 0;
+  var i = window._editando;
+  var pr = (i !== undefined && i !== null && PRODS[i]) ? PRODS[i].pr : 0;
+  var ideas = [];
+  if(desde > 1 && precio > 0 && pr > 0){
+    // Cuántos paga de verdad: la cuenta que él no tiene que hacer
+    var paga = Math.round(desde * precio / pr * 10) / 10;
+    var pagaEnt = Math.round(paga);
+    if(pagaEnt >= 1 && pagaEnt < desde){
+      ideas.push('COMPRA ' + desde + ' Y PAGA ' + pagaEnt);
+      var gratis = desde - pagaEnt;
+      ideas.push('COMPRA ' + pagaEnt + ' Y LLÉVATE ' + (gratis > 1 ? gratis + ' GRATIS' : '1 GRATIS'));
+    }
+    var ahorro = Math.round((pr - precio) * desde * 100) / 100;
+    if(ahorro > 0) ideas.push('LLEVA ' + desde + ' Y AHORRA $' + ahorro.toFixed(2));
+  }
+  caja.innerHTML = ideas.map(function(x){
+    return '<button onclick="ponerFrase(' + JSON.stringify(x).replace(/"/g,'&quot;') + ')" '
+      + 'style="padding:6px 10px;background:#fff;border:1.5px solid #FF9800;border-radius:7px;'
+      + 'font-size:11px;font-weight:800;color:#E65100;cursor:pointer">' + x + '</button>';
+  }).join('');
+  verFrase();
+}
+
+function sugerirFraseLleva(){
+  var caja = document.getElementById('sugerencias');
+  if(!caja) return;
+  var lv = parseInt((document.getElementById('pLleva')||{}).value, 10) || 0;
+  var pg = parseInt((document.getElementById('pPaga')||{}).value, 10) || 0;
+  var ideas = [];
+  if(lv > pg && pg >= 1){
+    ideas.push('COMPRA ' + lv + ' Y PAGA ' + pg);
+    var gratis = lv - pg;
+    ideas.push('COMPRA ' + pg + ' Y LLÉVATE ' + (gratis > 1 ? gratis + ' GRATIS' : '1 GRATIS'));
+  }
+  caja.innerHTML = ideas.map(function(x){
+    return '<button onclick="ponerFrase(' + JSON.stringify(x).replace(/"/g,'&quot;') + ')" '
+      + 'style="padding:6px 10px;background:#fff;border:1.5px solid #FF9800;border-radius:7px;'
+      + 'font-size:11px;font-weight:800;color:#E65100;cursor:pointer">' + x + '</button>';
+  }).join('');
+  verFrase();
+}
+
+function ponerFrase(t){
+  var e = document.getElementById('pFrase');
+  if(e){ e.value = t; verFrase(); }
+}
+
+function verFrase(){
+  var e = document.getElementById('pFrase');
+  var v = document.getElementById('verFrase');
+  if(!e || !v) return;
+  var t = (e.value || '').trim();
+  if(!t){
+    // Si no escribe nada, se calcula sola: nunca queda vacío
+    var desde = parseInt((document.getElementById('pDesde')||{}).value, 10) || 0;
+    var precio = parseFloat((document.getElementById('pPrecio')||{}).value) || 0;
+    var i = window._editando;
+    var pr = (i !== undefined && i !== null && PRODS[i]) ? PRODS[i].pr : 0;
+    if(desde > 1 && precio > 0 && pr > 0){
+      var paga = Math.round(desde * precio / pr);
+      if(paga >= 1 && paga < desde) t = 'COMPRA ' + desde + ' Y PAGA ' + paga;
+    }
+  }
+  v.textContent = '🎁 ' + (t || '(escribe tu frase)');
 }
 
 function guardarEdit(){
@@ -418,13 +520,15 @@ function guardarEdit(){
     var lv = parseInt(document.getElementById('pLleva').value, 10) || 3;
     var pg = parseInt(document.getElementById('pPaga').value, 10) || 2;
     if(pg >= lv){ alert('Lo que paga tiene que ser MENOS de lo que lleva.'); return; }
-    PRODS[i].promo = { tipo: 'lleva', lleva: lv, paga: pg };
+    PRODS[i].promo = { tipo: 'lleva', lleva: lv, paga: pg,
+                       frase: (document.getElementById('pFrase').value || '').trim().toUpperCase() };
   } else if(tp === 'cantidad'){
     var de = parseInt(document.getElementById('pDesde').value, 10) || 5;
     var pc2 = parseFloat(document.getElementById('pPrecio').value) || 0;
     if(pc2 <= 0){ alert('Ponle el precio de la promoción.'); return; }
     if(pc2 >= PRODS[i].pr){ alert('El precio de promoción tiene que ser MENOS que el normal.'); return; }
-    PRODS[i].promo = { tipo: 'cantidad', desde: de, precio: pc2 };
+    PRODS[i].promo = { tipo: 'cantidad', desde: de, precio: pc2,
+                       frase: (document.getElementById('pFrase').value || '').trim().toUpperCase() };
   } else {
     delete PRODS[i].promo;
   }
@@ -572,7 +676,7 @@ function guardarTodo(){
     return o;
   });
   bajarArchivo('productos.json', JSON.stringify(
-    { productos: limpios, clientes: CLIENTES, ajustes: AJUSTES }));
+    { productos: limpios, clientes: CLIENTES, ajustes: AJUSTES, combos: COMBOS }));
 
   // Las fotos, en trozos de 25
   var ids = Object.keys(FOTOS).sort();
@@ -594,6 +698,247 @@ function guardarTodo(){
       + 'Súbelos TODOS a la carpeta CATALOGO2 de tu GitHub, reemplazando los que hay.');
     pintar();
   }, 500 * (trozos + 1) + 400);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  📦 LOS PACKS (COMBOS)  (11 sep 2026)
+//
+//  Sensei: "un área donde yo pueda hacer combos pack, combinar 3 4 5 o 6 productos y
+//  ponerlos en especial; ahí irían los productos muertos o los dormidos".
+//
+//  🔑 En un pack el barbero NO compara precio producto por producto: ve un paquete y
+//  un precio. Es la mejor forma de mover lo que lleva meses parado.
+// ═══════════════════════════════════════════════════════════════════
+function abrirCombos(){
+  pintarCombos();
+  document.getElementById('ovCombos').classList.add('on');
+}
+function cerrarCombos(){
+  document.getElementById('ovCombos').classList.remove('on');
+  window._comboEdit = null;
+}
+
+function pintarCombos(){
+  var h = '<h2>📦 Packs <button onclick="cerrarCombos()" style="background:#F0F0F6;'
+    +   'border:none;border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button></h2>';
+
+  if(!COMBOS.length){
+    h += '<div style="background:#F3E5F5;border-radius:11px;padding:15px;text-align:center;'
+      + 'font-size:13px;color:#6A1B9A;line-height:1.6">'
+      + 'Todavía no tienes packs.<br><br>'
+      + '💡 Junta 3 o 4 productos <b>dormidos</b> y ponles un precio bueno.<br>'
+      + 'El barbero ve un paquete, no productos sueltos.</div>';
+  } else {
+    h += COMBOS.map(function(c, i){
+      var suelto = c.items.reduce(function(a, it){
+        var p = PRODS.find(function(x){ return x.id === it.id; });
+        return a + (p ? p.pr * (it.cant || 1) : 0);
+      }, 0);
+      return '<div style="border:2px solid #6A1B9A;border-radius:11px;padding:11px;'
+        +   'margin-bottom:9px">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
+        +   '<div style="flex:1"><div style="font-size:14px;font-weight:900;color:#6A1B9A">'
+        +     esc(c.nombre) + '</div>'
+        +     '<div style="font-size:11px;color:#8A8B9E">' + c.items.length + ' producto(s) · '
+        +       'sueltos ' + dinero(suelto) + '</div>'
+        +     '<div style="font-size:17px;font-weight:900;color:#6A1B9A;margin-top:3px">'
+        +       dinero(c.precio) + '</div></div>'
+        +   '<div style="display:flex;flex-direction:column;gap:4px">'
+        +     '<button onclick="editarCombo(' + i + ')" style="width:34px;height:31px;'
+        +       'border-radius:8px;border:1.5px solid #D4D5E0;background:#fff;cursor:pointer">✏️</button>'
+        +     '<button onclick="borrarCombo(' + i + ')" style="width:34px;height:31px;'
+        +       'border-radius:8px;border:1.5px solid #C62828;background:#FFF5F5;cursor:pointer">🗑️</button>'
+        +   '</div></div></div>';
+    }).join('');
+  }
+
+  h += '<button onclick="nuevoCombo()" style="width:100%;padding:14px;margin-top:11px;'
+    +   'background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:14.5px;'
+    +   'font-weight:900;cursor:pointer">➕ Armar un pack nuevo</button>'
+    + '<button onclick="cerrarCombos()" style="width:100%;padding:12px;margin-top:7px;'
+    +   'background:#F0F0F6;color:#444;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Cerrar</button>';
+  document.getElementById('cajaCombos').innerHTML = h;
+}
+
+function nuevoCombo(){
+  window._comboEdit = { nuevo: true, nombre: '', precio: 0, items: [] };
+  pintarEditorCombo();
+}
+function editarCombo(i){
+  var c = COMBOS[i];
+  window._comboEdit = { i: i, nombre: c.nombre, precio: c.precio,
+                        items: c.items.map(function(x){ return { id: x.id, cant: x.cant || 1 }; }) };
+  pintarEditorCombo();
+}
+function borrarCombo(i){
+  if(!confirm('¿Borrar el pack "' + COMBOS[i].nombre + '"?')) return;
+  COMBOS.splice(i, 1);
+  CAMBIOS = true;
+  pintarCombos();
+  pintar();
+}
+
+function pintarEditorCombo(){
+  var e = window._comboEdit;
+  if(!e) return;
+  // Lo que suman sueltos, para que vea cuánto rebaja
+  var suelto = e.items.reduce(function(a, it){
+    var p = PRODS.find(function(x){ return x.id === it.id; });
+    return a + (p ? p.pr * (it.cant || 1) : 0);
+  }, 0);
+  var ahorro = Math.round((suelto - (e.precio || 0)) * 100) / 100;
+
+  var h = '<h2>📦 ' + (e.nuevo ? 'Pack nuevo' : 'Cambiar pack')
+    +   ' <button onclick="pintarCombos()" style="background:#F0F0F6;border:none;'
+    +   'border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button></h2>'
+
+    + '<div class="et">NOMBRE DEL PACK</div>'
+    + '<input id="cNom" value="' + esc(e.nombre) + '" placeholder="Ej: PACK BARBERO COMPLETO" '
+    +   'oninput="window._comboEdit.nombre=this.value">'
+
+    + '<div class="et" style="margin-top:12px">PRODUCTOS DEL PACK ('
+    +   e.items.length + ')</div>';
+
+  if(!e.items.length){
+    h += '<div style="background:#F6F6FA;border-radius:9px;padding:13px;text-align:center;'
+      + 'font-size:12.5px;color:#8A8B9E">Todavía no has puesto ninguno</div>';
+  } else {
+    h += e.items.map(function(it, j){
+      var p = PRODS.find(function(x){ return x.id === it.id; });
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;'
+        + 'border-bottom:1px solid #F0F0F6">'
+        + '<div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:700">'
+        +   esc(p ? p.n : '?') + '</div>'
+        +   '<div style="font-size:11px;color:#8A8B9E">' + (p ? dinero(p.pr) : '') + ' c/u'
+        +   (p && p.dormido ? ' · 💀 dormido' : '') + '</div></div>'
+        + '<button onclick="menosCombo(' + j + ')" style="width:29px;height:29px;'
+        +   'border-radius:7px;border:1.5px solid #D4D5E0;background:#fff;cursor:pointer">−</button>'
+        + '<span style="font-weight:900;min-width:20px;text-align:center">' + (it.cant||1) + '</span>'
+        + '<button onclick="masCombo(' + j + ')" style="width:29px;height:29px;'
+        +   'border-radius:7px;border:none;background:#6A1B9A;color:#fff;cursor:pointer">+</button>'
+        + '<button onclick="quitarDelCombo(' + j + ')" style="width:29px;height:29px;'
+        +   'border-radius:7px;border:1.5px solid #C62828;background:#FFF5F5;cursor:pointer">🗑️</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  h += '<input id="cBusca" placeholder="🔍 Buscar para agregar…" oninput="buscarParaCombo(this.value)" '
+    +   'style="margin-top:11px">'
+    + '<div style="display:flex;gap:5px;margin-top:6px">'
+    +   '<button onclick="buscarParaCombo(\'\',true)" style="flex:1;padding:8px;'
+    +     'background:#FFEBEE;color:#C62828;border:1.5px solid #C62828;border-radius:8px;'
+    +     'font-size:11.5px;font-weight:800;cursor:pointer">💀 Ver los dormidos</button>'
+    + '</div>'
+    + '<div id="resCombo" style="max-height:190px;overflow:auto;margin-top:7px"></div>'
+
+    + '<div class="et" style="margin-top:12px">PRECIO DEL PACK</div>'
+    + '<input id="cPre" type="number" step="0.01" value="' + (e.precio || '') + '" '
+    +   'placeholder="0.00" oninput="window._comboEdit.precio=parseFloat(this.value)||0;pintarResumenCombo()">'
+
+    + '<div id="resumenCombo" style="background:#F3E5F5;border-radius:10px;padding:11px;'
+    +   'margin-top:10px;text-align:center"></div>'
+
+    + '<div class="btns"><button class="ok" onclick="guardarCombo()" '
+    +   'style="background:#6A1B9A">✓ Guardar pack</button>'
+    +   '<button class="no" onclick="pintarCombos()">Cancelar</button></div>';
+
+  document.getElementById('cajaCombos').innerHTML = h;
+  pintarResumenCombo();
+  buscarParaCombo('', true);
+}
+
+function pintarResumenCombo(){
+  var e = window._comboEdit;
+  var caja = document.getElementById('resumenCombo');
+  if(!e || !caja) return;
+  var suelto = 0, costo = 0;
+  e.items.forEach(function(it){
+    var p = PRODS.find(function(x){ return x.id === it.id; });
+    if(p){ suelto += p.pr * (it.cant||1); costo += (p.co||0) * (it.cant||1); }
+  });
+  suelto = Math.round(suelto*100)/100;
+  var pre = e.precio || 0;
+  var ahorro = Math.round((suelto - pre) * 100) / 100;
+  var gana = Math.round((pre - costo) * 100) / 100;
+  var margen = pre > 0 ? Math.round(gana / pre * 100) : 0;
+
+  var col = margen < 20 ? '#C62828' : (margen < 30 ? '#E65100' : '#0B7A3B');
+  caja.innerHTML = '<div style="font-size:12.5px;color:#6A1B9A">'
+    + 'Sueltos valen <b>' + dinero(suelto) + '</b></div>'
+    + (pre > 0
+        ? '<div style="font-size:13px;font-weight:800;color:#6A1B9A;margin-top:4px">'
+          + 'El barbero se ahorra ' + dinero(ahorro) + '</div>'
+          + '<div style="font-size:12.5px;font-weight:800;color:' + col + ';margin-top:5px">'
+          + '📊 Te queda ' + dinero(gana) + ' (' + margen + '%) '
+          + (margen < 20 ? '⚠️' : (margen < 30 ? '🟠' : '✅')) + '</div>'
+          + (margen < 20 ? '<div style="font-size:11px;color:#C62828;margin-top:3px">'
+                         + 'Es muy poco. Sube el precio del pack.</div>' : '')
+        : '<div style="font-size:12px;color:#8A8B9E;margin-top:4px">Ponle un precio</div>');
+}
+
+function buscarParaCombo(q, dormidos){
+  var caja = document.getElementById('resCombo');
+  if(!caja) return;
+  var e = window._comboEdit;
+  var lista;
+  if(dormidos){
+    // 💀 Los dormidos primero: es lo que hay que mover
+    lista = PRODS.filter(function(p){ return p.dormido; }).slice(0, 40);
+  } else {
+    q = (q||'').toLowerCase().trim();
+    if(!q){ caja.innerHTML = ''; return; }
+    lista = PRODS.filter(function(p){
+      return ((p.n||'') + ' ' + (p.m||'')).toLowerCase().indexOf(q) >= 0;
+    }).slice(0, 25);
+  }
+  var yaEstan = {};
+  e.items.forEach(function(it){ yaEstan[it.id] = true; });
+  caja.innerHTML = lista.length
+    ? lista.map(function(p){
+        if(yaEstan[p.id]) return '';
+        return '<div onclick="agregarAlCombo(\'' + p.id + '\')" '
+          + 'style="padding:8px;border:1px solid #E5E6EE;border-radius:8px;margin-bottom:5px;'
+          + 'cursor:pointer;font-size:12.5px;font-weight:700">'
+          + esc(p.n) + '<span style="color:#8A8B9E;font-weight:600"> · ' + dinero(p.pr) + '</span>'
+          + (p.dormido ? '<span style="color:#C62828;font-weight:900"> 💀</span>' : '')
+          + '</div>';
+      }).join('')
+    : '<div style="padding:11px;text-align:center;color:#8A8B9E;font-size:12px">'
+      + (dormidos ? 'No tienes productos dormidos 🎉' : 'No encontré nada') + '</div>';
+}
+
+function agregarAlCombo(id){
+  var e = window._comboEdit;
+  if(!e) return;
+  if(e.items.some(function(x){ return x.id === id; })) return;
+  e.items.push({ id: id, cant: 1 });
+  pintarEditorCombo();
+}
+function masCombo(j){ window._comboEdit.items[j].cant++; pintarEditorCombo(); }
+function menosCombo(j){
+  var it = window._comboEdit.items[j];
+  it.cant--;
+  if(it.cant < 1) window._comboEdit.items.splice(j, 1);
+  pintarEditorCombo();
+}
+function quitarDelCombo(j){ window._comboEdit.items.splice(j, 1); pintarEditorCombo(); }
+
+function guardarCombo(){
+  var e = window._comboEdit;
+  var nom = (document.getElementById('cNom').value || '').trim();
+  if(!nom){ alert('Ponle un nombre al pack.'); return; }
+  if(!e.items.length){ alert('Ponle al menos un producto.'); return; }
+  var pre = parseFloat(document.getElementById('cPre').value) || 0;
+  if(pre <= 0){ alert('Ponle un precio al pack.'); return; }
+  var nuevo = { nombre: nom.toUpperCase(), precio: pre, items: e.items };
+  if(e.nuevo) COMBOS.push(nuevo);
+  else COMBOS[e.i] = nuevo;
+  CAMBIOS = true;
+  window._comboEdit = null;
+  pintarCombos();
+  pintar();
 }
 
 window.addEventListener('beforeunload', function(e){

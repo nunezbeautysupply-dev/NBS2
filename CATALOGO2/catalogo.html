@@ -108,7 +108,7 @@
 </div>
 
 <div class="aviso" id="avisoDesc">
-  💵 <b>10% de descuento</b> pagando al contado<br>
+  💵 <b>Precios de contado y a crédito</b><br>
   <span style="opacity:.92;font-size:11.5px">Los precios en verde son de contado</span>
 </div>
 
@@ -142,7 +142,7 @@
 var DESCUENTO_CONTADO = 0.10;      // 10%
 var WHATSAPP_NBS = '14013050188';
 
-var PRODS = [], CLIENTES = [], YO = null;
+var PRODS = [], CLIENTES = [], YO = null, COMBOS = [];
 var CARRO = {}, FOTOS = {}, TROZOS = 3, _pedidos = {};
 var FILTRO = 'todo', BUSCA = '';
 
@@ -179,16 +179,23 @@ function conPromo(p, cant){
              ? 'Lleva ' + pr.desde + ' y te sale a $' + pr.precio.toFixed(2) : '' };
 }
 
-// El cartelito que ve el barbero en el producto
+// 🔑 LO QUE VE EL BARBERO. Sensei, 11 sep: "compra 6 y solo pagas 5 suena mucho mejor"
+// que "desde 6 a $8.33 c/u" — lo primero se entiende de un golpe, lo segundo le hace
+// calcular. Los números quedan para él; aquí solo va la frase.
 function textoPromo(p){
   if(!p.promo) return '';
+  if(p.promo.frase) return p.promo.frase;
+  // Si no escribió frase, se calcula sola: nunca queda vacío
   if(p.promo.tipo === 'lleva')
-    return '🎁 LLEVA ' + p.promo.lleva + ' Y PAGA ' + p.promo.paga;
-  return '🎁 DESDE ' + p.promo.desde + ' A $' + p.promo.precio.toFixed(2) + ' C/U';
+    return 'COMPRA ' + p.promo.lleva + ' Y PAGA ' + p.promo.paga;
+  var paga = Math.round(p.promo.desde * p.promo.precio / p.pr);
+  if(paga >= 1 && paga < p.promo.desde)
+    return 'COMPRA ' + p.promo.desde + ' Y PAGA ' + paga;
+  return 'LLEVA ' + p.promo.desde + ' Y AHORRA';
 }
 
 var GRUPOS = [
-  ['ofertas',  '🔥 Ofertas',    null],   // 🔑 lo primero que ve
+  ['promos',   '🔥🔥 PROMOS',   null],   // 🔑 lo primero, con las dos llamas
   ['todo',     'Todo',          null],
   ['pelo',     'Para el pelo',  /pelo|gel|wax|cream|shampoo|pomada|spray/i],
   ['colonias', 'Colonias',      /colonia|after shave|perfume/i],
@@ -203,6 +210,7 @@ fetch('productos.json').then(function(r){ return r.json(); }).then(function(d){
   CLIENTES = d.clientes || [];
   // 🔑 El descuento y el WhatsApp salen del archivo, para que Sensei los cambie desde
   // el administrador sin tocar código. -11 sep-
+  COMBOS = d.combos || [];
   if(d.ajustes){
     if(typeof d.ajustes.descuento === 'number') DESCUENTO_CONTADO = d.ajustes.descuento / 100;
     if(d.ajustes.whatsapp) WHATSAPP_NBS = String(d.ajustes.whatsapp);
@@ -234,7 +242,7 @@ function filtrar(k){ FILTRO = k; pintarChips(); pintar(); window.scrollTo(0,0); 
 function buscar(v){ BUSCA = v; pintar(); }
 
 function delGrupo(p, k){
-  if(k === 'ofertas') return !!p.oferta || !!p.promo;   // 🔥 lo rebajado y lo de promo
+  if(k === 'promos') return !!p.oferta || !!p.promo;   // 🔥🔥 lo rebajado y lo de promo
   if(k === 'todo') return true;
   var txt = (p.c || '') + ' ' + (p.n || '');
   if(k === 'otros') return !GRUPOS.some(function(x){ return x[2] && x[2].test(txt); });
@@ -252,12 +260,63 @@ function pintar(){
   });
 
   if(!lista.length){
-    document.getElementById('lista').innerHTML =
-      '<div class="vacio">No encontré nada con eso.<br>Prueba con otra palabra.</div>';
+    document.getElementById('lista').innerHTML = FILTRO === 'promos'
+      ? '<div class="vacio">Todavía no hay promociones.<br>Vuelve pronto.</div>'
+      : '<div class="vacio">No encontré nada con eso.<br>Prueba con otra palabra.</div>';
     return;
   }
 
-  document.getElementById('lista').innerHTML = lista.map(function(p){
+  // ⚡ EL AVISO DE PAGO INMEDIATO, solo aquí. Es lo que hace que valga la pena.
+  var cabecera = (FILTRO === 'promos')
+    ? '<div style="background:linear-gradient(135deg,#C62828,#E53935);border-radius:13px;'
+      + 'padding:14px;margin-bottom:12px;text-align:center;color:#fff;'
+      + 'box-shadow:0 3px 12px rgba(198,40,40,.3)">'
+      + '<div style="font-size:16px;font-weight:900;letter-spacing:.4px">'
+      +   '⚡ ESTOS PRECIOS SON PAGANDO DE INMEDIATO</div>'
+      + '<div style="font-size:12.5px;margin-top:5px;opacity:.95">'
+      +   'A crédito van al precio normal</div></div>'
+    : '';
+
+  // 📦 LOS COMBOS, arriba del todo en PROMOS
+  var htmlCombos = '';
+  if(FILTRO === 'promos' && COMBOS.length){
+    htmlCombos = COMBOS.map(function(c, ci){
+      var suelto = c.items.reduce(function(a, it){
+        var p2 = PRODS.find(function(x){ return x.id === it.id; });
+        return a + (p2 ? p2.pr * (it.cant || 1) : 0);
+      }, 0);
+      var ahorro = Math.round((suelto - c.precio) * 100) / 100;
+      return '<div style="background:#fff;border:2.5px solid #6A1B9A;border-radius:14px;'
+        +   'padding:13px;margin-bottom:11px;box-shadow:0 3px 10px rgba(106,27,154,.18)">'
+        + '<div style="background:linear-gradient(135deg,#6A1B9A,#8E24AA);color:#fff;'
+        +   'border-radius:9px;padding:9px;text-align:center;font-size:15px;font-weight:900;'
+        +   'margin:-4px -4px 10px">📦 ' + esc(c.nombre) + '</div>'
+        + c.items.map(function(it){
+            var p3 = PRODS.find(function(x){ return x.id === it.id; });
+            return '<div style="display:flex;justify-content:space-between;font-size:12.5px;'
+              + 'padding:4px 0;border-bottom:1px solid #F2F2F7">'
+              + '<span>' + (it.cant > 1 ? it.cant + ' × ' : '') + esc(p3 ? p3.n : '?') + '</span>'
+              + '<span style="color:#8A8B9E">' + (p3 ? dinero(p3.pr * (it.cant||1)) : '') + '</span>'
+              + '</div>';
+          }).join('')
+        + '<div style="display:flex;justify-content:space-between;align-items:center;'
+        +   'margin-top:11px;padding-top:10px;border-top:2px solid #6A1B9A">'
+        +   '<div><div style="font-size:10px;color:#8A8B9E;text-decoration:line-through">'
+        +     dinero(suelto) + ' por separado</div>'
+        +     '<div style="font-size:22px;font-weight:900;color:#6A1B9A">'
+        +     dinero(c.precio) + '</div></div>'
+        +   '<button onclick="pedirCombo(' + ci + ')" style="padding:12px 18px;'
+        +     'background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:14px;'
+        +     'font-weight:900;cursor:pointer">Lo quiero</button>'
+        + '</div>'
+        + (ahorro > 0 ? '<div style="background:#F3E5F5;border-radius:8px;padding:7px;'
+                      + 'margin-top:9px;text-align:center;font-size:12.5px;font-weight:800;'
+                      + 'color:#6A1B9A">Te ahorras ' + dinero(ahorro) + '</div>' : '')
+        + '</div>';
+    }).join('');
+  }
+
+  document.getElementById('lista').innerHTML = cabecera + htmlCombos + lista.map(function(p){
     var n = CARRO[p.id] || 0;
     var pc = precioContado(p.pr, p);
     return '<div class="p">'
@@ -274,16 +333,24 @@ function pintar(){
       +     '<div class="pcredito"><div class="et">A CRÉDITO</div>'
       +       '<div class="vl">' + dinero(p.pr) + '</div></div>'
       +   '</div>'
-      // 🎁 El cartel de la promoción, si la tiene
-      +   (p.promo ? '<div style="background:#FFF3E0;border:1.5px solid #FF9800;'
-                   + 'border-radius:7px;padding:4px 8px;margin-top:5px;font-size:10.5px;'
-                   + 'font-weight:900;color:#E65100;display:inline-block">'
-                   + textoPromo(p) + '</div>' : '')
-      // 🔥 Y el de oferta, para lo que está dormido
-      +   (p.oferta ? '<div style="background:#FFEBEE;border:1.5px solid #C62828;'
-                    + 'border-radius:7px;padding:4px 8px;margin-top:5px;font-size:10.5px;'
-                    + 'font-weight:900;color:#C62828;display:inline-block">'
-                    + '🔥 OFERTA</div>' : '')
+      // 🎁 EL CARTEL DE LA PROMOCIÓN, grande y llamativo -Sensei, 11 sep-
+      // En "Todo" solo una señal chiquita; el cartel grande va en PROMOS
+      +   ((FILTRO !== 'promos' && (p.promo || p.oferta))
+            ? '<div onclick="event.stopPropagation();filtrar(\'promos\')" '
+              + 'style="font-size:11.5px;font-weight:900;color:#C62828;margin-top:5px;'
+              + 'cursor:pointer">🔥 tiene promo →</div>'
+            : '')
+      +   (FILTRO === 'promos' && p.promo ? '<div style="background:linear-gradient(135deg,#FF9800,#F57C00);'
+                   + 'border-radius:9px;padding:9px 11px;margin-top:7px;font-size:14px;'
+                   + 'font-weight:900;color:#fff;text-align:center;letter-spacing:.3px;'
+                   + 'box-shadow:0 2px 7px rgba(245,124,0,.35)">'
+                   + '\ud83c\udf81 ' + esc(textoPromo(p)) + '</div>' : '')
+      // 🔥 Y EL DE OFERTA, en rojo y grande
+      +   (FILTRO === 'promos' && p.oferta ? '<div style="background:linear-gradient(135deg,#E53935,#C62828);'
+                    + 'border-radius:9px;padding:8px 11px;margin-top:7px;font-size:14px;'
+                    + 'font-weight:900;color:#fff;text-align:center;letter-spacing:.6px;'
+                    + 'box-shadow:0 2px 7px rgba(198,40,40,.35)">'
+                    + '\ud83d\udd25 EN OFERTA</div>' : '')
       +   '<div class="ctl">'
       +     (n > 0
           ? '<button class="bmen" onclick="menos(\'' + p.id + '\')">−</button>'
@@ -355,6 +422,15 @@ function menos(id){
 function totales(){
   var n = 0, contado = 0, credito = 0;
   for(var k in CARRO){
+    // 📦 Los combos llevan su propio precio, igual al contado que a crédito
+    if(k.indexOf('COMBO:') === 0){
+      var c = COMBOS[parseInt(k.split(':')[1], 10)];
+      if(!c) continue;
+      n += CARRO[k];
+      contado += c.precio * CARRO[k];
+      credito += c.precio * CARRO[k];
+      continue;
+    }
     var p = PRODS.find(function(x){ return x.id === k; });
     if(!p) continue;
     n += CARRO[k];
@@ -382,9 +458,40 @@ function cargarCarrito(){
   catch(e){ CARRO = {}; }
 }
 
+// ⚡ ¿Le falta poco para una promoción? Se lo decimos: es lo que más convierte.
+function empujones(){
+  var out = [];
+  for(var k in CARRO){
+    var p = PRODS.find(function(x){ return x.id === k; });
+    if(!p || !p.promo) continue;
+    var n = CARRO[k];
+    if(p.promo.tipo === 'cantidad'){
+      if(n < p.promo.desde && n >= Math.max(1, p.promo.desde - 3)){
+        var faltan = p.promo.desde - n;
+        var ahorro = Math.round((precioContado(p.pr, p) - p.promo.precio) * p.promo.desde * 100) / 100;
+        out.push({ id: k, n: p.n, faltan: faltan, ahorro: ahorro, frase: textoPromo(p) });
+      }
+    } else if(p.promo.tipo === 'lleva'){
+      var resto = n % p.promo.lleva;
+      if(resto > 0 && resto >= p.promo.lleva - 2){
+        var f2 = p.promo.lleva - resto;
+        var unit = precioContado(p.pr, p);
+        var ah2 = Math.round(unit * (p.promo.lleva - p.promo.paga) * 100) / 100;
+        out.push({ id: k, n: p.n, faltan: f2, ahorro: ah2, frase: textoPromo(p) });
+      }
+    }
+  }
+  return out;
+}
+
 function verCarrito(){
   var items = [], t = totales();
   for(var k in CARRO){
+    if(k.indexOf('COMBO:') === 0){
+      var cb = COMBOS[parseInt(k.split(':')[1], 10)];
+      if(cb) items.push({ combo: cb, id: k, n: CARRO[k] });
+      continue;
+    }
     var p = PRODS.find(function(x){ return x.id === k; });
     if(p) items.push({ p: p, n: CARRO[k] });
   }
@@ -395,6 +502,16 @@ function verCarrito(){
     +   '<button onclick="cerrarCarrito()" style="background:#F0F0F6;border:none;'
     +     'border-radius:9px;width:34px;height:34px;font-size:16px;cursor:pointer">✕</button></div>'
     + items.map(function(x){
+        if(x.combo){
+          return '<div class="cl"><div style="flex:1;min-width:0">'
+            + '<div style="font-size:13px;font-weight:800;color:#6A1B9A">📦 '
+            +   esc(x.combo.nombre) + '</div>'
+            + '<div style="font-size:11px;color:#8A8B9E">' + x.n + ' × '
+            +   dinero(x.combo.precio) + '</div></div>'
+            + '<div style="font-weight:900;font-size:14px;color:#6A1B9A">'
+            +   dinero(x.n * x.combo.precio) + '</div>'
+            + '<button class="bmen" onclick="menos(\'' + x.id + '\');verCarrito()">−</button></div>';
+        }
         return '<div class="cl"><div style="flex:1;min-width:0">'
           + '<div style="font-size:13px;font-weight:700">' + esc(x.p.n) + '</div>'
           + '<div style="font-size:11px;color:#8A8B9E">' + x.n + ' × '
@@ -402,6 +519,21 @@ function verCarrito(){
           + '<div style="font-weight:900;font-size:14px;color:#0B7A3B">'
           +   dinero(conPromo(x.p, x.n).total) + '</div>'
           + '<button class="bmen" onclick="menos(\'' + x.p.id + '\');verCarrito()">−</button></div>';
+      }).join('')
+
+    // ⚡ EL EMPUJÓN: "ponle 2 más y te salen a..."
+    + empujones().map(function(e){
+        return '<div onclick="sumarHasta(\'' + e.id + '\',' + e.faltan + ')" '
+          + 'style="background:linear-gradient(135deg,#FFF3E0,#FFE0B2);'
+          + 'border:2px solid #FF9800;border-radius:11px;padding:11px;margin-top:11px;'
+          + 'cursor:pointer">'
+          + '<div style="font-size:13.5px;font-weight:900;color:#E65100">'
+          +   '⚡ P\u00f3nle ' + e.faltan + ' m\u00e1s de ' + esc(e.n.slice(0,26)) + '</div>'
+          + '<div style="font-size:12px;color:#7A5C00;font-weight:700;margin-top:3px">'
+          +   e.frase + ' \u00b7 ahorrar\u00edas ' + dinero(e.ahorro) + '</div>'
+          + '<div style="font-size:11px;color:#E65100;font-weight:800;margin-top:4px">'
+          +   'Toca aqu\u00ed para agregarlas</div>'
+          + '</div>';
       }).join('')
 
     // 🔑 LOS DOS TOTALES, para que vea lo que se ahorra
@@ -425,9 +557,35 @@ function verCarrito(){
 }
 function cerrarCarrito(){ document.getElementById('car').classList.remove('on'); }
 
+// Toca el empujón y se le agregan las que le faltan, de un golpe
+// 📦 Pedir un combo: entra al carrito como UN BLOQUE con su precio, no suelto.
+function pedirCombo(i){
+  var c = COMBOS[i];
+  if(!c) return;
+  CARRO['COMBO:' + i] = (CARRO['COMBO:' + i] || 0) + 1;
+  guardar(); pintar(); barra();
+  alert('📦 ' + c.nombre + ' agregado.\n\n' + dinero(c.precio));
+}
+
+function sumarHasta(id, cuantas){
+  CARRO[id] = (CARRO[id] || 0) + cuantas;
+  guardar(); pintar(); barra(); verCarrito();
+}
+
 function enviar(){
   var t = totales(), lineas = [];
   for(var k in CARRO){
+    // 📦 Los combos van con su nombre y lo que llevan dentro
+    if(k.indexOf('COMBO:') === 0){
+      var cb = COMBOS[parseInt(k.split(':')[1], 10)];
+      if(!cb) continue;
+      lineas.push(CARRO[k] + ' × PACK ' + cb.nombre + '   ' + dinero(CARRO[k] * cb.precio));
+      cb.items.forEach(function(it){
+        var p2 = PRODS.find(function(x){ return x.id === it.id; });
+        if(p2) lineas.push('     - ' + (it.cant > 1 ? it.cant + ' ' : '') + p2.n);
+      });
+      continue;
+    }
     var p = PRODS.find(function(x){ return x.id === k; });
     if(!p) continue;
     lineas.push(CARRO[k] + ' × ' + p.n + '   ' + dinero(conPromo(p, CARRO[k]).total));
