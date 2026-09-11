@@ -224,10 +224,17 @@ fetch('productos.json').then(function(r){ return r.json(); }).then(function(d){
   var cod = new URLSearchParams(location.search).get('c');
   YO = CLIENTES.find(function(x){ return String(x.id) === String(cod); }) || null;
   document.getElementById('negocio').textContent = YO ? (YO.neg || YO.n) : 'Haz tu pedido';
+  // 🔑 Si no hay descuento general, ese aviso solo estorba: se esconde. -11 sep-
   var av = document.getElementById('avisoDesc');
-  if(av) av.innerHTML = '\ud83d\udcb5 <b>' + Math.round(DESCUENTO_CONTADO*100)
-    + '% de descuento</b> pagando al contado<br>'
-    + '<span style="opacity:.92;font-size:11.5px">Los precios en verde son de contado</span>';
+  if(av){
+    if(DESCUENTO_CONTADO > 0){
+      av.innerHTML = '\ud83d\udcb5 <b>' + Math.round(DESCUENTO_CONTADO*100)
+        + '% de descuento</b> pagando al contado<br>'
+        + '<span style="opacity:.92;font-size:11.5px">Los precios en verde son de contado</span>';
+    } else {
+      av.style.display = 'none';
+    }
+  }
   pintarChips();
   pintar();
   cargarCarrito();
@@ -265,7 +272,10 @@ function pintar(){
     return (p.n + ' ' + p.m).toLowerCase().indexOf(q) >= 0;
   });
 
-  if(!lista.length){
+  // 🔑 Solo se sale si NO hay nada que enseñar — ni productos ni packs. Antes se salía
+  // en cuanto no había productos con promo, y los packs no llegaban a pintarse. -11 sep-
+  var hayPacks = (FILTRO === 'promos' && COMBOS.length > 0);
+  if(!lista.length && !hayPacks){
     document.getElementById('lista').innerHTML = FILTRO === 'promos'
       ? '<div class="vacio">Todavía no hay promociones.<br>Vuelve pronto.</div>'
       : '<div class="vacio">No encontré nada con eso.<br>Prueba con otra palabra.</div>';
@@ -315,9 +325,6 @@ function pintar(){
         +     'background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:14px;'
         +     'font-weight:900;cursor:pointer">Lo quiero</button>'
         + '</div>'
-        + (ahorro > 0 ? '<div style="background:#F3E5F5;border-radius:8px;padding:7px;'
-                      + 'margin-top:9px;text-align:center;font-size:12.5px;font-weight:800;'
-                      + 'color:#6A1B9A">Te ahorras ' + dinero(ahorro) + '</div>' : '')
         + '</div>';
     }).join('');
   }
