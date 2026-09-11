@@ -46,6 +46,39 @@
         background:#fff;font-size:12.5px;font-weight:700;color:#555;cursor:pointer;white-space:nowrap}
   .chip.on{background:#0B1020;color:#fff;border-color:#0B1020}
 
+  /* 🔥 LA PESTAÑA DE PROMOS: tiene que gritar. Es la que le hace entrar. */
+  .chip.promo{background:linear-gradient(135deg,#E53935,#FF6F00);color:#fff;
+              border-color:#C62828;font-weight:900;font-size:13.5px;
+              padding:8px 15px;animation:latido 1.4s ease-in-out infinite;
+              box-shadow:0 2px 10px rgba(229,57,53,.45)}
+  .chip.promo.on{background:linear-gradient(135deg,#C62828,#E53935);
+                 animation:none;box-shadow:0 0 0 3px rgba(229,57,53,.3)}
+  @keyframes latido{
+    0%,100%{transform:scale(1);box-shadow:0 2px 10px rgba(229,57,53,.45)}
+    50%{transform:scale(1.06);box-shadow:0 3px 16px rgba(229,57,53,.75)}
+  }
+
+  /* 🔔 El globo de cuántas promos hay */
+  .chip .cuantas{background:#fff;color:#C62828;border-radius:10px;padding:1px 6px;
+                 font-size:11px;font-weight:900;margin-left:5px}
+
+  /* ⚡ La cinta de arriba, que se mueve */
+  .cinta{background:linear-gradient(90deg,#C62828,#FF6F00,#C62828);
+         background-size:200% 100%;animation:correr 3s linear infinite;
+         color:#fff;padding:10px 14px;text-align:center;font-size:13.5px;
+         font-weight:900;letter-spacing:.3px;cursor:pointer;
+         display:flex;align-items:center;justify-content:center;gap:8px}
+  @keyframes correr{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+  .cinta .flecha{animation:empuja 1s ease-in-out infinite}
+  @keyframes empuja{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
+
+  /* 📦 El pack, con brillo que pasa por encima */
+  .pack{position:relative;overflow:hidden}
+  .pack::after{content:'';position:absolute;top:0;left:-120%;width:60%;height:100%;
+               background:linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent);
+               animation:brillo 3.5s ease-in-out infinite}
+  @keyframes brillo{0%{left:-120%}45%{left:130%}100%{left:130%}}
+
   .lista{padding:10px}
   .p{display:flex;gap:11px;background:#fff;border-radius:13px;padding:10px;margin-bottom:9px;
      box-shadow:0 1px 4px rgba(0,0,0,.06)}
@@ -111,6 +144,12 @@
   <h1>🧴 NUNEZ BEAUTY SUPPLY</h1>
   <div class="neg" id="negocio">Cargando…</div>
   <input class="buscar" id="q" placeholder="🔍 Buscar producto o marca…" oninput="buscar(this.value)">
+</div>
+
+<div class="cinta" id="cintaPromos" onclick="filtrar('promos');window.scrollTo(0,0)"
+     style="display:none">
+  <span id="cintaTexto">🔥 OFERTAS DE ESTA SEMANA</span>
+  <span class="flecha">›</span>
 </div>
 
 <div class="aviso" id="avisoDesc">
@@ -235,6 +274,19 @@ fetch('productos.json').then(function(r){ return r.json(); }).then(function(d){
       av.style.display = 'none';
     }
   }
+  // ⚡ La cinta solo sale si hay algo que enseñar
+  var nPromos = COMBOS.length + PRODS.filter(function(p){ return p.promo || p.oferta; }).length;
+  if(nPromos > 0){
+    var ci = document.getElementById('cintaPromos');
+    var ct = document.getElementById('cintaTexto');
+    if(ct){
+      ct.textContent = COMBOS.length
+        ? '🔥 ' + COMBOS.length + (COMBOS.length === 1 ? ' PACK ESPECIAL' : ' PACKS ESPECIALES')
+          + ' · PAGANDO DE INMEDIATO'
+        : '🔥 ' + nPromos + ' OFERTAS · PAGANDO DE INMEDIATO';
+    }
+    if(ci) ci.style.display = 'flex';
+  }
   pintarChips();
   pintar();
   cargarCarrito();
@@ -244,9 +296,16 @@ fetch('productos.json').then(function(r){ return r.json(); }).then(function(d){
 });
 
 function pintarChips(){
+  // 🔑 Cuántas cosas hay en promo: el numerito le dice que ahí hay algo
+  var cuantas = COMBOS.length + PRODS.filter(function(p){ return p.promo || p.oferta; }).length;
   document.getElementById('chips').innerHTML = GRUPOS.map(function(g){
-    return '<div class="chip' + (FILTRO===g[0]?' on':'') + '" onclick="filtrar(\'' + g[0] + '\')">'
-      + g[1] + '</div>';
+    var esPromo = (g[0] === 'promos');
+    if(esPromo && !cuantas) return '';      // sin promos, no se enseña la pestaña
+    return '<div class="chip' + (esPromo ? ' promo' : '') + (FILTRO===g[0]?' on':'') + '" '
+      + 'onclick="filtrar(\'' + g[0] + '\')">'
+      + g[1]
+      + (esPromo ? '<span class="cuantas">' + cuantas + '</span>' : '')
+      + '</div>';
   }).join('');
 }
 function filtrar(k){ FILTRO = k; pintarChips(); pintar(); window.scrollTo(0,0); }
@@ -302,7 +361,7 @@ function pintar(){
         return a + (p2 ? p2.pr * (it.cant || 1) : 0);
       }, 0);
       var ahorro = Math.round((suelto - c.precio) * 100) / 100;
-      return '<div style="background:#fff;border:2.5px solid #6A1B9A;border-radius:14px;'
+      return '<div class="pack" style="background:#fff;border:2.5px solid #6A1B9A;border-radius:14px;'
         +   'padding:13px;margin-bottom:11px;box-shadow:0 3px 10px rgba(106,27,154,.18)">'
         + '<div style="background:linear-gradient(135deg,#6A1B9A,#8E24AA);color:#fff;'
         +   'border-radius:9px;padding:9px;text-align:center;font-size:15px;font-weight:900;'
