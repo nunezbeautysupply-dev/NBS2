@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>NBS · Administrar catálogo</title>
+<!--
+  🔧 ADMINISTRAR EL CATÁLOGO  (11 sep 2026)
+
+  Sensei: "necesito poder agregar y quitar productos, así como también poder cambiar
+  todo en ese catálogo".
+
+  🔑 LOS CAMBIOS SE GUARDAN EN UN ARCHIVO que él baja y sube a GitHub. Eligió esa vía
+  a propósito: NO toca Firebase ni su sesión — eso fue lo que le dañó la huella.
+
+  Esta pantalla es SUYA: el barbero nunca la abre.
+-->
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+       background:#F2F3F7;color:#151628;padding-bottom:120px}
+  .cab{background:#1a237e;color:#fff;padding:13px 14px;position:sticky;top:0;z-index:50;
+       box-shadow:0 2px 12px rgba(0,0,0,.2)}
+  .cab h1{margin:0;font-size:16px;font-weight:900}
+  .cab .sub{font-size:12px;color:#BFC6F0;font-weight:700;margin-top:2px}
+
+  .ajustes{background:#fff;padding:12px 14px;border-bottom:1px solid #E5E6EE}
+  .ajustes .fila{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .ajustes label{font-size:12px;font-weight:800;color:#555;flex:1}
+  .ajustes input{width:110px;padding:9px;border:1.5px solid #ccc;border-radius:8px;
+                 font-size:14px;font-weight:800;text-align:center}
+  .ajustes .ancho{width:100%;text-align:left}
+
+  .buscar{width:100%;padding:11px 13px;border:1.5px solid #ccc;border-radius:10px;
+          font-size:15px;margin:10px 0 8px}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;padding:7px 13px;border-radius:20px;border:1.5px solid #D4D5E0;
+        background:#fff;font-size:12px;font-weight:700;color:#555;cursor:pointer;white-space:nowrap}
+  .chip.on{background:#1a237e;color:#fff;border-color:#1a237e}
+
+  .lista{padding:0 10px}
+  .p{display:flex;gap:10px;background:#fff;border-radius:12px;padding:10px;margin-bottom:8px;
+     box-shadow:0 1px 3px rgba(0,0,0,.06);align-items:center}
+  .p.oculto{opacity:.5;background:#F6F6FA}
+  .fo{width:60px;height:60px;border-radius:9px;background:#EDEEF4;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .fo img{width:100%;height:100%;object-fit:cover}
+  .fo .sinf{font-size:8.5px;color:#9899AC;text-align:center;font-weight:800;line-height:1.3}
+  .inf{flex:1;min-width:0}
+  .nom{font-size:13px;font-weight:800;line-height:1.25}
+  .mar{font-size:10.5px;color:#8A8B9E;font-weight:700;margin-top:1px}
+  .pre{font-size:12px;font-weight:800;margin-top:3px}
+  .pre .c{color:#0B7A3B}
+  .pre .n{color:#8A8B9E;font-weight:600}
+  .bot{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+  .bot button{width:34px;height:31px;border-radius:8px;border:1.5px solid #D4D5E0;
+              background:#fff;font-size:14px;cursor:pointer;padding:0}
+  .bot .ver{border-color:#1a237e}
+  .bot .del{border-color:#C62828;background:#FFF5F5}
+
+  .pie{position:fixed;left:0;right:0;bottom:0;background:#fff;padding:10px 12px;
+       box-shadow:0 -3px 14px rgba(0,0,0,.14);z-index:60;display:flex;gap:8px}
+  .pie button{flex:1;padding:13px 6px;border:none;border-radius:11px;font-size:13.5px;
+              font-weight:900;cursor:pointer}
+  .pie .add{background:#fff;color:#1a237e;border:1.5px solid #1a237e}
+  .pie .save{background:#0B7A3B;color:#fff}
+
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:200;display:none;
+      align-items:center;justify-content:center;padding:14px}
+  .ov.on{display:flex}
+  .caja{background:#fff;border-radius:15px;padding:16px;max-width:420px;width:100%;
+        max-height:90vh;overflow:auto}
+  .caja h2{margin:0 0 12px;font-size:16px;font-weight:900;color:#1a237e;
+           display:flex;justify-content:space-between;align-items:center}
+  .caja .et{font-size:10.5px;font-weight:800;color:#555;letter-spacing:.3px;margin-top:9px}
+  .caja input{width:100%;padding:11px;border:1.5px solid #ccc;border-radius:9px;
+              font-size:15px;margin-top:3px}
+  .caja .btns{display:flex;gap:8px;margin-top:14px}
+  .caja .btns button{flex:1;padding:13px;border:none;border-radius:11px;
+                     font-size:14px;font-weight:900;cursor:pointer}
+  .caja .ok{background:#0B7A3B;color:#fff}
+  .caja .no{background:#F0F0F6;color:#444}
+  .vacio{text-align:center;padding:40px 20px;color:#9899AC;font-size:14px;line-height:1.6}
+  .aviso{background:#FFF8E1;border:1.5px solid #FFD54F;border-radius:10px;padding:10px;
+         font-size:12px;color:#6D4C00;line-height:1.5;margin:10px}
+</style>
+</head>
+<body>
+
+<div class="cab">
+  <h1>🔧 ADMINISTRAR CATÁLOGO</h1>
+  <div class="sub" id="cuenta">Cargando…</div>
+</div>
+
+<div class="ajustes">
+  <div class="fila">
+    <label>💵 Descuento al contado</label>
+    <input type="number" id="desc" min="0" max="50" step="1" onchange="cambiarDesc(this.value)">
+  </div>
+  <div class="fila">
+    <label>📱 Tu WhatsApp</label>
+  </div>
+  <input class="ancho" id="wa" placeholder="14013050188" onchange="cambiarWa(this.value)"
+         style="width:100%;padding:9px;border:1.5px solid #ccc;border-radius:8px;font-size:14px">
+
+  <input class="buscar" id="q" placeholder="🔍 Buscar producto…" oninput="buscar(this.value)">
+  <div class="chips" id="chips"></div>
+</div>
+
+<div id="avisoCambios"></div>
+<div class="lista" id="lista"><div class="vacio">Cargando…</div></div>
+
+<div class="pie">
+  <button class="add" onclick="abrirNuevo()">➕ Agregar</button>
+  <button class="save" onclick="guardarTodo()">💾 Guardar cambios</button>
+</div>
+
+<div class="ov" id="ovEdit"><div class="caja" id="cajaEdit"></div></div>
+
+<script>
+var PRODS = [], CLIENTES = [], FOTOS = {}, CAMBIOS = false;
+var FILTRO = 'todos', BUSCA = '';
+var AJUSTES = { descuento: 10, whatsapp: '14013050188' };
+
+function dinero(n){ return '$' + (Math.round(n*100)/100).toFixed(2); }
+// Cada producto puede tener SU descuento. Si no, usa el general.
+function contado(pr, p){
+  var d = (p && typeof p.desc === 'number') ? p.desc : AJUSTES.descuento;
+  return Math.round(pr * (1 - d/100) * 100) / 100;
+}
+// 📊 Cuanta ganancia le queda con ese descuento. Es lo que decide si puede darlo.
+function margenCon(p, desc){
+  var pr = p.pr, co = p.co || 0;
+  if(!pr || !co) return null;
+  var venta = pr * (1 - desc/100);
+  return Math.round((venta - co) / venta * 100);
+}
+function textoPromo(p){
+  if(!p.promo) return '';
+  if(p.promo.tipo === 'lleva') return '🎁 Lleva ' + p.promo.lleva + ' paga ' + p.promo.paga;
+  return '🎁 Desde ' + p.promo.desde + ' a $' + p.promo.precio.toFixed(2);
+}
+function esc(t){ return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Cargar todo ──
+Promise.all([
+  fetch('productos.json').then(function(r){ return r.json(); }),
+  fetch('fotos_00.json').then(function(r){ return r.json(); }).catch(function(){ return {}; }),
+  fetch('fotos_01.json').then(function(r){ return r.json(); }).catch(function(){ return {}; }),
+  fetch('fotos_02.json').then(function(r){ return r.json(); }).catch(function(){ return {}; })
+]).then(function(x){
+  PRODS = x[0].productos || [];
+  CLIENTES = x[0].clientes || [];
+  if(x[0].ajustes) AJUSTES = x[0].ajustes;
+  for(var i = 1; i < x.length; i++) for(var k in x[i]) FOTOS[k] = x[i][k];
+  document.getElementById('desc').value = AJUSTES.descuento;
+  document.getElementById('wa').value = AJUSTES.whatsapp;
+  pintarChips();
+  pintar();
+}).catch(function(e){
+  document.getElementById('lista').innerHTML =
+    '<div class="vacio">No pude cargar el catálogo.<br>' + esc(e.message) + '</div>';
+});
+
+var FILTROS = [
+  ['todos','Todos'], ['promo','🎁 Con promo'], ['oferta','🔥 En oferta'],
+  ['dormidos','💀 Dormidos'], ['ocultos','Ocultos'], ['sinfoto','Sin foto']
+];
+function pintarChips(){
+  document.getElementById('chips').innerHTML = FILTROS.map(function(f){
+    return '<div class="chip' + (FILTRO===f[0]?' on':'') + '" onclick="filtrar(\'' + f[0] + '\')">'
+      + f[1] + '</div>';
+  }).join('');
+}
+function filtrar(k){ FILTRO = k; pintarChips(); pintar(); }
+function buscar(v){ BUSCA = v; pintar(); }
+
+function pasaFiltro(p){
+  if(FILTRO === 'promo') return !!p.promo;
+  if(FILTRO === 'oferta') return !!p.oferta;
+  if(FILTRO === 'dormidos') return !!p.dormido;   // 💀 con stock y sin venderse
+  if(FILTRO === 'ocultos') return !!p.oculto;
+  if(FILTRO === 'sinfoto') return !p.tf;
+  return true;
+}
+
+function pintar(){
+  var q = (BUSCA||'').toLowerCase().trim();
+  var lista = PRODS.filter(function(p){
+    if(!pasaFiltro(p)) return false;
+    if(!q) return true;
+    return ((p.n||'') + ' ' + (p.m||'')).toLowerCase().indexOf(q) >= 0;
+  });
+
+  var visibles = PRODS.filter(function(p){ return !p.oculto; }).length;
+  var conFoto = PRODS.filter(function(p){ return p.tf; }).length;
+  document.getElementById('cuenta').textContent =
+    PRODS.length + ' productos · ' + visibles + ' visibles · ' + conFoto + ' con foto';
+
+  document.getElementById('avisoCambios').innerHTML = CAMBIOS
+    ? '<div class="aviso">⚠️ Tienes cambios sin guardar. Toca <b>💾 Guardar cambios</b> '
+      + 'abajo y sube el archivo que se baje.</div>' : '';
+
+  if(!lista.length){
+    document.getElementById('lista').innerHTML =
+      '<div class="vacio">No hay productos con eso.</div>';
+    return;
+  }
+
+  document.getElementById('lista').innerHTML = lista.map(function(p){
+    var i = PRODS.indexOf(p);
+    return '<div class="p' + (p.oculto ? ' oculto' : '') + '">'
+      + '<div class="fo">'
+      +   (p.tf && FOTOS[p.id] ? '<img src="' + FOTOS[p.id] + '">' : '<div class="sinf">SIN<br>FOTO</div>')
+      + '</div>'
+      + '<div class="inf">'
+      +   '<div class="nom">' + esc(p.n) + (p.oculto ? ' 🚫' : '') + '</div>'
+      +   (p.m ? '<div class="mar">' + esc(p.m) + '</div>' : '')
+      +   '<div class="pre"><span class="c">' + dinero(contado(p.pr, p)) + ' contado</span>'
+      +     '<span class="n">  ·  ' + dinero(p.pr) + ' crédito</span>'
+      +     (typeof p.desc === 'number'
+            ? '<span style="color:#E65100;font-weight:900">  ·  ' + p.desc + '% suyo</span>' : '')
+      +   '</div>'
+      +   (p.promo ? '<div style="font-size:10px;font-weight:800;color:#E65100;margin-top:2px">'
+                   + textoPromo(p) + '</div>' : '')
+      +   (p.oferta ? '<div style="font-size:10px;font-weight:900;color:#C62828;margin-top:2px">'
+                    + '🔥 EN OFERTA</div>' : '')
+      + '</div>'
+      + '<div class="bot">'
+      +   '<button class="ver" onclick="verNoVer(' + i + ')" title="Mostrar u ocultar">'
+      +     (p.oculto ? '🙈' : '👁️') + '</button>'
+      +   '<button onclick="abrirEditar(' + i + ')" title="Cambiar">✏️</button>'
+      +   '<button class="del" onclick="quitar(' + i + ')" title="Quitar">🗑️</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+// ── 👁️ Ocultar o mostrar ──
+function verNoVer(i){
+  PRODS[i].oculto = !PRODS[i].oculto;
+  CAMBIOS = true;
+  pintar();
+}
+
+// ── 🗑️ Quitar del catálogo ──
+function quitar(i){
+  var p = PRODS[i];
+  if(!confirm('¿Quitar "' + p.n + '" del catálogo?\n\nSi solo quieres que el barbero no lo '
+    + 'vea por ahora, usa el ojo 👁️ en vez de quitarlo.')) return;
+  PRODS.splice(i, 1);
+  CAMBIOS = true;
+  pintar();
+}
+
+// ── ✏️ Cambiar ──
+function abrirEditar(i){
+  var p = PRODS[i];
+  window._editando = i;
+  document.getElementById('cajaEdit').innerHTML =
+      '<h2>✏️ Cambiar producto <button onclick="cerrarEdit()" style="background:#F0F0F6;'
+    +   'border:none;border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button></h2>'
+    + '<div style="display:flex;gap:11px;align-items:center;margin-bottom:6px">'
+    +   '<div style="width:82px;height:82px;border-radius:10px;background:#EDEEF4;'
+    +     'overflow:hidden;display:flex;align-items:center;justify-content:center" id="prevFoto">'
+    +     (p.tf && FOTOS[p.id]
+          ? '<img src="' + FOTOS[p.id] + '" style="width:100%;height:100%;object-fit:cover">'
+          : '<span style="font-size:9px;color:#9899AC;font-weight:800;text-align:center">SIN<br>FOTO</span>')
+    +   '</div>'
+    +   '<div style="flex:1">'
+    +     '<input type="file" accept="image/*" id="fArch" style="display:none" onchange="ponerFoto(event)">'
+    +     '<button onclick="document.getElementById(\'fArch\').click()" style="width:100%;'
+    +       'padding:10px;background:#1a237e;color:#fff;border:none;border-radius:9px;'
+    +       'font-size:12.5px;font-weight:800;cursor:pointer">📷 Cambiar foto</button>'
+    +     (p.tf ? '<button onclick="quitarFoto()" style="width:100%;padding:9px;margin-top:6px;'
+                + 'background:#FFF5F5;color:#C62828;border:1.5px solid #C62828;border-radius:9px;'
+                + 'font-size:12px;font-weight:800;cursor:pointer">🗑️ Quitar foto</button>' : '')
+    +   '</div>'
+    + '</div>'
+    + '<div class="et">NOMBRE</div><input id="eNom" value="' + esc(p.n) + '">'
+    + '<div class="et">MARCA</div><input id="eMar" value="' + esc(p.m || '') + '">'
+    + '<div class="et">PRECIO NORMAL (a crédito)</div>'
+    + '<input id="ePre" type="number" step="0.01" value="' + p.pr + '" oninput="verContado()">'
+    // 💵 SU PROPIO DESCUENTO -Sensei, 11 sep: "no puedo darle el mismo a todos"-
+    + '<div style="background:#F4F6FB;border-radius:10px;padding:11px;margin-top:11px">'
+    +   '<div style="font-size:11px;font-weight:900;color:#1a237e;margin-bottom:7px">'
+    +     '💵 DESCUENTO AL CONTADO</div>'
+    +   '<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700">'
+    +     '<input type="radio" name="td" ' + (typeof p.desc !== 'number' ? 'checked' : '')
+    +     ' onchange="usarGeneral()"> Usar el general (' + AJUSTES.descuento + '%)</label>'
+    +   '<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;'
+    +     'margin-top:7px"><input type="radio" name="td" '
+    +     (typeof p.desc === 'number' ? 'checked' : '') + ' onchange="usarPropio()"> Solo para este:'
+    +     '<input id="eDesc" type="number" min="0" max="60" style="width:70px;padding:7px;'
+    +       'border:1.5px solid #ccc;border-radius:7px;text-align:center;font-weight:800;margin:0"'
+    +       ' value="' + (typeof p.desc === 'number' ? p.desc : AJUSTES.descuento) + '"'
+    +       ' oninput="verContado()"> %</label>'
+    + '</div>'
+    + '<div id="avisoContado" style="background:#E7F6ED;border-radius:9px;padding:10px;'
+    +   'margin-top:9px;text-align:center;font-size:13px;font-weight:800;color:#0B7A3B"></div>'
+
+    // 🎁 LA PROMOCIÓN
+    + '<div style="background:#FFF8E1;border-radius:10px;padding:11px;margin-top:10px">'
+    +   '<div style="font-size:11px;font-weight:900;color:#E65100;margin-bottom:7px">'
+    +     '🎁 PROMOCIÓN</div>'
+    +   '<select id="ePromo" onchange="cambiarTipoPromo()" style="width:100%;padding:9px;'
+    +     'border:1.5px solid #E0C070;border-radius:8px;font-size:13px;font-weight:700">'
+    +     '<option value="">Sin promoción</option>'
+    +     '<option value="lleva"' + (p.promo && p.promo.tipo==='lleva' ? ' selected':'') + '>'
+    +       'Lleva varios y paga menos</option>'
+    +     '<option value="cantidad"' + (p.promo && p.promo.tipo==='cantidad' ? ' selected':'') + '>'
+    +       'Desde X unidades, otro precio</option>'
+    +   '</select>'
+    +   '<div id="camposPromo" style="margin-top:9px"></div>'
+    + '</div>'
+
+    // 🔥 EN OFERTA
+    + '<label style="display:flex;align-items:center;gap:9px;background:#FFEBEE;'
+    +   'border-radius:10px;padding:11px;margin-top:10px;font-size:13px;font-weight:800;'
+    +   'color:#C62828;cursor:pointer">'
+    +   '<input type="checkbox" id="eOferta" ' + (p.oferta ? 'checked' : '')
+    +   ' style="width:20px;height:20px"> 🔥 Ponerlo en OFERTAS'
+    +   (p.dormido ? '<span style="font-size:10.5px;font-weight:700;opacity:.8">'
+                   + '(lleva 60 días sin venderse)</span>' : '')
+    + '</label>'
+
+    + '<div class="btns"><button class="ok" onclick="guardarEdit()">✓ Guardar</button>'
+    +   '<button class="no" onclick="cerrarEdit()">Cancelar</button></div>';
+  cambiarTipoPromo();
+  verContado();
+  document.getElementById('ovEdit').classList.add('on');
+}
+
+function usarGeneral(){ window._descPropio = false; verContado(); }
+function usarPropio(){ window._descPropio = true; verContado(); }
+
+// 📊 Le dice cuánta ganancia le queda con ese descuento. Es lo que decide si puede darlo.
+function verContado(){
+  var i = window._editando;
+  var p = (i !== undefined && i !== null && PRODS[i]) ? PRODS[i] : { co: 0 };
+  var pr = parseFloat(document.getElementById('ePre').value) || 0;
+  var elDesc = document.getElementById('eDesc');
+  var propio = window._descPropio;
+  if(propio === undefined) propio = (typeof p.desc === 'number');
+  var d = propio && elDesc ? (parseFloat(elDesc.value) || 0) : AJUSTES.descuento;
+  var venta = Math.round(pr * (1 - d/100) * 100) / 100;
+  var co = p.co || 0;
+  var m = (venta > 0 && co > 0) ? Math.round((venta - co) / venta * 100) : null;
+
+  var caja = document.getElementById('avisoContado');
+  if(!caja) return;
+  var txt = '💵 Al contado: <b>' + dinero(venta) + '</b>';
+  if(m !== null){
+    // 🔑 El aviso: si le queda poca ganancia, en rojo
+    var col = m < 20 ? '#C62828' : (m < 30 ? '#E65100' : '#0B7A3B');
+    var cara = m < 20 ? '⚠️' : (m < 30 ? '🟠' : '✅');
+    txt += '<br><span style="color:' + col + '">📊 Te queda <b>' + m
+         + '%</b> de ganancia ' + cara + '</span>';
+    if(m < 20) txt += '<br><span style="font-size:11px;color:#C62828">'
+         + 'Es muy poco. Baja el descuento.</span>';
+    caja.style.background = m < 20 ? '#FFEBEE' : (m < 30 ? '#FFF3E0' : '#E7F6ED');
+  }
+  caja.innerHTML = txt;
+}
+
+// 🎁 Los campos de la promoción, según el tipo
+function cambiarTipoPromo(){
+  var sel = document.getElementById('ePromo');
+  var caja = document.getElementById('camposPromo');
+  if(!sel || !caja) return;
+  var i = window._editando;
+  var p = (i !== undefined && i !== null && PRODS[i]) ? PRODS[i] : {};
+  var pm = p.promo || {};
+  if(sel.value === 'lleva'){
+    caja.innerHTML = '<div style="display:flex;gap:8px;align-items:center;font-size:13px;'
+      + 'font-weight:700">Lleva <input id="pLleva" type="number" min="2" value="'
+      + (pm.lleva || 3) + '" style="width:62px;padding:7px;border:1.5px solid #E0C070;'
+      + 'border-radius:7px;text-align:center;font-weight:800;margin:0">'
+      + ' y paga <input id="pPaga" type="number" min="1" value="' + (pm.paga || 2)
+      + '" style="width:62px;padding:7px;border:1.5px solid #E0C070;border-radius:7px;'
+      + 'text-align:center;font-weight:800;margin:0"></div>';
+  } else if(sel.value === 'cantidad'){
+    caja.innerHTML = '<div style="display:flex;gap:8px;align-items:center;font-size:13px;'
+      + 'font-weight:700;flex-wrap:wrap">Desde <input id="pDesde" type="number" min="2" value="'
+      + (pm.desde || 5) + '" style="width:62px;padding:7px;border:1.5px solid #E0C070;'
+      + 'border-radius:7px;text-align:center;font-weight:800;margin:0">'
+      + ' le sale a $<input id="pPrecio" type="number" step="0.01" value="'
+      + (pm.precio || 8) + '" style="width:80px;padding:7px;border:1.5px solid #E0C070;'
+      + 'border-radius:7px;text-align:center;font-weight:800;margin:0"> c/u</div>';
+  } else {
+    caja.innerHTML = '';
+  }
+}
+
+function guardarEdit(){
+  var i = window._editando;
+  if(i === undefined || i === null) return;
+  var nom = (document.getElementById('eNom').value || '').trim();
+  if(!nom){ alert('Ponle un nombre al producto.'); return; }
+  PRODS[i].n = nom;
+  PRODS[i].m = (document.getElementById('eMar').value || '').trim();
+  PRODS[i].pr = parseFloat(document.getElementById('ePre').value) || 0;
+
+  // 💵 Su propio descuento, o el general
+  var propio = window._descPropio;
+  if(propio === undefined) propio = (typeof PRODS[i].desc === 'number');
+  if(propio){
+    var d = parseFloat(document.getElementById('eDesc').value);
+    if(isFinite(d) && d >= 0 && d <= 60) PRODS[i].desc = d;
+  } else {
+    delete PRODS[i].desc;
+  }
+
+  // 🎁 La promoción
+  var tp = document.getElementById('ePromo').value;
+  if(tp === 'lleva'){
+    var lv = parseInt(document.getElementById('pLleva').value, 10) || 3;
+    var pg = parseInt(document.getElementById('pPaga').value, 10) || 2;
+    if(pg >= lv){ alert('Lo que paga tiene que ser MENOS de lo que lleva.'); return; }
+    PRODS[i].promo = { tipo: 'lleva', lleva: lv, paga: pg };
+  } else if(tp === 'cantidad'){
+    var de = parseInt(document.getElementById('pDesde').value, 10) || 5;
+    var pc2 = parseFloat(document.getElementById('pPrecio').value) || 0;
+    if(pc2 <= 0){ alert('Ponle el precio de la promoción.'); return; }
+    if(pc2 >= PRODS[i].pr){ alert('El precio de promoción tiene que ser MENOS que el normal.'); return; }
+    PRODS[i].promo = { tipo: 'cantidad', desde: de, precio: pc2 };
+  } else {
+    delete PRODS[i].promo;
+  }
+
+  // 🔥 En ofertas
+  if(document.getElementById('eOferta').checked) PRODS[i].oferta = true;
+  else delete PRODS[i].oferta;
+
+  window._descPropio = undefined;
+  CAMBIOS = true;
+  cerrarEdit();
+  pintar();
+}
+function cerrarEdit(){
+  document.getElementById('ovEdit').classList.remove('on');
+  window._editando = null;
+  window._nuevo = false;
+}
+
+// ── 📷 La foto: se achica antes de guardar, para que no pese ──
+function ponerFoto(ev){
+  var f = ev.target.files && ev.target.files[0];
+  if(!f) return;
+  var lector = new FileReader();
+  lector.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      // Máximo 520px de lado: se ve bien y pesa poco
+      var max = 520, w = img.width, h = img.height;
+      if(w > h && w > max){ h = Math.round(h * max / w); w = max; }
+      else if(h > max){ w = Math.round(w * max / h); h = max; }
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      var data = c.toDataURL('image/jpeg', 0.72);
+      var i = window._editando;
+      var id = window._nuevo ? window._idNuevo : PRODS[i].id;
+      FOTOS[id] = data;
+      if(!window._nuevo) PRODS[i].tf = true;
+      else window._fotoNueva = data;
+      document.getElementById('prevFoto').innerHTML =
+        '<img src="' + data + '" style="width:100%;height:100%;object-fit:cover">';
+      CAMBIOS = true;
+    };
+    img.src = e.target.result;
+  };
+  lector.readAsDataURL(f);
+  ev.target.value = '';
+}
+
+function quitarFoto(){
+  var i = window._editando;
+  if(i === undefined || i === null) return;
+  delete FOTOS[PRODS[i].id];
+  PRODS[i].tf = false;
+  CAMBIOS = true;
+  document.getElementById('prevFoto').innerHTML =
+    '<span style="font-size:9px;color:#9899AC;font-weight:800;text-align:center">SIN<br>FOTO</span>';
+}
+
+// ── ➕ Producto nuevo ──
+function abrirNuevo(){
+  window._nuevo = true;
+  window._idNuevo = 'n' + Date.now();
+  window._fotoNueva = null;
+  document.getElementById('cajaEdit').innerHTML =
+      '<h2>➕ Producto nuevo <button onclick="cerrarEdit()" style="background:#F0F0F6;'
+    +   'border:none;border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button></h2>'
+    + '<div style="display:flex;gap:11px;align-items:center;margin-bottom:6px">'
+    +   '<div style="width:82px;height:82px;border-radius:10px;background:#EDEEF4;'
+    +     'overflow:hidden;display:flex;align-items:center;justify-content:center" id="prevFoto">'
+    +     '<span style="font-size:9px;color:#9899AC;font-weight:800;text-align:center">SIN<br>FOTO</span></div>'
+    +   '<div style="flex:1">'
+    +     '<input type="file" accept="image/*" id="fArch" style="display:none" onchange="ponerFoto(event)">'
+    +     '<button onclick="document.getElementById(\'fArch\').click()" style="width:100%;'
+    +       'padding:10px;background:#1a237e;color:#fff;border:none;border-radius:9px;'
+    +       'font-size:12.5px;font-weight:800;cursor:pointer">📷 Ponerle foto</button>'
+    +   '</div></div>'
+    + '<div class="et">NOMBRE</div><input id="eNom" placeholder="Ej: Gummy hair gel verde">'
+    + '<div class="et">MARCA</div><input id="eMar" placeholder="Ej: Gummy">'
+    + '<div class="et">PRECIO NORMAL (a crédito)</div>'
+    + '<input id="ePre" type="number" step="0.01" placeholder="10.00" oninput="verContadoNuevo()">'
+    + '<div id="avisoContado" style="background:#E7F6ED;border-radius:9px;padding:9px;'
+    +   'margin-top:9px;text-align:center;font-size:13px;font-weight:800;color:#0B7A3B">'
+    +   '💵 Escribe el precio</div>'
+    + '<div class="btns"><button class="ok" onclick="guardarNuevo()">✓ Agregar</button>'
+    +   '<button class="no" onclick="cerrarEdit()">Cancelar</button></div>';
+  document.getElementById('ovEdit').classList.add('on');
+}
+
+function verContadoNuevo(){
+  var pr = parseFloat(document.getElementById('ePre').value) || 0;
+  document.getElementById('avisoContado').textContent = pr > 0
+    ? '💵 Al contado quedaría en ' + dinero(contado(pr)) : '💵 Escribe el precio';
+}
+
+function guardarNuevo(){
+  var nom = (document.getElementById('eNom').value || '').trim();
+  var pr = parseFloat(document.getElementById('ePre').value) || 0;
+  if(!nom){ alert('Ponle un nombre al producto.'); return; }
+  if(pr <= 0){ alert('Ponle un precio.'); return; }
+  var id = window._idNuevo;
+  if(window._fotoNueva) FOTOS[id] = window._fotoNueva;
+  PRODS.unshift({ id: id, n: nom, m: (document.getElementById('eMar').value||'').trim(),
+                  c: '', pr: pr, v: 0, tf: !!window._fotoNueva });
+  CAMBIOS = true;
+  cerrarEdit();
+  pintar();
+  window.scrollTo(0, 0);
+}
+
+function cambiarDesc(v){
+  var n = parseFloat(v);
+  if(!isFinite(n) || n < 0 || n > 50){ alert('El descuento tiene que ir de 0 a 50.'); return; }
+  AJUSTES.descuento = n;
+  CAMBIOS = true;
+  pintar();
+}
+function cambiarWa(v){
+  AJUSTES.whatsapp = (v || '').replace(/\D/g, '');
+  CAMBIOS = true;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  💾 GUARDAR: se bajan los archivos para subirlos a GitHub.
+//  🔑 NO toca Firebase ni la sesión de Sensei: eso fue lo que le dañó la huella.
+// ═══════════════════════════════════════════════════════════════════
+function bajarArchivo(nombre, texto){
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([texto], { type: 'application/json' }));
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 400);
+}
+
+function guardarTodo(){
+  // Los productos, sin fotos: liviano
+  var limpios = PRODS.map(function(p){
+    var o = { id: p.id, n: p.n, m: p.m || '', c: p.c || '', pr: p.pr, co: p.co || 0,
+              v: p.v || 0, tf: !!p.tf, oculto: !!p.oculto, dormido: !!p.dormido };
+    if(typeof p.desc === 'number') o.desc = p.desc;
+    if(p.promo) o.promo = p.promo;
+    if(p.oferta) o.oferta = true;
+    return o;
+  });
+  bajarArchivo('productos.json', JSON.stringify(
+    { productos: limpios, clientes: CLIENTES, ajustes: AJUSTES }));
+
+  // Las fotos, en trozos de 25
+  var ids = Object.keys(FOTOS).sort();
+  var trozos = Math.max(1, Math.ceil(ids.length / 25));
+  for(var i = 0; i < trozos; i++){
+    var g = {};
+    ids.slice(i*25, (i+1)*25).forEach(function(k){ g[k] = FOTOS[k]; });
+    (function(n, datos){
+      setTimeout(function(){
+        bajarArchivo('fotos_' + (n < 10 ? '0' : '') + n + '.json', JSON.stringify(datos));
+      }, 500 * (n + 1));
+    })(i, g);
+  }
+
+  CAMBIOS = false;
+  setTimeout(function(){
+    alert('💾 Se bajaron ' + (trozos + 1) + ' archivos.\n\n'
+      + '1 productos.json\n' + trozos + ' de fotos\n\n'
+      + 'Súbelos TODOS a la carpeta CATALOGO2 de tu GitHub, reemplazando los que hay.');
+    pintar();
+  }, 500 * (trozos + 1) + 400);
+}
+
+window.addEventListener('beforeunload', function(e){
+  if(CAMBIOS){ e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+</body>
+</html>
