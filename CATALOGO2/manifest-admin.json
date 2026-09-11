@@ -1,0 +1,24 @@
+{
+ "name": "Catalogo NBS · Administrar",
+ "short_name": "Catalogo NBS",
+ "id": "/CATALOGO2/admin.html",
+ "start_url": "/CATALOGO2/admin.html",
+ "scope": "/CATALOGO2/",
+ "display": "standalone",
+ "background_color": "#1a237e",
+ "theme_color": "#1a237e",
+ "icons": [
+  {
+   "src": "icono-admin.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any maskable"
+  },
+  {
+   "src": "icono-admin.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any maskable"
+  }
+ ]
+}
