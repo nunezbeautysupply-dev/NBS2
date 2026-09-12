@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260911a-OFICIAL-V2.0">
+<meta name="app-version" content="20260911b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -439,9 +439,45 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
   @page { margin: 0; size: 58mm auto; }
 </style>
 <!-- ===== FIREBASE - respaldo en la nube ===== -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- \u26a1 FIREBASE SE CARGA POR DETR\u00c1S -11 sep-. Antes estos tres archivos BLOQUEABAN
+     el arranque: el tel\u00e9fono los bajaba de internet -600 KB- ANTES de ense\u00f1ar nada, y
+     en la ruta con se\u00f1al lenta eso son segundos perdidos con un cliente delante.
+     Ahora la pantalla sale YA y la nube se engancha mientras Sensei trabaja. -->
+<script>
+window._firebaseListo = false;
+window._alHaberFirebase = [];
+function cuandoHayaFirebase(fn){
+  if(window._firebaseListo) { try{ fn(); }catch(e){} return; }
+  window._alHaberFirebase.push(fn);
+}
+(function(){
+  var cuales = ['app', 'auth', 'firestore'];
+  var i = 0;
+  function siguiente(){
+    if(i >= cuales.length){
+      window._firebaseListo = true;
+      // Se avisa a todo lo que estaba esperando
+      var pend = window._alHaberFirebase.slice();
+      window._alHaberFirebase = [];
+      pend.forEach(function(f){ try{ f(); }catch(e){ console.warn(e); } });
+      try { if(typeof arrancarNube === 'function') arrancarNube(); } catch(e){}
+      return;
+    }
+    var sc = document.createElement('script');
+    sc.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-' + cuales[i] + '-compat.js';
+    sc.onload = function(){ i++; siguiente(); };
+    sc.onerror = function(){
+      // Sin internet la app sigue funcionando: los datos viven en el tel\u00e9fono
+      console.warn('sin nube por ahora');
+      i++; siguiente();
+    };
+    document.head.appendChild(sc);
+  }
+  // Se empieza cuando la pantalla ya est\u00e1 dibujada, no antes
+  if(document.readyState === 'complete') setTimeout(siguiente, 60);
+  else window.addEventListener('load', function(){ setTimeout(siguiente, 60); });
+})();
+</script>
 <script>
   var firebaseConfig = {
     apiKey: "AIzaSyBqtoMWt9DTMmSN-RR5MUagRIuH7B_Bjbw",
@@ -451,9 +487,22 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     messagingSenderId: "946975018761",
     appId: "1:946975018761:web:6dea81efb50b993ca3cdd8"
   };
-  firebase.initializeApp(firebaseConfig);
-  var fbAuth = firebase.auth();
-  var fbDb = firebase.firestore();
+  // \u26a1 Firebase llega por detr\u00e1s, as\u00ed que esto espera a que est\u00e9. -11 sep-
+  var fbAuth = null, fbDb = null;
+
+  function arrancarNube(){
+    if(typeof firebase === 'undefined') return;   // no lleg\u00f3: la app sigue igual
+    try {
+      firebase.initializeApp(firebaseConfig);
+      fbAuth = firebase.auth();
+      fbDb = firebase.firestore();
+      window.fbAuth = fbAuth;
+      window.fbDb = fbDb;
+      prepararNube();
+    } catch(e){ console.warn('la nube no arranc\u00f3:', e); }
+  }
+
+  function prepararNube(){
 
   // ===== MODO SIN INTERNET (offline) =====
   // Guarda una copia de los datos en el teléfono. Así la app funciona sin internet:
@@ -483,6 +532,7 @@ body.inicio-oscuro .top{ background:#2C2C3B; border-bottom-color:#3E3E52; }
     window._offlineActivo = false;
     console.log('No se pudo activar el modo offline; la app funciona normal.', e && e.message);
   }
+  }   // \u2190 fin de prepararNube -11 sep-
 </script>
 </head>
 <body>
@@ -2139,7 +2189,7 @@ function tocarHoraUltimaCopiaNube(){
 }
 
 function hacerCopiaAutomatica(forzada){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return Promise.resolve(false);
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser) return Promise.resolve(false);
   if(!navigator.onLine) return Promise.resolve(false);
   if(!forzada && !toca_hacer_copia()) return Promise.resolve(false);
 
@@ -2558,7 +2608,7 @@ function iniciarCopiasAutomaticas(){
     if(document.visibilityState === 'hidden'){
       // Al SALIR de la app (mandarla a segundo plano): si hay huella registrada y el usuario
       // activó el bloqueo inmediato, se marca para bloquear en cuanto vuelva -aunque sean segundos-.
-      if(bloqueoInmediatoActivado() && hayHuellaRegistrada() && typeof fbAuth !== 'undefined' && fbAuth.currentUser && !window._appBloqueada){
+      if(bloqueoInmediatoActivado() && hayHuellaRegistrada() && typeof fbAuth !== 'undefined' && fbAuth && fbAuth.currentUser && !window._appBloqueada){
         // \ud83d\udd11 Se apunta CU\u00c1NDO sali\u00f3. Al volver se mira cu\u00e1nto tard\u00f3: si vuelve en
         // menos de 30 segundos, NO se le pide nada. Antes se le ped\u00eda la huella aunque
         // volviera en 2 segundos de mirar el WhatsApp, con el cliente delante. -8 sep-
@@ -2568,7 +2618,7 @@ function iniciarCopiasAutomaticas(){
     if(document.visibilityState === 'visible'){
       // Al VOLVER: si quedó marcado el bloqueo inmediato, se bloquea la app de una vez (pide huella).
       var _cuandoSalio = parseInt(localStorage.getItem(CLAVE_BLOQUEO_INMEDIATO_PENDIENTE) || '0', 10);
-      if(_cuandoSalio > 0 && hayHuellaRegistrada() && typeof fbAuth !== 'undefined' && fbAuth.currentUser && !window._appBloqueada){
+      if(_cuandoSalio > 0 && hayHuellaRegistrada() && typeof fbAuth !== 'undefined' && fbAuth && fbAuth.currentUser && !window._appBloqueada){
         try{ localStorage.removeItem(CLAVE_BLOQUEO_INMEDIATO_PENDIENTE); }catch(e){}
         // \ud83d\udd11 SOLO se bloquea si estuvo fuera M\u00c1S DE 30 SEGUNDOS. -8 sep-
         var _fuera = Date.now() - _cuandoSalio;
@@ -2956,7 +3006,7 @@ function vidsConFirma(ventasL){
 
 // Sube a `nbs_firmas` solo las que cambiaron, igual que hace sincronizarFotos.
 function sincronizarFirmas(ventasL){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser) return;
   if(!navigator.onLine) return;
   var indice = leerIndiceFirmas();
   var pendientes = (ventasL || []).filter(function(v){
@@ -2985,7 +3035,7 @@ function sincronizarFirmas(ventasL){
 
 // Y al revés: si este teléfono bajó ventas sin firma, se van a buscar.
 function descargarFirmasQueFaltan(listaVids){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser) return;
   if(!navigator.onLine || !listaVids || !listaVids.length) return;
   var tengo = {};
   try{
@@ -3056,7 +3106,7 @@ function guardarIndiceFotosCl(i){
 
 // Sube a la nube las fotos de clientes que hayan cambiado (cada una en su documento aparte)
 function sincronizarFotosClientes(cls){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser) return;
   if(!navigator.onLine) return;
   var indice = leerIndiceFotosCl();
   var pendientes = (cls || []).filter(function(c){
@@ -3388,7 +3438,7 @@ function aplicarCambiosProductos(){
 // rellena las que FALTAN -nunca sobreescribe una que ya tengas-, asi que no puede pisar
 // ningun dato.
 function revisarFotosDeLaNube(alTerminar, alAvanzar){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser){
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser){
     if(alTerminar) alTerminar({ error: 'SIN_SESION' });
     return;
   }
@@ -3552,7 +3602,7 @@ function bajarFotosQueFaltan(){
 }
 
 function descargarFotosClientesQueFaltan(){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser) return;
   if(!navigator.onLine) return;
   var cls = [];
   try { cls = JSON.parse(localStorage.getItem('ncl') || '[]'); } catch(e){ return; }
@@ -3571,7 +3621,7 @@ function descargarFotosClientesQueFaltan(){
 
 // Borra la foto de un cliente de la nube (cuando se quita)
 function borrarFotoClienteNube(cid){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser) return;
   if(!navigator.onLine) return;
   fbDb.collection('nbs_fotos_clientes').doc(String(cid)).delete().catch(function(){});
   var i = leerIndiceFotosCl();
@@ -3589,7 +3639,7 @@ function quitarFotosClientes(cls){
 }
 
 function sincronizarFotos(prods){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser) return;
   if(!navigator.onLine) return;
   var indice = leerIndiceFotos();
   var pendientes = (prods || []).filter(function(p){
@@ -3645,7 +3695,7 @@ function pegarFotosQueYaTengo(prodsDeLaNube){
 // Baja de la nube las fotos que este telefono no tenga -por ejemplo, si entras desde otro
 // telefono por primera vez-. Se hace en segundo plano, sin estorbar.
 function descargarFotosQueFaltan(listaPids){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser) return;
   if(!navigator.onLine || !listaPids || !listaPids.length) return;
   var tengo = {};
   try{
@@ -4006,7 +4056,7 @@ function SS(k,v){
     }
   } catch(eMarca){}
 
-  if(typeof fbAuth !== 'undefined' && fbAuth.currentUser){
+  if(typeof fbAuth !== 'undefined' && fbAuth && fbAuth.currentUser){
     // SOLO los datos del negocio. Antes se apuntaba CUALQUIER clave, incluidas las
     // internas (relojes, contadores, la meta semanal). Esas la nube las rechaza y se
     // quedaban atascadas para siempre en "cambios sin guardar". -30 jul-
@@ -11821,7 +11871,7 @@ function cargarCopiasDeLaNube(){
   var lista = document.getElementById('copias-lista');
   lista.innerHTML = '<div class="card" style="text-align:center;color:#bbb;font-size:13px;padding:18px">Buscando tus copias en la nube...</div>';
 
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser){
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser){
     lista.innerHTML = '<div class="card" style="text-align:center;color:#c0392b;font-size:13px;padding:18px">Necesitas iniciar sesión para ver tus copias.</div>';
     return;
   }
@@ -18940,7 +18990,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260911a';
+var NOVEDADES_VERSION = '20260911b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -33053,7 +33103,7 @@ function ejecutarBorradoTotal(){
     localStorage.clear();
     avisoGrande("Datos borrados", function(){ location.reload(); });
   };
-  if(typeof fbAuth !== 'undefined' && fbAuth.currentUser){
+  if(typeof fbAuth !== 'undefined' && fbAuth && fbAuth.currentUser){
     fbDb.collection('nbs_data').get().then(function(snapshot){
       var borrados = [];
       snapshot.forEach(function(doc){
@@ -34444,7 +34494,7 @@ function sesionVencidaPorInactividad(){
 // Al vencerse el tiempo: si hay huella registrada, se BLOQUEA la app -mas comodo-; si no,
 // se cierra la sesion de verdad y se piden correo y contraseña -mas estricto-.
 function cerrarSesionPorInactividad(){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser) return;
   if(hayHuellaRegistrada()){
     bloquearApp();
     return;
@@ -34495,6 +34545,17 @@ function configurarPantallaLogin(){
   document.getElementById('login-pass').addEventListener('keydown', function(e){
     if(e.key === 'Enter') intentarLogin();
   });
+  // \u26a1 Firebase ahora llega POR DETR\u00c1S, as\u00ed que se espera a que est\u00e9. Antes bloqueaba
+  // el arranque y Sensei esperaba 4 segundos con un cliente delante. -11 sep-
+  if(typeof cuandoHayaFirebase === 'function'){
+    cuandoHayaFirebase(engancharSesion);
+  } else {
+    engancharSesion();
+  }
+}
+
+function engancharSesion(){
+  if(typeof fbAuth === 'undefined' || !fbAuth) return;
   fbAuth.onAuthStateChanged(function(user){
     if(user){
       // Firebase recuerda la sesion aunque se cierre la app por completo. Aqui se revisa
@@ -34836,7 +34897,7 @@ function reintentarYDecirmeElError(){
     : '';
 
   // Antes estos dos casos tambien se salian callados cuando se tocaba el aviso naranja.
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser){
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser){
     avisoGrande('\u2601\ufe0f No estas conectado a la nube.\n\nEntra con tu correo y clave y se sube '
       + 'solo. Mientras tanto tus datos NO se pierden: estan guardados en el telefono.' + _lista);
     return;
@@ -34952,7 +35013,7 @@ function cerrarAvisoConBackup(){
 }
 
 function probarLaNubePiezaPorPieza(){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser){
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser){
     avisoGrande('Primero entra con tu correo y clave.'); return;
   }
   if(!navigator.onLine){ avisoGrande('No hay internet. Conéctate y prueba otra vez.'); return; }
@@ -35038,7 +35099,7 @@ var _trayendo = false;
 
 function traerLoNuevo(){
   if(_trayendo) return;
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser){
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser){
     avisoGrande('\u26a0\ufe0f No hay sesi\u00f3n de la nube todav\u00eda.\n\nEspera unos segundos y vuelve a intentar.');
     return;
   }
@@ -35126,7 +35187,7 @@ function traerLoNuevo(){
 }
 
 function subirPendientes(){
-  if(typeof fbAuth === 'undefined' || !fbAuth.currentUser) return;
+  if(typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser) return;
   try { limpiarPendientesQueNoSonDatos(); } catch(e){}
   // Nota: los pendientes se apuntan SIEMPRE al guardar -aunque la sesion no estuviera
   // lista-, y esta funcion es la que comprueba la sesion antes de intentar subir. Asi
@@ -40237,7 +40298,7 @@ function apuntarPedidoVisto(id, como){
  * Se llama sola al arrancar y cada 2 minutos.
  */
 function revisarPedidosDelCatalogo(alTerminar){
-  if(typeof fbDb === 'undefined' || typeof fbAuth === 'undefined' || !fbAuth.currentUser){
+  if(typeof fbDb === 'undefined' || typeof fbAuth === 'undefined' || !fbAuth || !fbAuth.currentUser){
     if(alTerminar) alTerminar([]);
     return;
   }
