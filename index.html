@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260911d-OFICIAL-V2.0">
+<meta name="app-version" content="20260911e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -546,6 +546,8 @@ function cuandoHayaFirebase(fn){
     <p style="font-size:13px;text-align:center;color:#888;margin-bottom:24px">Inicia sesión para continuar</p>
     <input id="login-email" type="email" placeholder="Correo electrónico" class="inp" style="margin-bottom:10px" autocomplete="username">
     <input id="login-pass" type="password" placeholder="Contraseña" class="inp" style="margin-bottom:14px" autocomplete="current-password">
+    <div id="login-version" style="text-align:center;font-size:11px;color:#999;
+         font-weight:700;margin-bottom:10px">v—</div>
     <button onclick="intentarLogin()" class="btn" style="width:100%;background:var(--nbs-gold,#D4A017);color:white;padding:12px;font-weight:700;border:none;border-radius:10px;cursor:pointer;font-size:15px">Entrar</button>
     <button onclick="recuperarContrasena()" style="width:100%;background:none;border:none;color:#1a237e;font-size:15.5px;font-weight:700;margin-top:14px;cursor:pointer;text-decoration:underline;font-family:inherit;padding:8px">¿Olvidaste tu contraseña?</button>
     <p id="login-error" style="color:#c0392b;font-size:14.5px;text-align:center;margin-top:12px;display:none;font-weight:600"></p>
@@ -19107,7 +19109,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260911d';
+var NOVEDADES_VERSION = '20260911e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34659,6 +34661,18 @@ function cerrarSesionNBS(){
 }
 
 function configurarPantallaLogin(){
+  // \ud83d\udd11 La versi\u00f3n, VISIBLE antes de entrar. As\u00ed Sensei ve de un vistazo si Chrome le
+  // est\u00e1 dando el archivo nuevo o una copia vieja. -11 sep-
+  try {
+    var mv = document.querySelector('meta[name="app-version"]');
+    var cont = mv ? (mv.getAttribute('content') || '') : '';
+    var ev = document.getElementById('login-version');
+    if(ev && cont){
+      var t = cont.split('-')[0];                       // 20260911e
+      ev.textContent = 'v' + t.slice(6, 8) + '/' + t.slice(4, 6) + t.slice(8).toUpperCase();
+    }
+  } catch(e){}
+
   document.getElementById('login-pass').addEventListener('keydown', function(e){
     if(e.key === 'Enter') intentarLogin();
   });
