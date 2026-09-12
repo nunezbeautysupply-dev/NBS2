@@ -725,6 +725,31 @@ function guardarTodo(){
 //  Le faltan 263 fotos. Una por una sería una tarde entera.
 // ═══════════════════════════════════════════════════════════════════
 
+// 🌉 EXPORTAR LAS FOTOS PARA LA APP. Los productos usan el MISMO id en los dos sitios,
+// así que el emparejado es exacto: no hay que adivinar nada. -11 sep-
+function exportarFotosParaApp(){
+  var ids = Object.keys(FOTOS);
+  if(!ids.length){ alert('Todavía no tienes fotos que pasar.'); return; }
+
+  var paquete = { tipo: 'nbs_fotos', cuando: Date.now(), fotos: {} };
+  ids.forEach(function(id){
+    var p = PRODS.find(function(x){ return String(x.id) === String(id); });
+    paquete.fotos[id] = { foto: FOTOS[id], nombre: p ? p.n : '' };
+  });
+
+  var txt = JSON.stringify(paquete);
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt], { type: 'application/json' }));
+  a.download = 'FOTOS_PARA_LA_APP.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 400);
+
+  alert('📤 Se bajó FOTOS_PARA_LA_APP.json con ' + ids.length + ' fotos.\n\n'
+    + 'Ábrelo desde tu app NBS2:\n'
+    + 'Menú ☰ → Catálogo → 📥 Traer fotos del catálogo');
+}
+
 function abrirCargaLotes(){
   window._lotesMarca = '';
   pintarCargaLotes();
@@ -818,6 +843,18 @@ function pintarCargaLotes(){
     +   '<button onclick="empezarSeguidas()" style="width:100%;padding:14px;'
     +     'background:#1a237e;color:#fff;border:none;border-radius:11px;font-size:14.5px;'
     +     'font-weight:900;cursor:pointer">📷 Empezar</button>'
+    + '</div>'
+
+    // 🌉 Y el puente para pasarlas a la app de la ruta
+    + '<div style="border:2px solid #6A1B9A;border-radius:12px;padding:13px;margin-top:11px">'
+    +   '<div style="font-size:14.5px;font-weight:900;color:#6A1B9A;margin-bottom:6px">'
+    +     '🌉 3. Pasarlas a tu app NBS2</div>'
+    +   '<div style="font-size:12px;color:#555;line-height:1.55;margin-bottom:10px">'
+    +     'Las fotos de aquí son del catálogo de tus barberos. Con esto las llevas '
+    +     'también a la app que usas en la ruta, todas de golpe.</div>'
+    +   '<button onclick="exportarFotosParaApp()" style="width:100%;padding:13px;'
+    +     'background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:14px;'
+    +     'font-weight:900;cursor:pointer">📤 Bajar las fotos para la app</button>'
     + '</div>'
 
     + '<button onclick="cerrarLotes()" style="width:100%;padding:12px;margin-top:11px;'

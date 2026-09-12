@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260911b-OFICIAL-V2.0">
+<meta name="app-version" content="20260911c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -798,6 +798,7 @@ function cuandoHayaFirebase(fn){
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">📦 Catálogo de Productos</h2>
   <button onclick="abrirFotosRapido()" style="width:100%;padding:12px;margin-bottom:14px;background:#1a237e;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer">📸 Ponerle fotos a los productos</button>
+  <button onclick="abrirTraerFotos()" style="width:100%;padding:12px;margin-bottom:14px;background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer">📥 Traer fotos del catálogo</button>
   <div id="cat-lista-wrap">
     <div style="background:#E0F7FA;border-radius:10px;padding:12px;margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleMarcasDetalle()">
@@ -4682,6 +4683,7 @@ var RECUADROS_ENCIMA = [
   { id: 'reporte-overlay',          cerrar: 'cerrarReporte' },
   { id: 'pedido-nuevo-overlay',     cerrar: 'cerrarAvisoPedidoNuevo' },
   { id: 'pedidos-web-overlay',      cerrar: 'cerrarPedidosWeb' },
+  { id: 'traerfotos-overlay',       cerrar: 'cerrarTraerFotos' },
   { id: 'fotorapido-overlay',       cerrar: 'cerrarFotosRapido' },
   { id: 'pin-overlay',              cerrar: 'cerrarPinRecuadro' },
   { id: 'estado-fechas-overlay',    cerrar: 'cerrarEstadoPorFechas' },
@@ -10147,6 +10149,121 @@ function verSoloSinPrecio(){
 //  que no tenga que buscar cada producto a mano. Foto → siguiente → foto → siguiente.
 // ═══════════════════════════════════════════════════════════════════
 var _fotoRapidaLista = [], _fotoRapidaIdx = 0;
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  📥 TRAER LAS FOTOS DEL CATÁLOGO  (11 sep 2026)
+//
+//  Sensei: "¿y así quedan también en el catálogo de la app automáticamente?"
+//  No: el administrador del catálogo y la app son dos sitios distintos. Este es el
+//  puente: él carga las fotos UNA vez en el administrador -donde están las herramientas
+//  de lotes- y con esto las trae todas de golpe a la app de la ruta.
+//
+//  🔑 Los productos usan el MISMO id en los dos sitios, así que el emparejado es
+//  exacto: no hay que adivinar nada.
+// ═══════════════════════════════════════════════════════════════════
+
+function abrirTraerFotos(){
+  var ov = document.getElementById('traerfotos-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'traerfotos-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:100006;'
+    + 'display:flex;align-items:center;justify-content:center;padding:14px';
+  ov.onclick = function(e){ if(e.target === ov) cerrarTraerFotos(); };
+
+  loadProds();
+  var sinFoto = productos.filter(function(p){
+    return !p.eliminado && !(p.foto && String(p.foto).length > 100);
+  }).length;
+
+  ov.innerHTML = '<div style="background:#fff;border-radius:15px;padding:16px;'
+    + 'max-width:420px;width:100%">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">'
+    +   '<div style="font-size:16px;font-weight:900;color:var(--nbs-ink)">'
+    +     '\ud83d\udce5 Traer fotos del cat\u00e1logo</div>'
+    +   '<button onclick="cerrarTraerFotos()" style="background:#F0F0F2;border:none;'
+    +     'border-radius:9px;width:33px;height:33px;font-size:15px;cursor:pointer">\u2715</button>'
+    + '</div>'
+
+    + '<div style="background:#F3E5F5;border-radius:11px;padding:12px;margin-bottom:12px;'
+    +   'font-size:12.5px;color:#6A1B9A;line-height:1.6">'
+    +   'Si ya pusiste las fotos en el <b>administrador del cat\u00e1logo</b>, aqu\u00ed las traes '
+    +   'todas de golpe. No hay que hacerlas dos veces.'
+    +   '<br><br>Te faltan <b>' + sinFoto + '</b> fotos en esta app.</div>'
+
+    + '<div style="background:#FFF8E1;border-radius:10px;padding:11px;margin-bottom:12px;'
+    +   'font-size:11.5px;color:#6D4C00;line-height:1.6">'
+    +   '<b>C\u00f3mo:</b><br>'
+    +   '1. En el administrador: \ud83d\udcf8 Fotos<br>'
+    +   '2. Toca \ud83d\udce4 Bajar las fotos para la app<br>'
+    +   '3. Vuelve aqu\u00ed y elige ese archivo</div>'
+
+    + '<input type="file" accept=".json,application/json" id="tf-arch" style="display:none" '
+    +   'onchange="leerFotosDelCatalogo(event)">'
+    + '<button onclick="document.getElementById(\'tf-arch\').click()" '
+    +   'style="width:100%;padding:15px;background:#6A1B9A;color:#fff;border:none;'
+    +   'border-radius:12px;font-size:15px;font-weight:900;cursor:pointer">'
+    +   '\ud83d\udcc1 Elegir el archivo de fotos</button>'
+    + '<button onclick="cerrarTraerFotos()" style="width:100%;padding:12px;margin-top:8px;'
+    +   'background:#F0F0F2;color:#444;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Cerrar</button>'
+    + '</div>';
+  ov.style.display = 'flex';
+}
+
+function cerrarTraerFotos(){
+  var ov = document.getElementById('traerfotos-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function leerFotosDelCatalogo(ev){
+  var f = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if(!f) return;
+
+  var lector = new FileReader();
+  lector.onload = function(e){
+    var paq;
+    try { paq = JSON.parse(e.target.result); }
+    catch(err){ avisoGrande('Ese archivo no se puede leer.\n\nTiene que ser el '
+      + 'FOTOS_PARA_LA_APP.json que baja el administrador.'); return; }
+
+    if(!paq || paq.tipo !== 'nbs_fotos' || !paq.fotos){
+      avisoGrande('Ese no es el archivo de fotos.\n\nBusca FOTOS_PARA_LA_APP.json');
+      return;
+    }
+
+    loadProds();
+    var puestas = 0, yaTenian = 0, noEstaban = 0;
+    Object.keys(paq.fotos).forEach(function(id){
+      var i = productos.findIndex(function(x){ return String(x.id) === String(id); });
+      if(i < 0){ noEstaban++; return; }
+      // \ud83d\udd11 NO se pisa una foto que ya tenga: las suyas mandan
+      if(productos[i].foto && String(productos[i].foto).length > 100){ yaTenian++; return; }
+      productos[i].foto = paq.fotos[id].foto;
+      productos[i].mod = Date.now();
+      puestas++;
+    });
+
+    if(!puestas){
+      avisoGrande('No hab\u00eda ninguna foto nueva que traer.\n\n'
+        + 'Ya ten\u00edan foto: ' + yaTenian);
+      return;
+    }
+    if(!SS('np', productos)) return;
+    loadProds();
+    cerrarTraerFotos();
+    avisoGrande('\u2705 Se trajeron ' + puestas + ' fotos.\n\n'
+      + (yaTenian ? 'Ya ten\u00edan foto: ' + yaTenian + '\n' : '')
+      + (noEstaban ? 'No estaban en esta app: ' + noEstaban : ''));
+    try { renderCatalogo(''); } catch(e2){}
+  };
+  lector.onerror = function(){ avisoGrande('No pude leer el archivo.'); };
+  lector.readAsText(f);
+}
 
 function abrirFotosRapido(){
   loadProds();
@@ -18990,7 +19107,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260911b';
+var NOVEDADES_VERSION = '20260911c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
