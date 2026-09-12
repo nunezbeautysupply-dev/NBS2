@@ -1159,10 +1159,37 @@ function escaparAttr(t){ return String(t||'').replace(/"/g, '&quot;'); }
 function loadProdsLotes(){ /* PRODS ya está cargado en el admin */ }
 
 // ═══ ① EMPAREJAR POR NOMBRE ═══
+// 🗑️ ¿Esto es basura? Banners, categorías, logos, fotos de estudio con nombre de
+// cámara, y hashes al azar. Nada de eso es un producto.
+function _esBasura(nombre){
+  var n = String(nombre || '').toLowerCase();
+  var malas = ['category', 'banner', 'hero', 'slider', 'carousel', 'logo', 'icon',
+               'favicon', 'background', 'bg-', 'bg_', 'header', 'footer', 'sprite',
+               'placeholder', 'lifestyle', 'model', '_mobile', '_desktop',
+               'instagram', 'facebook', 'payment', 'badge', 'flag', 'arrow'];
+  for(var i = 0; i < malas.length; i++){ if(n.indexOf(malas[i]) >= 0) return true; }
+  var base = n.replace(/^imgi_\d+_/, '').replace(/\.[a-z]+$/, '');
+  // Nombres de cámara: P1054875, DSC_0123, IMG_2026
+  if(/^(p\d{6,}|dsc[_-]?\d+|img[_-]?\d{4,})/i.test(base)) return true;
+  // Hashes: letras y números seguidos, sin guiones ni espacios
+  if(base.length > 18 && !/[_\- ]/.test(base)) return true;
+  return false;
+}
+
 function emparejarFotos(ev){
   var files = Array.prototype.slice.call(ev.target.files || []);
   if(!files.length) return;
   ev.target.value = '';
+  var cuantasLlegaron = files.length;
+
+  // 🗑️ Fuera lo que claramente no es un producto
+  var basura = 0;
+  files = files.filter(function(f){
+    if(_esBasura(f.name)){ basura++; return false; }
+    return true;
+  });
+  window._lotesBasura = basura;
+  window._lotesLlegaron = cuantasLlegaron;
 
   // 🔑 Solo los de la marca elegida, y solo los que NO tienen foto todavía. -12 sep-
   var marcaSel = (document.getElementById('lotesMarcaArch') || {}).value || '';
@@ -1183,7 +1210,21 @@ function emparejarFotos(ev){
              candidatos: candidatos };
   });
   window._candidatosLote = candidatos;
+  // 🔑 SOLO LAS QUE SE PARECEN A ALGO SUYO. Lo demás no es un producto de su tienda,
+  // y hacerle revisar 1.109 fotos sin pareja es hacerle perder el tiempo. -12 sep-
+  var sinPareja = props.filter(function(x){ return x.pct < 30; }).length;
+  props = props.filter(function(x){ return x.pct >= 30; });
+  window._lotesSinPareja = sinPareja;
   window._lotesPend = props;
+
+  if(!props.length){
+    alert('De las ' + (window._lotesLlegaron || 0) + ' fotos que elegiste, ninguna '
+      + 'coincide con tus productos de esta marca.\n\n'
+      + '\ud83d\udca1 Prueba a elegir otra marca arriba, o baja las fotos '
+      + 'una por una desde la p\u00e1gina de cada producto.');
+    pintarCargaLotes();
+    return;
+  }
   pintarEmparejadas();
 }
 
@@ -1193,22 +1234,36 @@ function pintarEmparejadas(){
   var dudosos = L.filter(function(x){ return x.pct >= 45 && x.pct < 75; }).length;
   var perdidos = L.filter(function(x){ return x.pct < 45; }).length;
 
-  var h = '<h2>📁 ' + L.length + ' fotos <button onclick="pintarCargaLotes()" '
+  var llegaron = window._lotesLlegaron || L.length;
+  var basura = window._lotesBasura || 0;
+  var sinPareja = window._lotesSinPareja || 0;
+
+  var h = '<h2>📁 ' + L.length + ' para revisar <button onclick="pintarCargaLotes()" '
     +   'style="background:#F0F0F6;border:none;border-radius:8px;width:32px;height:32px;'
     +   'font-size:15px;cursor:pointer">✕</button></h2>'
-    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">'
+
+    // 🔑 De dónde salió el número: que no desaparezcan fotos sin explicación
+    + ((basura || sinPareja)
+        ? '<div style="background:#F4F6FB;border-radius:10px;padding:11px;margin-bottom:11px;'
+          + 'font-size:12px;color:#555;line-height:1.7">'
+          + 'Elegiste <b>' + llegaron + '</b> fotos. Descart\u00e9:<br>'
+          + (basura ? '\u00b7 <b>' + basura + '</b> que no son productos (banners, '
+                    + 'modelos, logos)<br>' : '')
+          + (sinPareja ? '\u00b7 <b>' + sinPareja + '</b> que no se parecen a ning\u00fan '
+                       + 'producto tuyo<br>' : '')
+          + '\ud83d\udd11 Te quedan <b>' + L.length + '</b> por revisar.</div>'
+        : '')
+
+    + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:12px">'
     +   '<div style="background:#E7F6ED;border-radius:9px;padding:9px;text-align:center">'
     +     '<div style="font-size:19px;font-weight:900;color:#0B7A3B">' + seguros + '</div>'
     +     '<div style="font-size:9.5px;font-weight:800;color:#0B7A3B">SEGURAS</div></div>'
     +   '<div style="background:#FFF3E0;border-radius:9px;padding:9px;text-align:center">'
     +     '<div style="font-size:19px;font-weight:900;color:#E65100">' + dudosos + '</div>'
     +     '<div style="font-size:9.5px;font-weight:800;color:#E65100">REVISAR</div></div>'
-    +   '<div style="background:#FFEBEE;border-radius:9px;padding:9px;text-align:center">'
-    +     '<div style="font-size:19px;font-weight:900;color:#C62828">' + perdidos + '</div>'
-    +     '<div style="font-size:9.5px;font-weight:800;color:#C62828">SIN PAREJA</div></div>'
     + '</div>'
     + '<div style="font-size:11.5px;color:#555;margin-bottom:9px;line-height:1.5">'
-    +   'Quita la marca de las que no cuadren. Las verdes casi seguro están bien.</div>'
+    +   'Mira la foto y elige el producto. Quita la marca de las que no quieras.</div>'
     + '<div style="max-height:44vh;overflow:auto">';
 
   var cand = window._candidatosLote || PRODS;
