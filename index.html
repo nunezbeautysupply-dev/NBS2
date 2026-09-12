@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260911e-OFICIAL-V2.0">
+<meta name="app-version" content="20260912a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -455,11 +455,16 @@ function cuandoHayaFirebase(fn){
   var i = 0;
   function siguiente(){
     if(i >= cuales.length){
-      window._firebaseListo = true;
-      // Se avisa a todo lo que estaba esperando
-      var pend = window._alHaberFirebase.slice();
-      window._alHaberFirebase = [];
-      pend.forEach(function(f){ try{ f(); }catch(e){ console.warn(e); } });
+      // \ud83d\udd11 Aqu\u00ed NO se marca listo: lo hace arrancarNube en cuanto fbAuth existe.
+      // Y si firebase no lleg\u00f3, se marca igual para que el bot\u00f3n pueda avisar en vez
+      // de quedarse colgado. -12 sep-
+      if(typeof firebase === 'undefined'){
+        window._firebaseListo = true;
+        var pend = window._alHaberFirebase.slice();
+        window._alHaberFirebase = [];
+        pend.forEach(function(f){ try{ f(); }catch(e){ console.warn(e); } });
+        return;
+      }
       try { if(typeof arrancarNube === 'function') arrancarNube(); } catch(e){}
       return;
     }
@@ -498,7 +503,18 @@ function cuandoHayaFirebase(fn){
       fbDb = firebase.firestore();
       window.fbAuth = fbAuth;
       window.fbDb = fbDb;
-      prepararNube();
+
+      // \ud83d\udd11 YA SE PUEDE ENTRAR. Se avisa AHORA, sin esperar a la base local.
+      // Antes se esperaba a prepararNube(), que con 1,5 MB de ventas puede tardar
+      // mucho o colgarse — y el bot\u00f3n Entrar se quedaba esperando para siempre,
+      // sin mensaje ni salida. Eso es lo que le pas\u00f3 a Sensei. -12 sep-
+      window._firebaseListo = true;
+      var pend = (window._alHaberFirebase || []).slice();
+      window._alHaberFirebase = [];
+      pend.forEach(function(f){ try{ f(); }catch(e){ console.warn(e); } });
+
+      // La base local se prepara por su cuenta, sin frenar a nadie
+      setTimeout(function(){ try { prepararNube(); } catch(e){ console.warn(e); } }, 50);
     } catch(e){ console.warn('la nube no arranc\u00f3:', e); }
   }
 
@@ -19109,7 +19125,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260911e';
+var NOVEDADES_VERSION = '20260912a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
