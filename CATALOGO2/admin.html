@@ -179,8 +179,9 @@ Promise.all([
 });
 
 var FILTROS = [
-  ['todos','Todos'], ['promo','🎁 Con promo'], ['oferta','🔥 En oferta'],
-  ['dormidos','💀 Dormidos'], ['ocultos','Ocultos'], ['sinfoto','Sin foto']
+  ['todos','Todos'], ['visibles','👁️ Los ve el barbero'], ['ocultos','🙈 Escondidos'],
+  ['sinfoto','Sin foto'], ['promo','🎁 Con promo'], ['oferta','🔥 En oferta'],
+  ['dormidos','💀 Dormidos']
 ];
 function pintarChips(){
   document.getElementById('chips').innerHTML = FILTROS.map(function(f){
@@ -192,6 +193,7 @@ function filtrar(k){ FILTRO = k; pintarChips(); pintar(); }
 function buscar(v){ BUSCA = v; pintar(); }
 
 function pasaFiltro(p){
+  if(FILTRO === 'visibles') return !p.oculto;
   if(FILTRO === 'promo') return !!p.promo;
   if(FILTRO === 'oferta') return !!p.oferta;
   if(FILTRO === 'dormidos') return !!p.dormido;   // 💀 con stock y sin venderse
@@ -211,7 +213,8 @@ function pintar(){
   var visibles = PRODS.filter(function(p){ return !p.oculto; }).length;
   var conFoto = PRODS.filter(function(p){ return p.tf; }).length;
   document.getElementById('cuenta').textContent =
-    PRODS.length + ' productos · ' + visibles + ' visibles · ' + conFoto + ' con foto';
+    PRODS.length + ' productos \u00b7 ' + visibles + ' los ve el barbero \u00b7 '
+    + conFoto + ' con foto';
 
   document.getElementById('avisoCambios').innerHTML = CAMBIOS
     ? '<div class="aviso">⚠️ Tienes cambios sin guardar. Toca <b>💾 Guardar cambios</b> '
@@ -243,7 +246,9 @@ function pintar(){
                     + '🔥 EN OFERTA</div>' : '')
       + '</div>'
       + '<div class="bot">'
-      +   '<button class="ver" onclick="verNoVer(' + i + ')" title="Mostrar u ocultar">'
+      +   '<button class="ver" onclick="verNoVer(' + i + ')" '
+      +     'title="' + (p.oculto ? 'El barbero NO lo ve \u2014 toca para ense\u00f1arlo'
+                                  : 'El barbero S\u00cd lo ve \u2014 toca para esconderlo') + '">'
       +     (p.oculto ? '🙈' : '👁️') + '</button>'
       +   '<button onclick="abrirEditar(' + i + ')" title="Cambiar">✏️</button>'
       +   '<button class="del" onclick="quitar(' + i + ')" title="Quitar">🗑️</button>'
@@ -1089,9 +1094,19 @@ function pintarCargaLotes(){
     +   '<div style="font-size:14.5px;font-weight:900;color:#0B7A3B;margin-bottom:6px">'
     +     '📁 1. Sueltas muchas fotos de golpe</div>'
     +   '<div style="font-size:12px;color:#555;line-height:1.55;margin-bottom:10px">'
-    +     'Si bajas las fotos de <b>magnussupply.com</b> o <b>vipbarbersupply.com</b>, '
-    +     'ya vienen con el nombre del producto puesto.<br>'
-    +     'Las eliges todas y la app las empareja sola.</div>'
+    +     'Elige primero la MARCA. As\u00ed solo se comparan con los de esa marca '
+    +     'y aciertas mucho m\u00e1s.</div>'
+    // 🔑 LA MARCA PRIMERO: de 333 productos a solo los de esa marca. -12 sep-
+    +   '<div style="font-size:10.5px;font-weight:800;color:#555;margin-bottom:4px">'
+    +     '\u00bfDE QU\u00c9 MARCA SON ESTAS FOTOS?</div>'
+    +   '<select id="lotesMarcaArch" style="width:100%;padding:10px;border:1.5px solid #ccc;'
+    +     'border-radius:9px;font-size:13.5px;font-weight:700;margin-bottom:10px">'
+    +     '<option value="">Todas las marcas</option>'
+    +     orden.map(function(m){
+            return '<option value="' + escaparAttr(m) + '">' + esc(m) + ' \u2014 '
+              + marcas[m] + ' sin foto</option>';
+          }).join('')
+    +   '</select>'
     +   '<input type="file" accept="image/*" multiple id="lotesArch" style="display:none" '
     +     'onchange="emparejarFotos(event)">'
     +   '<button onclick="document.getElementById(\'lotesArch\').click()" '
@@ -1149,15 +1164,25 @@ function emparejarFotos(ev){
   if(!files.length) return;
   ev.target.value = '';
 
-  // Se busca a qué producto se parece más cada foto
+  // 🔑 Solo los de la marca elegida, y solo los que NO tienen foto todavía. -12 sep-
+  var marcaSel = (document.getElementById('lotesMarcaArch') || {}).value || '';
+  var candidatos = PRODS.filter(function(p){
+    if(p.tf) return false;                                   // ya tiene foto
+    if(!marcaSel) return true;
+    return (p.m || 'Sin marca') === marcaSel;
+  });
+  if(!candidatos.length) candidatos = PRODS.filter(function(p){ return !p.tf; });
+
   var props = files.map(function(f){
     var mejor = null, mejorPct = 0;
-    PRODS.forEach(function(p){
+    candidatos.forEach(function(p){
       var pct = _parecido(f.name, (p.m || '') + ' ' + p.n);
       if(pct > mejorPct){ mejorPct = pct; mejor = p; }
     });
-    return { file: f, p: mejor, pct: mejorPct, usar: mejorPct >= 55 };
+    return { file: f, p: mejor, pct: mejorPct, usar: mejorPct >= 55,
+             candidatos: candidatos };
   });
+  window._candidatosLote = candidatos;
   window._lotesPend = props;
   pintarEmparejadas();
 }
@@ -1186,19 +1211,31 @@ function pintarEmparejadas(){
     +   'Quita la marca de las que no cuadren. Las verdes casi seguro están bien.</div>'
     + '<div style="max-height:44vh;overflow:auto">';
 
+  var cand = window._candidatosLote || PRODS;
   L.forEach(function(x, i){
     var col = x.pct >= 75 ? '#0B7A3B' : (x.pct >= 45 ? '#E65100' : '#C62828');
-    h += '<div style="display:flex;align-items:center;gap:9px;padding:8px;'
+    h += '<div style="display:flex;align-items:center;gap:9px;padding:9px;'
       + 'border:1px solid #E5E6EE;border-left:4px solid ' + col + ';border-radius:9px;'
-      + 'margin-bottom:6px">'
+      + 'margin-bottom:7px">'
       + '<input type="checkbox" ' + (x.usar ? 'checked' : '') + ' style="width:19px;height:19px"'
       +   ' onchange="window._lotesPend[' + i + '].usar=this.checked">'
+      // 🔑 LA FOTO A LA VISTA: así sabe cuál es sin abrir nada
+      + '<div style="width:52px;height:52px;border-radius:8px;background:#EDEEF4;'
+      +   'flex-shrink:0;overflow:hidden" id="mini' + i + '"></div>'
       + '<div style="flex:1;min-width:0">'
-      +   '<div style="font-size:11px;color:#8A8B9E">' + esc(x.file.name.slice(0, 34)) + '</div>'
-      +   '<div style="font-size:12.5px;font-weight:800">'
-      +     (x.p ? esc(x.p.n.slice(0, 36)) : '(no encontré producto)') + '</div>'
+      +   '<div style="font-size:10px;color:#8A8B9E">' + esc(x.file.name.slice(0, 30)) + '</div>'
+      // 🔑 Y UN DESPLEGABLE con SOLO los de esa marca: lo cambia de un toque
+      +   '<select onchange="cambiarPareja(' + i + ', this.value)" '
+      +     'style="width:100%;padding:7px;border:1.5px solid ' + col + ';border-radius:7px;'
+      +     'font-size:12px;font-weight:700;margin-top:3px">'
+      +     '<option value="">— sin poner —</option>'
+      +     cand.map(function(p){
+              return '<option value="' + escaparAttr(String(p.id)) + '"'
+                + (x.p && String(x.p.id) === String(p.id) ? ' selected' : '') + '>'
+                + esc(p.n.slice(0, 42)) + '</option>';
+            }).join('')
+      +   '</select>'
       + '</div>'
-      + '<div style="font-size:12px;font-weight:900;color:' + col + '">' + x.pct + '%</div>'
       + '</div>';
   });
 
@@ -1210,6 +1247,33 @@ function pintarEmparejadas(){
     +   'background:#F0F0F6;color:#444;border:none;border-radius:10px;font-size:13px;'
     +   'font-weight:700;cursor:pointer">Cancelar</button>';
   document.getElementById('cajaLotes').innerHTML = h;
+  setTimeout(pintarMiniaturas, 40);
+}
+
+// 🔑 Cambiar a qué producto va una foto, de un toque. -12 sep-
+function cambiarPareja(i, id){
+  var x = window._lotesPend[i];
+  if(!x) return;
+  if(!id){ x.p = null; x.usar = false; return; }
+  var cand = window._candidatosLote || PRODS;
+  x.p = cand.find(function(p){ return String(p.id) === String(id); }) || null;
+  x.usar = !!x.p;
+}
+
+// Se pintan las miniaturas para que vea QUÉ foto es cada una
+function pintarMiniaturas(){
+  var L = window._lotesPend || [];
+  L.forEach(function(x, i){
+    var caja = document.getElementById('mini' + i);
+    if(!caja || caja.dataset.puesta) return;
+    caja.dataset.puesta = '1';
+    var lector = new FileReader();
+    lector.onload = function(e){
+      caja.innerHTML = '<img src="' + e.target.result + '" '
+        + 'style="width:100%;height:100%;object-fit:cover">';
+    };
+    lector.readAsDataURL(x.file);
+  });
 }
 
 function guardarEmparejadas(){
