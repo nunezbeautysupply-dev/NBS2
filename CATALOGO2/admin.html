@@ -171,6 +171,8 @@ Promise.all([
   document.getElementById('wa').value = AJUSTES.whatsapp;
   pintarChips();
   pintar();
+  // 🛟 ¿Hay fotos guardadas que no están en el archivo? Se avisa. -12 sep-
+  try { revisarFotosPerdidas(); } catch(e){ console.warn(e); }
 }).catch(function(e){
   document.getElementById('lista').innerHTML =
     '<div class="vacio">No pude cargar el catálogo.<br>' + esc(e.message) + '</div>';
@@ -577,6 +579,7 @@ function ponerFoto(ev){
       FOTOS[id] = data;
       if(!window._nuevo) PRODS[i].tf = true;
       else window._fotoNueva = data;
+      try { ponerFotosASalvo(); } catch(e){}   // 🛟 a salvo
       document.getElementById('prevFoto').innerHTML =
         '<img src="' + data + '" style="width:100%;height:100%;object-fit:cover">';
       CAMBIOS = true;
@@ -865,6 +868,112 @@ function limpiarFoto(dataUrl, listo, opciones){
   img.src = dataUrl;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  🛟 LA SALVAGUARDA DE LAS FOTOS  (12 sep 2026)
+//
+//  🔴 EL 12 SEP SENSEI PERDIÓ 263 FOTOS. Se pasó 15 minutos poniéndolas, tocó Guardar,
+//  y luego copió encima la carpeta CATALOGO2 de un zip mío —por una instrucción mía mal
+//  dada—. Los archivos suyos se pisaron con los míos, que solo traían 70.
+//
+//  🔑 A PARTIR DE AQUÍ NO PUEDE VOLVER A PASAR: cada foto que ponga se guarda TAMBIÉN
+//  en el navegador. Aunque pise los archivos, el administrador las ve y se las devuelve.
+// ═══════════════════════════════════════════════════════════════════
+
+var CLAVE_FOTOS_GUARDADAS = 'nbs_fotos_a_salvo';
+
+// Guarda las fotos en el navegador, aparte de los archivos
+function ponerFotosASalvo(){
+  try {
+    localStorage.setItem(CLAVE_FOTOS_GUARDADAS, JSON.stringify({
+      cuando: Date.now(),
+      fotos: FOTOS
+    }));
+    return true;
+  } catch(e){
+    // Si no caben, se avisa: más vale saberlo que creerse a salvo
+    console.warn('no pude guardar las fotos a salvo:', e);
+    return false;
+  }
+}
+
+function fotosASalvo(){
+  try {
+    var g = JSON.parse(localStorage.getItem(CLAVE_FOTOS_GUARDADAS) || 'null');
+    return (g && g.fotos) ? g : null;
+  } catch(e){ return null; }
+}
+
+/**
+ * 🛟 Al abrir el administrador: si hay más fotos guardadas que en el archivo, avisa.
+ * Eso es exactamente lo que le pasó a Sensei y nadie se lo dijo.
+ */
+function revisarFotosPerdidas(){
+  var g = fotosASalvo();
+  if(!g) return;
+  var guardadas = Object.keys(g.fotos || {}).length;
+  var enElArchivo = Object.keys(FOTOS || {}).length;
+  if(guardadas <= enElArchivo) return;      // todo en orden
+
+  var faltan = guardadas - enElArchivo;
+  var cuando = new Date(g.cuando || 0);
+  var fecha = isNaN(cuando) ? '' : (cuando.getDate() + '/' + (cuando.getMonth()+1)
+              + ' a las ' + String(cuando.getHours()).padStart(2,'0') + ':'
+              + String(cuando.getMinutes()).padStart(2,'0'));
+
+  var ov = document.createElement('div');
+  ov.id = 'ovRescate';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;'
+    + 'display:flex;align-items:center;justify-content:center;padding:15px';
+  ov.innerHTML = '<div style="background:#fff;border-radius:15px;padding:18px;'
+    + 'max-width:430px;width:100%">'
+    + '<div style="text-align:center;margin-bottom:13px">'
+    +   '<div style="font-size:36px">🛟</div>'
+    +   '<div style="font-size:17px;font-weight:900;color:#C62828">'
+    +     'TIENES FOTOS QUE NO ESTÁN EN EL ARCHIVO</div>'
+    + '</div>'
+    + '<div style="background:#FFEBEE;border-radius:11px;padding:13px;margin-bottom:13px;'
+    +   'font-size:13px;color:#C62828;line-height:1.6">'
+    +   'Guardadas en este navegador: <b>' + guardadas + '</b><br>'
+    +   'En el archivo del sitio: <b>' + enElArchivo + '</b><br><br>'
+    +   '🔑 Te faltan <b>' + faltan + '</b> fotos.'
+    +   (fecha ? '<br><span style="font-size:11.5px">Las pusiste el ' + fecha + '</span>' : '')
+    + '</div>'
+    + '<div style="font-size:12.5px;color:#555;line-height:1.6;margin-bottom:14px">'
+    +   'Esto pasa cuando se sube al sitio un archivo de fotos más viejo. '
+    +   'Tus fotos siguen aquí: puedes recuperarlas.</div>'
+    + '<button onclick="rescatarFotos()" style="width:100%;padding:15px;background:#0B7A3B;'
+    +   'color:#fff;border:none;border-radius:12px;font-size:15.5px;font-weight:900;'
+    +   'cursor:pointer">🛟 Recuperar mis ' + faltan + ' fotos</button>'
+    + '<button onclick="document.getElementById(\'ovRescate\').remove()" '
+    +   'style="width:100%;padding:12px;margin-top:8px;background:#F0F0F6;color:#555;'
+    +   'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">'
+    +   'Ahora no</button>'
+    + '</div>';
+  document.body.appendChild(ov);
+}
+
+function rescatarFotos(){
+  var g = fotosASalvo();
+  if(!g){ alert('No encontré fotos guardadas.'); return; }
+  var puestas = 0;
+  Object.keys(g.fotos).forEach(function(id){
+    if(!FOTOS[id]){
+      FOTOS[id] = g.fotos[id];
+      var p = PRODS.find(function(x){ return String(x.id) === String(id); });
+      if(p) p.tf = true;
+      puestas++;
+    }
+  });
+  CAMBIOS = true;
+  var ov = document.getElementById('ovRescate');
+  if(ov) ov.remove();
+  pintar();
+  alert('🛟 Se recuperaron ' + puestas + ' fotos.\n\n'
+    + 'Ahora toca 💾 Guardar cambios y sube los 4 archivos a GitHub\n'
+    + 'para que no se vuelvan a perder.');
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  📸 CARGA DE FOTOS POR LOTES  (11 sep 2026)
 //
@@ -1128,6 +1237,7 @@ function guardarEmparejadas(){
         FOTOS[x.p.id] = data;
         x.p.tf = true;
         hechas++;
+        try { ponerFotosASalvo(); } catch(e){}
         var v = document.getElementById('lotesVan');
         if(v) v.textContent = hechas;
       }
@@ -1240,6 +1350,7 @@ function guardarSeguida(ev){
       p.tf = true;
       window._seguidasHechas = (window._seguidasHechas || 0) + 1;
       CAMBIOS = true;
+      try { ponerFotosASalvo(); } catch(e){}   // 🛟 a salvo, por si se pisan los archivos
     }
     window._seguidasIdx++;
     pintarSeguidas();
