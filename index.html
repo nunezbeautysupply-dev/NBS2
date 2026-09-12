@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260911c-OFICIAL-V2.0">
+<meta name="app-version" content="20260911d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19107,7 +19107,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260911c';
+var NOVEDADES_VERSION = '20260911d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34662,6 +34662,20 @@ function configurarPantallaLogin(){
   document.getElementById('login-pass').addEventListener('keydown', function(e){
     if(e.key === 'Enter') intentarLogin();
   });
+
+  // \ud83d\udd11 Mientras la nube no llegue, el bot\u00f3n lo dice. As\u00ed no toca a ciegas. -11 sep-
+  var btn = document.querySelector('[onclick="intentarLogin()"]');
+  if(btn && typeof window._firebaseListo !== 'undefined' && !window._firebaseListo){
+    var textoOriginal = btn.textContent;
+    btn.textContent = 'Conectando\u2026';
+    btn.style.opacity = '.65';
+    if(typeof cuandoHayaFirebase === 'function'){
+      cuandoHayaFirebase(function(){
+        btn.textContent = textoOriginal || 'Entrar';
+        btn.style.opacity = '1';
+      });
+    }
+  }
   // \u26a1 Firebase ahora llega POR DETR\u00c1S, as\u00ed que se espera a que est\u00e9. Antes bloqueaba
   // el arranque y Sensei esperaba 4 segundos con un cliente delante. -11 sep-
   if(typeof cuandoHayaFirebase === 'function'){
@@ -34729,15 +34743,30 @@ function intentarLogin(){
     errorEl.textContent = 'No se pudo conectar. Revisa tu conexión a internet e intenta de nuevo.';
     errorEl.style.display = 'block';
   }, 12000);
-  fbAuth.signInWithEmailAndPassword(email, pass).then(function(){
-    clearTimeout(temporizador);
-  }).catch(function(e){
+  // \ud83d\udd11 Firebase llega por detr\u00e1s: si todav\u00eda no est\u00e1, se espera a que llegue en vez
+  // de reventar. Antes esto dejaba el "Entrando..." colgado para siempre. -11 sep-
+  function entrarDeVerdad(){
+    if(typeof fbAuth === 'undefined' || !fbAuth){
+      clearTimeout(temporizador);
+      document.getElementById('login-cargando').style.display = 'none';
+      errorEl.textContent = 'La nube no arranc\u00f3. Revisa tu internet y vuelve a intentar.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    fbAuth.signInWithEmailAndPassword(email, pass).then(function(){
+      clearTimeout(temporizador);
+    }).catch(function(e){
     clearTimeout(temporizador);
     if(seAgotoElTiempo) return; // ya se mostro el mensaje de tiempo agotado, no pisarlo
-    document.getElementById('login-cargando').style.display = 'none';
-    errorEl.textContent = 'Correo o contraseña incorrectos.';
-    errorEl.style.display = 'block';
-  });
+      document.getElementById('login-cargando').style.display = 'none';
+      errorEl.textContent = 'Correo o contrase\u00f1a incorrectos.';
+      errorEl.style.display = 'block';
+    });
+  }
+
+  // Si Firebase ya est\u00e1, entra ya. Si no, espera a que llegue.
+  if(typeof cuandoHayaFirebase === 'function') cuandoHayaFirebase(entrarDeVerdad);
+  else entrarDeVerdad();
 }
 
 // ═══════════════════════════════════════════════════════════════
