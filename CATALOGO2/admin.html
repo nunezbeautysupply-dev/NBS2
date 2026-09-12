@@ -95,7 +95,8 @@
 <body>
 
 <div class="cab">
-  <h1>🔧 ADMINISTRAR CATÁLOGO</h1>
+  <h1>🔧 ADMINISTRAR CATÁLOGO <span style="font-size:11px;background:rgba(255,255,255,.2);
+      padding:2px 7px;border-radius:9px;font-weight:800">v12/09E</span></h1>
   <div class="sub" id="cuenta">Cargando…</div>
 </div>
 
@@ -1206,7 +1207,8 @@ function emparejarFotos(ev){
       var pct = _parecido(f.name, (p.m || '') + ' ' + p.n);
       if(pct > mejorPct){ mejorPct = pct; mejor = p; }
     });
-    return { file: f, p: mejor, pct: mejorPct, usar: mejorPct >= 55,
+    // Vienen marcadas de entrada: la app ya eligió la mejor de cada producto
+    return { file: f, p: mejor, pct: mejorPct, usar: mejorPct >= 35,
              candidatos: candidatos };
   });
   window._candidatosLote = candidatos;
@@ -1215,6 +1217,28 @@ function emparejarFotos(ev){
   var sinPareja = props.filter(function(x){ return x.pct < 30; }).length;
   props = props.filter(function(x){ return x.pct >= 30; });
   window._lotesSinPareja = sinPareja;
+
+  // 🔑 UNA SOLA FOTO POR PRODUCTO. Las webs traen 4 o 5 imágenes del mismo bote —la
+  // del premio, la de estudio, la de la lata—. Él solo necesita una. Se queda la que
+  // mejor coincide; a igualdad, la más grande. -12 sep-
+  var porProducto = {};
+  props.forEach(function(x){
+    if(!x.p) return;
+    var k = String(x.p.id);
+    var hay = porProducto[k];
+    if(!hay){ porProducto[k] = x; return; }
+    // Gana la de mejor parecido; si empatan, la más pesada (suele ser la mejor)
+    if(x.pct > hay.pct || (x.pct === hay.pct && x.file.size > hay.file.size)){
+      porProducto[k] = x;
+    }
+  });
+  var elegidas = Object.keys(porProducto).map(function(k){ return porProducto[k]; });
+  var repetidas = props.length - elegidas.length;
+  window._lotesRepetidas = repetidas;
+
+  // Ordenadas por lo que más vende: lo importante primero
+  elegidas.sort(function(a, b){ return (b.p.v || 0) - (a.p.v || 0); });
+  props = elegidas;
   window._lotesPend = props;
 
   if(!props.length){
@@ -1237,13 +1261,14 @@ function pintarEmparejadas(){
   var llegaron = window._lotesLlegaron || L.length;
   var basura = window._lotesBasura || 0;
   var sinPareja = window._lotesSinPareja || 0;
+  var repetidas = window._lotesRepetidas || 0;
 
-  var h = '<h2>📁 ' + L.length + ' para revisar <button onclick="pintarCargaLotes()" '
+  var h = '<h2>📁 ' + L.length + ' productos <button onclick="pintarCargaLotes()" '
     +   'style="background:#F0F0F6;border:none;border-radius:8px;width:32px;height:32px;'
     +   'font-size:15px;cursor:pointer">✕</button></h2>'
 
     // 🔑 De dónde salió el número: que no desaparezcan fotos sin explicación
-    + ((basura || sinPareja)
+    + ((basura || sinPareja || repetidas)
         ? '<div style="background:#F4F6FB;border-radius:10px;padding:11px;margin-bottom:11px;'
           + 'font-size:12px;color:#555;line-height:1.7">'
           + 'Elegiste <b>' + llegaron + '</b> fotos. Descart\u00e9:<br>'
@@ -1251,7 +1276,9 @@ function pintarEmparejadas(){
                     + 'modelos, logos)<br>' : '')
           + (sinPareja ? '\u00b7 <b>' + sinPareja + '</b> que no se parecen a ning\u00fan '
                        + 'producto tuyo<br>' : '')
-          + '\ud83d\udd11 Te quedan <b>' + L.length + '</b> por revisar.</div>'
+          + (repetidas ? '\u00b7 <b>' + repetidas + '</b> repetidas del mismo producto '
+                       + '\u2014 me qued\u00e9 con la mejor<br>' : '')
+          + '\ud83d\udd11 Te quedan <b>' + L.length + '</b>, una por producto.</div>'
         : '')
 
     + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:12px">'
@@ -1262,8 +1289,16 @@ function pintarEmparejadas(){
     +     '<div style="font-size:19px;font-weight:900;color:#E65100">' + dudosos + '</div>'
     +     '<div style="font-size:9.5px;font-weight:800;color:#E65100">REVISAR</div></div>'
     + '</div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:9px">'
+    +   '<button onclick="marcarTodasLote(true)" style="flex:1;padding:10px;'
+    +     'background:#0B7A3B;color:#fff;border:none;border-radius:9px;font-size:12.5px;'
+    +     'font-weight:900;cursor:pointer">\u2713 Marcar todas</button>'
+    +   '<button onclick="marcarTodasLote(false)" style="flex:1;padding:10px;'
+    +     'background:#fff;color:#555;border:1.5px solid #ccc;border-radius:9px;'
+    +     'font-size:12.5px;font-weight:800;cursor:pointer">Quitar todas</button>'
+    + '</div>'
     + '<div style="font-size:11.5px;color:#555;margin-bottom:9px;line-height:1.5">'
-    +   'Mira la foto y elige el producto. Quita la marca de las que no quieras.</div>'
+    +   'Mira la foto y el producto. Quita la marca de las que no cuadren.</div>'
     + '<div style="max-height:44vh;overflow:auto">';
 
   var cand = window._candidatosLote || PRODS;
@@ -1303,6 +1338,12 @@ function pintarEmparejadas(){
     +   'font-weight:700;cursor:pointer">Cancelar</button>';
   document.getElementById('cajaLotes').innerHTML = h;
   setTimeout(pintarMiniaturas, 40);
+}
+
+// Marcar o desmarcar todas de golpe: si la app acertó, no hay que ir una por una.
+function marcarTodasLote(si){
+  (window._lotesPend || []).forEach(function(x){ x.usar = si && !!x.p; });
+  pintarEmparejadas();
 }
 
 // 🔑 Cambiar a qué producto va una foto, de un toque. -12 sep-
