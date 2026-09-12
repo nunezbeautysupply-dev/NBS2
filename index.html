@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260912a-OFICIAL-V2.0">
+<meta name="app-version" content="20260912b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -817,6 +817,7 @@ function cuandoHayaFirebase(fn){
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">📦 Catálogo de Productos</h2>
   <button onclick="abrirFotosRapido()" style="width:100%;padding:12px;margin-bottom:14px;background:#1a237e;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer">📸 Ponerle fotos a los productos</button>
   <button onclick="abrirTraerFotos()" style="width:100%;padding:12px;margin-bottom:14px;background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer">📥 Traer fotos del catálogo</button>
+  <label style="display:flex;align-items:center;gap:9px;background:#E7F6ED;border:1.5px solid #0B7A3B;border-radius:11px;padding:11px;margin-bottom:14px;cursor:pointer"><input type="checkbox" id="chk-limpiar-app" checked onchange="window._limpiarFotosApp=this.checked;localStorage.setItem('nbs_limpiar_fotos', this.checked?'1':'0')" style="width:20px;height:20px"><span><span style="display:block;font-size:13px;font-weight:900;color:#0B7A3B">✨ Limpiar las fotos solas</span><span style="display:block;font-size:11px;color:#2E7D32;line-height:1.45">Recorta el producto, lo centra, quita el fondo y las deja todas iguales</span></span></label>
   <div id="cat-lista-wrap">
     <div style="background:#E0F7FA;border-radius:10px;padding:12px;margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleMarcasDetalle()">
@@ -10181,6 +10182,16 @@ var _fotoRapidaLista = [], _fotoRapidaIdx = 0;
 //  exacto: no hay que adivinar nada.
 // ═══════════════════════════════════════════════════════════════════
 
+// \u2728 Se recuerda si Sensei apag\u00f3 el limpiador, para no tener que marcarlo cada vez.
+function arrancarLimpiadorFotos(){
+  try {
+    var g = localStorage.getItem('nbs_limpiar_fotos');
+    window._limpiarFotosApp = (g !== '0');
+    var chk = document.getElementById('chk-limpiar-app');
+    if(chk) chk.checked = window._limpiarFotosApp;
+  } catch(e){}
+}
+
 function abrirTraerFotos(){
   var ov = document.getElementById('traerfotos-overlay');
   if(!ov){
@@ -10384,19 +10395,27 @@ function guardarFotoRapida(ev){
   var p = _fotoRapidaLista[_fotoRapidaIdx];
   var lector = new FileReader();
   lector.onload = function(e){
-    // 🔑 El MISMO recortador que usa la ficha del producto: la foto sale igual de bien
-    abrirRecortarFoto(e.target.result, function(dataFinal){
-      if(!dataFinal){ return; }
-      loadProds();
-      var i = productos.findIndex(function(x){ return String(x.id) === String(p.id); });
-      if(i < 0){ saltarFotoRapida(); return; }
-      productos[i].foto = dataFinal;
-      productos[i].mod = Date.now();
-      if(!SS('np', productos)) return;
-      loadProds();
-      _fotoRapidaIdx++;
-      pintarFotoRapida();
-    });
+    // \u2728 Se limpia sola -recorta el producto, lo centra, quita el fondo- y luego pasa
+    // por el recortador de siempre, por si quiere ajustarla a mano. -12 sep-
+    var seguir = function(lista){
+      abrirRecortarFoto(lista, function(dataFinal){
+        if(!dataFinal){ return; }
+        loadProds();
+        var i = productos.findIndex(function(x){ return String(x.id) === String(p.id); });
+        if(i < 0){ saltarFotoRapida(); return; }
+        productos[i].foto = dataFinal;
+        productos[i].mod = Date.now();
+        if(!SS('np', productos)) return;
+        loadProds();
+        _fotoRapidaIdx++;
+        pintarFotoRapida();
+      });
+    };
+    if(window._limpiarFotosApp === false || typeof limpiarFoto !== 'function'){
+      seguir(e.target.result);
+    } else {
+      limpiarFoto(e.target.result, function(limpia){ seguir(limpia); }, { lado: 560 });
+    }
   };
   lector.readAsDataURL(f);
   ev.target.value = '';
@@ -10409,6 +10428,7 @@ function cerrarFotosRapido(){
 }
 
 function renderCatalogo(q){
+  try { arrancarLimpiadorFotos(); } catch(e){}
   loadProds();
 
   // Actualizar contador total y por marca
@@ -14053,6 +14073,26 @@ function leerBarcodeDeFoto(input){
   input.value = '';
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  ✨ LIMPIAR LAS FOTOS  (12 sep 2026)
+//
+//  Sensei: "una herramienta que recorte y limpie mis propias fotos automáticamente —
+//  que quite el fondo y las deje todas iguales, como de catálogo".
+//
+//  🔑 TODO PASA EN SU TELÉFONO/PC. No sube nada a ningún sitio, no depende de ningún
+//  servicio de pago, y funciona sin internet.
+//
+//  QUÉ HACE CON CADA FOTO:
+//    ① Busca dónde está el producto y recorta lo que sobra
+//    ② Lo centra en un cuadrado
+//    ③ Pone fondo blanco limpio
+//    ④ Sube un poco el contraste y el brillo
+//  Así todas quedan iguales, como de catálogo.
+// ═══════════════════════════════════════════════════════════════════
+
+// 🔑 Encuentra el producto: mira el color de las esquinas -que es el fondo- y busca
+// hasta dónde llega lo que NO se parece a ese color.
 function abrirEscanerSKU(){
   document.getElementById('ep-sku-foto').click();
 }
@@ -14121,6 +14161,141 @@ function cerrarEscanerSKU(){
 
 // Recortador de fotos reutilizable: muestra un cuadro donde se puede arrastrar y hacer zoom
 // antes de confirmar. Al confirmar, llama a onConfirmar(dataUrlRecortado).
+function _dondeEstaElProducto(datos, W, H){
+  function color(x, y){
+    var i = (y * W + x) * 4;
+    return [datos[i], datos[i+1], datos[i+2]];
+  }
+  // El fondo: el promedio de las cuatro esquinas
+  var esq = [color(2,2), color(W-3,2), color(2,H-3), color(W-3,H-3)];
+  var fr = 0, fg = 0, fb = 0;
+  esq.forEach(function(c){ fr += c[0]; fg += c[1]; fb += c[2]; });
+  fr /= 4; fg /= 4; fb /= 4;
+
+  var UMBRAL = 42;          // cuánto tiene que diferenciarse para contar como producto
+  var x1 = W, y1 = H, x2 = 0, y2 = 0, hallados = 0;
+  var salto = Math.max(1, Math.floor(Math.min(W, H) / 220));   // no hace falta mirar todo
+
+  for(var y = 0; y < H; y += salto){
+    for(var x = 0; x < W; x += salto){
+      var c = color(x, y);
+      var dif = Math.abs(c[0]-fr) + Math.abs(c[1]-fg) + Math.abs(c[2]-fb);
+      if(dif > UMBRAL){
+        hallados++;
+        if(x < x1) x1 = x;
+        if(x > x2) x2 = x;
+        if(y < y1) y1 = y;
+        if(y > y2) y2 = y;
+      }
+    }
+  }
+  // Si no encontró nada claro, se deja la foto entera
+  if(hallados < 40 || x2 <= x1 || y2 <= y1) return { x: 0, y: 0, w: W, h: H, seguro: false };
+  // Un margen alrededor, para no cortar al ras
+  var m = Math.round(Math.max(x2-x1, y2-y1) * 0.08);
+  x1 = Math.max(0, x1 - m); y1 = Math.max(0, y1 - m);
+  x2 = Math.min(W, x2 + m); y2 = Math.min(H, y2 + m);
+  return { x: x1, y: y1, w: x2-x1, h: y2-y1, seguro: true };
+}
+
+/**
+ * ✨ Limpia una foto: recorta, centra en cuadrado, fondo blanco y realce.
+ * Devuelve la imagen lista para guardar.
+ */
+function limpiarFoto(dataUrl, listo, opciones){
+  opciones = opciones || {};
+  var LADO = opciones.lado || 600;
+  var img = new Image();
+  img.onload = function(){
+    try {
+      // Se mira la foto a tamaño manejable, para que vaya rápido
+      var W = img.width, H = img.height;
+      var esc = Math.min(1, 700 / Math.max(W, H));
+      var aw = Math.round(W * esc), ah = Math.round(H * esc);
+      var c1 = document.createElement('canvas');
+      c1.width = aw; c1.height = ah;
+      var x1 = c1.getContext('2d', { willReadFrequently: true });
+      x1.drawImage(img, 0, 0, aw, ah);
+      var datos = x1.getImageData(0, 0, aw, ah).data;
+
+      var r = opciones.recortar === false
+        ? { x: 0, y: 0, w: aw, h: ah, seguro: false }
+        : _dondeEstaElProducto(datos, aw, ah);
+
+      // Se pasa el recorte a las medidas de la foto original
+      var rx = Math.round(r.x / esc), ry = Math.round(r.y / esc);
+      var rw = Math.round(r.w / esc), rh = Math.round(r.h / esc);
+
+      // El lienzo final: cuadrado y blanco
+      var c2 = document.createElement('canvas');
+      c2.width = LADO; c2.height = LADO;
+      var x2 = c2.getContext('2d');
+      x2.fillStyle = opciones.fondo || '#ffffff';
+      x2.fillRect(0, 0, LADO, LADO);
+
+      // El producto, centrado y sin deformar
+      var margen = Math.round(LADO * 0.06);
+      var cabe = LADO - margen * 2;
+      var f = Math.min(cabe / rw, cabe / rh);
+      var dw = Math.round(rw * f), dh = Math.round(rh * f);
+      var dx = Math.round((LADO - dw) / 2), dy = Math.round((LADO - dh) / 2);
+      x2.imageSmoothingQuality = 'high';
+      x2.drawImage(img, rx, ry, rw, rh, dx, dy, dw, dh);
+
+      // 🧹 QUITAR EL FONDO: lo que se parece al color de las esquinas se vuelve blanco.
+      // Así el producto queda sobre blanco limpio, no sobre el mostrador. -12 sep-
+      if(opciones.quitarFondo !== false){
+        var imf = x2.getImageData(0, 0, LADO, LADO);
+        var pf = imf.data;
+        // El color del fondo: las esquinas del recorte ya pegado
+        function px(xx, yy){ var i = (yy*LADO+xx)*4; return [pf[i],pf[i+1],pf[i+2]]; }
+        var muestras = [px(dx+3,dy+3), px(dx+dw-4,dy+3), px(dx+3,dy+dh-4), px(dx+dw-4,dy+dh-4),
+                        px(dx+Math.round(dw/2),dy+2), px(dx+2,dy+Math.round(dh/2))];
+        var fr2=0, fg2=0, fb2=0;
+        muestras.forEach(function(c){ fr2+=c[0]; fg2+=c[1]; fb2+=c[2]; });
+        fr2/=muestras.length; fg2/=muestras.length; fb2/=muestras.length;
+
+        // Solo si el fondo NO es ya casi blanco: si lo es, no hay nada que quitar
+        if(!(fr2 > 232 && fg2 > 232 && fb2 > 232)){
+          var TOL = 58;
+          for(var k = 0; k < pf.length; k += 4){
+            var dd = Math.abs(pf[k]-fr2) + Math.abs(pf[k+1]-fg2) + Math.abs(pf[k+2]-fb2);
+            if(dd < TOL){ pf[k] = 255; pf[k+1] = 255; pf[k+2] = 255; }
+            else if(dd < TOL * 1.9){
+              // Borde: se mezcla con blanco para que no quede recortado a cuchillo
+              var m2 = (dd - TOL) / (TOL * 0.9);
+              pf[k]   = Math.round(pf[k]   * m2 + 255 * (1-m2));
+              pf[k+1] = Math.round(pf[k+1] * m2 + 255 * (1-m2));
+              pf[k+2] = Math.round(pf[k+2] * m2 + 255 * (1-m2));
+            }
+          }
+          x2.putImageData(imf, 0, 0);
+        }
+      }
+
+      // ✨ Un poco de brillo y contraste, para que se vea de catálogo
+      if(opciones.realzar !== false){
+        var im2 = x2.getImageData(0, 0, LADO, LADO);
+        var p = im2.data;
+        var CONTRASTE = 1.14, BRILLO = 8;
+        for(var i = 0; i < p.length; i += 4){
+          p[i]   = Math.min(255, Math.max(0, (p[i]   - 128) * CONTRASTE + 128 + BRILLO));
+          p[i+1] = Math.min(255, Math.max(0, (p[i+1] - 128) * CONTRASTE + 128 + BRILLO));
+          p[i+2] = Math.min(255, Math.max(0, (p[i+2] - 128) * CONTRASTE + 128 + BRILLO));
+        }
+        x2.putImageData(im2, 0, 0);
+      }
+
+      listo(c2.toDataURL('image/jpeg', 0.82), r.seguro);
+    } catch(e){
+      console.warn('no pude limpiar la foto:', e);
+      listo(dataUrl, false);        // si algo falla, se deja la original
+    }
+  };
+  img.onerror = function(){ listo(dataUrl, false); };
+  img.src = dataUrl;
+}
+
 function abrirRecortarFoto(dataUrlOriginal, onConfirmar, salidaMaxCustom){
   var MAXW = 320, MAXH = 420; // tamano maximo del area donde se ve la foto completa en pantalla
   var SALIDA_MAX = salidaMaxCustom || 600; // resolucion maxima del lado mas largo de la imagen final -mas alta para facturas/recibos, donde hay que poder leer numeros chiquitos-
@@ -14490,7 +14665,14 @@ function abrirRecortarFoto(dataUrlOriginal, onConfirmar, salidaMaxCustom){
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
     var dataFinal = canvas.toDataURL('image/jpeg', 0.85);
     cerrar();
-    onConfirmar(dataFinal);
+    // \u2728 EL LIMPIADOR -12 sep-: recorta el producto, lo centra, quita el fondo y
+    // realza. Sensei lo quiso en los dos sitios, para que d\u00e9 igual d\u00f3nde haga la foto.
+    // Se puede apagar desde Cat\u00e1logo, con la casilla de limpiar.
+    if(window._limpiarFotosApp !== false && typeof limpiarFoto === 'function'){
+      limpiarFoto(dataFinal, function(limpia){ onConfirmar(limpia || dataFinal); }, { lado: 560 });
+    } else {
+      onConfirmar(dataFinal);
+    }
   };
 
   overlay.style.display = 'flex'; overlay.scrollTop = 0;
@@ -19125,7 +19307,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260912a';
+var NOVEDADES_VERSION = '20260912b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -41396,6 +41578,160 @@ var MOTIVOS_DEVOLUCION = [
   { id:'no_gusto',    texto:'\ud83d\ude41 No le gust\u00f3 al cliente' },
   { id:'otro',        texto:'\u2026 Otro motivo' }
 ];
+
+// ═══════════════════════════════════════════════════════════════════
+//  ✨ LIMPIAR LAS FOTOS  (12 sep 2026)
+//
+//  Sensei: "una herramienta que recorte y limpie mis propias fotos automáticamente —
+//  que quite el fondo y las deje todas iguales, como de catálogo".
+//
+//  🔑 TODO PASA EN SU TELÉFONO/PC. No sube nada a ningún sitio, no depende de ningún
+//  servicio de pago, y funciona sin internet.
+//
+//  QUÉ HACE CON CADA FOTO:
+//    ① Busca dónde está el producto y recorta lo que sobra
+//    ② Lo centra en un cuadrado
+//    ③ Pone fondo blanco limpio
+//    ④ Sube un poco el contraste y el brillo
+//  Así todas quedan iguales, como de catálogo.
+// ═══════════════════════════════════════════════════════════════════
+
+// 🔑 Encuentra el producto: mira el color de las esquinas -que es el fondo- y busca
+// hasta dónde llega lo que NO se parece a ese color.
+function _dondeEstaElProducto(datos, W, H){
+  function color(x, y){
+    var i = (y * W + x) * 4;
+    return [datos[i], datos[i+1], datos[i+2]];
+  }
+  // El fondo: el promedio de las cuatro esquinas
+  var esq = [color(2,2), color(W-3,2), color(2,H-3), color(W-3,H-3)];
+  var fr = 0, fg = 0, fb = 0;
+  esq.forEach(function(c){ fr += c[0]; fg += c[1]; fb += c[2]; });
+  fr /= 4; fg /= 4; fb /= 4;
+
+  var UMBRAL = 42;          // cuánto tiene que diferenciarse para contar como producto
+  var x1 = W, y1 = H, x2 = 0, y2 = 0, hallados = 0;
+  var salto = Math.max(1, Math.floor(Math.min(W, H) / 220));   // no hace falta mirar todo
+
+  for(var y = 0; y < H; y += salto){
+    for(var x = 0; x < W; x += salto){
+      var c = color(x, y);
+      var dif = Math.abs(c[0]-fr) + Math.abs(c[1]-fg) + Math.abs(c[2]-fb);
+      if(dif > UMBRAL){
+        hallados++;
+        if(x < x1) x1 = x;
+        if(x > x2) x2 = x;
+        if(y < y1) y1 = y;
+        if(y > y2) y2 = y;
+      }
+    }
+  }
+  // Si no encontró nada claro, se deja la foto entera
+  if(hallados < 40 || x2 <= x1 || y2 <= y1) return { x: 0, y: 0, w: W, h: H, seguro: false };
+  // Un margen alrededor, para no cortar al ras
+  var m = Math.round(Math.max(x2-x1, y2-y1) * 0.08);
+  x1 = Math.max(0, x1 - m); y1 = Math.max(0, y1 - m);
+  x2 = Math.min(W, x2 + m); y2 = Math.min(H, y2 + m);
+  return { x: x1, y: y1, w: x2-x1, h: y2-y1, seguro: true };
+}
+
+/**
+ * ✨ Limpia una foto: recorta, centra en cuadrado, fondo blanco y realce.
+ * Devuelve la imagen lista para guardar.
+ */
+function limpiarFoto(dataUrl, listo, opciones){
+  opciones = opciones || {};
+  var LADO = opciones.lado || 600;
+  var img = new Image();
+  img.onload = function(){
+    try {
+      // Se mira la foto a tamaño manejable, para que vaya rápido
+      var W = img.width, H = img.height;
+      var esc = Math.min(1, 700 / Math.max(W, H));
+      var aw = Math.round(W * esc), ah = Math.round(H * esc);
+      var c1 = document.createElement('canvas');
+      c1.width = aw; c1.height = ah;
+      var x1 = c1.getContext('2d', { willReadFrequently: true });
+      x1.drawImage(img, 0, 0, aw, ah);
+      var datos = x1.getImageData(0, 0, aw, ah).data;
+
+      var r = opciones.recortar === false
+        ? { x: 0, y: 0, w: aw, h: ah, seguro: false }
+        : _dondeEstaElProducto(datos, aw, ah);
+
+      // Se pasa el recorte a las medidas de la foto original
+      var rx = Math.round(r.x / esc), ry = Math.round(r.y / esc);
+      var rw = Math.round(r.w / esc), rh = Math.round(r.h / esc);
+
+      // El lienzo final: cuadrado y blanco
+      var c2 = document.createElement('canvas');
+      c2.width = LADO; c2.height = LADO;
+      var x2 = c2.getContext('2d');
+      x2.fillStyle = opciones.fondo || '#ffffff';
+      x2.fillRect(0, 0, LADO, LADO);
+
+      // El producto, centrado y sin deformar
+      var margen = Math.round(LADO * 0.06);
+      var cabe = LADO - margen * 2;
+      var f = Math.min(cabe / rw, cabe / rh);
+      var dw = Math.round(rw * f), dh = Math.round(rh * f);
+      var dx = Math.round((LADO - dw) / 2), dy = Math.round((LADO - dh) / 2);
+      x2.imageSmoothingQuality = 'high';
+      x2.drawImage(img, rx, ry, rw, rh, dx, dy, dw, dh);
+
+      // 🧹 QUITAR EL FONDO: lo que se parece al color de las esquinas se vuelve blanco.
+      // Así el producto queda sobre blanco limpio, no sobre el mostrador. -12 sep-
+      if(opciones.quitarFondo !== false){
+        var imf = x2.getImageData(0, 0, LADO, LADO);
+        var pf = imf.data;
+        // El color del fondo: las esquinas del recorte ya pegado
+        function px(xx, yy){ var i = (yy*LADO+xx)*4; return [pf[i],pf[i+1],pf[i+2]]; }
+        var muestras = [px(dx+3,dy+3), px(dx+dw-4,dy+3), px(dx+3,dy+dh-4), px(dx+dw-4,dy+dh-4),
+                        px(dx+Math.round(dw/2),dy+2), px(dx+2,dy+Math.round(dh/2))];
+        var fr2=0, fg2=0, fb2=0;
+        muestras.forEach(function(c){ fr2+=c[0]; fg2+=c[1]; fb2+=c[2]; });
+        fr2/=muestras.length; fg2/=muestras.length; fb2/=muestras.length;
+
+        // Solo si el fondo NO es ya casi blanco: si lo es, no hay nada que quitar
+        if(!(fr2 > 232 && fg2 > 232 && fb2 > 232)){
+          var TOL = 58;
+          for(var k = 0; k < pf.length; k += 4){
+            var dd = Math.abs(pf[k]-fr2) + Math.abs(pf[k+1]-fg2) + Math.abs(pf[k+2]-fb2);
+            if(dd < TOL){ pf[k] = 255; pf[k+1] = 255; pf[k+2] = 255; }
+            else if(dd < TOL * 1.9){
+              // Borde: se mezcla con blanco para que no quede recortado a cuchillo
+              var m2 = (dd - TOL) / (TOL * 0.9);
+              pf[k]   = Math.round(pf[k]   * m2 + 255 * (1-m2));
+              pf[k+1] = Math.round(pf[k+1] * m2 + 255 * (1-m2));
+              pf[k+2] = Math.round(pf[k+2] * m2 + 255 * (1-m2));
+            }
+          }
+          x2.putImageData(imf, 0, 0);
+        }
+      }
+
+      // ✨ Un poco de brillo y contraste, para que se vea de catálogo
+      if(opciones.realzar !== false){
+        var im2 = x2.getImageData(0, 0, LADO, LADO);
+        var p = im2.data;
+        var CONTRASTE = 1.14, BRILLO = 8;
+        for(var i = 0; i < p.length; i += 4){
+          p[i]   = Math.min(255, Math.max(0, (p[i]   - 128) * CONTRASTE + 128 + BRILLO));
+          p[i+1] = Math.min(255, Math.max(0, (p[i+1] - 128) * CONTRASTE + 128 + BRILLO));
+          p[i+2] = Math.min(255, Math.max(0, (p[i+2] - 128) * CONTRASTE + 128 + BRILLO));
+        }
+        x2.putImageData(im2, 0, 0);
+      }
+
+      listo(c2.toDataURL('image/jpeg', 0.82), r.seguro);
+    } catch(e){
+      console.warn('no pude limpiar la foto:', e);
+      listo(dataUrl, false);        // si algo falla, se deja la original
+    }
+  };
+  img.onerror = function(){ listo(dataUrl, false); };
+  img.src = dataUrl;
+}
 
 function textoDelMotivo(id){
   for(var i = 0; i < MOTIVOS_DEVOLUCION.length; i++){
