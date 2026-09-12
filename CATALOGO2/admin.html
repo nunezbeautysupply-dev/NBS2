@@ -710,6 +710,161 @@ function guardarTodo(){
 
 
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  ✨ LIMPIAR LAS FOTOS  (12 sep 2026)
+//
+//  Sensei: "una herramienta que recorte y limpie mis propias fotos automáticamente —
+//  que quite el fondo y las deje todas iguales, como de catálogo".
+//
+//  🔑 TODO PASA EN SU TELÉFONO/PC. No sube nada a ningún sitio, no depende de ningún
+//  servicio de pago, y funciona sin internet.
+//
+//  QUÉ HACE CON CADA FOTO:
+//    ① Busca dónde está el producto y recorta lo que sobra
+//    ② Lo centra en un cuadrado
+//    ③ Pone fondo blanco limpio
+//    ④ Sube un poco el contraste y el brillo
+//  Así todas quedan iguales, como de catálogo.
+// ═══════════════════════════════════════════════════════════════════
+
+// 🔑 Encuentra el producto: mira el color de las esquinas -que es el fondo- y busca
+// hasta dónde llega lo que NO se parece a ese color.
+function _dondeEstaElProducto(datos, W, H){
+  function color(x, y){
+    var i = (y * W + x) * 4;
+    return [datos[i], datos[i+1], datos[i+2]];
+  }
+  // El fondo: el promedio de las cuatro esquinas
+  var esq = [color(2,2), color(W-3,2), color(2,H-3), color(W-3,H-3)];
+  var fr = 0, fg = 0, fb = 0;
+  esq.forEach(function(c){ fr += c[0]; fg += c[1]; fb += c[2]; });
+  fr /= 4; fg /= 4; fb /= 4;
+
+  var UMBRAL = 42;          // cuánto tiene que diferenciarse para contar como producto
+  var x1 = W, y1 = H, x2 = 0, y2 = 0, hallados = 0;
+  var salto = Math.max(1, Math.floor(Math.min(W, H) / 220));   // no hace falta mirar todo
+
+  for(var y = 0; y < H; y += salto){
+    for(var x = 0; x < W; x += salto){
+      var c = color(x, y);
+      var dif = Math.abs(c[0]-fr) + Math.abs(c[1]-fg) + Math.abs(c[2]-fb);
+      if(dif > UMBRAL){
+        hallados++;
+        if(x < x1) x1 = x;
+        if(x > x2) x2 = x;
+        if(y < y1) y1 = y;
+        if(y > y2) y2 = y;
+      }
+    }
+  }
+  // Si no encontró nada claro, se deja la foto entera
+  if(hallados < 40 || x2 <= x1 || y2 <= y1) return { x: 0, y: 0, w: W, h: H, seguro: false };
+  // Un margen alrededor, para no cortar al ras
+  var m = Math.round(Math.max(x2-x1, y2-y1) * 0.08);
+  x1 = Math.max(0, x1 - m); y1 = Math.max(0, y1 - m);
+  x2 = Math.min(W, x2 + m); y2 = Math.min(H, y2 + m);
+  return { x: x1, y: y1, w: x2-x1, h: y2-y1, seguro: true };
+}
+
+/**
+ * ✨ Limpia una foto: recorta, centra en cuadrado, fondo blanco y realce.
+ * Devuelve la imagen lista para guardar.
+ */
+function limpiarFoto(dataUrl, listo, opciones){
+  opciones = opciones || {};
+  var LADO = opciones.lado || 600;
+  var img = new Image();
+  img.onload = function(){
+    try {
+      // Se mira la foto a tamaño manejable, para que vaya rápido
+      var W = img.width, H = img.height;
+      var esc = Math.min(1, 700 / Math.max(W, H));
+      var aw = Math.round(W * esc), ah = Math.round(H * esc);
+      var c1 = document.createElement('canvas');
+      c1.width = aw; c1.height = ah;
+      var x1 = c1.getContext('2d', { willReadFrequently: true });
+      x1.drawImage(img, 0, 0, aw, ah);
+      var datos = x1.getImageData(0, 0, aw, ah).data;
+
+      var r = opciones.recortar === false
+        ? { x: 0, y: 0, w: aw, h: ah, seguro: false }
+        : _dondeEstaElProducto(datos, aw, ah);
+
+      // Se pasa el recorte a las medidas de la foto original
+      var rx = Math.round(r.x / esc), ry = Math.round(r.y / esc);
+      var rw = Math.round(r.w / esc), rh = Math.round(r.h / esc);
+
+      // El lienzo final: cuadrado y blanco
+      var c2 = document.createElement('canvas');
+      c2.width = LADO; c2.height = LADO;
+      var x2 = c2.getContext('2d');
+      x2.fillStyle = opciones.fondo || '#ffffff';
+      x2.fillRect(0, 0, LADO, LADO);
+
+      // El producto, centrado y sin deformar
+      var margen = Math.round(LADO * 0.06);
+      var cabe = LADO - margen * 2;
+      var f = Math.min(cabe / rw, cabe / rh);
+      var dw = Math.round(rw * f), dh = Math.round(rh * f);
+      var dx = Math.round((LADO - dw) / 2), dy = Math.round((LADO - dh) / 2);
+      x2.imageSmoothingQuality = 'high';
+      x2.drawImage(img, rx, ry, rw, rh, dx, dy, dw, dh);
+
+      // 🧹 QUITAR EL FONDO: lo que se parece al color de las esquinas se vuelve blanco.
+      // Así el producto queda sobre blanco limpio, no sobre el mostrador. -12 sep-
+      if(opciones.quitarFondo !== false){
+        var imf = x2.getImageData(0, 0, LADO, LADO);
+        var pf = imf.data;
+        // El color del fondo: las esquinas del recorte ya pegado
+        function px(xx, yy){ var i = (yy*LADO+xx)*4; return [pf[i],pf[i+1],pf[i+2]]; }
+        var muestras = [px(dx+3,dy+3), px(dx+dw-4,dy+3), px(dx+3,dy+dh-4), px(dx+dw-4,dy+dh-4),
+                        px(dx+Math.round(dw/2),dy+2), px(dx+2,dy+Math.round(dh/2))];
+        var fr2=0, fg2=0, fb2=0;
+        muestras.forEach(function(c){ fr2+=c[0]; fg2+=c[1]; fb2+=c[2]; });
+        fr2/=muestras.length; fg2/=muestras.length; fb2/=muestras.length;
+
+        // Solo si el fondo NO es ya casi blanco: si lo es, no hay nada que quitar
+        if(!(fr2 > 232 && fg2 > 232 && fb2 > 232)){
+          var TOL = 58;
+          for(var k = 0; k < pf.length; k += 4){
+            var dd = Math.abs(pf[k]-fr2) + Math.abs(pf[k+1]-fg2) + Math.abs(pf[k+2]-fb2);
+            if(dd < TOL){ pf[k] = 255; pf[k+1] = 255; pf[k+2] = 255; }
+            else if(dd < TOL * 1.9){
+              // Borde: se mezcla con blanco para que no quede recortado a cuchillo
+              var m2 = (dd - TOL) / (TOL * 0.9);
+              pf[k]   = Math.round(pf[k]   * m2 + 255 * (1-m2));
+              pf[k+1] = Math.round(pf[k+1] * m2 + 255 * (1-m2));
+              pf[k+2] = Math.round(pf[k+2] * m2 + 255 * (1-m2));
+            }
+          }
+          x2.putImageData(imf, 0, 0);
+        }
+      }
+
+      // ✨ Un poco de brillo y contraste, para que se vea de catálogo
+      if(opciones.realzar !== false){
+        var im2 = x2.getImageData(0, 0, LADO, LADO);
+        var p = im2.data;
+        var CONTRASTE = 1.14, BRILLO = 8;
+        for(var i = 0; i < p.length; i += 4){
+          p[i]   = Math.min(255, Math.max(0, (p[i]   - 128) * CONTRASTE + 128 + BRILLO));
+          p[i+1] = Math.min(255, Math.max(0, (p[i+1] - 128) * CONTRASTE + 128 + BRILLO));
+          p[i+2] = Math.min(255, Math.max(0, (p[i+2] - 128) * CONTRASTE + 128 + BRILLO));
+        }
+        x2.putImageData(im2, 0, 0);
+      }
+
+      listo(c2.toDataURL('image/jpeg', 0.82), r.seguro);
+    } catch(e){
+      console.warn('no pude limpiar la foto:', e);
+      listo(dataUrl, false);        // si algo falla, se deja la original
+    }
+  };
+  img.onerror = function(){ listo(dataUrl, false); };
+  img.src = dataUrl;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  📸 CARGA DE FOTOS POR LOTES  (11 sep 2026)
 //
@@ -802,10 +957,23 @@ function pintarCargaLotes(){
   var h = '<h2>📸 Fotos por lotes <button onclick="cerrarLotes()" style="background:#F0F0F6;'
     +   'border:none;border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button></h2>'
 
-    + '<div style="background:#FFF8E1;border-radius:10px;padding:11px;margin-bottom:13px;'
+    + '<div style="background:#FFF8E1;border-radius:10px;padding:11px;margin-bottom:11px;'
     +   'font-size:12.5px;color:#6D4C00;line-height:1.55">'
     +   'Te faltan <b>' + sinFoto.length + '</b> fotos. Aquí las pones de golpe, '
     +   'no una por una.</div>'
+
+    // ✨ El limpiador automático
+    + '<label style="display:flex;align-items:center;gap:9px;background:#E7F6ED;'
+    +   'border:1.5px solid #0B7A3B;border-radius:10px;padding:11px;margin-bottom:13px;'
+    +   'cursor:pointer">'
+    +   '<input type="checkbox" id="chkLimpiar" '
+    +     (window._limpiarFotos === false ? '' : 'checked')
+    +     ' onchange="window._limpiarFotos=this.checked" style="width:20px;height:20px">'
+    +   '<div><div style="font-size:13px;font-weight:900;color:#0B7A3B">'
+    +     '✨ Limpiar las fotos solas</div>'
+    +     '<div style="font-size:11px;color:#2E7D32;line-height:1.45">'
+    +     'Recorta el producto, lo centra, quita el fondo y las deja todas '
+    +     'iguales, como de catálogo.</div></div></label>'
 
     // ═══ ① DE GOLPE, POR NOMBRE ═══
     + '<div style="border:2px solid #0B7A3B;border-radius:12px;padding:13px;margin-bottom:11px">'
@@ -969,22 +1137,28 @@ function guardarEmparejadas(){
   siguiente(0);
 }
 
-// Achica la foto para que no pese: lo mismo que hace el editor de uno en uno
+// ✨ Achica Y LIMPIA la foto: recorta, centra en cuadrado, quita el fondo y realza.
+// Así todas quedan iguales, como de catálogo, sin que Sensei toque nada. -12 sep-
 function achicarFoto(file, listo){
   var lector = new FileReader();
   lector.onload = function(e){
-    var img = new Image();
-    img.onload = function(){
-      var max = 520, w = img.width, h = img.height;
-      if(w > h && w > max){ h = Math.round(h * max / w); w = max; }
-      else if(h > max){ w = Math.round(w * max / h); h = max; }
-      var c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      c.getContext('2d').drawImage(img, 0, 0, w, h);
-      listo(c.toDataURL('image/jpeg', 0.72));
-    };
-    img.onerror = function(){ listo(null); };
-    img.src = e.target.result;
+    if(window._limpiarFotos === false){
+      // Sin limpiar: solo achicar
+      var img = new Image();
+      img.onload = function(){
+        var max = 520, w = img.width, h = img.height;
+        if(w > h && w > max){ h = Math.round(h * max / w); w = max; }
+        else if(h > max){ w = Math.round(w * max / h); h = max; }
+        var c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        listo(c.toDataURL('image/jpeg', 0.72));
+      };
+      img.onerror = function(){ listo(null); };
+      img.src = e.target.result;
+      return;
+    }
+    limpiarFoto(e.target.result, function(limpia){ listo(limpia); }, { lado: 560 });
   };
   lector.onerror = function(){ listo(null); };
   lector.readAsDataURL(file);
