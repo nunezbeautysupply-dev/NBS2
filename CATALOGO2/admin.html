@@ -120,10 +120,12 @@
 <div class="pie">
   <button class="add" onclick="abrirNuevo()">➕ Producto</button>
   <button class="add" onclick="abrirCombos()" style="border-color:#6A1B9A;color:#6A1B9A">📦 Packs</button>
+  <button class="add" onclick="abrirCargaLotes()" style="border-color:#0B7A3B;color:#0B7A3B">📸 Fotos</button>
   <button class="save" onclick="guardarTodo()">💾 Guardar</button>
 </div>
 
 <div class="ov" id="ovCombos"><div class="caja" id="cajaCombos" style="max-width:460px"></div></div>
+<div class="ov" id="ovLotes"><div class="caja" id="cajaLotes" style="max-width:460px"></div></div>
 
 <div class="ov" id="ovEdit"><div class="caja" id="cajaEdit"></div></div>
 
@@ -706,6 +708,332 @@ function guardarTodo(){
   }, 500 * (trozos + 1) + 400);
 }
 
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  📸 CARGA DE FOTOS POR LOTES  (11 sep 2026)
+//
+//  Sensei: "hay alguna forma de que yo pueda ponerle fotos a los productos sin tener
+//  que hacerlo uno por uno porque es mucho trabajo".
+//
+//  🔑 DOS FORMAS:
+//    ① POR NOMBRE — suelta muchas fotos de golpe y la app las empareja sola con el
+//       producto que más se le parezca. Las que baja de magnussupply ya vienen con el
+//       nombre puesto, así que no escribe nada.
+//    ② CON EL MÓVIL — le va pasando los productos uno por uno, y él solo dispara.
+//
+//  Le faltan 263 fotos. Una por una sería una tarde entera.
+// ═══════════════════════════════════════════════════════════════════
+
+function abrirCargaLotes(){
+  window._lotesMarca = '';
+  pintarCargaLotes();
+  document.getElementById('ovLotes').classList.add('on');
+}
+function cerrarLotes(){
+  document.getElementById('ovLotes').classList.remove('on');
+  window._lotesPend = null;
+}
+
+// Quita tildes, marcas y palabras de relleno: así "Level3 Guante mediano negro" y
+// "level3-guante-mediano-negro.jpg" se reconocen como lo mismo.
+function _limpiar(t){
+  return String(t || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\.(jpe?g|png|webp|gif|heic)$/i, '')
+    .replace(/[_\-\.]+/g, ' ')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// 🔑 Cuánto se parecen dos nombres, de 0 a 100. Cuenta las palabras que comparten,
+// dando más peso a las largas —"keratin" dice más que "de"—.
+function _parecido(a, b){
+  var pa = _limpiar(a).split(' ').filter(function(x){ return x.length > 1; });
+  var pb = _limpiar(b).split(' ').filter(function(x){ return x.length > 1; });
+  if(!pa.length || !pb.length) return 0;
+  var peso = 0, total = 0;
+  pa.forEach(function(w){
+    var v = w.length >= 5 ? 3 : (w.length >= 3 ? 2 : 1);
+    total += v;
+    if(pb.indexOf(w) >= 0) peso += v;
+    else if(pb.some(function(x){ return x.indexOf(w) === 0 || w.indexOf(x) === 0; })) peso += v * 0.6;
+  });
+  return Math.round(peso / total * 100);
+}
+
+function pintarCargaLotes(){
+  loadProdsLotes();
+  var sinFoto = PRODS.filter(function(p){ return !p.tf; });
+  var marcas = {};
+  sinFoto.forEach(function(p){
+    var m = (p.m || 'Sin marca');
+    marcas[m] = (marcas[m] || 0) + 1;
+  });
+  var orden = Object.keys(marcas).sort(function(a, b){ return marcas[b] - marcas[a]; });
+
+  var h = '<h2>📸 Fotos por lotes <button onclick="cerrarLotes()" style="background:#F0F0F6;'
+    +   'border:none;border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button></h2>'
+
+    + '<div style="background:#FFF8E1;border-radius:10px;padding:11px;margin-bottom:13px;'
+    +   'font-size:12.5px;color:#6D4C00;line-height:1.55">'
+    +   'Te faltan <b>' + sinFoto.length + '</b> fotos. Aquí las pones de golpe, '
+    +   'no una por una.</div>'
+
+    // ═══ ① DE GOLPE, POR NOMBRE ═══
+    + '<div style="border:2px solid #0B7A3B;border-radius:12px;padding:13px;margin-bottom:11px">'
+    +   '<div style="font-size:14.5px;font-weight:900;color:#0B7A3B;margin-bottom:6px">'
+    +     '📁 1. Sueltas muchas fotos de golpe</div>'
+    +   '<div style="font-size:12px;color:#555;line-height:1.55;margin-bottom:10px">'
+    +     'Si bajas las fotos de <b>magnussupply.com</b> o <b>vipbarbersupply.com</b>, '
+    +     'ya vienen con el nombre del producto puesto.<br>'
+    +     'Las eliges todas y la app las empareja sola.</div>'
+    +   '<input type="file" accept="image/*" multiple id="lotesArch" style="display:none" '
+    +     'onchange="emparejarFotos(event)">'
+    +   '<button onclick="document.getElementById(\'lotesArch\').click()" '
+    +     'style="width:100%;padding:14px;background:#0B7A3B;color:#fff;border:none;'
+    +     'border-radius:11px;font-size:14.5px;font-weight:900;cursor:pointer">'
+    +     '📁 Elegir muchas fotos</button>'
+    + '</div>'
+
+    // ═══ ② CON EL MÓVIL, UNA DETRÁS DE OTRA ═══
+    + '<div style="border:2px solid #1a237e;border-radius:12px;padding:13px">'
+    +   '<div style="font-size:14.5px;font-weight:900;color:#1a237e;margin-bottom:6px">'
+    +     '📷 2. Con la cámara, seguidas</div>'
+    +   '<div style="font-size:12px;color:#555;line-height:1.55;margin-bottom:10px">'
+    +     'La app te va diciendo qué producto toca. Tú solo apuntas y disparas — '
+    +     'no escribes nada.</div>'
+    +   '<div style="font-size:10.5px;font-weight:800;color:#555;margin-bottom:4px">'
+    +     'EMPEZAR POR:</div>'
+    +   '<select id="lotesMarca" style="width:100%;padding:10px;border:1.5px solid #ccc;'
+    +     'border-radius:9px;font-size:13.5px;font-weight:700;margin-bottom:9px">'
+    +     '<option value="">Los que más vendo (todos)</option>'
+    +     orden.map(function(m){
+            return '<option value="' + escaparAttr(m) + '">' + esc(m) + ' — '
+              + marcas[m] + ' sin foto</option>';
+          }).join('')
+    +   '</select>'
+    +   '<button onclick="empezarSeguidas()" style="width:100%;padding:14px;'
+    +     'background:#1a237e;color:#fff;border:none;border-radius:11px;font-size:14.5px;'
+    +     'font-weight:900;cursor:pointer">📷 Empezar</button>'
+    + '</div>'
+
+    + '<button onclick="cerrarLotes()" style="width:100%;padding:12px;margin-top:11px;'
+    +   'background:#F0F0F6;color:#444;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Cerrar</button>';
+  document.getElementById('cajaLotes').innerHTML = h;
+}
+
+function escaparAttr(t){ return String(t||'').replace(/"/g, '&quot;'); }
+function loadProdsLotes(){ /* PRODS ya está cargado en el admin */ }
+
+// ═══ ① EMPAREJAR POR NOMBRE ═══
+function emparejarFotos(ev){
+  var files = Array.prototype.slice.call(ev.target.files || []);
+  if(!files.length) return;
+  ev.target.value = '';
+
+  // Se busca a qué producto se parece más cada foto
+  var props = files.map(function(f){
+    var mejor = null, mejorPct = 0;
+    PRODS.forEach(function(p){
+      var pct = _parecido(f.name, (p.m || '') + ' ' + p.n);
+      if(pct > mejorPct){ mejorPct = pct; mejor = p; }
+    });
+    return { file: f, p: mejor, pct: mejorPct, usar: mejorPct >= 55 };
+  });
+  window._lotesPend = props;
+  pintarEmparejadas();
+}
+
+function pintarEmparejadas(){
+  var L = window._lotesPend || [];
+  var seguros = L.filter(function(x){ return x.pct >= 75; }).length;
+  var dudosos = L.filter(function(x){ return x.pct >= 45 && x.pct < 75; }).length;
+  var perdidos = L.filter(function(x){ return x.pct < 45; }).length;
+
+  var h = '<h2>📁 ' + L.length + ' fotos <button onclick="pintarCargaLotes()" '
+    +   'style="background:#F0F0F6;border:none;border-radius:8px;width:32px;height:32px;'
+    +   'font-size:15px;cursor:pointer">✕</button></h2>'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">'
+    +   '<div style="background:#E7F6ED;border-radius:9px;padding:9px;text-align:center">'
+    +     '<div style="font-size:19px;font-weight:900;color:#0B7A3B">' + seguros + '</div>'
+    +     '<div style="font-size:9.5px;font-weight:800;color:#0B7A3B">SEGURAS</div></div>'
+    +   '<div style="background:#FFF3E0;border-radius:9px;padding:9px;text-align:center">'
+    +     '<div style="font-size:19px;font-weight:900;color:#E65100">' + dudosos + '</div>'
+    +     '<div style="font-size:9.5px;font-weight:800;color:#E65100">REVISAR</div></div>'
+    +   '<div style="background:#FFEBEE;border-radius:9px;padding:9px;text-align:center">'
+    +     '<div style="font-size:19px;font-weight:900;color:#C62828">' + perdidos + '</div>'
+    +     '<div style="font-size:9.5px;font-weight:800;color:#C62828">SIN PAREJA</div></div>'
+    + '</div>'
+    + '<div style="font-size:11.5px;color:#555;margin-bottom:9px;line-height:1.5">'
+    +   'Quita la marca de las que no cuadren. Las verdes casi seguro están bien.</div>'
+    + '<div style="max-height:44vh;overflow:auto">';
+
+  L.forEach(function(x, i){
+    var col = x.pct >= 75 ? '#0B7A3B' : (x.pct >= 45 ? '#E65100' : '#C62828');
+    h += '<div style="display:flex;align-items:center;gap:9px;padding:8px;'
+      + 'border:1px solid #E5E6EE;border-left:4px solid ' + col + ';border-radius:9px;'
+      + 'margin-bottom:6px">'
+      + '<input type="checkbox" ' + (x.usar ? 'checked' : '') + ' style="width:19px;height:19px"'
+      +   ' onchange="window._lotesPend[' + i + '].usar=this.checked">'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:11px;color:#8A8B9E">' + esc(x.file.name.slice(0, 34)) + '</div>'
+      +   '<div style="font-size:12.5px;font-weight:800">'
+      +     (x.p ? esc(x.p.n.slice(0, 36)) : '(no encontré producto)') + '</div>'
+      + '</div>'
+      + '<div style="font-size:12px;font-weight:900;color:' + col + '">' + x.pct + '%</div>'
+      + '</div>';
+  });
+
+  h += '</div>'
+    + '<button onclick="guardarEmparejadas()" style="width:100%;padding:14px;margin-top:11px;'
+    +   'background:#0B7A3B;color:#fff;border:none;border-radius:11px;font-size:15px;'
+    +   'font-weight:900;cursor:pointer">✓ Poner las marcadas</button>'
+    + '<button onclick="pintarCargaLotes()" style="width:100%;padding:12px;margin-top:7px;'
+    +   'background:#F0F0F6;color:#444;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Cancelar</button>';
+  document.getElementById('cajaLotes').innerHTML = h;
+}
+
+function guardarEmparejadas(){
+  var L = (window._lotesPend || []).filter(function(x){ return x.usar && x.p; });
+  if(!L.length){ alert('No marcaste ninguna.'); return; }
+  var hechas = 0;
+  document.getElementById('cajaLotes').innerHTML =
+      '<h2>📁 Guardando…</h2>'
+    + '<div style="text-align:center;padding:22px">'
+    +   '<div id="lotesVan" style="font-size:32px;font-weight:900;color:#0B7A3B">0</div>'
+    +   '<div style="font-size:13px;color:#555">de ' + L.length + '</div></div>';
+
+  function siguiente(i){
+    if(i >= L.length){
+      CAMBIOS = true;
+      pintar();
+      alert('✅ Se pusieron ' + hechas + ' fotos.\n\n'
+        + 'Ahora toca 💾 Guardar cambios y sube los archivos.');
+      cerrarLotes();
+      return;
+    }
+    var x = L[i];
+    achicarFoto(x.file, function(data){
+      if(data){
+        FOTOS[x.p.id] = data;
+        x.p.tf = true;
+        hechas++;
+        var v = document.getElementById('lotesVan');
+        if(v) v.textContent = hechas;
+      }
+      siguiente(i + 1);
+    });
+  }
+  siguiente(0);
+}
+
+// Achica la foto para que no pese: lo mismo que hace el editor de uno en uno
+function achicarFoto(file, listo){
+  var lector = new FileReader();
+  lector.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var max = 520, w = img.width, h = img.height;
+      if(w > h && w > max){ h = Math.round(h * max / w); w = max; }
+      else if(h > max){ w = Math.round(w * max / h); h = max; }
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      listo(c.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = function(){ listo(null); };
+    img.src = e.target.result;
+  };
+  lector.onerror = function(){ listo(null); };
+  lector.readAsDataURL(file);
+}
+
+// ═══ ② CON LA CÁMARA, SEGUIDAS ═══
+function empezarSeguidas(){
+  var marca = document.getElementById('lotesMarca').value;
+  var lista = PRODS.filter(function(p){
+    if(p.tf) return false;
+    if(!marca) return true;
+    return (p.m || 'Sin marca') === marca;
+  }).sort(function(a, b){ return (b.v || 0) - (a.v || 0); });   // el que más vende primero
+
+  if(!lista.length){ alert('Todos los de ahí ya tienen foto 🎉'); return; }
+  window._seguidas = lista;
+  window._seguidasIdx = 0;
+  window._seguidasHechas = 0;
+  pintarSeguidas();
+}
+
+function pintarSeguidas(){
+  var L = window._seguidas || [];
+  var i = window._seguidasIdx || 0;
+  if(i >= L.length){
+    document.getElementById('cajaLotes').innerHTML =
+        '<div style="text-align:center;padding:26px">'
+      + '<div style="font-size:40px">🎉</div>'
+      + '<div style="font-size:17px;font-weight:900;margin:9px 0">¡Terminaste!</div>'
+      + '<div style="font-size:13.5px;color:#555">Pusiste ' + (window._seguidasHechas || 0)
+      +   ' fotos</div>'
+      + '<button onclick="cerrarLotes()" style="width:100%;padding:14px;margin-top:16px;'
+      +   'background:#1a237e;color:#fff;border:none;border-radius:11px;font-size:14px;'
+      +   'font-weight:900;cursor:pointer">Cerrar</button></div>';
+    CAMBIOS = true;
+    pintar();
+    return;
+  }
+  var p = L[i];
+  document.getElementById('cajaLotes').innerHTML =
+      '<h2>📷 Foto ' + (i + 1) + ' de ' + L.length
+    +   ' <button onclick="pintarCargaLotes()" style="background:#F0F0F6;border:none;'
+    +   'border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button></h2>'
+
+    + '<div style="background:#E8F5E9;border-radius:9px;padding:8px;text-align:center;'
+    +   'margin-bottom:11px;font-size:11.5px;font-weight:800;color:#2E7D32">'
+    +   'LLEVAS ' + (window._seguidasHechas || 0) + ' · TE QUEDAN ' + (L.length - i) + '</div>'
+
+    + '<div style="background:#FFF8E1;border:1.5px solid #FFD54F;border-radius:11px;'
+    +   'padding:14px;margin-bottom:12px">'
+    +   '<div style="font-size:16px;font-weight:900;line-height:1.3">' + esc(p.n) + '</div>'
+    +   (p.m ? '<div style="font-size:12.5px;color:#7A5C00;font-weight:700;margin-top:3px">'
+             + esc(p.m) + '</div>' : '')
+    +   (p.v > 0 ? '<div style="font-size:11.5px;color:#2E7D32;font-weight:800;margin-top:5px">'
+               + '🔥 has vendido ' + p.v + ' de este</div>' : '')
+    + '</div>'
+
+    + '<input type="file" accept="image/*" capture="environment" id="segArch" '
+    +   'style="display:none" onchange="guardarSeguida(event)">'
+    + '<button onclick="document.getElementById(\'segArch\').click()" '
+    +   'style="width:100%;padding:16px;background:#1a237e;color:#fff;border:none;'
+    +   'border-radius:12px;font-size:16px;font-weight:900;cursor:pointer">'
+    +   '📷 Tomar la foto</button>'
+    + '<button onclick="saltarSeguida()" style="width:100%;padding:12px;margin-top:8px;'
+    +   'background:#fff;color:#555;border:1.5px solid #ccc;border-radius:10px;'
+    +   'font-size:13.5px;font-weight:700;cursor:pointer">⏭️ Saltar este</button>';
+}
+
+function saltarSeguida(){ window._seguidasIdx++; pintarSeguidas(); }
+
+function guardarSeguida(ev){
+  var f = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if(!f) return;
+  var p = window._seguidas[window._seguidasIdx];
+  achicarFoto(f, function(data){
+    if(data){
+      FOTOS[p.id] = data;
+      p.tf = true;
+      window._seguidasHechas = (window._seguidasHechas || 0) + 1;
+      CAMBIOS = true;
+    }
+    window._seguidasIdx++;
+    pintarSeguidas();
+  });
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  📦 LOS PACKS (COMBOS)  (11 sep 2026)
