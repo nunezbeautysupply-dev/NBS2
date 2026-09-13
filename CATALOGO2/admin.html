@@ -96,7 +96,7 @@
 
 <div class="cab">
   <h1>🔧 ADMINISTRAR CATÁLOGO <span style="font-size:11px;background:rgba(255,255,255,.2);
-      padding:2px 7px;border-radius:9px;font-weight:800">v12/09E</span></h1>
+      padding:2px 7px;border-radius:9px;font-weight:800">v12/09F</span></h1>
   <div class="sub" id="cuenta">Cargando…</div>
 </div>
 
@@ -1030,6 +1030,33 @@ function cerrarLotes(){
   window._lotesPend = null;
 }
 
+// 🔑 INGLÉS → ESPAÑOL. Las webs nombran los archivos en inglés y Sensei pone los
+// nombres en español. Sin esto, "neck_paper.jpg" no encuentra "Papel cuello". -12 sep-
+var _TRADUCE = {
+  'paper':'papel', 'neck':'cuello', 'glove':'guante', 'gloves':'guante',
+  'blade':'navaja', 'blades':'navaja', 'razor':'navaja', 'shave':'afeitar',
+  'shaving':'afeitar', 'gel':'gel', 'hair':'pelo', 'cream':'crema', 'wax':'wax',
+  'pomade':'pomada', 'powder':'polvo', 'spray':'spray', 'oil':'aceite',
+  'beard':'barba', 'cologne':'colonia', 'perfume':'colonia', 'aftershave':'aftershave',
+  'black':'negro', 'white':'blanco', 'red':'rojo', 'blue':'azul', 'green':'verde',
+  'gold':'oro', 'silver':'plata', 'purple':'morada', 'clear':'clear',
+  'small':'pequeno', 'medium':'mediano', 'large':'large', 'big':'gde',
+  'brush':'cepillo', 'comb':'peine', 'cape':'capa', 'towel':'toalla',
+  'clipper':'maquina', 'trimmer':'maquina', 'machine':'maquina',
+  'talc':'talco', 'mask':'mascarilla', 'shampoo':'shampoo', 'conditioner':'acondicionador',
+  'sheen':'brillo', 'shine':'brillo', 'styling':'styling', 'holder':'porta',
+  'disposable':'desechable', 'nitrile':'nitrilo', 'professional':'professional'
+};
+
+function _traducir(palabras){
+  var out = [];
+  palabras.forEach(function(w){
+    out.push(w);
+    if(_TRADUCE[w] && _TRADUCE[w] !== w) out.push(_TRADUCE[w]);
+  });
+  return out;
+}
+
 // Quita tildes, marcas y palabras de relleno: así "Level3 Guante mediano negro" y
 // "level3-guante-mediano-negro.jpg" se reconocen como lo mismo.
 function _limpiar(t){
@@ -1046,8 +1073,9 @@ function _limpiar(t){
 // 🔑 Cuánto se parecen dos nombres, de 0 a 100. Cuenta las palabras que comparten,
 // dando más peso a las largas —"keratin" dice más que "de"—.
 function _parecido(a, b){
-  var pa = _limpiar(a).split(' ').filter(function(x){ return x.length > 1; });
-  var pb = _limpiar(b).split(' ').filter(function(x){ return x.length > 1; });
+  // 🔑 Se traducen las palabras del nombre del archivo, que viene en inglés
+  var pa = _traducir(_limpiar(a).split(' ').filter(function(x){ return x.length > 1; }));
+  var pb = _traducir(_limpiar(b).split(' ').filter(function(x){ return x.length > 1; }));
   if(!pa.length || !pb.length) return 0;
   var peso = 0, total = 0;
   pa.forEach(function(w){
@@ -1225,14 +1253,26 @@ function emparejarFotos(ev){
   props.forEach(function(x){
     if(!x.p) return;
     var k = String(x.p.id);
-    var hay = porProducto[k];
-    if(!hay){ porProducto[k] = x; return; }
-    // Gana la de mejor parecido; si empatan, la más pesada (suele ser la mejor)
-    if(x.pct > hay.pct || (x.pct === hay.pct && x.file.size > hay.file.size)){
-      porProducto[k] = x;
-    }
+    if(!porProducto[k]) porProducto[k] = [];
+    porProducto[k].push(x);
   });
-  var elegidas = Object.keys(porProducto).map(function(k){ return porProducto[k]; });
+  var elegidas = [];
+  Object.keys(porProducto).forEach(function(k){
+    var grupo = porProducto[k];
+    if(grupo.length === 1){ elegidas.push(grupo[0]); return; }
+    // 🔑 Solo se descarta si los NOMBRES DE ARCHIVO se parecen mucho entre sí: eso
+    // significa que son del mismo bote. Si son distintos, se enseñan TODAS y él
+    // decide — más vale que elija a que se pierdan fotos buenas. -12 sep-
+    grupo.sort(function(a, b){
+      if(b.pct !== a.pct) return b.pct - a.pct;
+      return b.file.size - a.file.size;
+    });
+    var mejor = grupo[0];
+    elegidas.push(mejor);
+    grupo.slice(1).forEach(function(x){
+      if(_parecido(x.file.name, mejor.file.name) < 70) elegidas.push(x);
+    });
+  });
   var repetidas = props.length - elegidas.length;
   window._lotesRepetidas = repetidas;
 
