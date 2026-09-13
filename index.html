@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260912b-OFICIAL-V2.0">
+<meta name="app-version" content="20260912e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19313,7 +19313,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260912b';
+var NOVEDADES_VERSION = '20260912e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -29429,13 +29429,15 @@ function textoParaCliente(cid, tipo, monto, detalleFacturas){
 
   var t = [];
   t.push('*NUNEZ BEAUTY SUPPLY*');
+  t.push('_Tu proveedor de confianza_');
   t.push('');
-  t.push('Hola Sr. ' + (c.nombre || nombreCl(c)) + ' 👋');
+  t.push('Buenas, Sr. ' + (c.nombre || nombreCl(c)) + ' \ud83d\udc4b');
   t.push('');
 
   if(tipo === 'pago'){
-    t.push('✅ Recibí tu pago de *$' + fmtNum(monto) + '*');
-    t.push('📅 ' + fechaHoy() + ' · ' + horaAhora());
+    t.push('Le confirmo su pago:');
+    t.push('');
+    t.push('\u25aa\ufe0f Pago recibido        $' + fmtNum(monto));
     if(detalleFacturas && detalleFacturas.length > 1){
       t.push('');
       t.push('Lo apliqué así:');
@@ -29444,25 +29446,74 @@ function textoParaCliente(cid, tipo, monto, detalleFacturas){
       });
     }
   } else {
-    t.push('🧾 Te entregué mercancía por *$' + fmtNum(monto) + '*');
-    t.push('📅 ' + fechaHoy() + ' · ' + horaAhora());
+    t.push('Le dejo el detalle de su pedido de hoy:');
+    t.push('');
+    t.push('\u25aa\ufe0f Mercanc\u00eda entregada   $' + fmtNum(monto));
+    // 🔑 Si abonó algo en la misma visita, se le dice. Antes solo veía lo entregado y
+    // el balance, y no quedaba claro que su abono se hubiera apuntado. -12 sep-
+    var abonado = 0;
+    try {
+      // La última factura suya de hoy: lo que haya pagado en ella es su abono
+      var suyasHoy = ventas.filter(function(v){
+        return String(v.cid) === String(cid) && !v.cancelada && v.fecha === fechaHoy();
+      });
+      var ult = suyasHoy.length ? suyasHoy[suyasHoy.length - 1] : null;
+      if(ult){
+        (ult.pagosFactura || []).forEach(function(p){
+          if(!p || p.esDevolucion) return;
+          abonado += (typeof dinero === 'function') ? dinero(p.monto) : (parseFloat(p.monto) || 0);
+        });
+      }
+    } catch(e){}
+    if(abonado > 0.005){
+      t.push('\u25aa\ufe0f Abono recibido        $' + fmtNum(abonado));
+    }
   }
 
-  t.push('');
-  t.push('━━━━━━━━━━━━━━━');
+  t.push('\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501');
   if(debe > 0.005){
-    t.push('*Tu balance ahora: $' + fmtNum(debe) + '*');
+    t.push('\u25aa\ufe0f *Balance pendiente     $' + fmtNum(debe) + '*');
   } else {
-    t.push('*Tu balance: $0.00 — al día* ✅');
+    t.push('\u25aa\ufe0f *Balance: $0.00 \u2014 al d\u00eda* \u2705');
   }
+  t.push('\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501');
   if(aFavor > 0.005){
-    t.push('Tienes $' + fmtNum(aFavor) + ' a favor para tu próxima compra.');
+    t.push('');
+    t.push('\ud83d\udcb0 Tiene $' + fmtNum(aFavor) + ' a favor para su pr\u00f3xima compra.');
   }
-  t.push('━━━━━━━━━━━━━━━');
   t.push('');
-  t.push('Si algo no te cuadra, dímelo hoy mismo y lo revisamos juntos. 🙏');
+  t.push('\ud83d\udcc5 ' + fechaHoy() + ' \u00b7 ' + horaAhora());
   t.push('');
-  t.push('Gracias por tu compra.');
+  t.push('Estamos siempre a su orden. Si tiene alguna duda, cont\u00e1cteme con '
+       + 'confianza \u2014 estamos para servirle.');
+  t.push('');
+  t.push('Gracias por su preferencia.');
+
+  // \ud83c\udf81 EL PROGRAMA VIP. A prop\u00f3sito NO se le dice de cu\u00e1l producto: as\u00ed pregunta,
+  // y cuando pregunta, compra. -Sensei, 12 sep-
+  try {
+    var _vip = calcVIP(cid) || {};
+    var _max = 0;
+    Object.keys(_vip).forEach(function(k){
+      var pts = (_vip[k].puntos || 0) % 10;
+      if((_vip[k].puntos || 0) > 0 && pts === 0) pts = 10;
+      if(pts > _max) _max = pts;
+    });
+    t.push('');
+    if(_max >= 10){
+      t.push('\ud83c\udf81 *\u00a1Ya complet\u00f3 sus 10 puntos!* Su pr\u00f3ximo producto va por '
+           + 'nuestra cuenta.');
+    } else if(_max > 0){
+      t.push('\ud83c\udf81 *Lleva ' + _max + ' puntos de 10* en uno de los productos de su '
+           + 'Programa VIP.');
+    } else {
+      t.push('\ud83c\udf81 *Programa VIP de Lealtad:* al comprar 10 del mismo producto, '
+           + 'el siguiente va por nuestra cuenta.');
+    }
+  } catch(e){}
+
+  t.push('');
+  t.push('_Nunez Beauty Supply_');
   return t.join('\n');
 }
 
@@ -34350,6 +34401,27 @@ function repararListasQueFaltan(){
   return arreglos;
 }
 
+// \u26a1 Cuando la nube termina de bajar POR DETR\u00c1S, se refresca lo que se est\u00e9 viendo.
+// As\u00ed Sensei entra al instante y, si la nube trae algo de otro aparato, aparece solo
+// sin que \u00e9l espere. -12 sep-
+function refrescarTrasLaNube(){
+  try {
+    ventas = LS('nv', []);
+    clientes = LS('ncl', []);
+    PRODS = []; loadProds();
+    try { creditos = LS('ncr', []); } catch(e){}
+  } catch(e){ return; }
+  // Se repinta solo la pantalla en la que est\u00e9, sin sacarlo de donde estaba
+  try {
+    var p = (typeof pantallaActual === 'function') ? pantallaActual() : '';
+    if(p === 'p-inicio' && typeof pintarInicio === 'function') pintarInicio();
+    else if(p === 'p-cl' && typeof renderCl === 'function') renderCl('');
+    else if(p === 'p-cxc' && typeof renderCxC === 'function') renderCxC('');
+    else if(p === 'p-cat' && typeof renderCatalogo === 'function') renderCatalogo('');
+  } catch(e){}
+  try { if(typeof actualizarBarraDia === 'function') actualizarBarraDia(); } catch(e){}
+}
+
 function iniciarAppDespuesDeLogin(){
   try { repararListasQueFaltan(); } catch(e){ console.error('No se pudo reparar:', e); }
   try { liberarEspacioSiHaceFalta(); } catch(e){ console.error('No se pudo liberar espacio:', e); }
@@ -34605,10 +34677,13 @@ function desbloquearConHuella(){
     } else {
       // Caso: cerraste la app y volviste tarde -la app nunca llego a arrancar-. Ahora que
       // se verifico la huella, se bajan los datos de la nube y se arranca normalmente.
-      cargarDatosDeLaNube(function(){
-        document.getElementById('app-contenido').style.display = 'block';
-        iniciarAppDespuesDeLogin();
-      });
+      // \u26a1 Igual con la huella: entra ya, la nube detr\u00e1s. -12 sep-
+      document.getElementById('app-contenido').style.display = 'block';
+      iniciarAppDespuesDeLogin();
+      setTimeout(function(){
+        try { cargarDatosDeLaNube(function(){ try { refrescarTrasLaNube(); } catch(e){} }); }
+        catch(e){ console.warn('la nube no baj\u00f3:', e); }
+      }, 300);
     }
   }).catch(function(e){
     clearTimeout(window._relojHuella);
@@ -34920,13 +34995,17 @@ function engancharSesion(){
         }
         return;
       }
-      document.getElementById('login-cargando').style.display = 'block';
+      document.getElementById('login-cargando').style.display = 'none';
       document.getElementById('login-error').style.display = 'none';
-      cargarDatosDeLaNube(function(){
-        document.getElementById('pantalla-login').style.display = 'none';
-        document.getElementById('app-contenido').style.display = 'block';
-        iniciarAppDespuesDeLogin();
-      });
+      // \u26a1 SE ENTRA YA, con los datos del tel\u00e9fono. La nube baja POR DETR\u00c1S.
+      // Antes se esperaba hasta 15 s mirando "Entrando...". -12 sep-
+      document.getElementById('pantalla-login').style.display = 'none';
+      document.getElementById('app-contenido').style.display = 'block';
+      iniciarAppDespuesDeLogin();
+      setTimeout(function(){
+        try { cargarDatosDeLaNube(function(){ try { refrescarTrasLaNube(); } catch(e){} }); }
+        catch(e){ console.warn('la nube no baj\u00f3:', e); }
+      }, 300);
     } else {
       window._appBloqueada = false;
       document.getElementById('pantalla-bloqueo').style.display = 'none';
