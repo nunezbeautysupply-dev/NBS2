@@ -96,7 +96,7 @@
 
 <div class="cab">
   <h1>🔧 ADMINISTRAR CATÁLOGO <span style="font-size:11px;background:rgba(255,255,255,.2);
-      padding:2px 7px;border-radius:9px;font-weight:800">v12/09I</span></h1>
+      padding:2px 7px;border-radius:9px;font-weight:800">v12/09J</span></h1>
   <div class="sub" id="cuenta">Cargando…</div>
 </div>
 
@@ -1033,6 +1033,10 @@ function cerrarLotes(){
 // 🔑 INGLÉS → ESPAÑOL. Las webs nombran los archivos en inglés y Sensei pone los
 // nombres en español. Sin esto, "neck_paper.jpg" no encuentra "Papel cuello". -12 sep-
 var _TRADUCE = {
+  // 🔑 "after shave" es COLONIA, no gel de afeitar. Sin esto, "After-Shave-Cologne-
+  // Royale" se iba a "Aqua shaving gel". -12 sep-
+  'aftershave':'colonia', 'aftshv':'colonia', 'cologne':'colonia',
+  'royale':'royal', 'rozada':'rose', 'morada':'royal',
   'paper':'papel', 'neck':'cuello', 'glove':'guante', 'gloves':'guante',
   'blade':'navaja', 'blades':'navaja', 'razor':'navaja', 'shave':'afeitar',
   'shaving':'afeitar', 'gel':'gel', 'hair':'pelo', 'cream':'crema', 'wax':'wax',
@@ -1072,10 +1076,31 @@ function _limpiar(t){
 
 // 🔑 Cuánto se parecen dos nombres, de 0 a 100. Cuenta las palabras que comparten,
 // dando más peso a las largas —"keratin" dice más que "de"—.
+// 🔑 Palabras de relleno: aparecen en todo y no distinguen nada.
+var _RELLENO = ['level3', 'l3vel3', 'l3', 'imgi', 'product', 'image', 'ml', 'oz',
+                'new', 'copy', 'adjusted', 'final', 'web', 'jpg', 'png', 'the',
+                'con', 'para', 'del', 'los', 'las', 'gde', 'pequeno',
+                // 🔑 "after" y "shave" salen en medio catálogo: no distinguen nada
+                'after', 'shave', 'afeitar'];
+
 function _parecido(a, b){
   // 🔑 Se traducen las palabras del nombre del archivo, que viene en inglés
   var pa = _traducir(_limpiar(a).split(' ').filter(function(x){ return x.length > 1; }));
   var pb = _traducir(_limpiar(b).split(' ').filter(function(x){ return x.length > 1; }));
+
+  // 🔑 LAS PALABRAS QUE DE VERDAD DISTINGUEN. "After-Shave-Cologne-Frost" contra
+  // "Colonia frost blanca" comparten "frost", que es LA palabra que decide cuál es.
+  // Antes eso daba 27% y se descartaba. -12 sep-
+  var da = pa.filter(function(w){ return w.length >= 4 && _RELLENO.indexOf(w) < 0; });
+  var db = pb.filter(function(w){ return w.length >= 4 && _RELLENO.indexOf(w) < 0; });
+  var comunes = da.filter(function(w){ return db.indexOf(w) >= 0; });
+  if(comunes.length >= 2) return 90;      // dos palabras clave: casi seguro
+  if(comunes.length === 1){
+    // Una sola, pero distintiva: vale mucho
+    var w = comunes[0];
+    if(w.length >= 6) return 72;
+    return 58;
+  }
   if(!pa.length || !pb.length) return 0;
   var peso = 0, total = 0;
   pa.forEach(function(w){
