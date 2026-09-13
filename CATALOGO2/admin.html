@@ -96,7 +96,7 @@
 
 <div class="cab">
   <h1>🔧 ADMINISTRAR CATÁLOGO <span style="font-size:11px;background:rgba(255,255,255,.2);
-      padding:2px 7px;border-radius:9px;font-weight:800">v12/09J</span></h1>
+      padding:2px 7px;border-radius:9px;font-weight:800">v13/09A</span></h1>
   <div class="sub" id="cuenta">Cargando…</div>
 </div>
 
@@ -1127,8 +1127,21 @@ function pintarCargaLotes(){
 
     + '<div style="background:#FFF8E1;border-radius:10px;padding:11px;margin-bottom:11px;'
     +   'font-size:12.5px;color:#6D4C00;line-height:1.55">'
-    +   'Te faltan <b>' + sinFoto.length + '</b> fotos. Aquí las pones de golpe, '
-    +   'no una por una.</div>'
+    +   'Te faltan <b>' + sinFoto.length + '</b> fotos.</div>'
+
+    // 🔗 LO MÁS RÁPIDO Y LO QUE NO FALLA: pegar el link. -13 sep-
+    + '<div style="border:2.5px solid #1a237e;border-radius:12px;padding:13px;'
+    +   'margin-bottom:11px;background:#F4F6FB">'
+    +   '<div style="font-size:15px;font-weight:900;color:#1a237e;margin-bottom:6px">'
+    +     '🔗 LO MÁS RÁPIDO · Pegar el link</div>'
+    +   '<div style="font-size:12px;color:#444;line-height:1.6;margin-bottom:10px">'
+    +     'No bajas nada. En la web de la marca, <b>botón derecho sobre la foto → '
+    +     'Copiar dirección de la imagen</b>, y la pegas aquí.<br>'
+    +     '👉 15 segundos por producto, sin adivinar.</div>'
+    +   '<button onclick="abrirPegarLinks()" style="width:100%;padding:15px;'
+    +     'background:#1a237e;color:#fff;border:none;border-radius:11px;font-size:15px;'
+    +     'font-weight:900;cursor:pointer">🔗 Empezar a pegar links</button>'
+    + '</div>'
 
     // ✨ El limpiador automático
     + '<label style="display:flex;align-items:center;gap:9px;background:#E7F6ED;'
@@ -1438,6 +1451,176 @@ function guardarPorProducto(){
     });
   }
   siguiente(0);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  🔗 PONER FOTO PEGANDO EL LINK  (13 sep 2026)
+//
+//  🔴 Sensei, tras día y medio peleando: "esto se ha salido de control, busca la
+//  solución definitiva". Tenía razón: bajar 1.000 fotos, filtrar basura y adivinar
+//  cuál va con cuál son cuatro pasos que fallan en todos.
+//
+//  🔑 LA SOLUCIÓN: no bajar nada. En la web, botón derecho sobre la foto → "Copiar
+//  dirección de la imagen" → pegar aquí. 15 segundos por producto, sin adivinar.
+//  La foto se descarga sola y se guarda en el catálogo, así que no depende de que
+//  la tienda la mantenga.
+// ═══════════════════════════════════════════════════════════════════
+
+function abrirPegarLinks(){
+  window._pegarIdx = 0;
+  pintarPegarLinks();
+  document.getElementById('ovLotes').classList.add('on');
+}
+
+function pintarPegarLinks(){
+  var marca = (window._marcaPegar || '');
+  var lista = PRODS.filter(function(p){
+    if(p.tf) return false;
+    if(!marca) return true;
+    return (p.m || 'Sin marca') === marca;
+  }).sort(function(a, b){ return (b.v || 0) - (a.v || 0); });
+
+  if(!lista.length){
+    document.getElementById('cajaLotes').innerHTML =
+        '<div style="text-align:center;padding:26px">'
+      + '<div style="font-size:38px">🎉</div>'
+      + '<div style="font-size:16px;font-weight:900;margin:9px 0">Todos tienen foto</div>'
+      + '<button onclick="cerrarLotes()" style="width:100%;padding:13px;background:#1a237e;'
+      +   'color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:900;'
+      +   'cursor:pointer">Cerrar</button></div>';
+    return;
+  }
+
+  var i = Math.min(window._pegarIdx || 0, lista.length - 1);
+  var p = lista[i];
+  window._pegarProducto = p.id;
+
+  var marcas = {};
+  PRODS.filter(function(x){ return !x.tf; }).forEach(function(x){
+    var m = (x.m || 'Sin marca');
+    marcas[m] = (marcas[m] || 0) + 1;
+  });
+  var orden = Object.keys(marcas).sort(function(a, b){ return marcas[b] - marcas[a]; });
+
+  document.getElementById('cajaLotes').innerHTML =
+      '<h2>🔗 Pegar el link de la foto '
+    +   '<button onclick="cerrarLotes()" style="background:#F0F0F6;border:none;'
+    +   'border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button></h2>'
+
+    + '<select onchange="window._marcaPegar=this.value;window._pegarIdx=0;pintarPegarLinks()" '
+    +   'style="width:100%;padding:9px;border:1.5px solid #ccc;border-radius:9px;'
+    +   'font-size:13px;font-weight:700;margin-bottom:10px">'
+    +   '<option value="">Todas las marcas — ' + PRODS.filter(function(x){ return !x.tf; }).length + ' sin foto</option>'
+    +   orden.map(function(m){
+          return '<option value="' + escaparAttr(m) + '"' + (m === marca ? ' selected' : '') + '>'
+            + esc(m) + ' — ' + marcas[m] + ' sin foto</option>';
+        }).join('')
+    + '</select>'
+
+    + '<div style="background:#E8F5E9;border-radius:9px;padding:8px;text-align:center;'
+    +   'margin-bottom:11px;font-size:11.5px;font-weight:800;color:#2E7D32">'
+    +   (i + 1) + ' de ' + lista.length + '</div>'
+
+    + '<div style="background:#FFF8E1;border:1.5px solid #FFD54F;border-radius:11px;'
+    +   'padding:13px;margin-bottom:11px">'
+    +   '<div style="font-size:15px;font-weight:900;line-height:1.3">' + esc(p.n) + '</div>'
+    +   (p.m ? '<div style="font-size:12px;color:#7A5C00;font-weight:700;margin-top:2px">'
+             + esc(p.m) + '</div>' : '')
+    +   (p.v ? '<div style="font-size:11.5px;color:#2E7D32;font-weight:800;margin-top:4px">'
+             + '🔥 vendiste ' + p.v + '</div>' : '')
+    + '</div>'
+
+    + '<input id="linkFoto" placeholder="Pega aquí el link de la foto" '
+    +   'onpaste="setTimeout(traerFotoDelLink,60)" '
+    +   'style="width:100%;padding:12px;border:2px solid #1a237e;border-radius:10px;'
+    +   'font-size:13px">'
+    + '<div id="estadoLink" style="text-align:center;padding:9px;font-size:12.5px;'
+    +   'color:#8A8B9E">Copia la foto en la web y pégala aquí</div>'
+    + '<div id="vistaLink" style="width:100%;height:150px;border-radius:10px;'
+    +   'background:#EDEEF4;display:flex;align-items:center;justify-content:center;'
+    +   'overflow:hidden;margin-bottom:10px"></div>'
+
+    + '<div style="display:flex;gap:7px">'
+    +   '<button onclick="saltarPegar(-1)" style="flex:1;padding:12px;background:#fff;'
+    +     'color:#555;border:1.5px solid #ccc;border-radius:10px;font-size:13px;'
+    +     'font-weight:800;cursor:pointer">‹ Anterior</button>'
+    +   '<button onclick="saltarPegar(1)" style="flex:1;padding:12px;background:#fff;'
+    +     'color:#555;border:1.5px solid #ccc;border-radius:10px;font-size:13px;'
+    +     'font-weight:800;cursor:pointer">Saltar ›</button>'
+    + '</div>'
+    + '<button onclick="cerrarLotes()" style="width:100%;padding:12px;margin-top:8px;'
+    +   'background:#F0F0F6;color:#444;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Cerrar</button>';
+
+  setTimeout(function(){
+    var e = document.getElementById('linkFoto');
+    if(e) e.focus();
+  }, 60);
+}
+
+function saltarPegar(n){
+  window._pegarIdx = Math.max(0, (window._pegarIdx || 0) + n);
+  pintarPegarLinks();
+}
+
+// 🔑 Se baja la foto del link y se guarda en el catálogo. Así no depende de que la
+// tienda la mantenga publicada.
+function traerFotoDelLink(){
+  var e = document.getElementById('linkFoto');
+  var est = document.getElementById('estadoLink');
+  if(!e || !e.value) return;
+  var url = e.value.trim();
+  if(!/^https?:\/\//i.test(url)){
+    est.innerHTML = '<span style="color:#C62828">Eso no es un link de imagen</span>';
+    return;
+  }
+  est.innerHTML = '<span style="color:#1a237e">⏳ Trayendo la foto…</span>';
+
+  var img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function(){
+    try {
+      var max = 560, w = img.width, h = img.height;
+      if(w > h && w > max){ h = Math.round(h * max / w); w = max; }
+      else if(h > max){ w = Math.round(w * max / h); h = max; }
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      var data = c.toDataURL('image/jpeg', 0.8);
+      // Y pasa por el limpiador, como las demás
+      if(window._limpiarFotos !== false && typeof limpiarFoto === 'function'){
+        limpiarFoto(data, function(limpia){ guardarFotoDelLink(limpia || data); }, { lado: 560 });
+      } else {
+        guardarFotoDelLink(data);
+      }
+    } catch(err){
+      est.innerHTML = '<span style="color:#C62828">Esa web no deja copiar la foto. '
+        + 'Prueba con otra tienda.</span>';
+    }
+  };
+  img.onerror = function(){
+    est.innerHTML = '<span style="color:#C62828">No pude traer esa foto. '
+      + 'Comprueba el link.</span>';
+  };
+  img.src = url;
+}
+
+function guardarFotoDelLink(data){
+  var id = window._pegarProducto;
+  if(!id) return;
+  FOTOS[id] = data;
+  var p = PRODS.find(function(x){ return String(x.id) === String(id); });
+  if(p) p.tf = true;
+  CAMBIOS = true;
+  try { ponerFotosASalvo(); } catch(e){}
+  // Se enseña un momento y pasa al siguiente
+  var v = document.getElementById('vistaLink');
+  if(v) v.innerHTML = '<img src="' + data + '" style="max-width:100%;max-height:100%">';
+  var est = document.getElementById('estadoLink');
+  if(est) est.innerHTML = '<span style="color:#0B7A3B;font-weight:800">✅ Puesta</span>';
+  pintar();
+  setTimeout(function(){ pintarPegarLinks(); }, 700);
 }
 
 // 🗑️ ¿Esto es basura? Banners, categorías, logos, fotos de estudio con nombre de
