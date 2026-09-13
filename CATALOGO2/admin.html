@@ -96,7 +96,7 @@
 
 <div class="cab">
   <h1>🔧 ADMINISTRAR CATÁLOGO <span style="font-size:11px;background:rgba(255,255,255,.2);
-      padding:2px 7px;border-radius:9px;font-weight:800">v12/09F</span></h1>
+      padding:2px 7px;border-radius:9px;font-weight:800">v12/09G</span></h1>
   <div class="sub" id="cuenta">Cargando…</div>
 </div>
 
@@ -1235,8 +1235,9 @@ function emparejarFotos(ev){
       var pct = _parecido(f.name, (p.m || '') + ' ' + p.n);
       if(pct > mejorPct){ mejorPct = pct; mejor = p; }
     });
-    // Vienen marcadas de entrada: la app ya eligió la mejor de cada producto
-    return { file: f, p: mejor, pct: mejorPct, usar: mejorPct >= 35,
+    // 🔑 Si encontró producto, viene MARCADA. Es más rápido desmarcar las pocas que
+    // fallen que marcar las 69 buenas a mano. -12 sep-
+    return { file: f, p: mejor, pct: mejorPct, usar: !!mejor,
              candidatos: candidatos };
   });
   window._candidatosLote = candidatos;
@@ -1256,22 +1257,20 @@ function emparejarFotos(ev){
     if(!porProducto[k]) porProducto[k] = [];
     porProducto[k].push(x);
   });
+  // 🔑 UNA FOTO POR PRODUCTO, SIN EXCEPCIONES. Él solo puede ponerle una a cada uno,
+  // así que enseñarle cuatro del mismo es hacerle perder el tiempo. Se queda la que
+  // mejor coincide; si empatan, la más pesada, que suele ser la de mejor calidad.
+  // Las demás quedan guardadas por si quiere cambiarla. -12 sep-
   var elegidas = [];
   Object.keys(porProducto).forEach(function(k){
     var grupo = porProducto[k];
-    if(grupo.length === 1){ elegidas.push(grupo[0]); return; }
-    // 🔑 Solo se descarta si los NOMBRES DE ARCHIVO se parecen mucho entre sí: eso
-    // significa que son del mismo bote. Si son distintos, se enseñan TODAS y él
-    // decide — más vale que elija a que se pierdan fotos buenas. -12 sep-
     grupo.sort(function(a, b){
       if(b.pct !== a.pct) return b.pct - a.pct;
       return b.file.size - a.file.size;
     });
     var mejor = grupo[0];
+    mejor.otras = grupo.slice(1);      // las demás, por si quiere otra
     elegidas.push(mejor);
-    grupo.slice(1).forEach(function(x){
-      if(_parecido(x.file.name, mejor.file.name) < 70) elegidas.push(x);
-    });
   });
   var repetidas = props.length - elegidas.length;
   window._lotesRepetidas = repetidas;
@@ -1294,9 +1293,9 @@ function emparejarFotos(ev){
 
 function pintarEmparejadas(){
   var L = window._lotesPend || [];
-  var seguros = L.filter(function(x){ return x.pct >= 75; }).length;
-  var dudosos = L.filter(function(x){ return x.pct >= 45 && x.pct < 75; }).length;
-  var perdidos = L.filter(function(x){ return x.pct < 45; }).length;
+  var seguros = L.filter(function(x){ return x.pct >= 55; }).length;
+  var dudosos = L.filter(function(x){ return x.pct < 55; }).length;
+  var perdidos = 0;
 
   var llegaron = window._lotesLlegaron || L.length;
   var basura = window._lotesBasura || 0;
@@ -1343,7 +1342,8 @@ function pintarEmparejadas(){
 
   var cand = window._candidatosLote || PRODS;
   L.forEach(function(x, i){
-    var col = x.pct >= 75 ? '#0B7A3B' : (x.pct >= 45 ? '#E65100' : '#C62828');
+    // Verde: casi seguro · Naranja: míralo · Rojo: revísalo bien
+    var col = x.pct >= 55 ? '#0B7A3B' : (x.pct >= 35 ? '#E65100' : '#C62828');
     h += '<div style="display:flex;align-items:center;gap:9px;padding:9px;'
       + 'border:1px solid #E5E6EE;border-left:4px solid ' + col + ';border-radius:9px;'
       + 'margin-bottom:7px">'
@@ -1351,7 +1351,11 @@ function pintarEmparejadas(){
       +   ' onchange="window._lotesPend[' + i + '].usar=this.checked">'
       // 🔑 LA FOTO A LA VISTA: así sabe cuál es sin abrir nada
       + '<div style="width:52px;height:52px;border-radius:8px;background:#EDEEF4;'
-      +   'flex-shrink:0;overflow:hidden" id="mini' + i + '"></div>'
+      +   'flex-shrink:0;overflow:hidden;cursor:' + (x.otras && x.otras.length ? 'pointer' : 'default')
+      +   '" id="mini' + i + '"'
+      +   (x.otras && x.otras.length ? ' onclick="otraFoto(' + i + ')" title="Hay '
+              + x.otras.length + ' foto(s) m\u00e1s \u2014 toca para cambiar"' : '')
+      +   '></div>'
       + '<div style="flex:1;min-width:0">'
       +   '<div style="font-size:10px;color:#8A8B9E">' + esc(x.file.name.slice(0, 30)) + '</div>'
       // 🔑 Y UN DESPLEGABLE con SOLO los de esa marca: lo cambia de un toque
@@ -1378,6 +1382,28 @@ function pintarEmparejadas(){
     +   'font-weight:700;cursor:pointer">Cancelar</button>';
   document.getElementById('cajaLotes').innerHTML = h;
   setTimeout(pintarMiniaturas, 40);
+}
+
+// 🔄 Si hay varias fotos del mismo producto, se rota entre ellas de un toque.
+// Así ve las otras sin que le llenen la lista. -12 sep-
+function otraFoto(i){
+  var x = window._lotesPend[i];
+  if(!x || !x.otras || !x.otras.length) return;
+  var siguiente = x.otras.shift();
+  x.otras.push({ file: x.file, p: x.p, pct: x.pct });
+  var antes = x.file;
+  x.file = siguiente.file;
+  // Se repinta solo esa miniatura
+  var caja = document.getElementById('mini' + i);
+  if(caja){
+    caja.dataset.puesta = '';
+    var lector = new FileReader();
+    lector.onload = function(e){
+      caja.innerHTML = '<img src="' + e.target.result + '" '
+        + 'style="width:100%;height:100%;object-fit:cover">';
+    };
+    lector.readAsDataURL(x.file);
+  }
 }
 
 // Marcar o desmarcar todas de golpe: si la app acertó, no hay que ir una por una.
