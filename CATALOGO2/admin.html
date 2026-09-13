@@ -96,7 +96,7 @@
 
 <div class="cab">
   <h1>🔧 ADMINISTRAR CATÁLOGO <span style="font-size:11px;background:rgba(255,255,255,.2);
-      padding:2px 7px;border-radius:9px;font-weight:800">v12/09G</span></h1>
+      padding:2px 7px;border-radius:9px;font-weight:800">v12/09H</span></h1>
   <div class="sub" id="cuenta">Cargando…</div>
 </div>
 
@@ -1137,7 +1137,7 @@ function pintarCargaLotes(){
           }).join('')
     +   '</select>'
     +   '<input type="file" accept="image/*" multiple id="lotesArch" style="display:none" '
-    +     'onchange="emparejarFotos(event)">'
+    +     'onchange="abrirPorProducto(event)">'
     +   '<button onclick="document.getElementById(\'lotesArch\').click()" '
     +     'style="width:100%;padding:14px;background:#0B7A3B;color:#fff;border:none;'
     +     'border-radius:11px;font-size:14.5px;font-weight:900;cursor:pointer">'
@@ -1188,6 +1188,233 @@ function escaparAttr(t){ return String(t||'').replace(/"/g, '&quot;'); }
 function loadProdsLotes(){ /* PRODS ya está cargado en el admin */ }
 
 // ═══ ① EMPAREJAR POR NOMBRE ═══
+
+// ═══════════════════════════════════════════════════════════════════
+//  📋 PONER FOTOS YENDO POR TUS PRODUCTOS  (12 sep 2026)
+//
+//  🔴 Sensei: "de 57 productos el sistema solo reconoce 6, esto así no sirve".
+//  Tenía razón. Mi enfoque era al revés: partía de las FOTOS e intentaba adivinar a
+//  qué producto iban. Con 828 fotos que "no se parecían a nada", sus productos se
+//  quedaban sin foto aunque la foto estuviera ahí.
+//
+//  🔑 AHORA SE VA POR SUS PRODUCTOS: se le enseña la lista de los 57, y para cada uno
+//  las fotos ordenadas por cuál pega mejor. Él toca y elige. NINGUNO se queda fuera.
+// ═══════════════════════════════════════════════════════════════════
+
+var _fotosSueltas = [];
+
+function abrirPorProducto(ev){
+  var files = Array.prototype.slice.call(ev.target.files || []);
+  if(!files.length) return;
+  ev.target.value = '';
+  var basura = 0;
+  files = files.filter(function(f){
+    if(_esBasura(f.name)){ basura++; return false; }
+    return true;
+  });
+  _fotosSueltas = files.map(function(f, i){ return { i: i, file: f, usada: false }; });
+  window._basuraPP = basura;
+  window._marcaPP = (document.getElementById('lotesMarcaArch') || {}).value || '';
+  window._elegidasPP = {};
+  pintarPorProducto();
+}
+
+function pintarPorProducto(){
+  var marca = window._marcaPP || '';
+  var lista = PRODS.filter(function(p){
+    if(p.tf) return false;
+    if(!marca) return true;
+    return (p.m || 'Sin marca') === marca;
+  }).sort(function(a, b){ return (b.v || 0) - (a.v || 0); });
+  window._listaPP = lista;
+
+  var puestas = Object.keys(window._elegidasPP || {}).length;
+
+  var h = '<h2>📋 Tus ' + lista.length + ' productos '
+    +   '<button onclick="pintarCargaLotes()" style="background:#F0F0F6;border:none;'
+    +   'border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button></h2>'
+    + '<div style="background:#F4F6FB;border-radius:10px;padding:11px;margin-bottom:11px;'
+    +   'font-size:12px;color:#555;line-height:1.6">'
+    +   'Tienes <b>' + _fotosSueltas.length + '</b> fotos para '
+    +   '<b>' + lista.length + '</b> productos sin foto.<br>'
+    +   '🔑 Toca un producto y elige su foto.</div>'
+    + (puestas
+        ? '<div style="background:#E7F6ED;border-radius:10px;padding:10px;margin-bottom:11px;'
+          + 'text-align:center;font-size:13px;font-weight:800;color:#0B7A3B">'
+          + '✅ Llevas ' + puestas + ' puesta(s)</div>'
+        : '')
+    + '<div style="max-height:46vh;overflow:auto">';
+
+  lista.forEach(function(p){
+    var tiene = (window._elegidasPP || {})[p.id] !== undefined;
+    h += '<div onclick="elegirFotoPara(\'' + escaparAttr(String(p.id)) + '\')" '
+      + 'style="display:flex;align-items:center;gap:10px;padding:9px;'
+      + 'border:1px solid ' + (tiene ? '#0B7A3B' : '#E5E6EE') + ';'
+      + 'border-left:4px solid ' + (tiene ? '#0B7A3B' : '#D4D5E0') + ';'
+      + 'border-radius:9px;margin-bottom:7px;cursor:pointer">'
+      + '<div style="width:54px;height:54px;border-radius:8px;background:#EDEEF4;'
+      +   'flex-shrink:0;overflow:hidden;display:flex;align-items:center;'
+      +   'justify-content:center" id="pp' + p.id + '">'
+      +   (tiene ? '' : '<span style="font-size:9px;color:#9899AC;font-weight:800;text-align:center">SIN<br>FOTO</span>')
+      + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:13px;font-weight:800">' + esc(p.n) + '</div>'
+      +   '<div style="font-size:10.5px;color:#8A8B9E">'
+      +     (p.v ? 'vendiste ' + p.v : 'sin ventas') + ' · ' + dinero(p.pr) + '</div>'
+      + '</div>'
+      + '<div style="font-size:20px;font-weight:900;color:' + (tiene ? '#0B7A3B' : '#C8C9D6') + '">'
+      +   (tiene ? '✓' : '›') + '</div>'
+      + '</div>';
+  });
+
+  h += '</div>'
+    + '<button onclick="guardarPorProducto()" style="width:100%;padding:14px;margin-top:11px;'
+    +   'background:' + (puestas ? '#0B7A3B' : '#C8C9D6') + ';color:#fff;border:none;'
+    +   'border-radius:11px;font-size:15px;font-weight:900;cursor:pointer">'
+    +   '✓ Guardar ' + (puestas || '') + ' foto(s)</button>'
+    + '<button onclick="pintarCargaLotes()" style="width:100%;padding:12px;margin-top:7px;'
+    +   'background:#F0F0F6;color:#444;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Cancelar</button>';
+  document.getElementById('cajaLotes').innerHTML = h;
+  setTimeout(pintarMiniaturasPP, 40);
+}
+
+function pintarMiniaturasPP(){
+  Object.keys(window._elegidasPP || {}).forEach(function(id){
+    var caja = document.getElementById('pp' + id);
+    if(!caja || caja.dataset.puesta) return;
+    var f = _fotosSueltas[window._elegidasPP[id]];
+    if(!f) return;
+    caja.dataset.puesta = '1';
+    var lector = new FileReader();
+    lector.onload = function(e){
+      caja.innerHTML = '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover">';
+    };
+    lector.readAsDataURL(f.file);
+  });
+}
+
+// 🔑 Al tocar un producto: las fotos ordenadas por cuál pega mejor CON ESE producto.
+function elegirFotoPara(idProd){
+  var p = PRODS.find(function(x){ return String(x.id) === String(idProd); });
+  if(!p) return;
+  window._eligiendoPara = idProd;
+  var conNota = _fotosSueltas.map(function(f){
+    return { f: f, pct: _parecido(f.file.name, (p.m || '') + ' ' + p.n) };
+  }).sort(function(a, b){
+    if(a.f.usada !== b.f.usada) return a.f.usada ? 1 : -1;
+    return b.pct - a.pct;
+  });
+  window._ordenPP = conNota;
+
+  document.getElementById('cajaLotes').innerHTML =
+      '<h2>📷 Elige la foto '
+    +   '<button onclick="pintarPorProducto()" style="background:#F0F0F6;border:none;'
+    +   'border-radius:8px;width:32px;height:32px;font-size:15px;cursor:pointer">✕</button></h2>'
+    + '<div style="background:#FFF8E1;border:1.5px solid #FFD54F;border-radius:10px;'
+    +   'padding:11px;margin-bottom:11px">'
+    +   '<div style="font-size:14px;font-weight:900">' + esc(p.n) + '</div>'
+    +   (p.m ? '<div style="font-size:11.5px;color:#7A5C00;font-weight:700">' + esc(p.m) + '</div>' : '')
+    + '</div>'
+    + '<input id="buscaFotoPP" placeholder="🔍 Filtrar por nombre…" '
+    +   'oninput="filtrarFotosPP(this.value)" style="margin-bottom:9px">'
+    + '<div id="rejillaPP" style="display:grid;grid-template-columns:repeat(3,1fr);'
+    +   'gap:7px;max-height:50vh;overflow:auto"></div>'
+    + '<button onclick="quitarFotoDe(\'' + escaparAttr(String(idProd)) + '\')" '
+    +   'style="width:100%;padding:11px;margin-top:10px;background:#FFF5F5;color:#C62828;'
+    +   'border:1.5px solid #C62828;border-radius:10px;font-size:13px;font-weight:800;'
+    +   'cursor:pointer">🗑️ Dejarlo sin foto</button>'
+    + '<button onclick="pintarPorProducto()" style="width:100%;padding:12px;margin-top:7px;'
+    +   'background:#F0F0F6;color:#444;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Volver</button>';
+  pintarRejillaPP(conNota);
+}
+
+function pintarRejillaPP(lista){
+  var caja = document.getElementById('rejillaPP');
+  if(!caja) return;
+  var muestra = lista.slice(0, 60);
+  caja.innerHTML = muestra.map(function(x){
+    return '<div onclick="ponerFotoAlProducto(' + x.f.i + ')" '
+      + 'style="position:relative;aspect-ratio:1;border-radius:9px;background:#EDEEF4;'
+      + 'overflow:hidden;cursor:pointer;border:2.5px solid '
+      + (x.f.usada ? '#C8C9D6' : (x.pct >= 40 ? '#0B7A3B' : '#E5E6EE')) + ';'
+      + (x.f.usada ? 'opacity:.4;' : '') + '" id="rj' + x.f.i + '"></div>';
+  }).join('');
+  muestra.forEach(function(x){
+    var c = document.getElementById('rj' + x.f.i);
+    if(!c || c.dataset.puesta) return;
+    c.dataset.puesta = '1';
+    var lector = new FileReader();
+    lector.onload = function(e){
+      c.insertAdjacentHTML('afterbegin', '<img src="' + e.target.result + '" '
+        + 'style="width:100%;height:100%;object-fit:cover">');
+    };
+    lector.readAsDataURL(x.f.file);
+  });
+}
+
+function filtrarFotosPP(q){
+  q = (q || '').toLowerCase().trim();
+  var lista = window._ordenPP || [];
+  if(q) lista = lista.filter(function(x){ return x.f.file.name.toLowerCase().indexOf(q) >= 0; });
+  pintarRejillaPP(lista);
+}
+
+function ponerFotoAlProducto(iFoto){
+  var id = window._eligiendoPara;
+  if(id === undefined || id === null) return;
+  Object.keys(window._elegidasPP).forEach(function(k){
+    if(window._elegidasPP[k] === iFoto) delete window._elegidasPP[k];
+  });
+  var antes = window._elegidasPP[id];
+  if(antes !== undefined && _fotosSueltas[antes]) _fotosSueltas[antes].usada = false;
+  window._elegidasPP[id] = iFoto;
+  if(_fotosSueltas[iFoto]) _fotosSueltas[iFoto].usada = true;
+  pintarPorProducto();
+}
+
+function quitarFotoDe(id){
+  var antes = window._elegidasPP[id];
+  if(antes !== undefined && _fotosSueltas[antes]) _fotosSueltas[antes].usada = false;
+  delete window._elegidasPP[id];
+  pintarPorProducto();
+}
+
+function guardarPorProducto(){
+  var ids = Object.keys(window._elegidasPP || {});
+  if(!ids.length){ alert('Todavía no elegiste ninguna foto.'); return; }
+  var hechas = 0;
+  document.getElementById('cajaLotes').innerHTML =
+      '<h2>📋 Guardando…</h2><div style="text-align:center;padding:22px">'
+    + '<div id="ppVan" style="font-size:32px;font-weight:900;color:#0B7A3B">0</div>'
+    + '<div style="font-size:13px;color:#555">de ' + ids.length + '</div></div>';
+  function siguiente(n){
+    if(n >= ids.length){
+      CAMBIOS = true;
+      try { ponerFotosASalvo(); } catch(e){}
+      pintar();
+      alert('✅ Se pusieron ' + hechas + ' fotos.\n\nAhora toca 💾 Guardar cambios y sube los archivos.');
+      cerrarLotes();
+      return;
+    }
+    var f = _fotosSueltas[window._elegidasPP[ids[n]]];
+    if(!f){ siguiente(n + 1); return; }
+    achicarFoto(f.file, function(data){
+      if(data){
+        FOTOS[ids[n]] = data;
+        var p = PRODS.find(function(x){ return String(x.id) === String(ids[n]); });
+        if(p) p.tf = true;
+        hechas++;
+        var v = document.getElementById('ppVan');
+        if(v) v.textContent = hechas;
+      }
+      siguiente(n + 1);
+    });
+  }
+  siguiente(0);
+}
+
 // 🗑️ ¿Esto es basura? Banners, categorías, logos, fotos de estudio con nombre de
 // cámara, y hashes al azar. Nada de eso es un producto.
 function _esBasura(nombre){
