@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260912e-OFICIAL-V2.0">
+<meta name="app-version" content="20260913a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10466,12 +10466,20 @@ function renderCatalogo(q){
         _html += '<option value="' + sp.id + '">' + String(sp.nombre || '').replace(/[<>&"]/g,'') + '</option>';
       });
       _html += '<option value="SINPRECIO">⚠️ Solo los que no tienen precio de venta</option>';
+      // 📷 Con foto y sin foto — para saber cuáles le faltan. -13 sep-
+      _html += '<option value="SINFOTO">📷 Solo los que NO tienen foto</option>';
+      _html += '<option value="CONFOTO">🖼️ Solo los que SÍ tienen foto</option>';
       _sel.innerHTML = _html;
       _sel.value = _filtro || '';
     }
   }
   if(_filtro === 'SINPRECIO'){
     list = list.filter(function(p){ return !(parseFloat(p.precio) > 0.005); });
+  } else if(_filtro === 'SINFOTO'){
+    // 📷 Los que le faltan por fotografiar. -13 sep-
+    list = list.filter(function(p){ return !(p.foto && String(p.foto).length > 100); });
+  } else if(_filtro === 'CONFOTO'){
+    list = list.filter(function(p){ return !!(p.foto && String(p.foto).length > 100); });
   } else if(_filtro){
     var _ids = productosDeSuplidor(_filtro);
     list = list.filter(function(p){ return _ids[String(p.id)]; });
@@ -19313,7 +19321,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260912e';
+var NOVEDADES_VERSION = '20260913a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
