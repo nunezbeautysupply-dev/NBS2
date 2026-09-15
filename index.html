@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260913d-OFICIAL-V2.0">
+<meta name="app-version" content="20260913e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19378,7 +19378,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260913d';
+var NOVEDADES_VERSION = '20260913e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34616,7 +34616,11 @@ function activarHuella(){
     }).then(function(credencial){
       localStorage.setItem(CLAVE_HUELLA_ID, bufferABase64(credencial.rawId));
       actualizarBotonHuella();
-      alert('✅ Huella activada. A partir de ahora, tras 15 minutos sin usar la app, se desbloquea con tu huella.');
+      // 🔑 Dice el tiempo QUE TIENE PUESTO, no 15 fijo. -13 sep-
+      var _min = parseInt(localStorage.getItem(CLAVE_MINUTOS_BLOQUEO) || '1', 10) || 1;
+      alert('\u2705 Huella activada.\n\nA partir de ahora, tras '
+        + etiquetaMinutos(_min) + ' sin usar la app, se desbloquea con tu huella.\n\n'
+        + 'Puedes cambiar ese tiempo en el men\u00fa \u2630, donde dice "\ud83d\udd12 Bloquear tras".');
     }).catch(function(e){
       console.error('No se pudo activar la huella:', e);
       alert('No se pudo activar la huella. Puede que la hayas cancelado, o que no esté configurada en el teléfono.');
@@ -34626,7 +34630,7 @@ function activarHuella(){
 
 function desactivarHuella(){
   cerrarMenuLateral();
-  if(!confirm('¿Quitar la huella? La app volverá a pedirte correo y contraseña tras 15 minutos.')) return;
+  if(!confirm('¿Quitar la huella? La app volverá a pedirte correo y contraseña.')) return;
   localStorage.removeItem(CLAVE_HUELLA_ID);
   actualizarBotonHuella();
   alert('Huella desactivada.');
@@ -34875,13 +34879,13 @@ function renderToggleBloqueoInmediato(){
 var PRESETS_BLOQUEO = [1, 5, 10, 15, 20, 30, 45, 60, 90, 120];
 
 function limiteInactividadMs(){
-  var mins = parseInt(localStorage.getItem(CLAVE_MINUTOS_BLOQUEO) || '15', 10);
-  if(!mins || mins < 1) mins = 15;
+  var mins = parseInt(localStorage.getItem(CLAVE_MINUTOS_BLOQUEO) || '1', 10);
+  if(!mins || mins < 1) mins = 1;
   return mins * 60 * 1000;
 }
 
 function etiquetaMinutos(m){
-  if(m === 1) return '1 min (prueba)';
+  if(m === 1) return '1 minuto';
   if(m < 60) return m + ' min';
   if(m === 60) return '1 hora';
   if(m % 60 === 0) return (m/60) + ' horas';
@@ -34893,8 +34897,8 @@ function etiquetaMinutos(m){
 function renderSelectorBloqueo(){
   var sel = document.getElementById('sel-minutos-bloqueo');
   if(!sel) return;
-  var actual = parseInt(localStorage.getItem(CLAVE_MINUTOS_BLOQUEO) || '15', 10);
-  if(!actual || actual < 1) actual = 15;
+  var actual = parseInt(localStorage.getItem(CLAVE_MINUTOS_BLOQUEO) || '1', 10);
+  if(!actual || actual < 1) actual = 1;
   var valores = PRESETS_BLOQUEO.slice();
   if(valores.indexOf(actual) < 0) valores.push(actual);
   valores.sort(function(a,b){ return a-b; });
@@ -34929,7 +34933,7 @@ function cambiarMinutosBloqueo(valor){
     return;
   }
   var mins = parseInt(valor, 10);
-  if(!mins || mins < 1) mins = 15;
+  if(!mins || mins < 1) mins = 1;
   localStorage.setItem(CLAVE_MINUTOS_BLOQUEO, String(mins));
   renderSelectorBloqueo();
   registrarActividad(); // reiniciar el conteo con el tiempo nuevo
