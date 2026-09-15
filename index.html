@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260913b-OFICIAL-V2.0">
+<meta name="app-version" content="20260913c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19367,7 +19367,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260913b';
+var NOVEDADES_VERSION = '20260913c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34748,14 +34748,19 @@ function desbloquearConHuella(){
     // borrarla y registrar una nueva. Antes se dejaba guardada y Sensei tocaba
     // "Intentar de nuevo" una y otra vez sin que pasara nada. -8 sep-
     var texto = String((e && (e.name + ' ' + e.message)) || '');
-    var yaNoExiste = /NotAllowedError|InvalidStateError|NotSupportedError|no credentials|not found/i.test(texto);
+    // 🔑 SOLO si el teléfono dice que esa credencial YA NO EXISTE. `NotAllowedError`
+    // también sale cuando se cancela o se agota el tiempo, y por eso se le borraba la
+    // huella a Sensei sin motivo. -13 sep-
+    var yaNoExiste = /InvalidStateError|NotSupportedError|no credentials|not found|not registered/i.test(texto);
 
     // Se cuentan los fallos seguidos: si falla 3 veces, la huella no sirve aunque el
     // error no lo diga claro
     var fallos = (parseInt(localStorage.getItem('nbs_fallos_huella') || '0', 10) || 0) + 1;
     localStorage.setItem('nbs_fallos_huella', String(fallos));
 
-    if(yaNoExiste || fallos >= 3){
+    // 🔑 Y los fallos normales YA NO la borran: se queda, y él vuelve a intentarlo.
+    // Antes 3 fallos seguidos —dedo mojado, lector sucio— le costaban la huella. -13 sep-
+    if(yaNoExiste){
       // \ud83d\uddd1\ufe0f SE BORRA la huella que ya no sirve, para no seguir dando vueltas
       localStorage.removeItem(CLAVE_HUELLA_ID);
       localStorage.removeItem('nbs_fallos_huella');
@@ -35061,6 +35066,16 @@ function engancharSesion(){
         catch(e){ console.warn('la nube no baj\u00f3:', e); }
       }, 300);
     } else {
+      // \ud83d\udd11 SIN SESI\u00d3N, PERO CON HUELLA: se le pide la huella, no el correo.
+      // Firebase pierde la sesi\u00f3n sola tras d\u00edas sin abrir, y Sensei acababa
+      // escribiendo correo y contrase\u00f1a cada vez. -13 sep-
+      if(hayHuellaRegistrada()){
+        window._appBloqueada = true;
+        document.getElementById('pantalla-login').style.display = 'none';
+        document.getElementById('login-cargando').style.display = 'none';
+        bloquearApp();
+        return;
+      }
       window._appBloqueada = false;
       document.getElementById('pantalla-bloqueo').style.display = 'none';
       document.getElementById('pantalla-login').style.display = 'flex';
