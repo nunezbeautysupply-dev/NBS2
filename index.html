@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260913a-OFICIAL-V2.0">
+<meta name="app-version" content="20260913b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -824,6 +824,7 @@ function cuandoHayaFirebase(fn){
         <div>
           <div style="font-size:11px;color:#00838F;font-weight:700">TOTAL PRODUCTOS</div>
           <div id="cat-total-num" style="font-size:22px;font-weight:800;color:#00838F">0</div>
+          <div id="cat-sin-foto" style="font-size:11px;font-weight:800;color:#C62828"></div>
         </div>
         <div id="cat-marcas-toggle-txt" style="font-size:12px;color:#00838F;font-weight:600">Ver por marca ▼</div>
       </div>
@@ -861,6 +862,19 @@ function cuandoHayaFirebase(fn){
          no hace falta guardar nada nuevo en cada producto.
          El desplegable usa la clase .inp de la app para que quede del mismo alto y del
          mismo ancho que la caja de buscar, y no descuadrado como quedo la primera vez. -->
+    <!-- 📷 LOS BOTONES DE FOTO, A LA VISTA -13 sep-. Antes estaban escondidos en el
+         desplegable y Sensei no los encontraba. -->
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button id="fb-todos" onclick="filtroFoto('')" style="flex:1;padding:9px 4px;
+        background:#1a237e;color:#fff;border:none;border-radius:9px;font-size:12px;
+        font-weight:800;cursor:pointer">Todos</button>
+      <button id="fb-sin" onclick="filtroFoto('SINFOTO')" style="flex:1;padding:9px 4px;
+        background:#fff;color:#C62828;border:1.5px solid #C62828;border-radius:9px;
+        font-size:12px;font-weight:800;cursor:pointer">📷 Sin foto</button>
+      <button id="fb-con" onclick="filtroFoto('CONFOTO')" style="flex:1;padding:9px 4px;
+        background:#fff;color:#0B7A3B;border:1.5px solid #0B7A3B;border-radius:9px;
+        font-size:12px;font-weight:800;cursor:pointer">🖼️ Con foto</button>
+    </div>
     <select class="inp" id="cat-suplidor" onchange="filtrarCatalogo()" style="font-size:14px;font-weight:700;margin-bottom:8px">
       <option value="">🏪 Todos los suplidores</option>
     </select>
@@ -10433,6 +10447,28 @@ function cerrarFotosRapido(){
   try { renderCatalogo(''); } catch(e){}
 }
 
+// 📷 Los botones de foto del catálogo. -13 sep-
+function filtroFoto(cual){
+  var sel = document.getElementById('cat-suplidor');
+  if(sel) sel.value = cual;
+  window._filtroFoto = cual;
+  renderCatalogo(document.getElementById('catq') ? document.getElementById('catq').value : '');
+}
+
+function pintarBotonesFoto(){
+  var cual = window._filtroFoto || '';
+  var b = [['fb-todos', '', '#1a237e'], ['fb-sin', 'SINFOTO', '#C62828'],
+           ['fb-con', 'CONFOTO', '#0B7A3B']];
+  b.forEach(function(x){
+    var e = document.getElementById(x[0]);
+    if(!e) return;
+    var activo = (cual === x[1]);
+    e.style.background = activo ? x[2] : '#fff';
+    e.style.color = activo ? '#fff' : x[2];
+    e.style.border = activo ? 'none' : ('1.5px solid ' + x[2]);
+  });
+}
+
 function renderCatalogo(q){
   try { arrancarLimpiadorFotos(); } catch(e){}
   loadProds();
@@ -10440,6 +10476,15 @@ function renderCatalogo(q){
   // Actualizar contador total y por marca
   var elTotal = document.getElementById('cat-total-num');
   if(elTotal) elTotal.textContent = productos.length;
+  // 📷 Cuántas le faltan por fotografiar
+  var elSF = document.getElementById('cat-sin-foto');
+  if(elSF){
+    var _sf = productos.filter(function(p){
+      return !(p.foto && String(p.foto).length > 100);
+    }).length;
+    elSF.textContent = _sf ? ('📷 ' + _sf + ' sin foto') : '';
+  }
+  try { pintarBotonesFoto(); } catch(e){}
   actualizarMarcasDetalle();
 
   var el = document.getElementById('catlista');
@@ -10459,7 +10504,8 @@ function renderCatalogo(q){
   if(_sel){
     // Se rellena el desplegable con sus suplidores, conservando lo que tenga escogido
     var _sups = LS('nsup', []);
-    var _falta = _sel.options.length !== (_sups.length + 2);
+    // 🔑 Ahora son 4 fijas: todos, sin precio, sin foto, con foto. -13 sep-
+    var _falta = _sel.options.length !== (_sups.length + 4);
     if(_falta){
       var _html = '<option value="">🏪 Todos los suplidores</option>';
       _sups.forEach(function(sp){
@@ -19321,7 +19367,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260913a';
+var NOVEDADES_VERSION = '20260913b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
