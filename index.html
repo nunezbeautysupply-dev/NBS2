@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260913c-OFICIAL-V2.0">
+<meta name="app-version" content="20260913d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -829,6 +829,19 @@ function cuandoHayaFirebase(fn){
         <div id="cat-marcas-toggle-txt" style="font-size:12px;color:#00838F;font-weight:600">Ver por marca ▼</div>
       </div>
       <div id="cat-marcas-detalle" style="display:none;margin-top:10px;border-top:1px solid #B2EBF2;padding-top:10px;max-height:220px;overflow-y:auto"></div>
+    <!-- 📷 LOS BOTONES DE FOTO, A LA VISTA -13 sep-. Antes estaban escondidos en el
+         desplegable y Sensei no los encontraba. -->
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button id="fb-todos" onclick="filtroFoto('')" style="flex:1;padding:9px 4px;
+        background:#1a237e;color:#fff;border:none;border-radius:9px;font-size:12px;
+        font-weight:800;cursor:pointer">Todos</button>
+      <button id="fb-sin" onclick="filtroFoto('SINFOTO')" style="flex:1;padding:9px 4px;
+        background:#fff;color:#C62828;border:1.5px solid #C62828;border-radius:9px;
+        font-size:12px;font-weight:800;cursor:pointer">📷 Sin foto</button>
+      <button id="fb-con" onclick="filtroFoto('CONFOTO')" style="flex:1;padding:9px 4px;
+        background:#fff;color:#0B7A3B;border:1.5px solid #0B7A3B;border-radius:9px;
+        font-size:12px;font-weight:800;cursor:pointer">🖼️ Con foto</button>
+    </div>
     </div>
     <!-- ⚙️ OPCIONES DEL CATALOGO -Sensei, 19 ago-: "ya hay demasiadas [opciones] arriba,
          deberias hacer un menu que se despliegue y titular OPCIONES". Los nueve botones
@@ -862,19 +875,7 @@ function cuandoHayaFirebase(fn){
          no hace falta guardar nada nuevo en cada producto.
          El desplegable usa la clase .inp de la app para que quede del mismo alto y del
          mismo ancho que la caja de buscar, y no descuadrado como quedo la primera vez. -->
-    <!-- 📷 LOS BOTONES DE FOTO, A LA VISTA -13 sep-. Antes estaban escondidos en el
-         desplegable y Sensei no los encontraba. -->
-    <div style="display:flex;gap:6px;margin-bottom:8px">
-      <button id="fb-todos" onclick="filtroFoto('')" style="flex:1;padding:9px 4px;
-        background:#1a237e;color:#fff;border:none;border-radius:9px;font-size:12px;
-        font-weight:800;cursor:pointer">Todos</button>
-      <button id="fb-sin" onclick="filtroFoto('SINFOTO')" style="flex:1;padding:9px 4px;
-        background:#fff;color:#C62828;border:1.5px solid #C62828;border-radius:9px;
-        font-size:12px;font-weight:800;cursor:pointer">📷 Sin foto</button>
-      <button id="fb-con" onclick="filtroFoto('CONFOTO')" style="flex:1;padding:9px 4px;
-        background:#fff;color:#0B7A3B;border:1.5px solid #0B7A3B;border-radius:9px;
-        font-size:12px;font-weight:800;cursor:pointer">🖼️ Con foto</button>
-    </div>
+    
     <select class="inp" id="cat-suplidor" onchange="filtrarCatalogo()" style="font-size:14px;font-weight:700;margin-bottom:8px">
       <option value="">🏪 Todos los suplidores</option>
     </select>
@@ -10457,8 +10458,15 @@ function filtroFoto(cual){
 
 function pintarBotonesFoto(){
   var cual = window._filtroFoto || '';
-  var b = [['fb-todos', '', '#1a237e'], ['fb-sin', 'SINFOTO', '#C62828'],
-           ['fb-con', 'CONFOTO', '#0B7A3B']];
+  // 🔑 Cuántos hay de cada uno, para que lo vea sin tocar nada. -13 sep-
+  var conFoto = productos.filter(function(p){
+    return !!(p.foto && String(p.foto).length > 100);
+  }).length;
+  var sinFoto = productos.length - conFoto;
+
+  var b = [['fb-todos', '', '#1a237e', 'Todos', productos.length],
+           ['fb-sin', 'SINFOTO', '#C62828', '📷 Sin foto', sinFoto],
+           ['fb-con', 'CONFOTO', '#0B7A3B', '🖼️ Con foto', conFoto]];
   b.forEach(function(x){
     var e = document.getElementById(x[0]);
     if(!e) return;
@@ -10466,6 +10474,9 @@ function pintarBotonesFoto(){
     e.style.background = activo ? x[2] : '#fff';
     e.style.color = activo ? '#fff' : x[2];
     e.style.border = activo ? 'none' : ('1.5px solid ' + x[2]);
+    // El número, debajo del nombre y más grande
+    e.innerHTML = '<div style="font-size:11px;line-height:1.2">' + x[3] + '</div>'
+      + '<div style="font-size:15px;font-weight:900;line-height:1.25">' + x[4] + '</div>';
   });
 }
 
@@ -10482,7 +10493,7 @@ function renderCatalogo(q){
     var _sf = productos.filter(function(p){
       return !(p.foto && String(p.foto).length > 100);
     }).length;
-    elSF.textContent = _sf ? ('📷 ' + _sf + ' sin foto') : '';
+    elSF.textContent = '';      // el botón de Sin foto ya lo dice
   }
   try { pintarBotonesFoto(); } catch(e){}
   actualizarMarcasDetalle();
@@ -19367,7 +19378,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260913c';
+var NOVEDADES_VERSION = '20260913d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
