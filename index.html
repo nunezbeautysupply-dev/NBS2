@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260913e-OFICIAL-V2.0">
+<meta name="app-version" content="20260915a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -699,6 +699,7 @@ function cuandoHayaFirebase(fn){
         </div>
       </div>
     </div>
+    <button onclick="verMiPin()" style="width:100%;margin-top:8px;background:none;border:1px solid #D4A017;color:#8a6a10;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer">🔑 Ver mi PIN (pide huella)</button>
     <button onclick="cambiarPinAdmin()" style="width:100%;margin-top:8px;background:none;border:1px solid var(--nbs-muted);color:var(--nbs-ink);padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">🔑 Cambiar mi PIN secreto</button>
     <button id="btn-huella-config" onclick="activarHuella()" style="width:100%;margin-top:14px;background:none;border:1px solid var(--nbs-gold, #D4A017);color:var(--nbs-gold-dark, #8a6a10);padding:11px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">👆 Activar huella digital</button>
     <div style="background:#F5F3EF;border-radius:10px;padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
@@ -19378,7 +19379,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260913e';
+var NOVEDADES_VERSION = '20260915a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -26180,6 +26181,23 @@ function verificarPinConLimite(pinIngresado){
   return false;
 }
 var PIN_ACTIVO = false;
+
+// 🔑 VER MI PIN. Sensei lo olvidó y no podía abrir su backup. Va protegido con la
+// huella: solo entra quien pueda poner el dedo en este teléfono. -15 sep-
+function verMiPin(){
+  cerrarMenuLateral();
+  function enseniarlo(){
+    var p = localStorage.getItem('nbs_pin_admin') || '8899';
+    avisoGrande('\ud83d\udd11 TU PIN DE ADMINISTRADOR\n\n' + p + '\n\n'
+      + 'Es el mismo que abre tus backups.\n'
+      + 'Ap\u00fantalo en un sitio seguro.');
+  }
+  if(typeof protegerConHuella === 'function'){
+    protegerConHuella(enseniarlo, 'Ver tu PIN de administrador');
+  } else {
+    enseniarlo();
+  }
+}
 
 // Permite al usuario poner su PROPIO PIN secreto (queda guardado solo en su teléfono).
 function cambiarPinAdmin(){
