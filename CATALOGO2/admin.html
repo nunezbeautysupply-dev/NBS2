@@ -96,7 +96,7 @@
 
 <div class="cab">
   <h1>🔧 ADMINISTRAR CATÁLOGO <span style="font-size:11px;background:rgba(255,255,255,.2);
-      padding:2px 7px;border-radius:9px;font-weight:800">v13/09A</span></h1>
+      padding:2px 7px;border-radius:9px;font-weight:800">v16/09A</span></h1>
   <div class="sub" id="cuenta">Cargando…</div>
 </div>
 
@@ -157,12 +157,18 @@ function esc(t){ return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
   .replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ── Cargar todo ──
-Promise.all([
-  fetch('productos.json').then(function(r){ return r.json(); }),
-  fetch('fotos_00.json').then(function(r){ return r.json(); }).catch(function(){ return {}; }),
-  fetch('fotos_01.json').then(function(r){ return r.json(); }).catch(function(){ return {}; }),
-  fetch('fotos_02.json').then(function(r){ return r.json(); }).catch(function(){ return {}; })
-]).then(function(x){
+// 🔑 SE LEEN TODOS LOS ARCHIVOS DE FOTOS QUE HAYA, no solo los tres primeros.
+// Sensei tenía 8 archivos con 185 fotos y el administrador solo veía 75. -16 sep-
+var _peticiones = [ fetch('productos.json').then(function(r){ return r.json(); }) ];
+for(var _t = 0; _t < 40; _t++){
+  (function(n){
+    var nom = 'fotos_' + (n < 10 ? '0' : '') + n + '.json';
+    _peticiones.push(
+      fetch(nom).then(function(r){ return r.ok ? r.json() : {}; }).catch(function(){ return {}; })
+    );
+  })(_t);
+}
+Promise.all(_peticiones).then(function(x){
   PRODS = x[0].productos || [];
   CLIENTES = x[0].clientes || [];
   if(x[0].ajustes) AJUSTES = x[0].ajustes;
@@ -172,6 +178,9 @@ Promise.all([
   document.getElementById('wa').value = AJUSTES.whatsapp;
   pintarChips();
   pintar();
+  // 🔑 Primero se mete en la copia lo que trae el archivo del sitio: así la copia
+  // siempre tiene TODO, venga de donde venga. -16 sep-
+  try { ponerFotosASalvo(); } catch(e){}
   // 🛟 ¿Hay fotos guardadas que no están en el archivo? Se avisa. -12 sep-
   try { revisarFotosPerdidas(); } catch(e){ console.warn(e); }
 }).catch(function(e){
@@ -891,9 +900,18 @@ var CLAVE_FOTOS_GUARDADAS = 'nbs_fotos_a_salvo';
 // Guarda las fotos en el navegador, aparte de los archivos
 function ponerFotosASalvo(){
   try {
+    // 🔑 SOLO CRECE. Se junta con lo que ya había guardado, nunca se reemplaza: si esta
+    // sesión tiene menos fotos que la copia, la copia manda. Antes se pisaba con lo que
+    // hubiera en ese momento y Sensei perdía fotos en cada vuelta. -16 sep-
+    var juntas = {};
+    try {
+      var antes = JSON.parse(localStorage.getItem(CLAVE_FOTOS_GUARDADAS) || 'null');
+      if(antes && antes.fotos) juntas = antes.fotos;
+    } catch(e){}
+    Object.keys(FOTOS || {}).forEach(function(id){ juntas[id] = FOTOS[id]; });
     localStorage.setItem(CLAVE_FOTOS_GUARDADAS, JSON.stringify({
       cuando: Date.now(),
-      fotos: FOTOS
+      fotos: juntas
     }));
     return true;
   } catch(e){
