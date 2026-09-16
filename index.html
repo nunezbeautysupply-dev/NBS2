@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260915a-OFICIAL-V2.0">
+<meta name="app-version" content="20260915b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19379,7 +19379,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260915a';
+var NOVEDADES_VERSION = '20260915b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -35306,13 +35306,29 @@ function cargarDatosDeLaNube(callback){
       var horaTelefono = horaLocalDe(doc.id);
       var hayAlgoLocal = localStorage.getItem(doc.id) !== null;
 
-      if(hayAlgoLocal && horaTelefono > horaNube){
+      // 🔑 LAS LISTAS QUE SABEN JUNTARSE NO SE PROTEGEN ENTERAS. Si este aparato tiene
+      // la lista más nueva, antes se saltaba la nube COMPLETA — y los registros que solo
+      // estaban en el otro aparato no bajaban nunca. A Sensei le faltaron 57 productos
+      // en la PC por esto. Ahora se juntan registro por registro. -15 sep-
+      var _seJunta = false;
+      try {
+        _seJunta = esListaDeRegistros(doc.id)
+          || String(doc.id).indexOf('_borrados_') === 0
+          || CLAVES_CUADERNO.indexOf(doc.id) >= 0
+          || CLAVES_MAPA.indexOf(doc.id) >= 0;
+      } catch(e){ _seJunta = false; }
+
+      if(hayAlgoLocal && horaTelefono > horaNube && !_seJunta){
         protegidos++;
         protegidosLista.push(doc.id);
         console.log('PROTEGIDO: "'+doc.id+'" en este teléfono es más nuevo que en la nube. No se toca.');
         // Y como lo del telefono es mas nuevo, hay que subirlo -la nube esta atrasada-
         marcarPendienteDeSubir(doc.id);
         return;
+      }
+      // Si se junta y este aparato va por delante, se juntará igual y luego se sube
+      if(hayAlgoLocal && horaTelefono > horaNube && _seJunta){
+        marcarPendienteDeSubir(doc.id);
       }
 
       try{
