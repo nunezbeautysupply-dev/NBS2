@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260917b-OFICIAL-V2.0">
+<meta name="app-version" content="20260917c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -813,6 +813,7 @@ function cuandoHayaFirebase(fn){
   </div>
 </div>
 
+<style>@keyframes latidoAviso{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}</style>
 <div id="p-cat" class="pg">
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">📦 Catálogo de Productos</h2>
@@ -5018,7 +5019,11 @@ function ir(id, sinHistorial){
   // Si sale de la Academia, callar la voz para que no siga hablando en otra pantalla
   if(id!=='p-academia' && typeof acaPausar === 'function' && window._acaReproduciendo) acaPausar();
   if(id==='p-inventario') renderInventario('');
-  if(id==='p-inicio'){ renderInicio(); }
+  if(id==='p-inicio'){
+    renderInicio();
+    // 🔔 El aviso con sonido, si hay pedidos nuevos. Sale UNA vez. -17 sep-
+    setTimeout(function(){ try { avisarPedidosNuevos(); } catch(e){} }, 700);
+  }
   pintarMiniResumen();   // la miniatura sale en todas las pantallas, se refresca siempre
   if(id==='p-relleno') abrirRelleno();
   if(id==='p-van') abrirVan();
@@ -19434,7 +19439,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260917b';
+var NOVEDADES_VERSION = '20260917c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -21201,6 +21206,82 @@ function cancelarPedidoMultiple(){
 //
 //  Esta barra va FUERA de los pasos: se ve siempre, en cualquier paso.
 // ═══════════════════════════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  🔔 EL AVISO DE PEDIDOS NUEVOS  (17 sep 2026)
+//
+//  Sensei: "quiero una ventana que se abra en la pantalla con la alerta y un sonido
+//  fuerte que no sea desapercibido".
+//
+//  🔑 Sale UNA VEZ al abrir la app, si hay pedidos nuevos. No molesta después.
+// ═══════════════════════════════════════════════════════════════════
+
+function avisarPedidosNuevos(){
+  try {
+    var peds = LS('npedidos', []);
+    var nuevos = peds.filter(function(p){ return p.nuevo; });
+    if(!nuevos.length) return;
+
+    // Solo una vez por sesión: si ya lo vio, no se le repite
+    if(window._yaAvisePedidos) return;
+    window._yaAvisePedidos = true;
+
+    var total = 0;
+    nuevos.forEach(function(p){
+      (p.items || []).forEach(function(it){
+        total += (Number(it.cant) || 0) * (Number(it.precio) || 0);
+      });
+    });
+
+    var ov = document.createElement('div');
+    ov.id = 'aviso-pedidos-nuevos';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100010;'
+      + 'display:flex;align-items:center;justify-content:center;padding:15px';
+    ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;'
+      +   'max-width:400px;width:100%;text-align:center;'
+      +   'animation:latidoAviso .6s ease-in-out 3">'
+      + '<div style="font-size:46px;margin-bottom:6px">\ud83d\udd14</div>'
+      + '<div style="font-size:18px;font-weight:900;color:#C62828;margin-bottom:13px">'
+      +   '\u00a1TIENES ' + nuevos.length + ' PEDIDO'
+      +   (nuevos.length > 1 ? 'S' : '') + ' NUEVO' + (nuevos.length > 1 ? 'S' : '') + '!</div>'
+      + '<div style="background:#FFF3E0;border-radius:11px;padding:11px;margin-bottom:13px;'
+      +   'text-align:left">'
+      + nuevos.slice(0, 6).map(function(p){
+          var t = (p.items || []).reduce(function(a, it){
+            return a + ((Number(it.cant) || 0) * (Number(it.precio) || 0));
+          }, 0);
+          return '<div style="display:flex;justify-content:space-between;gap:8px;'
+            + 'padding:4px 0;font-size:13px">'
+            + '<span style="font-weight:800">' + escaparHtml(String(p.nombre || '').slice(0, 22)) + '</span>'
+            + '<span style="font-weight:900;color:#0B7A3B;flex-shrink:0">$' + fmtNum(t) + '</span></div>';
+        }).join('')
+      + (nuevos.length > 6
+          ? '<div style="font-size:11.5px;color:#8A6D00;margin-top:4px">y '
+            + (nuevos.length - 6) + ' m\u00e1s\u2026</div>'
+          : '')
+      + '</div>'
+      + '<div style="font-size:16px;font-weight:900;margin-bottom:14px">TOTAL: $'
+      +   fmtNum(total) + '</div>'
+      + '<button onclick="document.getElementById(\'aviso-pedidos-nuevos\').remove();'
+      +   'verPedidosPendientes()" style="width:100%;padding:15px;background:#C62828;'
+      +   'color:#fff;border:none;border-radius:12px;font-size:15.5px;font-weight:900;'
+      +   'cursor:pointer">\ud83d\udccb VER LOS PEDIDOS</button>'
+      + '<button onclick="document.getElementById(\'aviso-pedidos-nuevos\').remove()" '
+      +   'style="width:100%;padding:12px;margin-top:8px;background:#F0F0F2;color:#555;'
+      +   'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">'
+      +   'Ahora no</button>'
+      + '</div>';
+    document.body.appendChild(ov);
+
+    // 🔊 El sonido: tres campanadas seguidas para que no pase desapercibido
+    try { sonarCampanaPedido(); } catch(e){}
+    setTimeout(function(){ try { sonarCampanaPedido(); } catch(e){} }, 380);
+    setTimeout(function(){ try { sonarCampanaPedido(); } catch(e){} }, 760);
+    // Y que vibre, si el teléfono puede
+    try { if(navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]); } catch(e){}
+  } catch(e){ console.warn('no pude avisar de los pedidos:', e); }
+}
 
 function pintarBarraGuardados(){
   try {
