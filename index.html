@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260916a-OFICIAL-V2.0">
+<meta name="app-version" content="20260916b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16971,7 +16971,16 @@ function saveV(){
           + '\n\nYa le toca su regalo.');
       }
     }, 250);
-    setTimeout(function(){ ofrecerMensajeAlCliente(ultV.cid, 'venta', tot, null); }, 900);
+    // 💬 LOS 7 MENSAJES -Sensei, 16 sep-: escoge qué pasó hoy y sale el texto armado.
+    setTimeout(function(){
+      try {
+        var _pag = 0;
+        (ultV.pagosFactura || []).forEach(function(p){
+          if(p && !p.esDevolucion) _pag += (parseFloat(p.monto) || 0);
+        });
+        abrirMensajeCliente(ultV.cid, { compra: tot, pago: _pag });
+      } catch(e){ ofrecerMensajeAlCliente(ultV.cid, 'venta', tot, null); }
+    }, 900);
   }
   } catch(e){}
 
@@ -19423,7 +19432,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260916a';
+var NOVEDADES_VERSION = '20260916b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -26042,7 +26051,12 @@ function verCl(id){
     + '<button class="btn" style="flex:1;margin:0;background:#6A1B9A;color:#fff;padding:11px 4px;font-size:12.5px" onclick="irAPedidoCliente(' + id + ')">\u26a1 Pedido</button>'
     + '<button class="btn" style="flex:1;margin:0;background:#00695C;color:#fff;padding:11px 4px;font-size:12.5px" onclick="irACobrarCliente(' + id + ')">\ud83d\udcb5 Cobrar</button>'
     + '<button class="btn" style="flex:1;margin:0;background:#1565C0;color:#fff;padding:11px 4px;font-size:12.5px" onclick="irAVenderCliente(' + id + ')">\ud83e\uddfe Vender</button>'
-    + '</div>';
+    + '</div>'
+    // 💬 LOS 7 MENSAJES -16 sep-
+    + '<button class="btn" style="width:100%;margin:6px 0 0;background:#25D366;'
+    +   'color:#fff;padding:11px;font-size:13px;font-weight:800" '
+    +   'onclick="abrirMensajeCliente(' + _arg(id) + ')">'
+    +   '\ud83d\udcac Mandarle un mensaje</button>';
   cab.innerHTML = h;
   el.appendChild(cab);
 
@@ -26056,6 +26070,28 @@ function verCl(id){
   // Show profile page (usando ir() para que el historial de navegacion funcione)
   ir('p-cl-perfil');
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  💬 LOS 7 MENSAJES AL CLIENTE  (16 sep 2026)
+//
+//  Sensei los redactó él mismo, en voz de EMPRESA: "quiero usar un lenguaje de
+//  negocios, basado en una empresa de prestigio y excelente reputación, con el mayor
+//  respeto posible para mis clientes".
+//
+//  🔑 Los 7 casos posibles del día, con los números reales de cada cliente.
+//  Las despedidas rotan solas para que no suene monótono.
+// ═══════════════════════════════════════════════════════════════════
+
+// 🔑 Las despedidas. Se elige una al azar cada vez, y las dos últimas solo en su caso.
+var DESPEDIDAS_NBS = [
+  'Gracias por hacer negocio con nosotros, estamos para servirle.',
+  'Agradecemos su preferencia. Quedamos a su entera disposición.',
+  'Es un placer atenderle. Cuente con nosotros para lo que necesite.',
+  'Gracias por su confianza. Seguimos a su servicio.',
+  'Apreciamos su preferencia. Estamos para apoyarle en lo que precise.'
+];
+var DESPEDIDA_AL_DIA = 'Agradecemos su puntualidad en el pago. Un gusto trabajar con usted.';
+var DESPEDIDA_A_FAVOR = 'Gracias por su confianza. Su crédito queda disponible cuando lo necesite.';
 
 function verFactura(v){
   var el=document.getElementById('cl-factura-contenido');el.innerHTML='';
@@ -29540,6 +29576,247 @@ function pintarEstadoDeCuenta(){
 
 // El texto que se le manda después de una VENTA o de un COBRO.
 // tipo: 'venta' o 'pago'.  monto: lo de esta operación.
+function despedidaNBS(caso){
+  if(caso === 'aldia') return DESPEDIDA_AL_DIA;
+  if(caso === 'afavor') return DESPEDIDA_A_FAVOR;
+  var n = (typeof window._despedidaVa === 'number') ? window._despedidaVa : -1;
+  n = (n + 1) % DESPEDIDAS_NBS.length;
+  window._despedidaVa = n;
+  return DESPEDIDAS_NBS[n];
+}
+
+/**
+ * 💬 Arma el mensaje del caso que Sensei escoja, con los números reales del cliente.
+ * casos: pago · compraypago · compra · aldia · demas · devolucion · credito
+ */
+function mensajeNBS(cid, caso, datos){
+  datos = datos || {};
+  clientes = LS('ncl', []);
+  ventas = LS('nv', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c) return '';
+
+  // Lo que debe AHORA
+  var debe = 0;
+  ventas.forEach(function(v){
+    if(String(v.cid) !== String(cid) || v.cancelada) return;
+    debe += cobradoYDebeDe(v).debe;
+  });
+  debe = Math.round(debe * 100) / 100;
+  var aFavor = Math.round((parseFloat(c.creditoAFavor) || 0) * 100) / 100;
+
+  var compra = Math.round((parseFloat(datos.compra) || 0) * 100) / 100;
+  var pago = Math.round((parseFloat(datos.pago) || 0) * 100) / 100;
+  var devolucion = Math.round((parseFloat(datos.devolucion) || 0) * 100) / 100;
+  var credito = Math.round((parseFloat(datos.credito) || 0) * 100) / 100;
+
+  // 🔑 El balance de antes se deduce SOLO con lo que de verdad pasó en este caso. -16 sep-
+  var antes = debe;
+  if(caso === 'pago' || caso === 'aldia' || caso === 'demas'){
+    antes = debe + pago;
+  } else if(caso === 'compraypago'){
+    antes = debe + pago - compra;
+  } else if(caso === 'compra'){
+    antes = debe - compra;
+  } else if(caso === 'devolucion'){
+    antes = debe + devolucion;
+  } else if(caso === 'credito'){
+    antes = debe + credito - compra;
+  }
+  antes = Math.round(antes * 100) / 100;
+  if(antes < 0) antes = 0;
+
+  var d = function(n){ return '$' + fmtNum(n); };
+  var t = [];
+  t.push('Estimado Sr. ' + (c.nombre || nombreCl(c)) + ',');
+  t.push('');
+
+  if(caso === 'pago'){
+    t.push('Tenía un balance pendiente de ' + d(antes));
+    t.push('');
+    t.push('Hoy registramos su pago de ' + d(pago));
+    t.push('');
+    t.push('Queda con un balance pendiente al día de hoy de ' + d(debe));
+    t.push('');
+    t.push(despedidaNBS());
+
+  } else if(caso === 'compraypago'){
+    t.push('Tenía un balance pendiente de ' + d(antes));
+    t.push('');
+    t.push('Hoy realizó una compra por valor de ' + d(compra));
+    t.push('');
+    t.push('Y registramos su pago de ' + d(pago));
+    t.push('');
+    t.push('Queda con un balance pendiente al día de hoy de ' + d(debe));
+    t.push('');
+    t.push(despedidaNBS());
+
+  } else if(caso === 'compra'){
+    t.push('Tenía un balance pendiente de ' + d(antes));
+    t.push('');
+    t.push('Hoy realizó una compra por valor de ' + d(compra));
+    t.push('');
+    t.push('Queda con un balance pendiente al día de hoy de ' + d(debe));
+    t.push('');
+    t.push(despedidaNBS());
+
+  } else if(caso === 'aldia'){
+    t.push('Tenía un balance pendiente de ' + d(antes));
+    t.push('');
+    t.push('Hoy registramos su pago de ' + d(pago));
+    t.push('');
+    t.push('Su cuenta queda al día, con balance de $0.00 \u2705');
+    t.push('');
+    t.push(despedidaNBS('aldia'));
+
+  } else if(caso === 'demas'){
+    t.push('Tenía un balance pendiente de ' + d(antes));
+    t.push('');
+    t.push('Hoy registramos su pago de ' + d(pago));
+    t.push('');
+    t.push('Su cuenta queda al día, y con ' + d(aFavor)
+      + ' a favor para su próxima compra');
+    t.push('');
+    t.push(despedidaNBS('afavor'));
+
+  } else if(caso === 'devolucion'){
+    t.push('Tenía un balance pendiente de ' + d(antes));
+    t.push('');
+    t.push('Hoy registramos la devolución de ' + d(devolucion));
+    t.push('');
+    t.push('Queda con un balance pendiente al día de hoy de ' + d(debe));
+    t.push('');
+    t.push(despedidaNBS());
+
+  } else if(caso === 'credito'){
+    t.push('Tenía ' + d(credito) + ' a favor');
+    t.push('');
+    t.push('Hoy realizó una compra por valor de ' + d(compra));
+    t.push('');
+    t.push('Aplicamos su crédito a favor y queda con un balance pendiente al día de hoy de '
+      + d(debe));
+    t.push('');
+    t.push(despedidaNBS());
+  }
+
+  t.push('');
+  t.push('Att. Nunez Beauty Supply');
+  return t.join('\n');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  📤 LA PANTALLA PARA ESCOGER EL MENSAJE  (16 sep 2026)
+//  Sensei escoge qué pasó hoy, ve el mensaje armado, y lo manda por WhatsApp.
+//  En WhatsApp todavía lo puede editar antes de darle a enviar.
+// ═══════════════════════════════════════════════════════════════════
+
+var CASOS_MENSAJE = [
+  ['pago',        '① Pagó y no compró'],
+  ['compraypago', '② Compró y pagó'],
+  ['compra',      '③ Compró y no pagó'],
+  ['aldia',       '④ Quedó al día'],
+  ['demas',       '⑤ Pagó de más'],
+  ['devolucion',  '⑥ Devolvió mercancía'],
+  ['credito',     '⑦ Usó su crédito a favor']
+];
+
+function abrirMensajeCliente(cid, datos){
+  if(!cid) return;
+  clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c){ avisoGrande('No encontré ese cliente.'); return; }
+
+  window._msgCid = cid;
+  window._msgDatos = datos || {};
+  window._msgCaso = null;
+
+  var ov = document.getElementById('msgcli-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'msgcli-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100007;'
+    + 'display:flex;align-items:center;justify-content:center;padding:13px';
+  ov.onclick = function(e){ if(e.target === ov) cerrarMensajeCliente(); };
+  pintarMensajeCliente();
+  ov.style.display = 'flex';
+}
+
+function cerrarMensajeCliente(){
+  var ov = document.getElementById('msgcli-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function pintarMensajeCliente(){
+  var cid = window._msgCid;
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c) return;
+  var caso = window._msgCaso;
+
+  var h = '<div style="background:#fff;border-radius:14px;padding:15px;max-width:430px;'
+    +   'width:100%;max-height:92vh;overflow:auto">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;'
+    +   'margin-bottom:11px">'
+    +   '<div style="font-size:15px;font-weight:900;color:var(--nbs-ink)">'
+    +     '\ud83d\udce4 Mensaje al cliente</div>'
+    +   '<button onclick="cerrarMensajeCliente()" style="background:#F0F0F2;border:none;'
+    +     'border-radius:9px;width:32px;height:32px;font-size:15px;cursor:pointer">\u2715</button>'
+    + '</div>'
+    + '<div style="background:#FFF8E1;border-radius:9px;padding:9px;margin-bottom:11px;'
+    +   'font-size:13.5px;font-weight:800">' + escaparHtml(nombreCl(c)) + '</div>';
+
+  if(!caso){
+    // ① Escoger qué pasó hoy
+    h += '<div style="font-size:11px;font-weight:800;color:#8A8B9E;margin-bottom:6px">'
+      +   '\u00bfQU\u00c9 PAS\u00d3 HOY?</div>'
+      + CASOS_MENSAJE.map(function(x){
+          return '<button onclick="escogerCaso(\'' + x[0] + '\')" '
+            + 'style="width:100%;padding:12px;margin-bottom:6px;background:#fff;'
+            + 'border:1.5px solid #D4D5E0;border-radius:10px;font-size:13.5px;'
+            + 'font-weight:700;text-align:left;cursor:pointer">' + x[1] + '</button>';
+        }).join('');
+  } else {
+    // ② Ver el mensaje y mandarlo
+    var texto = mensajeNBS(cid, caso, window._msgDatos);
+    window._msgTexto = texto;
+    h += '<div style="background:#F6F7FB;border:1.5px solid #E5E6EE;border-radius:11px;'
+      +   'padding:13px;font-size:13px;line-height:1.6;white-space:pre-wrap;'
+      +   'margin-bottom:11px">' + escaparHtml(texto) + '</div>'
+      + '<button onclick="mandarMensajeCliente()" style="width:100%;padding:14px;'
+      +   'background:#25D366;color:#fff;border:none;border-radius:11px;font-size:15px;'
+      +   'font-weight:900;cursor:pointer">\ud83d\udce4 Mandar por WhatsApp</button>'
+      + '<button onclick="otraDespedida()" style="width:100%;padding:11px;margin-top:7px;'
+      +   'background:#fff;color:#1a237e;border:1.5px solid #1a237e;border-radius:10px;'
+      +   'font-size:13px;font-weight:800;cursor:pointer">\ud83d\udd04 Otra despedida</button>'
+      + '<button onclick="window._msgCaso=null;pintarMensajeCliente()" '
+      +   'style="width:100%;padding:11px;margin-top:7px;background:#F0F0F2;color:#444;'
+      +   'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">'
+      +   '\u2039 Escoger otro caso</button>';
+  }
+  h += '</div>';
+  document.getElementById('msgcli-overlay').innerHTML = h;
+}
+
+function escogerCaso(caso){
+  window._msgCaso = caso;
+  pintarMensajeCliente();
+}
+
+function otraDespedida(){
+  pintarMensajeCliente();      // despedidaNBS() ya rota sola
+}
+
+function mandarMensajeCliente(){
+  var cid = window._msgCid;
+  if(!cid || !window._msgTexto) return;
+  cerrarMensajeCliente();
+  // 🔑 Se usa la de siempre: ya maneja el teléfono, el copiado y su modo de WhatsApp
+  try { enviarPorWhatsAppACliente(cid, window._msgTexto); }
+  catch(e){ avisoGrande('No pude abrir WhatsApp.'); }
+}
+
 function textoParaCliente(cid, tipo, monto, detalleFacturas){
   clientes = LS('ncl', []);
   ventas = LS('nv', []);
