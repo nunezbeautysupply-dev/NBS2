@@ -146,6 +146,15 @@
   <input class="buscar" id="q" placeholder="🔍 Buscar producto o marca…" oninput="buscar(this.value)">
 </div>
 
+<!-- 🎁 EL 5% POR PEDIR AQUÍ -Sensei, 17 sep-. Es lo que le ahorra viajes sin venta
+     y a ellos les conviene. -->
+<div style="background:linear-gradient(135deg,#0B7A3B,#12A653);color:#fff;padding:10px 14px;
+     text-align:center">
+  <div style="font-size:14.5px;font-weight:900;letter-spacing:.3px">
+    🎁 5% DE DESCUENTO por hacer tu pedido aquí</div>
+  <div style="font-size:11px;opacity:.93;margin-top:2px">
+    No aplica a máquinas, repuestos ni cargadores</div>
+</div>
 <div class="cinta" id="cintaPromos" onclick="filtrar('promos');window.scrollTo(0,0)"
      style="display:none">
   <span id="cintaTexto">🔥 OFERTAS DE ESTA SEMANA</span>
@@ -158,7 +167,7 @@
 </div>
 
 <div class="chips" id="chips"></div>
-<div style="text-align:center;font-size:9.5px;color:#B8B9C6;padding:3px">v16/09A</div>
+<div style="text-align:center;font-size:9.5px;color:#B8B9C6;padding:3px">v17/09A</div>
 <div class="lista" id="lista"><div class="vacio">Cargando el catálogo…</div></div>
 
 <div class="barra" id="barra">
@@ -186,6 +195,19 @@
 //  Para cambiarlo, solo esta línea.
 // ═══════════════════════════════════════════════════════════════════
 var DESCUENTO_CONTADO = 0.10;      // 10%
+
+// 🎁 EL DESCUENTO POR PEDIR EN EL CATÁLOGO -17 sep-
+var DESCUENTO_CATALOGO = 0.05;     // 5%
+// 🔴 Categorías donde el margen no da para descuento
+var SIN_DESCUENTO = ['MAQUINAS', 'REEMPLAZOS', 'CARGADORES'];
+
+function llevaDescuento(p){
+  var c = String((p && p.c) || '').toUpperCase().trim();
+  for(var i = 0; i < SIN_DESCUENTO.length; i++){
+    if(c === SIN_DESCUENTO[i]) return false;
+  }
+  return true;
+}
 var WHATSAPP_NBS = '14013050188';
 
 var PRODS = [], CLIENTES = [], YO = null, COMBOS = [];
@@ -495,6 +517,7 @@ function menos(id){
 }
 function totales(){
   var n = 0, contado = 0, credito = 0;
+  var conDto = 0, sinDto = 0;      // 🎁 para el 5% del catálogo -17 sep-
   for(var k in CARRO){
     // 📦 Los combos llevan su propio precio, igual al contado que a crédito
     if(k.indexOf('COMBO:') === 0){
@@ -508,11 +531,19 @@ function totales(){
     var p = PRODS.find(function(x){ return x.id === k; });
     if(!p) continue;
     n += CARRO[k];
+    var _linea = CARRO[k] * p.pr;
     contado += conPromo(p, CARRO[k]).total;
-    credito += CARRO[k] * p.pr;
+    credito += _linea;
+    // 🎁 Se separa lo que lleva descuento de lo que no -17 sep-
+    if(llevaDescuento(p)) conDto += _linea;
+    else sinDto += _linea;
   }
+  var dto = Math.round(conDto * DESCUENTO_CATALOGO * 100) / 100;
   return { n: n, contado: Math.round(contado*100)/100,
            credito: Math.round(credito*100)/100,
+           // 🎁 El 5% por pedir aquí -17 sep-
+           dto: dto, sinDto: Math.round(sinDto*100)/100,
+           conDescuento: Math.round((credito - dto) * 100) / 100,
            ahorro: Math.round((credito - contado)*100)/100 };
 }
 function barra(){
@@ -612,13 +643,27 @@ function verCarrito(){
 
     // 🔑 LOS DOS TOTALES, para que vea lo que se ahorra
     + '<div style="border:2px solid #0B7A3B;border-radius:12px;padding:13px;margin-top:14px">'
-    +   '<div style="display:flex;justify-content:space-between;font-size:19px;font-weight:900;'
-    +     'color:#0B7A3B"><span>💵 AL CONTADO</span><span>' + dinero(t.contado) + '</span></div>'
-    +   '<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;'
-    +     'color:#7C7D90;margin-top:6px"><span>A crédito</span><span>' + dinero(t.credito) + '</span></div>'
-    +   '<div style="background:#E7F6ED;border-radius:8px;padding:8px;margin-top:9px;'
-    +     'text-align:center;font-size:13px;font-weight:800;color:#0B7A3B">'
-    +     'Pagando al contado ahorras ' + dinero(t.ahorro) + '</div>'
+    +   '<div style="display:flex;justify-content:space-between;font-size:14px;'
+    +     'color:#555"><span>Subtotal</span><span style="font-weight:700">'
+    +     dinero(t.credito) + '</span></div>'
+    // 🎁 EL 5% POR PEDIR AQUÍ -17 sep-
+    +   (t.dto > 0.005
+          ? '<div style="display:flex;justify-content:space-between;font-size:14px;'
+            + 'color:#0B7A3B;font-weight:800;margin-top:5px">'
+            + '<span>🎁 Descuento 5%</span><span>−' + dinero(t.dto) + '</span></div>'
+          : '')
+    +   (t.sinDto > 0.005
+          ? '<div style="font-size:10.5px;color:#8A8B9E;margin-top:2px">'
+            + 'Máquinas y repuestos (' + dinero(t.sinDto) + ') sin descuento</div>'
+          : '')
+    +   '<div style="display:flex;justify-content:space-between;font-size:20px;font-weight:900;'
+    +     'color:#0B7A3B;margin-top:9px;padding-top:9px;border-top:2px solid #0B7A3B">'
+    +     '<span>TOTAL</span><span>' + dinero(t.conDescuento) + '</span></div>'
+    +   (t.dto > 0.005
+          ? '<div style="background:#E7F6ED;border-radius:8px;padding:8px;margin-top:9px;'
+            + 'text-align:center;font-size:12.5px;font-weight:800;color:#0B7A3B">'
+            + '🎁 Te ahorras ' + dinero(t.dto) + ' por pedir aquí</div>'
+          : '')
     + '</div>'
 
     + '<button onclick="enviar()" style="width:100%;padding:15px;margin-top:13px;'
@@ -646,6 +691,102 @@ function sumarHasta(id, cuantas){
   guardar(); pintar(); barra(); verCarrito();
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  📤 MANDAR EL PEDIDO AL BUZÓN  (17 sep 2026)
+//
+//  🔴 CUIDADO: en septiembre el catálogo entró al MISMO Firebase que la app y le pisó
+//  la sesión — Sensei perdió la huella. Por eso aquí se usa una app de Firebase APARTE,
+//  con su propio nombre ('buzon'), y NUNCA se toca la autenticación.
+//
+//  🔒 Las reglas del 17 sep solo dejan CREAR en nbs_buzon_pedidos. Ni leer, ni cambiar,
+//  ni borrar, ni tocar nada más del negocio.
+// ═══════════════════════════════════════════════════════════════════
+
+var _fbBuzon = null;
+
+function prepararBuzon(){
+  if(_fbBuzon) return _fbBuzon;
+  try {
+    if(typeof firebase === 'undefined') return null;
+    // 🔑 Una app APARTE, con nombre propio: así no toca la sesión de la app de Sensei
+    var app;
+    try { app = firebase.app('buzon'); }
+    catch(e){
+      app = firebase.initializeApp({
+        apiKey: "AIzaSyBqtoMWt9DTMmSN-RR5MUagRIuH7B_Bjbw",
+        authDomain: "nbs2-b641a.firebaseapp.com",
+        projectId: "nbs2-b641a",
+        storageBucket: "nbs2-b641a.firebasestorage.app",
+        messagingSenderId: "946975018761",
+        appId: "1:946975018761:web:6dea81efb50b993ca3cdd8"
+      }, 'buzon');
+    }
+    _fbBuzon = firebase.firestore(app);
+    return _fbBuzon;
+  } catch(e){
+    console.warn('no pude preparar el buzón:', e);
+    return null;
+  }
+}
+
+/**
+ * 📤 Deja el pedido en el buzón. Si no puede (sin internet, Firebase caído), NO pasa
+ * nada: el pedido igual se manda por WhatsApp, que es lo que ya funcionaba.
+ */
+function mandarPedidoAlBuzon(lineasCarro, t, listo){
+  var db = prepararBuzon();
+  if(!db || !YO){ listo(false); return; }
+
+  var items = [];
+  for(var k in CARRO){
+    if(k.indexOf('COMBO:') === 0){
+      var cb = COMBOS[parseInt(k.split(':')[1], 10)];
+      if(!cb) continue;
+      items.push({ pid: k, nombre: 'PACK ' + cb.nombre, cant: CARRO[k],
+                   precio: cb.precio, sinDescuento: false });
+      continue;
+    }
+    var p = PRODS.find(function(x){ return x.id === k; });
+    if(!p) continue;
+    items.push({ pid: String(p.id), nombre: String(p.n || '').slice(0, 60),
+                 cant: CARRO[k], precio: p.pr,
+                 sinDescuento: !llevaDescuento(p) });
+  }
+  if(!items.length){ listo(false); return; }
+
+  var pedido = {
+    cid: String(YO.id),
+    nombre: String(YO.n || ''),
+    barberia: String(YO.neg || ''),
+    items: items,
+    subtotal: t.credito,
+    descuento: t.dto || 0,
+    total: t.conDescuento,
+    cuando: Date.now(),
+    delCatalogo: true,
+    recogido: false
+  };
+
+  // 🔑 Con un límite de tiempo: si tarda, no se le deja esperando
+  var yaTermine = false;
+  var reloj = setTimeout(function(){
+    if(!yaTermine){ yaTermine = true; listo(false); }
+  }, 6000);
+
+  db.collection('nbs_buzon_pedidos').add(pedido)
+    .then(function(){
+      if(yaTermine) return;
+      yaTermine = true; clearTimeout(reloj); listo(true);
+    })
+    .catch(function(e){
+      if(yaTermine) return;
+      yaTermine = true; clearTimeout(reloj);
+      console.warn('el pedido no llegó al buzón:', e);
+      listo(false);
+    });
+}
+
 function enviar(){
   var t = totales(), lineas = [];
   for(var k in CARRO){
@@ -670,13 +811,39 @@ function enviar(){
   if(YO){ m.push(YO.n); if(YO.neg) m.push(YO.neg); m.push(''); }
   m = m.concat(lineas);
   m.push('');
-  m.push('TOTAL AL CONTADO: ' + dinero(t.contado));
-  m.push('Total a credito: ' + dinero(t.credito));
-  m.push('(al contado ahorras ' + dinero(t.ahorro) + ')');
+  m.push('Subtotal: ' + dinero(t.credito));
+  if(t.dto > 0.005){
+    m.push('Descuento 5% por pedir aqui: -' + dinero(t.dto));
+    if(t.sinDto > 0.005){
+      m.push('(maquinas y repuestos ' + dinero(t.sinDto) + ' sin descuento)');
+    }
+  }
+  m.push('*TOTAL: ' + dinero(t.conDescuento) + '*');
 
-  CARRO = {}; guardar(); pintar(); barra(); cerrarCarrito();
-  location.href = 'https://wa.me/' + WHATSAPP_NBS + '?text=' + encodeURIComponent(m.join('\n'));
+  var _texto = m.join('\n');
+
+  // 📤 Primero al buzón, para que le llegue a la app. Si falla, da igual: WhatsApp
+  // sigue funcionando como siempre y el pedido no se pierde. -17 sep-
+  mandarPedidoAlBuzon(lineas, t, function(llego){
+    if(llego){
+      try {
+        var av = document.createElement('div');
+        av.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);'
+          + 'background:#0B7A3B;color:#fff;padding:11px 18px;border-radius:22px;'
+          + 'font-size:13px;font-weight:800;z-index:99999;box-shadow:0 3px 12px rgba(0,0,0,.3)';
+        av.textContent = '\u2705 Tu pedido lleg\u00f3 a NBS';
+        document.body.appendChild(av);
+        setTimeout(function(){ try { av.remove(); } catch(e){} }, 2500);
+      } catch(e){}
+    }
+    CARRO = {}; guardar(); pintar(); barra(); cerrarCarrito();
+    location.href = 'https://wa.me/' + WHATSAPP_NBS + '?text=' + encodeURIComponent(_texto);
+  });
 }
 </script>
+<!-- 🔥 Firebase SOLO para dejar el pedido en el buzón. Va al final y por detrás, así
+     no frena el catálogo si internet está lento. -17 sep- -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" defer></script>
 </body>
 </html>

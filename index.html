@@ -4723,6 +4723,7 @@ var RECUADROS_ENCIMA = [
   { id: 'traerfotos-overlay',       cerrar: 'cerrarTraerFotos' },
   { id: 'msgcli-overlay',           cerrar: 'cerrarMensajeCliente' },
   { id: 'guardados-overlay',        cerrar: 'cerrarGuardados' },
+  { id: 'aviso-pedidos-nuevos',     cerrar: 'cerrarAvisoPedidos' },
   { id: 'fotorapido-overlay',       cerrar: 'cerrarFotosRapido' },
   { id: 'pin-overlay',              cerrar: 'cerrarPinRecuadro' },
   { id: 'estado-fechas-overlay',    cerrar: 'cerrarEstadoPorFechas' },
@@ -21283,6 +21284,169 @@ function avisarPedidosNuevos(){
   } catch(e){ console.warn('no pude avisar de los pedidos:', e); }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  📥 RECOGER LOS PEDIDOS DEL BUZÓN  (17 sep 2026)
+//
+//  El catálogo deja los pedidos en `nbs_buzon_pedidos`. La app los recoge al abrirse,
+//  los mete en `npedidos` —los mismos que él ya maneja— y los marca como recogidos
+//  para no traerlos dos veces.
+//
+//  🔒 Va POR DETRÁS: si no hay internet o Firebase tarda, la app arranca igual.
+// ═══════════════════════════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  🔔 EL AVISO DE PEDIDOS NUEVOS  (17 sep 2026)
+//
+//  Sensei: "quiero una ventana que se abra en la pantalla con la alerta y un sonido
+//  fuerte que no sea desapercibido".
+//
+//  🔑 Sale UNA VEZ al abrir la app, si el buzón trajo pedidos nuevos.
+// ═══════════════════════════════════════════════════════════════════
+
+function avisarPedidosNuevos(cuantos){
+  try {
+    if(!cuantos) return;
+    var peds = LS('npedidos', []).filter(function(p){ return p.nuevo; });
+    if(!peds.length) return;
+
+    var total = 0;
+    peds.forEach(function(p){
+      (p.items || []).forEach(function(it){
+        total += (Number(it.cant) || 0) * (Number(it.precio) || 0);
+      });
+    });
+
+    var ov = document.createElement('div');
+    ov.id = 'aviso-pedidos-nuevos';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100011;'
+      + 'display:flex;align-items:center;justify-content:center;padding:15px';
+    ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;'
+      +   'max-width:400px;width:100%;text-align:center">'
+      + '<div style="font-size:46px;margin-bottom:5px">\ud83d\udd14</div>'
+      + '<div style="font-size:18px;font-weight:900;color:#C62828;margin-bottom:12px">'
+      +   '\u00a1TIENES ' + peds.length + ' PEDIDO' + (peds.length > 1 ? 'S' : '')
+      +   ' NUEVO' + (peds.length > 1 ? 'S' : '') + '!</div>'
+      + '<div style="background:#FFF3E0;border-radius:11px;padding:11px;margin-bottom:12px;'
+      +   'text-align:left">'
+      + peds.slice(0, 6).map(function(p){
+          var t = (p.items || []).reduce(function(a, it){
+            return a + ((Number(it.cant) || 0) * (Number(it.precio) || 0));
+          }, 0);
+          return '<div style="display:flex;justify-content:space-between;gap:8px;'
+            + 'padding:4px 0;font-size:13px">'
+            + '<span style="font-weight:800;min-width:0;overflow:hidden;'
+            +   'text-overflow:ellipsis;white-space:nowrap">'
+            +   escaparHtml(String(p.nombre || '')) + '</span>'
+            + '<span style="font-weight:900;color:#0B7A3B;flex-shrink:0">$'
+            +   fmtNum(t) + '</span></div>';
+        }).join('')
+      + (peds.length > 6
+          ? '<div style="font-size:11.5px;color:#8A6D00;margin-top:4px">y '
+            + (peds.length - 6) + ' m\u00e1s\u2026</div>' : '')
+      + '</div>'
+      + '<div style="font-size:16px;font-weight:900;margin-bottom:13px">TOTAL: $'
+      +   fmtNum(total) + '</div>'
+      + '<button onclick="cerrarAvisoPedidos();verLosGuardados()" '
+      +   'style="width:100%;padding:15px;background:#C62828;color:#fff;border:none;'
+      +   'border-radius:12px;font-size:15.5px;font-weight:900;cursor:pointer">'
+      +   '\ud83d\udccb VER LOS PEDIDOS</button>'
+      + '<button onclick="cerrarAvisoPedidos()" style="width:100%;padding:12px;'
+      +   'margin-top:8px;background:#F0F0F2;color:#555;border:none;border-radius:10px;'
+      +   'font-size:13px;font-weight:700;cursor:pointer">Ahora no</button>'
+      + '</div>';
+    document.body.appendChild(ov);
+
+    // 🔊 Tres campanadas seguidas, para que no pase desapercibido
+    try { sonarCampanaPedido(); } catch(e){}
+    setTimeout(function(){ try { sonarCampanaPedido(); } catch(e){} }, 380);
+    setTimeout(function(){ try { sonarCampanaPedido(); } catch(e){} }, 760);
+    try { if(navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]); } catch(e){}
+  } catch(e){ console.warn('no pude avisar:', e); }
+}
+
+function cerrarAvisoPedidos(){
+  var ov = document.getElementById('aviso-pedidos-nuevos');
+  if(ov) ov.remove();
+}
+
+function recogerPedidosDelBuzon(cuandoTermine){
+  cuandoTermine = cuandoTermine || function(){};
+  try {
+    if(typeof fbDb === 'undefined' || !fbDb){ cuandoTermine(0); return; }
+
+    fbDb.collection('nbs_buzon_pedidos')
+      .where('recogido', '==', false)
+      .get()
+      .then(function(snap){
+        if(snap.empty){ cuandoTermine(0); return; }
+
+        var peds = LS('npedidos', []);
+        var yaEstan = {};
+        peds.forEach(function(p){ if(p.buzonId) yaEstan[p.buzonId] = true; });
+
+        var nuevos = 0, marcar = [];
+        snap.forEach(function(doc){
+          if(yaEstan[doc.id]) return;     // ya lo tiene
+          var d = doc.data() || {};
+          if(!d.items || !d.items.length) return;
+
+          peds.push({
+            id: Date.now() + nuevos,
+            buzonId: doc.id,              // 🔑 para no traerlo dos veces
+            cid: d.cid,
+            nombre: d.nombre || '',
+            barberia: d.barberia || '',
+            items: d.items,
+            delCatalogo: true,
+            nuevo: true,                  // 🔔 para el aviso
+            cuando: d.cuando ? horaCortita(d.cuando) : ''
+          });
+          marcar.push(doc.ref);
+          nuevos++;
+        });
+
+        if(!nuevos){ cuandoTermine(0); return; }
+
+        SS('npedidos', peds);
+        try { pedidos = LS('npedidos', []); } catch(e){}
+
+        // Se marcan como recogidos para que no vuelvan a bajar
+        marcar.forEach(function(ref){
+          try { ref.update({ recogido: true }); } catch(e){}
+        });
+
+        try { pintarBarraGuardados(); } catch(e){}
+        cuandoTermine(nuevos);
+      })
+      .catch(function(e){
+        console.warn('no pude recoger del buzón:', e);
+        cuandoTermine(0);
+      });
+  } catch(e){
+    console.warn('el buzón falló:', e);
+    cuandoTermine(0);
+  }
+}
+
+// La hora, cortita, para enseñarla en la lista
+function horaCortita(ms){
+  try {
+    var d = new Date(ms);
+    var hoy = new Date();
+    var esHoy = d.toDateString() === hoy.toDateString();
+    var h = d.getHours(), m = d.getMinutes();
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if(h === 0) h = 12;
+    var hora = h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+    if(esHoy) return 'hoy ' + hora;
+    var ayer = new Date(hoy.getTime() - 86400000);
+    if(d.toDateString() === ayer.toDateString()) return 'ayer ' + hora;
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hora;
+  } catch(e){ return ''; }
+}
+
 function pintarBarraGuardados(){
   try {
     var barra = document.getElementById('barra-pedidos-guardados');
@@ -35053,6 +35217,15 @@ function iniciarAppDespuesDeLogin(){
     try { descargarFotosClientesQueFaltan(); } catch(e){}
   }, 5000);
   window._appInicializada = true;
+  // 📥 LOS PEDIDOS DEL CATÁLOGO -17 sep-: se recogen del buzón y, si hay nuevos, se le
+  // avisa con la ventana y el sonido. Va por detrás: si no hay internet, no pasa nada.
+  setTimeout(function(){
+    try {
+      recogerPedidosDelBuzon(function(cuantos){
+        if(cuantos > 0){ try { avisarPedidosNuevos(cuantos); } catch(e){} }
+      });
+    } catch(e){ console.warn('el buzón no respondió:', e); }
+  }, 6000);
   detectarActualizacion();            // muestra "LA APP SE ACTUALIZÓ" si la versión cambió
   // Revisar si hay versión nueva en GitHub: a los 8 seg de abrir, y luego cada 30 min
   setTimeout(revisarVersionNueva, 8000);
