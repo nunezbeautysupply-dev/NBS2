@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260916b-OFICIAL-V2.0">
+<meta name="app-version" content="20260917b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4720,6 +4720,8 @@ var RECUADROS_ENCIMA = [
   { id: 'pedido-nuevo-overlay',     cerrar: 'cerrarAvisoPedidoNuevo' },
   { id: 'pedidos-web-overlay',      cerrar: 'cerrarPedidosWeb' },
   { id: 'traerfotos-overlay',       cerrar: 'cerrarTraerFotos' },
+  { id: 'msgcli-overlay',           cerrar: 'cerrarMensajeCliente' },
+  { id: 'guardados-overlay',        cerrar: 'cerrarGuardados' },
   { id: 'fotorapido-overlay',       cerrar: 'cerrarFotosRapido' },
   { id: 'pin-overlay',              cerrar: 'cerrarPinRecuadro' },
   { id: 'estado-fechas-overlay',    cerrar: 'cerrarEstadoPorFechas' },
@@ -19432,7 +19434,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260916b';
+var NOVEDADES_VERSION = '20260917b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -21186,8 +21188,143 @@ function cancelarPedidoMultiple(){
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  📋 LA BARRA DE PEDIDOS GUARDADOS  (17 sep 2026)
+//
+//  🔴 Sensei perdía pedidos —o eso creía—: guardaba 3, volvía a la barbería para
+//  añadir 2 más, y al terminar los 3 primeros "ya no estaban".
+//
+//  🔑 LA CAUSA: nunca se perdieron. La franja de pendientes vive dentro del PASO 1
+//  (`ped-lista-wrap`), y al elegir barbería la app esconde ese paso entero. Él se
+//  quedaba en el paso 2 tomando el pedido, sin ver la franja.
+//
+//  Esta barra va FUERA de los pasos: se ve siempre, en cualquier paso.
+// ═══════════════════════════════════════════════════════════════════
+
+function pintarBarraGuardados(){
+  try {
+    var barra = document.getElementById('barra-pedidos-guardados');
+    if(!barra) return;
+    var peds = LS('npedidos', []);
+    if(!peds.length){ barra.style.display = 'none'; return; }
+
+    var monto = 0;
+    peds.forEach(function(p){
+      (p.items || []).forEach(function(it){
+        monto += (Number(it.cant) || 0) * (Number(it.precio) || 0);
+      });
+    });
+
+    // Los nombres, agrupados por barbería para que quepan
+    var porBarberia = {};
+    peds.forEach(function(p){
+      var b = p.barberia || 'Sin barbería';
+      if(!porBarberia[b]) porBarberia[b] = [];
+      var soloNombre = String(p.nombre || '').split(' ')[0];
+      porBarberia[b].push(soloNombre);
+    });
+    var quienes = Object.keys(porBarberia).map(function(b){
+      return b + ': ' + porBarberia[b].join(', ');
+    }).join(' \u00b7 ');
+
+    document.getElementById('bpg-titulo').textContent =
+      '\ud83d\udccb TIENES ' + peds.length + ' PEDIDO' + (peds.length > 1 ? 'S' : '') + ' GUARDADO'
+      + (peds.length > 1 ? 'S' : '');
+    document.getElementById('bpg-quienes').textContent = quienes;
+    document.getElementById('bpg-monto').textContent = '$' + fmtNum(monto);
+    barra.style.display = 'block';
+  } catch(e){ console.warn('no pude pintar la barra:', e); }
+}
+
+/**
+ * 📋 Al tocar la barra: enseña los pedidos guardados sin salirse de lo que está
+ * haciendo. Si está tomando un pedido, no lo pierde.
+ */
+function verLosGuardados(){
+  pedidos = LS('npedidos', []);
+  if(!pedidos.length) return;
+
+  var ov = document.getElementById('guardados-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'guardados-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100009;'
+    + 'display:flex;align-items:center;justify-content:center;padding:13px';
+  ov.onclick = function(e){ if(e.target === ov) cerrarGuardados(); };
+
+  var monto = 0;
+  pedidos.forEach(function(p){
+    (p.items || []).forEach(function(it){
+      monto += (Number(it.cant) || 0) * (Number(it.precio) || 0);
+    });
+  });
+
+  ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:15px;'
+    +   'max-width:430px;width:100%;max-height:90vh;overflow:auto">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;'
+    +   'margin-bottom:11px">'
+    +   '<div style="font-size:15px;font-weight:900;color:var(--nbs-ink)">'
+    +     '\ud83d\udccb ' + pedidos.length + ' pedido(s) guardado(s)</div>'
+    +   '<button onclick="cerrarGuardados()" style="background:#F0F0F2;border:none;'
+    +     'border-radius:9px;width:32px;height:32px;font-size:15px;cursor:pointer">\u2715</button>'
+    + '</div>'
+    + '<div style="background:#E7F6ED;border-radius:9px;padding:9px;margin-bottom:11px;'
+    +   'text-align:center;font-size:13.5px;font-weight:800;color:#0B7A3B">'
+    +   'TOTAL: $' + fmtNum(monto) + '</div>'
+    + pedidos.map(function(p, idx){
+        var t = (p.items || []).reduce(function(a, it){
+          return a + ((Number(it.cant) || 0) * (Number(it.precio) || 0));
+        }, 0);
+        return '<div style="background:#F6F7FB;border-radius:11px;padding:11px;'
+          + 'margin-bottom:8px;border-left:4px solid var(--nbs-gold)">'
+          + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">'
+          +   '<div style="flex:1;min-width:0">'
+          +     '<div style="font-size:14px;font-weight:900">'
+          +       escaparHtml(p.nombre || '') + '</div>'
+          +     (p.barberia
+                ? '<div style="font-size:11.5px;color:var(--nbs-muted);font-weight:700">'
+                  + '\ud83d\udccd ' + escaparHtml(p.barberia) + '</div>'
+                : '')
+          +     '<div style="font-size:11px;color:var(--nbs-muted);margin-top:2px">'
+          +       ((p.items || []).length) + ' producto(s)</div>'
+          +   '</div>'
+          +   '<div style="font-size:15px;font-weight:900;color:#0B7A3B;flex-shrink:0">$'
+          +     fmtNum(t) + '</div>'
+          + '</div>'
+          + '<div style="display:flex;gap:5px;margin-top:8px">'
+          +   '<button onclick="cerrarGuardados();convertirPedidoAVenta(' + idx + ')" '
+          +     'style="flex:1;padding:9px 4px;background:#0B7A3B;color:#fff;border:none;'
+          +     'border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">'
+          +     '\ud83d\uded2 Al carrito</button>'
+          +   '<button onclick="cerrarGuardados();editarPedido(' + idx + ')" '
+          +     'style="flex:1;padding:9px 4px;background:var(--nbs-gold-bg);'
+          +     'color:var(--nbs-gold-dark);border:none;border-radius:8px;font-size:11.5px;'
+          +     'font-weight:800;cursor:pointer">\u270f\ufe0f Cambiar</button>'
+          +   '<button onclick="cerrarGuardados();borrarPedido(' + idx + ')" '
+          +     'style="padding:9px 10px;background:var(--nbs-red-bg);color:var(--nbs-red-text);'
+          +     'border:none;border-radius:8px;font-size:11.5px;font-weight:800;'
+          +     'cursor:pointer">\ud83d\uddd1\ufe0f</button>'
+          + '</div></div>';
+      }).join('')
+    + '<button onclick="cerrarGuardados()" style="width:100%;padding:12px;margin-top:6px;'
+    +   'background:#F0F0F2;color:#444;border:none;border-radius:10px;font-size:13px;'
+    +   'font-weight:700;cursor:pointer">Seguir tomando pedidos</button>'
+    + '</div>';
+  ov.style.display = 'flex';
+}
+
+function cerrarGuardados(){
+  var ov = document.getElementById('guardados-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
 function renderPedidosPendientes(){
   pedidos = LS('npedidos', []);
+  try { pintarBarraGuardados(); } catch(e){}
+  try { pintarBarraGuardados(); } catch(e){}
   var el = document.getElementById('ped-pendientes-wrap');
   if(!el) return;
   el.innerHTML = '';
@@ -43183,6 +43320,23 @@ function verHistorialCliente(cid, modo){
   </div>
 </div>
 <div id="p-ped" class="pg">
+  <!-- 📋 LA BARRA DE PEDIDOS GUARDADOS -17 sep 2026-. Va FUERA de los pasos, así que
+       se ve mientras toma el pedido. Antes estaba dentro del paso 1 y desaparecía al
+       elegir barbería: Sensei creía que había perdido los pedidos. -->
+  <div id="barra-pedidos-guardados" onclick="verLosGuardados()"
+       style="display:none;background:linear-gradient(135deg,#C62828,#E53935);color:#fff;
+       border-radius:11px;padding:10px 12px;margin-bottom:9px;cursor:pointer;
+       box-shadow:0 2px 8px rgba(198,40,40,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div id="bpg-titulo" style="font-size:13.5px;font-weight:900"></div>
+        <div id="bpg-quienes" style="font-size:11px;opacity:.95;white-space:nowrap;
+             overflow:hidden;text-overflow:ellipsis"></div>
+      </div>
+      <div id="bpg-monto" style="font-size:15px;font-weight:900;flex-shrink:0"></div>
+      <div style="font-size:18px;flex-shrink:0">›</div>
+    </div>
+  </div>
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:24px;font-weight:800;color:#1a237e;margin-bottom:14px;text-align:center;padding-bottom:12px;border-bottom:2px solid #E8EAF6">⚡ Pedidos Rápidos</h2>
 
