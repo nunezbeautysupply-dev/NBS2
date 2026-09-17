@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260915b-OFICIAL-V2.0">
+<meta name="app-version" content="20260916a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -818,6 +818,7 @@ function cuandoHayaFirebase(fn){
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">📦 Catálogo de Productos</h2>
   <button onclick="abrirFotosRapido()" style="width:100%;padding:12px;margin-bottom:14px;background:#1a237e;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer">📸 Ponerle fotos a los productos</button>
   <button onclick="abrirTraerFotos()" style="width:100%;padding:12px;margin-bottom:14px;background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer">📥 Traer fotos del catálogo</button>
+  <button onclick="mandarFotosAlCatalogo()" style="width:100%;padding:12px;margin-bottom:14px;background:#0B7A3B;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer">📤 Mandar mis fotos al catálogo</button>
   <label style="display:flex;align-items:center;gap:9px;background:#E7F6ED;border:1.5px solid #0B7A3B;border-radius:11px;padding:11px;margin-bottom:14px;cursor:pointer"><input type="checkbox" id="chk-limpiar-app" checked onchange="cambiarLimpiarFotos(this.checked)" style="width:20px;height:20px"><span><span style="display:block;font-size:13px;font-weight:900;color:#0B7A3B">✨ Limpiar las fotos solas</span><span style="display:block;font-size:11px;color:#2E7D32;line-height:1.45">Recorta el producto, lo centra, quita el fondo y las deja todas iguales</span></span></label>
   <div id="cat-lista-wrap">
     <div style="background:#E0F7FA;border-radius:10px;padding:12px;margin-bottom:12px">
@@ -10214,6 +10215,49 @@ function arrancarLimpiadorFotos(){
   } catch(e){}
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  📤 MANDAR MIS FOTOS AL CATÁLOGO  (16 sep 2026)
+//
+//  🔴 Sensei: la app tiene 249 fotos y el catálogo solo 185. Las 64 que faltan las
+//  puso EN LA APP, y el puente que había solo iba del catálogo a la app.
+//
+//  🔑 Este es el camino de vuelta: saca las fotos de la app en un archivo que el
+//  administrador del catálogo sabe leer.
+// ═══════════════════════════════════════════════════════════════════
+
+function mandarFotosAlCatalogo(){
+  loadProds();
+  var conFoto = productos.filter(function(p){
+    return !p.eliminado && p.foto && String(p.foto).length > 100;
+  });
+  if(!conFoto.length){
+    avisoGrande('Todav\u00eda no tienes fotos que mandar.');
+    return;
+  }
+
+  var paquete = { tipo: 'nbs_fotos_app', cuando: Date.now(), fotos: {} };
+  conFoto.forEach(function(p){
+    paquete.fotos[String(p.id)] = { foto: p.foto, nombre: p.nombre || '' };
+  });
+
+  var txt = JSON.stringify(paquete);
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt], { type: 'application/json' }));
+  a.download = 'FOTOS_DE_LA_APP.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }, 400);
+
+  avisoGrande('\ud83d\udce4 Se baj\u00f3 FOTOS_DE_LA_APP.json con ' + conFoto.length + ' fotos.\n\n'
+    + 'Pesa unos ' + Math.round(txt.length / 1024 / 1024 * 10) / 10 + ' MB.\n\n'
+    + 'Ahora \u00e1brelo en el administrador del cat\u00e1logo:\n'
+    + '\ud83d\udcf8 Fotos \u2192 \ud83d\udce5 Traer fotos de la app');
+}
+
 function abrirTraerFotos(){
   var ov = document.getElementById('traerfotos-overlay');
   if(!ov){
@@ -19379,7 +19423,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260915b';
+var NOVEDADES_VERSION = '20260916a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',

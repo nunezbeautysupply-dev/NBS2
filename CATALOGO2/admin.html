@@ -1232,6 +1232,16 @@ function pintarCargaLotes(){
     +   '<button onclick="exportarFotosParaApp()" style="width:100%;padding:13px;'
     +     'background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:14px;'
     +     'font-weight:900;cursor:pointer">📤 Bajar las fotos para la app</button>'
+    // 📥 Y EL CAMINO DE VUELTA: traer las que puso en la app -16 sep-
+    +   '<div style="font-size:12px;color:#555;line-height:1.55;margin:11px 0 8px">'
+    +     '¿Pusiste fotos en tu app NBS2? Tr\u00e1elas aqu\u00ed:<br>'
+    +     'En la app \u2192 Cat\u00e1logo \u2192 \ud83d\udce4 Mandar mis fotos al cat\u00e1logo</div>'
+    +   '<input type="file" accept=".json,application/json" id="archApp" '
+    +     'style="display:none" onchange="traerFotosDeLaApp(event)">'
+    +   '<button onclick="document.getElementById(\'archApp\').click()" '
+    +     'style="width:100%;padding:13px;background:#fff;color:#6A1B9A;'
+    +     'border:2px solid #6A1B9A;border-radius:11px;font-size:14px;'
+    +     'font-weight:900;cursor:pointer">📥 Traer fotos de la app</button>'
     + '</div>'
 
     + '<button onclick="cerrarLotes()" style="width:100%;padding:12px;margin-top:11px;'
@@ -1639,6 +1649,59 @@ function guardarFotoDelLink(data){
   if(est) est.innerHTML = '<span style="color:#0B7A3B;font-weight:800">✅ Puesta</span>';
   pintar();
   setTimeout(function(){ pintarPegarLinks(); }, 700);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  📥 TRAER LAS FOTOS DE LA APP  (16 sep 2026)
+//
+//  🔴 Sensei tenía 249 fotos en la app y solo 185 en el catálogo. Las 64 que faltaban
+//  las puso EN LA APP, y el puente solo iba en un sentido.
+//  🔑 Este es el camino de vuelta.
+// ═══════════════════════════════════════════════════════════════════
+
+function traerFotosDeLaApp(ev){
+  var f = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if(!f) return;
+
+  var lector = new FileReader();
+  lector.onload = function(e){
+    var paq;
+    try { paq = JSON.parse(e.target.result); }
+    catch(err){ alert('Ese archivo no se puede leer.\n\nBusca FOTOS_DE_LA_APP.json'); return; }
+    if(!paq || paq.tipo !== 'nbs_fotos_app' || !paq.fotos){
+      alert('Ese no es el archivo de la app.\n\nBusca FOTOS_DE_LA_APP.json');
+      return;
+    }
+
+    var puestas = 0, yaTenian = 0, noEstaban = 0;
+    Object.keys(paq.fotos).forEach(function(id){
+      var p = PRODS.find(function(x){ return String(x.id) === String(id); });
+      if(!p){ noEstaban++; return; }
+      // 🔑 No se pisa una foto que ya esté en el catálogo: las de aquí mandan
+      if(FOTOS[id]){ yaTenian++; return; }
+      FOTOS[id] = paq.fotos[id].foto;
+      p.tf = true;
+      puestas++;
+    });
+
+    if(!puestas){
+      alert('No había ninguna foto nueva que traer.\n\n'
+        + 'Ya estaban en el catálogo: ' + yaTenian);
+      return;
+    }
+    CAMBIOS = true;
+    try { ponerFotosASalvo(); } catch(e2){}
+    pintar();
+    alert('✅ Se trajeron ' + puestas + ' fotos de tu app.\n\n'
+      + (yaTenian ? 'Ya estaban aquí: ' + yaTenian + '\n' : '')
+      + (noEstaban ? 'No están en el catálogo: ' + noEstaban + '\n' : '')
+      + '\nAhora toca 💾 Guardar y sube los archivos.');
+    cerrarLotes();
+  };
+  lector.onerror = function(){ alert('No pude leer el archivo.'); };
+  lector.readAsText(f);
 }
 
 // 🗑️ ¿Esto es basura? Banners, categorías, logos, fotos de estudio con nombre de
