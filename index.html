@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260917c-OFICIAL-V2.0">
+<meta name="app-version" content="20260917d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -17957,6 +17957,13 @@ var CLAVE_PEDIDO_EN_PROCESO = 'nbs_pedido_en_proceso';
 function guardarPedidoEnProceso(){
   try{
     if(!pedidosMultiTemp.length){ localStorage.removeItem(CLAVE_PEDIDO_EN_PROCESO); return; }
+    // 🔑 Si NINGUNO tiene productos pendientes —todos guardados o en blanco—, no hay
+    // nada "a medias" que recordar. Antes se guardaba igual, y Sensei veía sus 3
+    // pedidos guardados MÁS un borrador con esos mismos 3 en cero. -17 sep-
+    var _quedaAlgo = pedidosMultiTemp.some(function(p){
+      return !p._guardado && (p.items || []).length > 0;
+    });
+    if(!_quedaAlgo){ localStorage.removeItem(CLAVE_PEDIDO_EN_PROCESO); return; }
     // Se deja fuera _habituales -los productos que suele comprar-: se vuelve a calcular
     // solo, y guardarlo ocuparia mucho sin necesidad.
     var limpio = pedidosMultiTemp.map(function(p){
@@ -19440,7 +19447,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260917c';
+var NOVEDADES_VERSION = '20260917d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -21062,7 +21069,7 @@ function guardarUnPedidoMulti(idx){
   p._abierto = false;
   p.items = [];
 
-  // Y se guarda el "pedido a medias" con lo que queda, por si se cierra la app
+  // El borrador se guarda solo con lo que de verdad quede pendiente
   try { guardarPedidoEnProceso(); } catch(e){}
 
   renderPedidosMultiples();
