@@ -21194,97 +21194,6 @@ function cancelarPedidoMultiple(){
 }
 
 
-
-// ═══════════════════════════════════════════════════════════════════
-//  📋 LA BARRA DE PEDIDOS GUARDADOS  (17 sep 2026)
-//
-//  🔴 Sensei perdía pedidos —o eso creía—: guardaba 3, volvía a la barbería para
-//  añadir 2 más, y al terminar los 3 primeros "ya no estaban".
-//
-//  🔑 LA CAUSA: nunca se perdieron. La franja de pendientes vive dentro del PASO 1
-//  (`ped-lista-wrap`), y al elegir barbería la app esconde ese paso entero. Él se
-//  quedaba en el paso 2 tomando el pedido, sin ver la franja.
-//
-//  Esta barra va FUERA de los pasos: se ve siempre, en cualquier paso.
-// ═══════════════════════════════════════════════════════════════════
-
-
-// ═══════════════════════════════════════════════════════════════════
-//  🔔 EL AVISO DE PEDIDOS NUEVOS  (17 sep 2026)
-//
-//  Sensei: "quiero una ventana que se abra en la pantalla con la alerta y un sonido
-//  fuerte que no sea desapercibido".
-//
-//  🔑 Sale UNA VEZ al abrir la app, si hay pedidos nuevos. No molesta después.
-// ═══════════════════════════════════════════════════════════════════
-
-function avisarPedidosNuevos(){
-  try {
-    var peds = LS('npedidos', []);
-    var nuevos = peds.filter(function(p){ return p.nuevo; });
-    if(!nuevos.length) return;
-
-    // Solo una vez por sesión: si ya lo vio, no se le repite
-    if(window._yaAvisePedidos) return;
-    window._yaAvisePedidos = true;
-
-    var total = 0;
-    nuevos.forEach(function(p){
-      (p.items || []).forEach(function(it){
-        total += (Number(it.cant) || 0) * (Number(it.precio) || 0);
-      });
-    });
-
-    var ov = document.createElement('div');
-    ov.id = 'aviso-pedidos-nuevos';
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100010;'
-      + 'display:flex;align-items:center;justify-content:center;padding:15px';
-    ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;'
-      +   'max-width:400px;width:100%;text-align:center;'
-      +   'animation:latidoAviso .6s ease-in-out 3">'
-      + '<div style="font-size:46px;margin-bottom:6px">\ud83d\udd14</div>'
-      + '<div style="font-size:18px;font-weight:900;color:#C62828;margin-bottom:13px">'
-      +   '\u00a1TIENES ' + nuevos.length + ' PEDIDO'
-      +   (nuevos.length > 1 ? 'S' : '') + ' NUEVO' + (nuevos.length > 1 ? 'S' : '') + '!</div>'
-      + '<div style="background:#FFF3E0;border-radius:11px;padding:11px;margin-bottom:13px;'
-      +   'text-align:left">'
-      + nuevos.slice(0, 6).map(function(p){
-          var t = (p.items || []).reduce(function(a, it){
-            return a + ((Number(it.cant) || 0) * (Number(it.precio) || 0));
-          }, 0);
-          return '<div style="display:flex;justify-content:space-between;gap:8px;'
-            + 'padding:4px 0;font-size:13px">'
-            + '<span style="font-weight:800">' + escaparHtml(String(p.nombre || '').slice(0, 22)) + '</span>'
-            + '<span style="font-weight:900;color:#0B7A3B;flex-shrink:0">$' + fmtNum(t) + '</span></div>';
-        }).join('')
-      + (nuevos.length > 6
-          ? '<div style="font-size:11.5px;color:#8A6D00;margin-top:4px">y '
-            + (nuevos.length - 6) + ' m\u00e1s\u2026</div>'
-          : '')
-      + '</div>'
-      + '<div style="font-size:16px;font-weight:900;margin-bottom:14px">TOTAL: $'
-      +   fmtNum(total) + '</div>'
-      + '<button onclick="document.getElementById(\'aviso-pedidos-nuevos\').remove();'
-      +   'verPedidosPendientes()" style="width:100%;padding:15px;background:#C62828;'
-      +   'color:#fff;border:none;border-radius:12px;font-size:15.5px;font-weight:900;'
-      +   'cursor:pointer">\ud83d\udccb VER LOS PEDIDOS</button>'
-      + '<button onclick="document.getElementById(\'aviso-pedidos-nuevos\').remove()" '
-      +   'style="width:100%;padding:12px;margin-top:8px;background:#F0F0F2;color:#555;'
-      +   'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">'
-      +   'Ahora no</button>'
-      + '</div>';
-    document.body.appendChild(ov);
-
-    // 🔊 El sonido: tres campanadas seguidas para que no pase desapercibido
-    try { sonarCampanaPedido(); } catch(e){}
-    setTimeout(function(){ try { sonarCampanaPedido(); } catch(e){} }, 380);
-    setTimeout(function(){ try { sonarCampanaPedido(); } catch(e){} }, 760);
-    // Y que vibre, si el teléfono puede
-    try { if(navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]); } catch(e){}
-  } catch(e){ console.warn('no pude avisar de los pedidos:', e); }
-}
-
-
 // ═══════════════════════════════════════════════════════════════════
 //  📥 RECOGER LOS PEDIDOS DEL BUZÓN  (17 sep 2026)
 //
@@ -21540,15 +21449,15 @@ function verLosGuardados(){
           +     fmtNum(t) + '</div>'
           + '</div>'
           + '<div style="display:flex;gap:5px;margin-top:8px">'
-          +   '<button onclick="cerrarGuardados();convertirPedidoAVenta(' + idx + ')" '
+          +   '<button onclick="cerrarGuardados();alCarritoPorId(' + _arg(String(p.id)) + ')" '
           +     'style="flex:1;padding:9px 4px;background:#0B7A3B;color:#fff;border:none;'
           +     'border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer">'
           +     '\ud83d\uded2 Al carrito</button>'
-          +   '<button onclick="cerrarGuardados();editarPedido(' + idx + ')" '
+          +   '<button onclick="cerrarGuardados();editarPedidoPorId(' + _arg(String(p.id)) + ')" '
           +     'style="flex:1;padding:9px 4px;background:var(--nbs-gold-bg);'
           +     'color:var(--nbs-gold-dark);border:none;border-radius:8px;font-size:11.5px;'
           +     'font-weight:800;cursor:pointer">\u270f\ufe0f Cambiar</button>'
-          +   '<button onclick="cerrarGuardados();borrarPedido(' + idx + ')" '
+          +   '<button onclick="cerrarGuardados();borrarPedidoPorId(' + _arg(String(p.id)) + ')" '
           +     'style="padding:9px 10px;background:var(--nbs-red-bg);color:var(--nbs-red-text);'
           +     'border:none;border-radius:8px;font-size:11.5px;font-weight:800;'
           +     'cursor:pointer">\ud83d\uddd1\ufe0f</button>'
@@ -21592,9 +21501,9 @@ function renderPedidosPendientes(){
       +'<div style="font-size:12px;color:var(--nbs-gold-dark);margin-top:2px;font-weight:500">'+(p.items || []).length+' producto(s) · $'+fmtNum(totalMonto)+'</div>'
       +'</div>'
       +'<div style="display:flex;gap:6px">'
-      +'<button onclick="editarPedido('+idx+')" style="padding:8px 10px;background:var(--nbs-gold-bg);color:var(--nbs-gold-dark);border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">✏️</button>'
-      +'<button onclick="convertirPedidoAVenta('+idx+')" style="padding:8px 10px;background:var(--nbs-ink);color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🛒</button>'
-      +'<button onclick="borrarPedido('+idx+')" style="padding:8px 10px;background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🗑️</button>'
+      +'<button onclick="editarPedidoPorId('+_arg(String(p.id))+')" style="padding:8px 10px;background:var(--nbs-gold-bg);color:var(--nbs-gold-dark);border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">✏️</button>'
+      +'<button onclick="alCarritoPorId('+_arg(String(p.id))+')" style="padding:8px 10px;background:var(--nbs-ink);color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🛒</button>'
+      +'<button onclick="borrarPedidoPorId('+_arg(String(p.id))+')" style="padding:8px 10px;background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">🗑️</button>'
       +'</div>';
     el.appendChild(card);
   });
@@ -22343,6 +22252,31 @@ function savePedido(){
   flash.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2E7D32;color:white;padding:12px 24px;border-radius:20px;font-size:14px;font-weight:700;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.2)';
   document.body.appendChild(flash);
   setTimeout(function(){ flash.style.opacity='0';flash.style.transition='opacity 0.5s';setTimeout(function(){ flash.remove(); },500); }, 2000);
+}
+
+// 🔑 LAS TRES PUERTAS SEGURAS -17 sep-. Reciben el ID del pedido, no su posición.
+// La posición cambia en cuanto se guarda otro pedido; el id nunca.
+function _posDelPedido(id){
+  pedidos = LS('npedidos', []);
+  return pedidos.findIndex(function(x){ return String(x.id) === String(id); });
+}
+
+function alCarritoPorId(id){
+  var i = _posDelPedido(id);
+  if(i < 0){ avisoGrande('Ese pedido ya no est\u00e1.'); return; }
+  convertirPedidoAVenta(i);
+}
+
+function editarPedidoPorId(id){
+  var i = _posDelPedido(id);
+  if(i < 0){ avisoGrande('Ese pedido ya no est\u00e1.'); return; }
+  editarPedido(i);
+}
+
+function borrarPedidoPorId(id){
+  var i = _posDelPedido(id);
+  if(i < 0){ avisoGrande('Ese pedido ya no est\u00e1.'); return; }
+  borrarPedido(i);
 }
 
 function convertirPedidoAVenta(idx){
@@ -30158,10 +30092,50 @@ function pintarMensajeCliente(){
             + 'style="width:100%;padding:12px;margin-bottom:6px;background:#fff;'
             + 'border:1.5px solid #D4D5E0;border-radius:10px;font-size:13.5px;'
             + 'font-weight:700;text-align:left;cursor:pointer">' + x[1] + '</button>';
-        }).join('');
+        }).join('')
+      // 🔑 La salida clara: antes solo estaba la ✕ de arriba y no se veía. -17 sep-
+      + '<button onclick="cerrarMensajeCliente()" style="width:100%;padding:13px;'
+      +   'margin-top:9px;background:#F0F0F2;color:#555;border:none;border-radius:10px;'
+      +   'font-size:13.5px;font-weight:800;cursor:pointer">'
+      +   'No mandar ning\u00fan mensaje</button>';
+  } else if(window._msgLargo === null || window._msgLargo === undefined){
+    // ② ¿Corto o largo? Como antes de los 7 mensajes -Sensei, 17 sep-
+    h += '<div style="font-size:11px;font-weight:800;color:#8A8B9E;margin-bottom:6px">'
+      +   '\u00bfC\u00d3MO SE LO MANDO?</div>'
+      + '<button onclick="escogerLargoCorto(false)" style="width:100%;padding:13px;'
+      +   'margin-bottom:7px;background:#fff;border:1.5px solid #1a237e;border-radius:11px;'
+      +   'text-align:left;cursor:pointer">'
+      +   '<div style="font-size:14px;font-weight:900;color:#1a237e">\ud83d\udcdd CORTO</div>'
+      +   '<div style="font-size:11.5px;color:#8A8B9E;margin-top:1px">'
+      +     'Solo lo de hoy y su balance</div></button>'
+      + '<button onclick="escogerLargoCorto(true)" style="width:100%;padding:13px;'
+      +   'margin-bottom:7px;background:#fff;border:1.5px solid #0B7A3B;border-radius:11px;'
+      +   'text-align:left;cursor:pointer">'
+      +   '<div style="font-size:14px;font-weight:900;color:#0B7A3B">\ud83d\udcc4 LARGO</div>'
+      +   '<div style="font-size:11.5px;color:#8A8B9E;margin-top:1px">'
+      +     'Con el detalle de lo que debe</div></button>'
+      + '<button onclick="window._msgCaso=null;pintarMensajeCliente()" '
+      +   'style="width:100%;padding:11px;margin-top:4px;background:#F0F0F2;color:#444;'
+      +   'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">'
+      +   '\u2039 Escoger otro caso</button>'
+      + '<button onclick="cerrarMensajeCliente()" style="width:100%;padding:12px;'
+      +   'margin-top:7px;background:#fff;color:#8A8B9E;border:1.5px solid #D4D5E0;'
+      +   'border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">'
+      +   'No mandar ning\u00fan mensaje</button>';
   } else {
-    // ② Ver el mensaje y mandarlo
+    // ③ Ver el mensaje y mandarlo
     var texto = mensajeNBS(cid, caso, window._msgDatos);
+    if(window._msgLargo){
+      // 📄 El largo lleva el detalle, justo antes de la despedida
+      var det = detalleDeSusFacturas(cid);
+      if(det){
+        var lineas = texto.split('\n');
+        var iFirma = lineas.length - 1;
+        while(iFirma > 0 && !/^Att\./.test(lineas[iFirma])) iFirma--;
+        if(iFirma > 2) lineas.splice(iFirma - 2, 0, det);
+        texto = lineas.join('\n');
+      }
+    }
     window._msgTexto = texto;
     h += '<div style="background:#F6F7FB;border:1.5px solid #E5E6EE;border-radius:11px;'
       +   'padding:13px;font-size:13px;line-height:1.6;white-space:pre-wrap;'
@@ -30172,10 +30146,14 @@ function pintarMensajeCliente(){
       + '<button onclick="otraDespedida()" style="width:100%;padding:11px;margin-top:7px;'
       +   'background:#fff;color:#1a237e;border:1.5px solid #1a237e;border-radius:10px;'
       +   'font-size:13px;font-weight:800;cursor:pointer">\ud83d\udd04 Otra despedida</button>'
-      + '<button onclick="window._msgCaso=null;pintarMensajeCliente()" '
+      + '<button onclick="window._msgLargo=null;pintarMensajeCliente()" '
       +   'style="width:100%;padding:11px;margin-top:7px;background:#F0F0F2;color:#444;'
       +   'border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">'
-      +   '\u2039 Escoger otro caso</button>';
+      +   '\u2039 Atr\u00e1s</button>'
+      + '<button onclick="cerrarMensajeCliente()" style="width:100%;padding:12px;'
+      +   'margin-top:7px;background:#fff;color:#8A8B9E;border:1.5px solid #D4D5E0;'
+      +   'border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">'
+      +   'No mandar ning\u00fan mensaje</button>';
   }
   h += '</div>';
   document.getElementById('msgcli-overlay').innerHTML = h;
@@ -30183,7 +30161,44 @@ function pintarMensajeCliente(){
 
 function escogerCaso(caso){
   window._msgCaso = caso;
+  window._msgLargo = null;      // todavía no ha elegido corto o largo
   pintarMensajeCliente();
+}
+
+// 🔑 Corto o largo, como antes de los 7 mensajes. -17 sep-
+function escogerLargoCorto(largo){
+  window._msgLargo = !!largo;
+  pintarMensajeCliente();
+}
+
+/**
+ * 📄 EL LARGO: el mismo mensaje del caso, más el detalle de lo que debe factura por
+ * factura. El CORTO es solo lo de hoy y su balance.
+ */
+function detalleDeSusFacturas(cid){
+  try {
+    ventas = LS('nv', []);
+    var suyas = ventas.filter(function(v){
+      if(String(v.cid) !== String(cid) || v.cancelada) return false;
+      return cobradoYDebeDe(v).debe > 0.005;
+    });
+    if(!suyas.length) return '';
+    suyas.sort(function(a, b){
+      var fa = 0, fb = 0;
+      try { fa = parsearFechaVenta(a.fecha).getTime(); } catch(e){}
+      try { fb = parsearFechaVenta(b.fecha).getTime(); } catch(e){}
+      return fa - fb;
+    });
+    var t = [];
+    t.push('');
+    t.push('\ud83d\udcc4 *Detalle de lo pendiente:*');
+    suyas.forEach(function(v){
+      var d = cobradoYDebeDe(v);
+      t.push('\u00b7 ' + (v.fecha || '') + (v.numFactura ? ' \u00b7 #' + v.numFactura : '')
+        + ' \u2014 $' + fmtNum(d.debe));
+    });
+    return t.join('\n');
+  } catch(e){ return ''; }
 }
 
 function otraDespedida(){
@@ -35219,13 +35234,26 @@ function iniciarAppDespuesDeLogin(){
   window._appInicializada = true;
   // 📥 LOS PEDIDOS DEL CATÁLOGO -17 sep-: se recogen del buzón y, si hay nuevos, se le
   // avisa con la ventana y el sonido. Va por detrás: si no hay internet, no pasa nada.
-  setTimeout(function(){
+  function _mirarElBuzon(){
     try {
       recogerPedidosDelBuzon(function(cuantos){
         if(cuantos > 0){ try { avisarPedidosNuevos(cuantos); } catch(e){} }
       });
     } catch(e){ console.warn('el buzón no respondió:', e); }
-  }, 6000);
+  }
+  setTimeout(_mirarElBuzon, 3000);
+  // 🔑 Y CADA 2 MINUTOS -Sensei, 17 sep-: antes solo se miraba al entrar, y si tenía
+  // la app abierta el pedido no llegaba hasta que se bloqueaba por inactividad.
+  if(!window._relojDelBuzon){
+    window._relojDelBuzon = setInterval(_mirarElBuzon, 120000);
+  }
+  // Y al volver a la app desde otra pantalla del teléfono
+  if(!window._buzonAlVolver){
+    window._buzonAlVolver = true;
+    document.addEventListener('visibilitychange', function(){
+      if(!document.hidden) setTimeout(_mirarElBuzon, 700);
+    });
+  }
   detectarActualizacion();            // muestra "LA APP SE ACTUALIZÓ" si la versión cambió
   // Revisar si hay versión nueva en GitHub: a los 8 seg de abrir, y luego cada 30 min
   setTimeout(revisarVersionNueva, 8000);
