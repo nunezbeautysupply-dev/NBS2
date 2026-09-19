@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260919a-OFICIAL-V2.0">
+<meta name="app-version" content="20260919b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19458,7 +19458,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260919a';
+var NOVEDADES_VERSION = '20260919b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -19466,6 +19466,7 @@ var NOVEDADES = [
   'Ya tienes tu lado del NBS Chat, dentro de la app. En la pantalla de inicio hay un boton nuevo que dice NBS Chat, con un globito rojo que te cuenta los mensajes sin leer. El globito se actualiza solo, con el mismo reloj de dos minutos del buzon de pedidos.',
   'Adentro ves todas las conversaciones, las que tienen mensajes sin leer arriba y marcadas en rojo. Tocas una y contestas ahi mismo: tus mensajes salen en verde a la derecha, los del cliente a la izquierda. Al abrir la conversacion, sus mensajes quedan leidos y el globito baja.',
   'Para darle chat a un cliente tocas Dar acceso, lo escoges de tu lista de siempre, y TU escribes la clave que le vas a dar, como decidiste. Y en Ver los accesos esta cada uno con su clave y cuando entro por ultima vez, con un boton para quitarle el acceso o devolverselo. La conversacion nunca se borra: si se lo devuelves, la ve completa.',
+  'Y el chat quedo con candado de raiz: cada conversacion vive dentro de su propia clave, como un buzon cerrado. Quien no tenga la clave exacta no puede ver nada, ni la lista de claves, ni escribir haciendose pasar por NBS. Tu, con tu sesion, lo ves todo como siempre.',
   'El chat del cliente entra por su propia puerta, aparte del catalogo, asi que puedes darle chat a alguien sin darle el catalogo. Y nada de esto toca tu dinero ni tus ventas: el chat solo lee y escribe mensajes.',
   'Tienes un boton nuevo en el Catalogo que dice Buscador profundo. Escribes parte del nombre de un producto que no encuentras y te busca en OCHO sitios distintos: si esta guardado en el aparato, si la app lo esta escondiendo, si su numero esta marcado como borrado, en cuantas facturas de venta esta, con que numero lo guardan esas facturas, y si el buscador del catalogo lo encuentra o no.',
   'Y al final te da un boton para copiar todo eso y pegarmelo en el chat. Asi yo veo exactamente lo que pasa en TU telefono con TUS datos, en vez de adivinar.',
@@ -43537,7 +43538,9 @@ function verHistorialCliente(cid, modo){
 //
 //  🔑 Usa fbDb (la sesión de Sensei ya autenticada). El barbero entra por
 //  su app APARTE ('nbschat') — así nadie le pisa la huella a Sensei.
-//  Colecciones: nbs_chat_accesos (doc id = la clave) y nbs_chat_mensajes.
+//  🔒 CANDADO (19 sep): cada conversación vive DENTRO de su clave:
+//  nbs_chat_accesos/{CLAVE}/mensajes. La clave es la llave — sin la clave
+//  exacta, Firebase no deja ver NADA, ni pedir la lista de claves.
 //  NADA de esto toca dinero, ventas ni clientes: solo lee y escribe chat.
 // ═══════════════════════════════════════════════════════════════════
 
@@ -43546,22 +43549,35 @@ function _bdChat(){
   catch(e){ return null; }
 }
 
+// El buzón de mensajes que vive dentro de una clave
+function _buzonDeClave(clave){
+  var bd = _bdChat();
+  return bd ? bd.collection('nbs_chat_accesos').doc(clave).collection('mensajes') : null;
+}
+
 // ── EL GLOBITO ROJO DEL INICIO ──
 // Lo llama _mirarElBuzon: al abrir, cada 2 minutos y al volver a la app.
 function revisarChatSinLeer(){
   var bd = _bdChat();
   if(!bd) return;
   try {
-    bd.collection('nbs_chat_mensajes').where('leido', '==', false).get()
-      .then(function(snap){
-        // 🔑 Se filtra aquí y no en la consulta: pedir leido+deNBS juntos
-        // obligaría a crear un índice compuesto en Firebase. Así no hace falta.
-        var n = 0;
-        snap.forEach(function(d){ var m = d.data(); if(m && !m.deNBS) n++; });
-        window._chatSinLeer = n;
-        pintarGloboChatNBS(n);
-      })
-      .catch(function(e){ console.warn('chat: no pude contar los sin leer:', e); });
+    bd.collection('nbs_chat_accesos').get().then(function(snap){
+      var accesos = [];
+      snap.forEach(function(d){ var a = d.data() || {}; a.clave = d.id; accesos.push(a); });
+      window._chatAccesos = accesos;
+      // Un vistazo al buzón de cada clave. Son 10-15 claves: liviano.
+      // (deNBS+leido son dos filtros de igualdad: Firebase los sirve sin índice extra.)
+      return Promise.all(accesos.map(function(a){
+        return _buzonDeClave(a.clave)
+          .where('deNBS', '==', false).where('leido', '==', false).get()
+          .then(function(s){ return s.size || 0; })
+          .catch(function(){ return 0; });
+      }));
+    }).then(function(cuentas){
+      var n = (cuentas || []).reduce(function(s, x){ return s + x; }, 0);
+      window._chatSinLeer = n;
+      pintarGloboChatNBS(n);
+    }).catch(function(e){ console.warn('chat: no pude contar los sin leer:', e); });
   } catch(e){ console.warn('chat: no pude revisar:', e); }
 }
 
@@ -43622,17 +43638,26 @@ function cargarListaChatNBS(){
   pararEscuchaChatNBS();
   o.innerHTML = '<div style="max-width:480px;margin:0 auto">'
     + '<div style="text-align:center;color:#888;font-size:13px;padding:24px 0">Cargando el chat…</div></div>';
-  var accesos = [], mensajes = [];
-  // Los accesos y los últimos mensajes, en paralelo. 500 mensajes alcanzan de
-  // sobra para 10-15 clientes; si un día se queda corto, se sube el límite.
-  var pAcc = bd.collection('nbs_chat_accesos').get().then(function(snap){
+  // Primero los accesos; luego, al buzón de cada clave se le piden dos cosas
+  // en paralelo: su último mensaje y sus sin leer. 10-15 claves: liviano.
+  bd.collection('nbs_chat_accesos').get().then(function(snap){
+    var accesos = [];
     snap.forEach(function(d){ var a = d.data() || {}; a.clave = d.id; accesos.push(a); });
-  });
-  var pMsg = bd.collection('nbs_chat_mensajes').orderBy('cuando', 'desc').limit(500).get().then(function(snap){
-    snap.forEach(function(d){ var m = d.data(); if(m) mensajes.push(m); });
-  });
-  Promise.all([pAcc, pMsg]).then(function(){
-    pintarListaChatNBS(accesos, mensajes);
+    return Promise.all(accesos.map(function(a){
+      var buzon = _buzonDeClave(a.clave);
+      return Promise.all([
+        buzon.orderBy('cuando', 'desc').limit(1).get()
+          .then(function(s){ var u = null; s.forEach(function(d){ u = d.data(); }); return u; })
+          .catch(function(){ return null; }),
+        buzon.where('deNBS', '==', false).where('leido', '==', false).get()
+          .then(function(s){ return s.size || 0; })
+          .catch(function(){ return 0; })
+      ]).then(function(par){ return { clave: a.clave, ultimo: par[0], sinLeer: par[1] }; });
+    })).then(function(resumenes){
+      var porClave = {};
+      resumenes.forEach(function(r){ porClave[r.clave] = { ultimo: r.ultimo, sinLeer: r.sinLeer }; });
+      pintarListaChatNBS(accesos, porClave);
+    });
   }).catch(function(e){
     console.warn('chat: no pude cargar la lista:', e);
     o.innerHTML = '<div style="max-width:480px;margin:0 auto">'
@@ -43643,17 +43668,9 @@ function cargarListaChatNBS(){
   });
 }
 
-function pintarListaChatNBS(accesos, mensajes){
+function pintarListaChatNBS(accesos, porClave){
   var o = _cajaChatNBS();
-  // Se agrupan los mensajes por clave: el último de cada uno y cuántos sin leer
-  var porClave = {};
-  (mensajes || []).forEach(function(m){
-    if(!m || !m.clave) return;
-    var g = porClave[m.clave];
-    if(!g){ g = porClave[m.clave] = { ultimo: null, sinLeer: 0 }; }
-    if(!g.ultimo || (m.cuando || 0) > (g.ultimo.cuando || 0)) g.ultimo = m;
-    if(!m.deNBS && !m.leido) g.sinLeer++;
-  });
+  porClave = porClave || {};
   var filas = (accesos || []).map(function(a){
     var g = porClave[a.clave] || { ultimo: null, sinLeer: 0 };
     return { a: a, ultimo: g.ultimo, sinLeer: g.sinLeer,
@@ -43736,9 +43753,8 @@ function abrirConversacionNBS(claveCod){
 
   pararEscuchaChatNBS();
   try {
-    // 🔑 Solo where por clave y orden aquí adentro: así no hace falta índice compuesto.
-    window._chatEscucha = bd.collection('nbs_chat_mensajes')
-      .where('clave', '==', clave)
+    // 🔑 El buzón de SU clave, y nada más. El orden se pone aquí adentro.
+    window._chatEscucha = _buzonDeClave(clave)
       .onSnapshot(function(snap){
         var msgs = [];
         snap.forEach(function(d){ var m = d.data(); if(m) msgs.push(m); });
@@ -43795,11 +43811,9 @@ function mandarMensajeNBS(){
   if(boton) boton.disabled = true;
   caja.value = '';
   caja.style.height = 'auto';
-  bd.collection('nbs_chat_mensajes').add({
-    clave: a.clave,
-    cid: a.cid || '',
-    nombre: a.nombre || '',
-    barberia: a.barberia || '',
+  // El mensaje cae en el buzón de la clave; los datos del cliente ya viven
+  // en su tarjeta de acceso, aquí va solo el mensaje.
+  _buzonDeClave(a.clave).add({
     texto: texto.slice(0, 900),
     deNBS: true,
     leido: false,

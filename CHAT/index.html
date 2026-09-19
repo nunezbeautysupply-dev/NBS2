@@ -197,9 +197,10 @@ function escucharMensajes(){
   if(!bd || !YO) return;
   if(_escuchando){ try { _escuchando(); } catch(e){} }
 
-  // 🔑 Solo SU conversación. Ni se piden las de los demás.
-  _escuchando = bd.collection('nbs_chat_mensajes')
-    .where('clave', '==', YO.clave)
+  // 🔑 Su conversación vive DENTRO de su clave (candado del 19 sep):
+  // sin la clave exacta, Firebase no deja ni asomarse a los mensajes.
+  _escuchando = bd.collection('nbs_chat_accesos').doc(YO.clave)
+    .collection('mensajes')
     .onSnapshot(function(snap){
       var msgs = [];
       snap.forEach(function(d){ msgs.push(d.data()); });
@@ -242,11 +243,11 @@ function mandar(){
   caja.value = '';
   caja.style.height = 'auto';
 
-  bd.collection('nbs_chat_mensajes').add({
-    clave: YO.clave,
-    cid: YO.cid || '',
-    nombre: YO.nombre || '',
-    barberia: YO.barberia || '',
+  // El mensaje cae en el buzón de SU clave. Los datos del barbero ya están
+  // en su tarjeta de acceso; aquí va solo el mensaje. deNBS:false es ley:
+  // las reglas de Firebase no dejan a nadie sin cuenta escribir como NBS.
+  bd.collection('nbs_chat_accesos').doc(YO.clave)
+    .collection('mensajes').add({
     texto: texto.slice(0, 900),
     deNBS: false,
     leido: false,
