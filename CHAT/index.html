@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0B1020">
+<title>NBS Chat</title>
+<link rel="manifest" href="manifest-chat.json">
+<link rel="apple-touch-icon" href="icono-chat.png">
+
+<!-- 🔥 Firebase. Va ARRIBA para que esté listo antes de que el barbero escriba.
+     Lección del 17 sep: con `defer` al final, los pedidos no salían. -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+       background:#0B1020;color:#fff;height:100vh;overflow:hidden;
+       display:flex;flex-direction:column}
+
+  /* ── LA PUERTA: pedir la clave ── */
+  #puerta{position:fixed;inset:0;background:#0B1020;z-index:100;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;
+          padding:24px;text-align:center}
+  #puerta .logo{font-size:56px;margin-bottom:6px}
+  #puerta h1{margin:0 0 4px;font-size:26px;font-weight:900;letter-spacing:.5px}
+  #puerta .sub{font-size:13.5px;color:#8892B8;margin-bottom:26px}
+  #clave{width:100%;max-width:300px;padding:15px;border:2px solid #2A3355;
+         border-radius:12px;background:#151C33;color:#fff;font-size:17px;
+         font-weight:800;text-align:center;letter-spacing:1px}
+  #clave:focus{outline:none;border-color:#D4A017}
+  #entrar{width:100%;max-width:300px;padding:15px;margin-top:11px;background:#D4A017;
+          color:#0B1020;border:none;border-radius:12px;font-size:16px;font-weight:900;
+          cursor:pointer}
+  #puerta .pie{font-size:12px;color:#5A648C;margin-top:22px}
+  #errClave{color:#FF6B6B;font-size:13px;font-weight:700;margin-top:11px;min-height:18px}
+
+  /* ── LA CABECERA ── */
+  .cab{background:#151C33;padding:11px 14px;border-bottom:1px solid #2A3355;flex-shrink:0}
+  .cab .titulo{font-size:15px;font-weight:900;letter-spacing:.3px}
+  .cab .quien{font-size:12px;color:#8892B8;font-weight:700;margin-top:1px}
+
+  /* ── EL AVISO DEL CATÁLOGO ── */
+  .catalogo-aviso{margin:10px 12px 0;background:linear-gradient(135deg,#D4A017,#B8860B);
+       color:#0B1020;border-radius:13px;padding:12px 14px;cursor:pointer;
+       box-shadow:0 3px 12px rgba(212,160,23,.28);flex-shrink:0}
+  .catalogo-aviso .t{font-size:14px;font-weight:900;letter-spacing:.2px}
+  .catalogo-aviso .d{font-size:12px;font-weight:700;opacity:.88;margin-top:2px;line-height:1.35}
+
+  /* ── LOS MENSAJES ── */
+  #hilo{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .msg{max-width:78%;padding:9px 13px;border-radius:15px;font-size:14px;line-height:1.4;
+       word-wrap:break-word;white-space:pre-wrap}
+  .deNBS{align-self:flex-start;background:#1E2742;border-bottom-left-radius:5px}
+  .mio{align-self:flex-end;background:#D4A017;color:#0B1020;font-weight:600;
+       border-bottom-right-radius:5px}
+  .hora{font-size:10px;opacity:.6;margin-top:3px;text-align:right;font-weight:700}
+  .vacio{text-align:center;color:#5A648C;font-size:13.5px;padding:40px 20px;line-height:1.6}
+
+  /* ── ESCRIBIR ── */
+  .abajo{background:#151C33;padding:9px 11px;display:flex;gap:8px;align-items:flex-end;
+         border-top:1px solid #2A3355;flex-shrink:0}
+  #texto{flex:1;padding:11px 14px;border:1.5px solid #2A3355;border-radius:20px;
+         background:#0B1020;color:#fff;font-size:14.5px;resize:none;max-height:100px;
+         font-family:inherit}
+  #texto:focus{outline:none;border-color:#D4A017}
+  #enviar{width:44px;height:44px;border-radius:50%;background:#D4A017;border:none;
+          font-size:19px;cursor:pointer;flex-shrink:0}
+  #enviar:disabled{opacity:.4;cursor:default}
+  .avisito{position:fixed;left:50%;bottom:78px;transform:translateX(-50%);
+       background:#1E2742;color:#fff;padding:9px 16px;border-radius:20px;font-size:12.5px;
+       font-weight:700;z-index:200;box-shadow:0 3px 12px rgba(0,0,0,.4)}
+</style>
+</head>
+<body>
+
+<!-- 🔒 LA PUERTA: sin clave no se entra -->
+<div id="puerta">
+  <div class="logo">💬</div>
+  <h1>NBS CHAT</h1>
+  <div class="sub">Nunez Beauty Supply</div>
+  <input id="clave" type="text" placeholder="Tu clave de acceso"
+         autocomplete="off" autocapitalize="characters">
+  <div id="errClave"></div>
+  <button id="entrar" onclick="tocarEntrar()">Entrar</button>
+  <div class="pie">Solo para clientes NBS</div>
+</div>
+
+<div class="cab">
+  <div class="titulo">💬 NBS CHAT</div>
+  <div class="quien" id="quienSoy"></div>
+</div>
+
+<div class="catalogo-aviso" onclick="abrirMiCatalogo()">
+  <div class="t">🛒 HAZ TU PEDIDO EN EL CATÁLOGO</div>
+  <div class="d">Así llega completo y nos ahorramos tiempo los dos</div>
+</div>
+
+<div id="hilo"></div>
+
+<div class="abajo">
+  <textarea id="texto" rows="1" placeholder="Escribe tu mensaje…"
+            oninput="crecerCaja(this)"></textarea>
+  <button id="enviar" onclick="mandar()">📤</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  💬 NBS CHAT  (18 septiembre 2026)
+//
+//  Chat privado entre Sensei y sus clientes más leales. El barbero entra con una clave
+//  que Sensei le da en persona — no con el link del catálogo, para que Sensei pueda dar
+//  chat sin dar catálogo, o al revés.
+//
+//  🔒 SEGURIDAD: cada barbero solo ve SU conversación. Las reglas de Firebase se
+//  encargan; aquí ni siquiera se piden las de los demás.
+// ═══════════════════════════════════════════════════════════════════
+
+var CLAVE_GUARDADA = 'nbschat_clave';
+var YO = null;              // el barbero que entró
+var db = null;
+var _escuchando = null;
+
+// ── Firebase, en una app APARTE ──
+// 🔴 En septiembre el catálogo entró al MISMO Firebase que la app de Sensei y le pisó
+// la sesión: perdió la huella. Por eso aquí también va con nombre propio.
+function prepararFirebase(){
+  if(db) return db;
+  try {
+    if(typeof firebase === 'undefined') return null;
+    var app;
+    try { app = firebase.app('nbschat'); }
+    catch(e){
+      app = firebase.initializeApp({
+        apiKey: "AIzaSyBqtoMWt9DTMmSN-RR5MUagRIuH7B_Bjbw",
+        authDomain: "nbs2-b641a.firebaseapp.com",
+        projectId: "nbs2-b641a",
+        storageBucket: "nbs2-b641a.firebasestorage.app",
+        messagingSenderId: "946975018761",
+        appId: "1:946975018761:web:6dea81efb50b993ca3cdd8"
+      }, 'nbschat');
+    }
+    db = firebase.firestore(app);
+    return db;
+  } catch(e){ console.warn('Firebase no arrancó:', e); return null; }
+}
+
+// ── LA PUERTA ──
+function tocarEntrar(){
+  var clave = (document.getElementById('clave').value || '').trim().toUpperCase();
+  if(!clave){ decirError('Escribe tu clave'); return; }
+  entrarConClave(clave, false);
+}
+
+function decirError(t){
+  document.getElementById('errClave').textContent = t;
+}
+
+function entrarConClave(clave, callado){
+  var bd = prepararFirebase();
+  if(!bd){
+    decirError('Sin internet. Prueba otra vez.');
+    return;
+  }
+  if(!callado) decirError('Comprobando…');
+
+  bd.collection('nbs_chat_accesos').doc(clave).get()
+    .then(function(doc){
+      if(!doc.exists || doc.data().activo === false){
+        localStorage.removeItem(CLAVE_GUARDADA);
+        decirError('Esa clave no sirve. Pídesela a NBS.');
+        return;
+      }
+      YO = doc.data();
+      YO.clave = clave;
+      localStorage.setItem(CLAVE_GUARDADA, clave);
+      document.getElementById('quienSoy').textContent =
+        (YO.nombre || '') + (YO.barberia ? ' · ' + YO.barberia : '');
+      document.getElementById('puerta').style.display = 'none';
+      escucharMensajes();
+      // 🔑 Se apunta que entró: así Sensei sabe quién usa el chat y cuándo
+      try {
+        bd.collection('nbs_chat_accesos').doc(clave)
+          .update({ ultimaEntrada: Date.now() });
+      } catch(e){}
+    })
+    .catch(function(e){
+      console.warn(e);
+      decirError('No pude comprobar la clave. ¿Tienes internet?');
+    });
+}
+
+// ── LOS MENSAJES ──
+function escucharMensajes(){
+  var bd = prepararFirebase();
+  if(!bd || !YO) return;
+  if(_escuchando){ try { _escuchando(); } catch(e){} }
+
+  // 🔑 Solo SU conversación. Ni se piden las de los demás.
+  _escuchando = bd.collection('nbs_chat_mensajes')
+    .where('clave', '==', YO.clave)
+    .onSnapshot(function(snap){
+      var msgs = [];
+      snap.forEach(function(d){ msgs.push(d.data()); });
+      msgs.sort(function(a, b){ return (a.cuando || 0) - (b.cuando || 0); });
+      pintarHilo(msgs);
+      // Se marcan como leídos los que mandó Sensei
+      snap.forEach(function(d){
+        var m = d.data();
+        if(m.deNBS && !m.leido){
+          try { d.ref.update({ leido: true }); } catch(e){}
+        }
+      });
+    }, function(e){ console.warn('no pude escuchar:', e); });
+}
+
+function pintarHilo(msgs){
+  var hilo = document.getElementById('hilo');
+  if(!msgs.length){
+    hilo.innerHTML = '<div class="vacio">Aún no hay mensajes.<br>'
+      + 'Escríbele a NBS cuando lo necesites.</div>';
+    return;
+  }
+  hilo.innerHTML = msgs.map(function(m){
+    return '<div class="msg ' + (m.deNBS ? 'deNBS' : 'mio') + '">'
+      + esc(m.texto || '')
+      + '<div class="hora">' + horaCorta(m.cuando) + '</div></div>';
+  }).join('');
+  hilo.scrollTop = hilo.scrollHeight;
+}
+
+function mandar(){
+  var caja = document.getElementById('texto');
+  var texto = (caja.value || '').trim();
+  if(!texto || !YO) return;
+  var bd = prepararFirebase();
+  if(!bd){ avisito('Sin internet'); return; }
+
+  var boton = document.getElementById('enviar');
+  boton.disabled = true;
+  caja.value = '';
+  caja.style.height = 'auto';
+
+  bd.collection('nbs_chat_mensajes').add({
+    clave: YO.clave,
+    cid: YO.cid || '',
+    nombre: YO.nombre || '',
+    barberia: YO.barberia || '',
+    texto: texto.slice(0, 900),
+    deNBS: false,
+    leido: false,
+    cuando: Date.now()
+  }).then(function(){
+    boton.disabled = false;
+  }).catch(function(e){
+    console.warn(e);
+    boton.disabled = false;
+    caja.value = texto;           // no se le pierde lo que escribió
+    avisito('No se pudo enviar. Prueba otra vez.');
+  });
+}
+
+function abrirMiCatalogo(){
+  if(!YO || !YO.cid){
+    avisito('Pídele a NBS tu link del catálogo');
+    return;
+  }
+  location.href = '../CATALOGO2/catalogo.html?c=' + encodeURIComponent(YO.cid);
+}
+
+// ── Cositas ──
+function esc(t){
+  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function horaCorta(ms){
+  try {
+    var d = new Date(ms), hoy = new Date();
+    var h = d.getHours(), m = d.getMinutes();
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if(h === 0) h = 12;
+    var hora = h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+    if(d.toDateString() === hoy.toDateString()) return hora;
+    var ayer = new Date(hoy.getTime() - 86400000);
+    if(d.toDateString() === ayer.toDateString()) return 'ayer ' + hora;
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hora;
+  } catch(e){ return ''; }
+}
+
+function crecerCaja(el){
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function avisito(t){
+  var d = document.createElement('div');
+  d.className = 'avisito';
+  d.textContent = t;
+  document.body.appendChild(d);
+  setTimeout(function(){ try { d.remove(); } catch(e){} }, 2600);
+}
+
+// ── Al abrir: si ya entró antes, no se le vuelve a pedir la clave ──
+(function(){
+  var guardada = localStorage.getItem(CLAVE_GUARDADA);
+  if(guardada){
+    document.getElementById('clave').value = guardada;
+    setTimeout(function(){ entrarConClave(guardada, true); }, 350);
+  }
+  document.getElementById('clave').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') tocarEntrar();
+  });
+  document.getElementById('texto').addEventListener('keydown', function(e){
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); mandar(); }
+  });
+})();
+</script>
+</body>
+</html>
