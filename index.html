@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260919b-OFICIAL-V2.0">
+<meta name="app-version" content="20260920a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5004,6 +5004,7 @@ function ir(id, sinHistorial){
     ponerHoyEnCampo('cc-fecha');   // 📅 la de hoy, lista para cambiarla -2 sep-
     loadProds();
     syncCCsup();
+    if(typeof pintarHojasFactura === 'function') pintarHojasFactura();   // 📄 la fila de hojas -20 sep-
     window._pagoMetodos = window._pagoMetodos || {};
     window._pagoMetodos['ccini'] = [{tipo:'efectivo', monto:0}];
     renderMetodosPago('ccini');
@@ -6335,6 +6336,74 @@ function cargarFotoGasto(input, prefijo){
   input.value = '';
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  HOJAS DE LA FACTURA DE COMPRA -20 sep-. Sensei: una factura a mano puede
+//  tener dos hojas o mas, y antes solo cabia una foto. Ahora se pueden poner
+//  varias. Se guardan en window._ccHojas -array de dataURLs-. La hoja 1 tambien
+//  se copia a #cc-foto-data para que el lector de texto -OCR- siga funcionando
+//  igual sobre la primera hoja, sin tocar nada de eso.
+window._ccHojas = window._ccHojas || [];
+
+function pintarHojasFactura(){
+  var fila = document.getElementById('cc-hojas-fila');
+  if(!fila) return;
+  var html = '';
+  window._ccHojas.forEach(function(dataUrl, i){
+    html += '<div onclick="opcionesHojaFactura('+i+')" '
+      + 'style="width:56px;height:56px;border-radius:10px;overflow:hidden;flex-shrink:0;cursor:pointer;position:relative;border:1px solid #ddd">'
+      + '<img src="'+dataUrl+'" style="width:100%;height:100%;object-fit:cover">'
+      + '<span style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);color:#fff;font-size:9px;font-weight:800;text-align:center;line-height:14px">Hoja '+(i+1)+'</span>'
+      + '</div>';
+  });
+  // El boton de agregar: siempre visible, para poner 2, 3, las que traiga la factura
+  html += '<div onclick="abrirOpcionesHojaNueva()" '
+    + 'style="width:56px;height:56px;border-radius:10px;background:var(--nbs-gold-bg);border:2px dashed var(--nbs-gold);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;color:var(--nbs-gold-dark)">'
+    + '<span style="font-size:20px;line-height:1">➕</span>'
+    + '<span style="font-size:9px;font-weight:800">'+(window._ccHojas.length?'más':'foto')+'</span>'
+    + '</div>';
+  fila.innerHTML = html;
+  // La hoja 1 alimenta el lector de texto -OCR- y el campo viejo, sin romper nada
+  var campoViejo = document.getElementById('cc-foto-data');
+  if(campoViejo) campoViejo.value = window._ccHojas[0] || '';
+  var btnOcr = document.getElementById('cc-btn-ocr');
+  if(btnOcr && window._ccHojas.length) btnOcr.style.display = 'block';
+}
+
+function abrirOpcionesHojaNueva(){
+  mostrarMenuOpcionesFoto([
+    ['📷 Tomar foto', function(){ recrearInputFoto('cc-foto-camara', function(input){ cargarHojaFactura(input); }).click(); }],
+    ['🖼️ Elegir de galería', function(){ recrearInputFoto('cc-foto-galeria', function(input){ cargarHojaFactura(input); }).click(); }]
+  ]);
+}
+
+function cargarHojaFactura(input){
+  var file = input.files[0];
+  if(!file) return;
+  if(!esFotoValida(file)){ input.value = ''; return; }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    // Misma resolucion alta que la foto de factura de siempre, para leer los numeros chiquitos
+    abrirRecortarFoto(e.target.result, function(dataFinal){
+      window._ccHojas.push(dataFinal);
+      pintarHojasFactura();
+    }, 1800);
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function opcionesHojaFactura(i){
+  var dataUrl = window._ccHojas[i];
+  if(!dataUrl) return;
+  mostrarMenuOpcionesFoto([
+    ['👁️ Ver esta hoja grande', function(){ verFotoGasto(dataUrl); }],
+    ['🗑️ Quitar esta hoja', function(){
+      window._ccHojas.splice(i, 1);
+      pintarHojasFactura();
+    }]
+  ]);
+}
+
 // Carga la libreria de lectura de texto -Tesseract.js- solo la primera vez que hace falta,
 // para no ralentizar el resto de la app en cada uso normal. Necesita internet SOLO esta
 // primera vez, para descargarla; despues de cargada, el navegador la guarda en cache.
@@ -6524,11 +6593,14 @@ function leerTextoFacturaCompra(){
 
 function quitarFotoGasto(prefijo){
   prefijo = prefijo || 'gasto';
-  document.getElementById(prefijo+'-foto-data').value = '';
+  var campo = document.getElementById(prefijo+'-foto-data');
+  if(campo) campo.value = '';
   var prev = document.getElementById(prefijo+'-foto-preview');
-  prev.innerHTML = '📷';
-  prev.style.background = 'var(--nbs-gold-bg)';
-  prev.style.border = '2px dashed var(--nbs-gold)';
+  if(prev){   // 📄 la compra ya no usa preview -usa hojas-; los demas si lo tienen
+    prev.innerHTML = '📷';
+    prev.style.background = 'var(--nbs-gold-bg)';
+    prev.style.border = '2px dashed var(--nbs-gold)';
+  }
   if(prefijo === 'cc'){
     var btnOcr = document.getElementById('cc-btn-ocr');
     if(btnOcr) btnOcr.style.display = 'block';  // se deja visible aunque no haya foto -26 jul-
@@ -8719,15 +8791,26 @@ function verFacturaCompra(c, sid){
       : '');
   el.appendChild(header);
 
-  if(c.foto){
+  // 📄 Las hojas de la factura -20 sep-. Las compras nuevas guardan varias en c.fotos;
+  //    las viejas tienen una sola en c.foto. Se muestran todas las que haya.
+  var hojasCompra = (c.fotos && c.fotos.length) ? c.fotos : (c.foto ? [c.foto] : []);
+  if(hojasCompra.length){
     var fotoCard = document.createElement('div');
     fotoCard.className = 'card';
-    fotoCard.innerHTML = '<div style="font-size:13px;font-weight:700;color:#5D4037;margin-bottom:8px">📷 FOTO DE LA FACTURA</div>'
-      +'<div id="compra-foto-thumb" style="width:110px;height:110px;border-radius:8px;overflow:hidden;cursor:pointer;background:#f0f0f0"></div>';
+    fotoCard.innerHTML = '<div style="font-size:13px;font-weight:700;color:#5D4037;margin-bottom:8px">📷 FACTURA'
+      + (hojasCompra.length > 1 ? ' ('+hojasCompra.length+' hojas)' : '') + '</div>';
+    var filaH = document.createElement('div');
+    filaH.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
+    hojasCompra.forEach(function(dataUrl, i){
+      var th = document.createElement('div');
+      th.style.cssText = 'width:110px;height:110px;border-radius:8px;overflow:hidden;cursor:pointer;background:#f0f0f0;position:relative';
+      th.innerHTML = '<img src="'+dataUrl+'" style="width:100%;height:100%;object-fit:cover">'
+        + (hojasCompra.length > 1 ? '<span style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);color:#fff;font-size:10px;font-weight:800;text-align:center;line-height:16px">Hoja '+(i+1)+'</span>' : '');
+      th.onclick = (function(u){ return function(){ verFotoGasto(u); }; })(dataUrl);
+      filaH.appendChild(th);
+    });
+    fotoCard.appendChild(filaH);
     el.appendChild(fotoCard);
-    var thumbCompra = fotoCard.querySelector('#compra-foto-thumb');
-    thumbCompra.innerHTML = '<img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover">';
-    thumbCompra.onclick = function(){ verFotoGasto(c.foto); };
   }
 
   var prodCard = document.createElement('div');
@@ -17152,7 +17235,7 @@ function filterCC(q){
   list.forEach(function(p){
     var d = document.createElement('div');
     d.style.cssText = 'padding:12px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:13px';
-    d.innerHTML = '<div style="font-weight:600">'+escaparHtml(p.nombre)+'</div><div style="color:#aaa;font-size:11px">'+p.cat+' · Stock actual:'+p.stock+' · Costo: $'+fmtNum(p.costo)+'</div>';
+    d.innerHTML = '<div style="font-weight:600">'+escaparHtml(p.nombre)+'</div><div style="color:#aaa;font-size:11px">'+p.cat+' · Costo: $'+fmtNum(p.costo)+' · <b style="color:#2E7D32">Quedan: '+p.stock+'</b></div>';
     d.onclick = (function(pid){ return function(){ selCC(pid); }; })(p.id);
     el.appendChild(d);
   });
@@ -17161,7 +17244,7 @@ function filterCC(q){
 function selCC(id){
   var p = productos.find(function(x){ return String(x.id)===String(id); }); if(!p) return;
   document.getElementById('ccsel').value = id;
-  document.getElementById('ccsn').textContent = p.nombre + ' - Costo actual: $' + fmtNum(p.costo);
+  document.getElementById('ccsn').innerHTML = escaparHtml(p.nombre) + ' · <b style="color:#2E7D32">Quedan ' + p.stock + '</b> · Costo: $' + fmtNum(p.costo);
   document.getElementById('cclist').style.display = 'none';
   document.getElementById('ccb').value = '';
   document.getElementById('ccchip').style.display = 'flex';
@@ -17432,7 +17515,8 @@ function saveCC(){
     fecha: fechaDelCampo('cc-fecha'),   // 📅 la que el escogio -2 sep-
     hora: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}),
     pagosFactura: pagosIniciales,
-    foto: document.getElementById('cc-foto-data').value || null
+    foto: (window._ccHojas && window._ccHojas[0]) || document.getElementById('cc-foto-data').value || null,
+    fotos: (window._ccHojas && window._ccHojas.length) ? window._ccHojas.slice() : null   // 📄 varias hojas -20 sep-
   });
 
   iCC = [];
@@ -17447,6 +17531,8 @@ function saveCC(){
     var elM = document.getElementById('cc-descm' + iD);  if(elM) elM.value = '';
   }
   quitarFotoGasto('cc');
+  window._ccHojas = [];
+  if(typeof pintarHojasFactura === 'function') pintarHojasFactura();
   var ocrResEl = document.getElementById('cc-ocr-resultado');
   if(ocrResEl) ocrResEl.style.display = 'none';
   window._pagoMetodos = window._pagoMetodos || {};
@@ -19458,7 +19544,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260919b';
+var NOVEDADES_VERSION = '20260920a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -44298,14 +44384,12 @@ function salirGuardandoPedido(){
       style="width:100%;padding:11px;margin-bottom:8px;background:#F2F2F6;color:#37474F;border:1.5px solid #DCDCE4;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
       <span>📎 Foto y lectura de la factura</span><span class="cc-flecha">›</span></button>
     <div id="cc-bloque-factura" style="display:none">
-    <label class="lbl">Foto de la factura del suplidor (opcional)</label>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <div id="cc-foto-preview" onclick="abrirOpcionesFotoGasto('cc')" style="width:56px;height:56px;border-radius:10px;background:var(--nbs-gold-bg);border:2px dashed var(--nbs-gold);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden;cursor:pointer">📷</div>
-      <div style="font-size:12px;color:#aaa;flex:1">Queda guardada junto a esta compra, para tenerla de constancia.</div>
-    </div>
+    <label class="lbl">Hojas de la factura del suplidor (opcional)</label>
+    <div id="cc-hojas-fila" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap"></div>
+    <div style="font-size:12px;color:#aaa;margin-bottom:10px">Toca ➕ para agregar otra hoja. Toca una hoja para verla o quitarla. Quedan guardadas junto a esta compra, de constancia.</div>
     <input type="hidden" id="cc-foto-data">
-    <input type="file" id="cc-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoGasto(this,'cc')">
-    <input type="file" id="cc-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this,'cc')">
+    <input type="file" id="cc-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarHojaFactura(this)">
+    <input type="file" id="cc-foto-galeria" accept="image/*" style="display:none" onchange="cargarHojaFactura(this)">
     <button type="button" id="cc-btn-ocr" style="width:100%;padding:10px;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px" onclick="leerTextoFacturaCompra()">🔍 Leer el texto de la foto -para copiar y pegar más rápido</button>
     <button type="button" onclick="abrirLectorFactura()" style="width:100%;padding:12px;background:#E8F5E9;color:#2E7D32;border:2px solid #2E7D32;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;margin-bottom:10px">📄 Leer factura del suplidor (PDF)</button>
     <!-- Solo sale si dejo una factura a medias -28 jul-. Asi puede salir al catalogo a
