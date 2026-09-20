@@ -293,17 +293,7 @@ fetch('productos.json').then(function(r){ return r.json(); }).then(function(d){
   var cod = new URLSearchParams(location.search).get('c');
   YO = CLIENTES.find(function(x){ return String(x.id) === String(cod); }) || null;
   document.getElementById('negocio').textContent = YO ? (YO.neg || YO.n) : 'Haz tu pedido';
-  // 🔑 Si no hay descuento general, ese aviso solo estorba: se esconde. -11 sep-
-  var av = document.getElementById('avisoDesc');
-  if(av){
-    if(DESCUENTO_CONTADO > 0){
-      av.innerHTML = '\ud83d\udcb5 <b>' + Math.round(DESCUENTO_CONTADO*100)
-        + '% de descuento</b> pagando al contado<br>'
-        + '<span class="pista" style="font-size:10.5px">Los precios en verde son de contado</span>';
-    } else {
-      av.style.display = 'none';
-    }
-  }
+  _refrescarAvisoDescuento();
   // ⚡ La cinta solo sale si hay algo que enseñar
   var nPromos = COMBOS.length + PRODS.filter(function(p){ return p.promo || p.oferta; }).length;
   if(nPromos > 0){
@@ -320,10 +310,48 @@ fetch('productos.json').then(function(r){ return r.json(); }).then(function(d){
   pintarChips();
   pintar();
   cargarCarrito();
+  leerYAplicarDescuentos();   // 💵 lee los descuentos que Sensei guardó y repinta -20 sep-
 }).catch(function(){
   document.getElementById('lista').innerHTML =
     '<div class="vacio">No pude cargar el catálogo.<br>Revisa tu conexión.</div>';
 });
+
+// 💵 El aviso verde de arriba: sale con el % general, o se esconde si no hay. -20 sep-
+function _refrescarAvisoDescuento(){
+  var av = document.getElementById('avisoDesc');
+  if(!av) return;
+  if(DESCUENTO_CONTADO > 0){
+    av.style.display = '';
+    av.innerHTML = '\ud83d\udcb5 <b>' + Math.round(DESCUENTO_CONTADO*100)
+      + '% de descuento</b> pagando al contado<br>'
+      + '<span class="pista" style="font-size:10.5px">Los precios en verde son de contado</span>';
+  } else {
+    av.style.display = 'none';
+  }
+}
+
+// 💵 Lee los descuentos guardados por Sensei en Firebase y los aplica en vivo. Si no
+//    hay regla puesta, sin internet, o no ha guardado nada, se queda con lo del archivo. -20 sep-
+function leerYAplicarDescuentos(){
+  try {
+    var db = prepararBuzon();
+    if(!db) return;
+    db.collection('nbs_descuentos').doc('config').get().then(function(doc){
+      if(!doc || !doc.exists) return;
+      var cfg = doc.data() || {};
+      if(typeof cfg.general === 'number') DESCUENTO_CONTADO = cfg.general / 100;
+      if(cfg.items){
+        PRODS.forEach(function(p){
+          var v = cfg.items[String(p.id)];
+          if(typeof v === 'number') p.desc = v;   // el % propio de ese producto
+        });
+      }
+      _refrescarAvisoDescuento();
+      pintarChips();
+      pintar();
+    }).catch(function(){ /* sin regla o sin internet: se queda con lo del archivo */ });
+  } catch(e){ /* Firebase no cargó: el catálogo sigue igual */ }
+}
 
 function pintarChips(){
   // 🔑 Cuántas cosas hay en promo: el numerito le dice que ahí hay algo
@@ -855,10 +883,158 @@ function enviar(){
     location.href = 'https://wa.me/' + WHATSAPP_NBS + '?text=' + encodeURIComponent(_texto);
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  🔒 ADMINISTRADOR DE DESCUENTOS  -20 sep-
+//  Se abre con ?admin en la dirección. Sensei entra con su correo y contraseña
+//  por una app APARTE ('admin'), pone el % de contado de cada producto, y se
+//  guarda en Firebase. Los clientes lo ven en vivo. NO toca su sesión ni su huella.
+// ═══════════════════════════════════════════════════════════════════
+var _admInput = 'width:100%;box-sizing:border-box;background:#151C2E;border:1px solid #2A3348;color:#EEF0F6;border-radius:8px;padding:10px;font-size:15px;margin-bottom:10px';
+var _admBtn = 'width:100%;background:#D4A017;color:#111;border:0;border-radius:8px;padding:12px;font-size:15px;font-weight:800;cursor:pointer';
+var _dbAdmin = null, _authAdmin = null, _cfgAdmin = { general: 10, items: {} };
+
+function _admEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _admMsg(t, err){ var m=document.getElementById('adm-msg'); if(m){ m.style.color = err?'#E5484D':'#35D07F'; m.textContent=t; } }
+
+function _prepararAdmin(){
+  if(_dbAdmin) return true;
+  try {
+    if(typeof firebase === 'undefined') return false;
+    var app;
+    try { app = firebase.app('admin'); }
+    catch(e){
+      app = firebase.initializeApp({
+        apiKey: "AIzaSyBqtoMWt9DTMmSN-RR5MUagRIuH7B_Bjbw",
+        authDomain: "nbs2-b641a.firebaseapp.com",
+        projectId: "nbs2-b641a",
+        storageBucket: "nbs2-b641a.firebasestorage.app",
+        messagingSenderId: "946975018761",
+        appId: "1:946975018761:web:6dea81efb50b993ca3cdd8"
+      }, 'admin');
+    }
+    _authAdmin = firebase.auth(app);
+    _dbAdmin = firebase.firestore(app);
+    return true;
+  } catch(e){ return false; }
+}
+
+function abrirAdmin(){
+  var d = document.createElement('div');
+  d.id = 'admin-ov';
+  d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0B1020;color:#EEF0F6;overflow:auto;padding:16px;font-family:system-ui,-apple-system,sans-serif';
+  d.innerHTML =
+    '<div style="max-width:640px;margin:0 auto">'
+    + '<h2 style="color:#D4A017;font-size:18px;margin:6px 0 14px">🔒 Administrador · Descuentos de contado</h2>'
+    + '<div id="adm-login">'
+    +   '<p style="font-size:13px;color:#98A0B8;margin:0 0 10px">Entra con tu correo y contraseña (los mismos de la app).</p>'
+    +   '<input id="adm-email" type="email" placeholder="Tu correo" autocomplete="username" style="'+_admInput+'">'
+    +   '<input id="adm-pass" type="password" placeholder="Tu contraseña" autocomplete="current-password" style="'+_admInput+'">'
+    +   '<button onclick="adminEntrar()" style="'+_admBtn+'">Entrar</button>'
+    +   '<div id="adm-msg" style="font-size:13px;margin-top:8px"></div>'
+    + '</div>'
+    + '<div id="adm-panel" style="display:none">'
+    +   '<div style="background:#151C2E;border-radius:10px;padding:12px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +     '<span style="font-weight:800">Descuento general:</span>'
+    +     '<input id="adm-general" type="number" min="0" max="90" style="width:70px;background:#0B1020;border:1px solid #2A3348;color:#EEF0F6;border-radius:8px;padding:8px;font-size:15px;text-align:center"> %'
+    +     '<span style="font-size:11px;color:#98A0B8">se usa en los que no tengan el suyo</span>'
+    +   '</div>'
+    +   '<input id="adm-buscar" placeholder="🔍 buscar producto..." oninput="adminPintarLista()" style="'+_admInput+'">'
+    +   '<div id="adm-lista" style="margin:8px 0 80px"></div>'
+    +   '<div style="position:fixed;left:0;right:0;bottom:0;background:#0B1020;border-top:1px solid #1E2740;padding:10px 16px;text-align:center">'
+    +     '<button onclick="adminGuardar()" style="'+_admBtn+';max-width:400px">💾 Guardar todo</button>'
+    +   '</div>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(d);
+}
+
+function adminEntrar(){
+  if(!_prepararAdmin()){ _admMsg('Firebase no cargó, revisa tu internet.', true); return; }
+  var email = (document.getElementById('adm-email').value||'').trim();
+  var pass = document.getElementById('adm-pass').value||'';
+  if(!email || !pass){ _admMsg('Pon tu correo y contraseña.', true); return; }
+  _admMsg('Entrando...', false);
+  _authAdmin.signInWithEmailAndPassword(email, pass).then(function(){
+    _dbAdmin.collection('nbs_descuentos').doc('config').get().then(function(doc){
+      if(doc && doc.exists){ var c=doc.data()||{}; if(typeof c.general==='number') _cfgAdmin.general=c.general; _cfgAdmin.items = c.items || {}; }
+      _admAbrirPanel();
+    }).catch(function(){ _admAbrirPanel(); });   // aunque no pueda leer, deja trabajar
+  }).catch(function(){ _admMsg('Correo o contraseña incorrectos.', true); });
+}
+
+function _admAbrirPanel(){
+  document.getElementById('adm-login').style.display='none';
+  document.getElementById('adm-panel').style.display='';
+  document.getElementById('adm-general').value = _cfgAdmin.general;
+  adminPintarLista();
+}
+
+function _admPctEfectivo(p){
+  var v = _cfgAdmin.items[String(p.id)];
+  return (typeof v==='number') ? v : _cfgAdmin.general;
+}
+
+function adminPintarLista(){
+  var cont = document.getElementById('adm-lista');
+  if(!cont) return;
+  if(!PRODS || !PRODS.length){ cont.innerHTML = '<div style="color:#98A0B8;padding:20px;text-align:center">Cargando productos… espera un momento y busca de nuevo.</div>'; return; }
+  var q = (document.getElementById('adm-buscar').value||'').toLowerCase().trim();
+  var lista = PRODS.filter(function(p){ return !q || (String(p.n)+' '+String(p.m||'')).toLowerCase().indexOf(q)>=0; });
+  var html = '';
+  lista.slice(0, 300).forEach(function(p){
+    var pid = String(p.id);
+    var val = (typeof _cfgAdmin.items[pid]==='number') ? _cfgAdmin.items[pid] : '';
+    var contado = Math.round(p.pr*(1-_admPctEfectivo(p)/100)*100)/100;
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #1A2236">'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_admEsc(p.n)+'</div>'
+      +   '<div style="font-size:11px;color:#98A0B8">Crédito '+dinero(p.pr)+' · Contado <b id="adm-c-'+pid+'" style="color:#35D07F">'+dinero(contado)+'</b></div>'
+      + '</div>'
+      + '<input type="number" min="0" max="90" value="'+val+'" placeholder="'+_cfgAdmin.general+'" '
+      +   'onchange="adminSetItem(\''+pid+'\', this.value)" oninput="adminPreview(\''+pid+'\', this.value, '+p.pr+')" '
+      +   'style="width:56px;text-align:center;background:#151C2E;border:1px solid #2A3348;color:#EEF0F6;border-radius:8px;padding:8px 4px;font-size:15px">'
+      + '<span style="color:#98A0B8;font-size:13px">%</span>'
+      + '</div>';
+  });
+  cont.innerHTML = html || '<div style="color:#98A0B8;padding:20px;text-align:center">Nada encontrado.</div>';
+}
+
+function adminPreview(pid, val, pr){
+  var pct = (val==='' || isNaN(parseFloat(val))) ? _cfgAdmin.general : parseFloat(val);
+  var el = document.getElementById('adm-c-'+pid);
+  if(el) el.textContent = dinero(Math.round(pr*(1-pct/100)*100)/100);
+}
+function adminSetItem(pid, val){
+  val = String(val).trim();
+  if(val===''){ delete _cfgAdmin.items[pid]; }
+  else { var n=parseFloat(val); _cfgAdmin.items[pid] = isNaN(n)?0:Math.max(0,Math.min(90,n)); }
+}
+
+function adminGuardar(){
+  if(!_dbAdmin){ alert('Vuelve a entrar.'); return; }
+  var g = parseFloat(document.getElementById('adm-general').value);
+  _cfgAdmin.general = isNaN(g) ? 0 : Math.max(0, Math.min(90, g));
+  var datos = { general: _cfgAdmin.general, items: _cfgAdmin.items, actualizado: Date.now() };
+  _dbAdmin.collection('nbs_descuentos').doc('config').set(datos).then(function(){
+    alert('✅ Guardado. Los clientes ya ven los precios nuevos.');
+  }).catch(function(e){
+    alert('No se pudo guardar.\n\nSi es la primera vez, quizás falta pegar la regla de Firebase.\n\n('+(e && e.message ? e.message : e)+')');
+  });
+}
+
+// ¿Entró por ?admin? → abre el panel
+if(new URLSearchParams(location.search).has('admin')){
+  if(document.readyState !== 'loading') abrirAdmin();
+  else document.addEventListener('DOMContentLoaded', abrirAdmin);
+}
 </script>
 <!-- 🔥 Firebase SOLO para dejar el pedido en el buzón. Va al final y por detrás, así
      no frena el catálogo si internet está lento. -17 sep- -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" defer></script>
+<!-- 🔒 Auth SOLO para el panel de administrador de descuentos, y por una app APARTE
+     ('admin'), así no toca la sesión de la app de Sensei ni su huella. -20 sep- -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" defer></script>
 </body>
 </html>
