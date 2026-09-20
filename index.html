@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260920a-OFICIAL-V2.0">
+<meta name="app-version" content="20260920b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16793,7 +16793,7 @@ function verificarStockSuficiente(items){
   var detalle = faltantes.map(function(f){
     return '• "'+f.nombre+'" — tienes '+f.stock+' en existencia, estás vendiendo '+f.cant+'.';
   }).join('\n');
-  return confirm('⚠️ Stock insuficiente\n\n'+detalle+'\n\nEl stock quedará en 0, no en negativo. Corrige tu inventario cuando puedas.\n\n¿Vender igual?');
+  return confirm('⚠️ Stock insuficiente\n\n'+detalle+'\n\nEl stock quedará en negativo y se corregirá solo cuando metas la factura de compra de estos productos.\n\n¿Vender igual?');
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -16887,7 +16887,7 @@ function saveV(){
   var subtot=0, gan=0;
   iV.forEach(function(it){
     var p=productos.find(function(x){return String(x.id) === String(it.pid);});
-    if(p) p.stock = Math.max(0, (p.stock||0) - it.cant);
+    if(p) p.stock = (p.stock||0) - it.cant;   // baja a negativo si se vende sin stock; la factura de compra lo corrige solo -20 sep-
     subtot += it.cant*it.precio;
     gan += it.cant*(it.precio-it.costo);
   });
@@ -17235,7 +17235,7 @@ function filterCC(q){
   list.forEach(function(p){
     var d = document.createElement('div');
     d.style.cssText = 'padding:12px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:13px';
-    d.innerHTML = '<div style="font-weight:600">'+escaparHtml(p.nombre)+'</div><div style="color:#aaa;font-size:11px">'+p.cat+' · Costo: $'+fmtNum(p.costo)+' · <b style="color:#2E7D32">Quedan: '+p.stock+'</b></div>';
+    d.innerHTML = '<div style="font-weight:600">'+escaparHtml(p.nombre)+'</div><div style="color:#aaa;font-size:11px">'+p.cat+' · Costo: $'+fmtNum(p.costo)+' · <b style="color:'+(p.stock<0?'#E67E22':'#2E7D32')+'">Quedan: '+p.stock+(p.stock<0?' \u26a0\ufe0f':'')+'</b></div>';
     d.onclick = (function(pid){ return function(){ selCC(pid); }; })(p.id);
     el.appendChild(d);
   });
@@ -17244,7 +17244,7 @@ function filterCC(q){
 function selCC(id){
   var p = productos.find(function(x){ return String(x.id)===String(id); }); if(!p) return;
   document.getElementById('ccsel').value = id;
-  document.getElementById('ccsn').innerHTML = escaparHtml(p.nombre) + ' · <b style="color:#2E7D32">Quedan ' + p.stock + '</b> · Costo: $' + fmtNum(p.costo);
+  document.getElementById('ccsn').innerHTML = escaparHtml(p.nombre) + ' · <b style="color:'+(p.stock<0?'#E67E22':'#2E7D32')+'">Quedan ' + p.stock + (p.stock<0?' \u26a0\ufe0f':'') + '</b> · Costo: $' + fmtNum(p.costo);
   document.getElementById('cclist').style.display = 'none';
   document.getElementById('ccb').value = '';
   document.getElementById('ccchip').style.display = 'flex';
@@ -19544,7 +19544,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260920a';
+var NOVEDADES_VERSION = '20260920b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -27803,7 +27803,7 @@ window.guardarModificacionFactura = function(vid){
   }
   window._itemsEdit.forEach(function(it){
     var p = productos.find(function(x){ return String(x.id)===String(it.pid); });
-    if(p) p.stock = Math.max(0, (p.stock||0) - it.cant);
+    if(p) p.stock = (p.stock||0) - it.cant;   // igual que saveV: baja a negativo, la factura lo corrige solo -20 sep-
   });
 
   var nuevoTotal = window._itemsEdit.reduce(function(s,it){ return s+it.cant*it.precio; }, 0);
