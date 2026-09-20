@@ -270,6 +270,7 @@ function textoPromo(p){
 
 var GRUPOS = [
   ['promos',   '🔥🔥 PROMOS',   null],   // 🔑 lo primero, con las dos llamas
+  ['top',      '⭐ Lo más vendido', null], // 🏆 el ranking real de las facturas -20 sep-
   ['todo',     'Todo',          null],
   ['pelo',     'Para el pelo',  /pelo|gel|wax|cream|shampoo|pomada|spray/i],
   ['colonias', 'Colonias',      /colonia|after shave|perfume/i],
@@ -344,6 +345,7 @@ function buscar(v){ BUSCA = v; pintar(); }
 
 function delGrupo(p, k){
   if(k === 'promos') return !!p.oferta || !!p.promo;   // 🔥🔥 lo rebajado y lo de promo
+  if(k === 'top') return !!p.top;                       // ⭐ los marcados con ranking real
   if(k === 'todo') return true;
   var txt = (p.c || '') + ' ' + (p.n || '');
   if(k === 'otros') return !GRUPOS.some(function(x){ return x[2] && x[2].test(txt); });
@@ -359,6 +361,11 @@ function pintar(){
     if(!q) return true;
     return (p.n + ' ' + p.m).toLowerCase().indexOf(q) >= 0;
   });
+
+  // ⭐ En "Lo más vendido" van en el orden REAL del ranking (1, 2, 3...) -20 sep-
+  if(FILTRO === 'top'){
+    lista.sort(function(a, b){ return (a.top || 99) - (b.top || 99); });
+  }
 
   // 🔑 Solo se sale si NO hay nada que enseñar — ni productos ni packs. Antes se salía
   // en cuanto no había productos con promo, y los packs no llegaban a pintarse. -11 sep-
@@ -425,7 +432,9 @@ function pintar(){
       +   (p.tf ? '<img data-foto="' + p.id + '" alt="">' : '<div class="sinf">SIN<br>FOTO</div>')
       + '</div>'
       + '<div class="inf">'
-      +   '<div class="nom">' + esc(p.n) + '</div>'
+      +   '<div class="nom">'
+      +     (FILTRO === 'top' && p.top ? (p.top===1?'🥇 ':p.top===2?'🥈 ':p.top===3?'🥉 ':'<span style="color:#98A0B8;font-weight:900">#'+p.top+'</span> ') : '')
+      +     esc(p.n) + '</div>'
       +   (p.m ? '<div class="mar">' + esc(p.m) + '</div>' : '')
       // 🔑 LOS DOS PRECIOS
       +   '<div class="precios">'
