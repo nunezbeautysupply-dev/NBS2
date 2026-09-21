@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<link rel="manifest" href="manifest-catalogo.json">
+<link rel="apple-touch-icon" href="icono-catalogo-192.png">
+<link rel="icon" href="icono-catalogo-192.png">
+<meta name="theme-color" content="#0B1020">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>NBS · Catálogo</title>
+<!--
+  🛒 CATÁLOGO DE NBS  (11 sep 2026)
+
+  Sensei: "quiero un catálogo como el que usa WhatsApp Business, que el cliente vea y
+  escoja y vaya poniendo en su carrito y pueda ver el total, y que haya dos precios:
+  uno con descuento si paga al contado y otro normal si es a crédito".
+
+  🔑 SOLO LOS 333 PRODUCTOS QUE HA VENDIDO ALGUNA VEZ — de los 599 que tiene en la app.
+  Los 266 que nunca vendió no se le enseñan al barbero.
+
+  Ordenados por lo que más vende, contado de sus facturas reales.
+-->
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+       background:#0B1020;color:#EEF0F6;padding-bottom:104px}
+
+  .cab{background:#0B1020;color:#fff;padding:12px 14px;position:sticky;top:0;z-index:50;
+       box-shadow:0 2px 12px rgba(0,0,0,.2)}
+  .cab h1{margin:0;font-size:15.5px;font-weight:900;letter-spacing:.4px}
+  .cab .neg{font-size:12px;color:#D9B24C;font-weight:800;margin-top:1px}
+  .buscar{width:100%;padding:11px 13px;border:none;border-radius:10px;font-size:15px;
+          margin-top:9px;background:#151C2E;color:#fff}
+
+  /* 💵 El aviso del descuento: es lo que le hace pagar al contado */
+  .aviso{background:#0D1526;color:#B9BECE;padding:6px 14px;border-bottom:1px solid #1E2740;
+         font-size:11.5px;font-weight:700;text-align:center;line-height:1.4}
+  .aviso b{font-size:12.5px;color:#EEF0F6}
+  .aviso .pista{color:#35D07F;opacity:1 !important}
+
+  .chips{display:flex;gap:6px;overflow-x:auto;padding:9px 14px;background:#0D1322;
+         border-bottom:1px solid #1E2740;position:sticky;top:104px;z-index:49}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;padding:7px 13px;border-radius:20px;border:1.5px solid #2A3352;
+        background:#151C2E;font-size:12.5px;font-weight:700;color:#B9BECE;cursor:pointer;white-space:nowrap}
+  .chip.on{background:#D4A017;color:#0B1020;border-color:#D4A017}
+
+  /* 🔥 LA PESTAÑA DE PROMOS: tiene que gritar. Es la que le hace entrar. */
+  .chip.promo{background:linear-gradient(135deg,#E53935,#FF6F00);color:#fff;
+              border-color:#C62828;font-weight:900;font-size:13.5px;
+              padding:8px 15px;animation:latido 1.4s ease-in-out infinite;
+              box-shadow:0 2px 10px rgba(229,57,53,.45)}
+  .chip.promo.on{background:linear-gradient(135deg,#C62828,#E53935);
+                 animation:none;box-shadow:0 0 0 3px rgba(229,57,53,.3)}
+  @keyframes latido{
+    0%,100%{transform:scale(1);box-shadow:0 2px 10px rgba(229,57,53,.45)}
+    50%{transform:scale(1.06);box-shadow:0 3px 16px rgba(229,57,53,.75)}
+  }
+
+  /* 🔔 El globo de cuántas promos hay */
+  .chip .cuantas{background:#F4F5F9;color:#C62828;border-radius:10px;padding:1px 6px;
+                 font-size:11px;font-weight:900;margin-left:5px}
+
+  /* ⚡ La cinta del pack: joya oscura con borde dorado y un brillo suave que pasa */
+  .cinta{background:#111832;border:1px solid rgba(212,160,23,.55);border-radius:10px;
+         margin:7px 10px 0;color:#E8C55F;padding:7px 14px;text-align:center;
+         font-size:12.5px;font-weight:900;letter-spacing:.5px;cursor:pointer;
+         display:flex;align-items:center;justify-content:center;gap:8px;
+         position:relative;overflow:hidden}
+  .cinta::after{content:'';position:absolute;top:0;left:-120%;width:55%;height:100%;
+         background:linear-gradient(90deg,transparent,rgba(232,197,95,.18),transparent);
+         animation:brillo 3.5s ease-in-out infinite}
+  .cinta .flecha{animation:empuja 1.6s ease-in-out infinite;color:#D4A017}
+  @keyframes empuja{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
+
+  /* 📦 El pack, con brillo que pasa por encima */
+  .pack{position:relative;overflow:hidden}
+  .pack::after{content:'';position:absolute;top:0;left:-120%;width:60%;height:100%;
+               background:linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent);
+               animation:brillo 3.5s ease-in-out infinite}
+  @keyframes brillo{0%{left:-120%}45%{left:130%}100%{left:130%}}
+
+  .lista{padding:10px}
+  .p{display:flex;gap:11px;background:#151C2E;border-radius:13px;padding:10px;margin-bottom:9px;
+     box-shadow:0 1px 5px rgba(0,0,0,.35)}
+  .fo{width:82px;height:82px;border-radius:10px;background:#1E2740;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer}
+  .fo img{width:100%;height:100%;object-fit:cover}
+  .fo .sinf{font-size:9px;color:#7C86A3;text-align:center;padding:4px;line-height:1.3;font-weight:800}
+  .inf{flex:1;min-width:0;display:flex;flex-direction:column}
+  .nom{font-size:13.5px;font-weight:800;line-height:1.28}
+  .mar{font-size:10.5px;color:#98A0B8;font-weight:700;letter-spacing:.3px;margin-top:2px}
+
+  /* 🔑 LOS DOS PRECIOS, uno al lado del otro */
+  .precios{display:flex;gap:7px;margin-top:6px;align-items:flex-end}
+  .pcontado{background:#0F2B1C;border:1.5px solid #0E9950;border-radius:9px;
+            padding:4px 9px;text-align:center}
+  .pcontado .et{font-size:8.5px;font-weight:900;color:#35D07F;letter-spacing:.3px}
+  .pcontado .vl{font-size:17px;font-weight:900;color:#35D07F;line-height:1.1}
+  .pcredito{padding:4px 2px;text-align:center}
+  .pcredito .et{font-size:8.5px;font-weight:800;color:#8A93AC;letter-spacing:.3px}
+  .pcredito .vl{font-size:13.5px;font-weight:800;color:#A7ADC2;line-height:1.1}
+
+  .ctl{display:flex;align-items:center;gap:7px;margin-top:7px}
+  .bmas{width:36px;height:36px;border-radius:10px;border:none;background:#D4A017;color:#0B1020;
+        font-size:19px;font-weight:700;cursor:pointer}
+  .bmen{width:31px;height:31px;border-radius:9px;border:1.5px solid #2A3352;background:#1E2740;
+        font-size:16px;cursor:pointer;color:#C9CDDB}
+  .cant{font-size:16px;font-weight:900;min-width:22px;text-align:center}
+
+  .barra{position:fixed;left:0;right:0;bottom:0;background:#0B7A3B;color:#fff;
+         padding:11px 14px;display:none;align-items:center;gap:11px;z-index:60;
+         box-shadow:0 -3px 16px rgba(0,0,0,.25)}
+  .barra.on{display:flex}
+  .barra .t{flex:1;min-width:0}
+  .barra .t1{font-size:11.5px;opacity:.92}
+  .barra .t2{font-size:19px;font-weight:900}
+  .barra .t3{font-size:11px;opacity:.9}
+  .barra button{padding:12px 17px;border:none;border-radius:11px;background:#EFF1F6;
+                color:#0B7A3B;font-size:14.5px;font-weight:900;cursor:pointer}
+
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:none;
+      align-items:center;justify-content:center;padding:16px}
+  .ov.on{display:flex}
+  .ov img{max-width:100%;max-height:72vh;border-radius:12px}
+  .ov .cierra{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.22);
+              color:#fff;border:none;border-radius:50%;width:40px;height:40px;
+              font-size:20px;cursor:pointer}
+  .ov .pie{position:absolute;bottom:28px;left:16px;right:16px;color:#fff;text-align:center;
+           font-size:14px;font-weight:700;line-height:1.5}
+
+  .car{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:150;display:none;
+       align-items:flex-end;justify-content:center}
+  .car.on{display:flex}
+  .carcaja{background:#111832;width:100%;max-width:560px;border-radius:17px 17px 0 0;
+           padding:15px;max-height:88vh;overflow:auto}
+  .cl{display:flex;justify-content:space-between;align-items:center;gap:9px;
+      padding:9px 0;border-bottom:1px solid #232C48}
+  .vacio{text-align:center;padding:46px 20px;color:#8A93AC;font-size:14px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="cab">
+  <h1>🧴 NUNEZ BEAUTY SUPPLY</h1>
+  <div class="neg" id="negocio">Cargando…</div>
+  <input class="buscar" id="q" placeholder="🔍 Buscar producto o marca…" oninput="buscar(this.value)">
+</div>
+
+<!-- 🎁 EL 5% POR PEDIR AQUÍ -Sensei, 17 sep-. Es lo que le ahorra viajes sin venta
+     y a ellos les conviene. -->
+<div style="background:#0D1526;border-left:3px solid #35D07F;padding:7px 14px;
+     display:flex;align-items:center;gap:11px">
+  <div style="font-size:20px;font-weight:900;color:#35D07F;letter-spacing:.5px;flex-shrink:0">5%</div>
+  <div style="text-align:left;min-width:0">
+    <div style="font-size:12.5px;font-weight:800;color:#EEF0F6;letter-spacing:.2px">
+      🎁 DE DESCUENTO por hacer tu pedido aquí</div>
+    <div style="font-size:10.5px;color:#98A0B8;margin-top:1px">
+      No aplica a máquinas, repuestos ni cargadores</div>
+  </div>
+</div>
+<div class="cinta" id="cintaPromos" onclick="filtrar('promos');window.scrollTo(0,0)"
+     style="display:none">
+  <span id="cintaTexto">🔥 OFERTAS DE ESTA SEMANA</span>
+  <span class="flecha">›</span>
+</div>
+
+<div class="aviso" id="avisoDesc">
+  💵 <b>Precios de contado y a crédito</b><br>
+  <span class="pista" style="font-size:10.5px">Los precios en verde son de contado</span>
+</div>
+
+<div class="chips" id="chips"></div>
+<div style="text-align:center;font-size:9.5px;color:#4A5470;padding:3px">v17/09A</div>
+<div class="lista" id="lista"><div class="vacio">Cargando el catálogo…</div></div>
+
+<div class="barra" id="barra">
+  <div class="t">
+    <div class="t1" id="bt1">0 productos</div>
+    <div class="t2" id="bt2">$0.00</div>
+    <div class="t3" id="bt3"></div>
+  </div>
+  <button onclick="verCarrito()">Ver pedido</button>
+</div>
+
+<div class="ov" id="ovFoto" onclick="cerrarFoto()">
+  <button class="cierra" onclick="cerrarFoto()">✕</button>
+  <img id="ovImg" src="" alt="">
+  <div class="pie" id="ovPie"></div>
+</div>
+
+<div class="car" id="car" onclick="if(event.target===this)cerrarCarrito()">
+  <div class="carcaja" id="carcaja"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  🔑 EL DESCUENTO POR PAGAR AL CONTADO
+//  Para cambiarlo, solo esta línea.
+// ═══════════════════════════════════════════════════════════════════
+var DESCUENTO_CONTADO = 0.10;      // 10%
+
+// 🎁 EL DESCUENTO POR PEDIR EN EL CATÁLOGO -17 sep-
+var DESCUENTO_CATALOGO = 0.05;     // 5%
+// 🔴 Categorías donde el margen no da para descuento
+var SIN_DESCUENTO = ['MAQUINAS', 'REEMPLAZOS', 'CARGADORES'];
+
+function llevaDescuento(p){
+  var c = String((p && p.c) || '').toUpperCase().trim();
+  for(var i = 0; i < SIN_DESCUENTO.length; i++){
+    if(c === SIN_DESCUENTO[i]) return false;
+  }
+  return true;
+}
+var WHATSAPP_NBS = '14013050188';
+
+var PRODS = [], CLIENTES = [], YO = null, COMBOS = [];
+var CARRO = {}, FOTOS = {}, TROZOS = 40, _pedidos = {};
+var FILTRO = 'todo', BUSCA = '';
+
+function dinero(n){ return '$' + (Math.round(n*100)/100).toFixed(2); }
+// 🔑 Cada producto puede tener SU descuento. Si no tiene, usa el general.
+function precioContado(pr, p){
+  var d = (p && typeof p.desc === 'number') ? p.desc / 100 : DESCUENTO_CONTADO;
+  return Math.round(pr * (1 - d) * 100) / 100;
+}
+
+// 🎁 LAS PROMOCIONES. Devuelve lo que paga de verdad por esa cantidad.
+//   lleva3paga2 → cada 3 que lleve, paga 2
+//   precioPorCantidad → a partir de X unidades, sale a otro precio
+function conPromo(p, cant){
+  var unit = precioContado(p.pr, p);
+  if(!p.promo || !cant) return { total: Math.round(unit * cant * 100) / 100, ahorro: 0, texto: '' };
+  var pr = p.promo;
+  if(pr.tipo === 'lleva'){
+    // lleva N, paga M
+    var grupos = Math.floor(cant / pr.lleva);
+    var sueltos = cant % pr.lleva;
+    var pagan = grupos * pr.paga + sueltos;
+    var total = Math.round(unit * pagan * 100) / 100;
+    return { total: total, ahorro: Math.round((unit * cant - total) * 100) / 100,
+             texto: 'Lleva ' + pr.lleva + ' y paga ' + pr.paga };
+  }
+  if(pr.tipo === 'cantidad' && cant >= pr.desde){
+    var total2 = Math.round(pr.precio * cant * 100) / 100;
+    return { total: total2, ahorro: Math.round((unit * cant - total2) * 100) / 100,
+             texto: 'Desde ' + pr.desde + ' a $' + pr.precio.toFixed(2) + ' c/u' };
+  }
+  return { total: Math.round(unit * cant * 100) / 100, ahorro: 0,
+           texto: pr.tipo === 'cantidad'
+             ? 'Lleva ' + pr.desde + ' y te sale a $' + pr.precio.toFixed(2) : '' };
+}
+
+// 🔑 LO QUE VE EL BARBERO. Sensei, 11 sep: "compra 6 y solo pagas 5 suena mucho mejor"
+// que "desde 6 a $8.33 c/u" — lo primero se entiende de un golpe, lo segundo le hace
+// calcular. Los números quedan para él; aquí solo va la frase.
+function textoPromo(p){
+  if(!p.promo) return '';
+  if(p.promo.frase) return p.promo.frase;
+  // Si no escribió frase, se calcula sola: nunca queda vacío
+  if(p.promo.tipo === 'lleva')
+    return 'COMPRA ' + p.promo.lleva + ' Y PAGA ' + p.promo.paga;
+  var paga = Math.round(p.promo.desde * p.promo.precio / p.pr);
+  if(paga >= 1 && paga < p.promo.desde)
+    return 'COMPRA ' + p.promo.desde + ' Y PAGA ' + paga;
+  return 'LLEVA ' + p.promo.desde + ' Y AHORRA';
+}
+
+var GRUPOS = [
+  ['promos',   '🔥🔥 PROMOS',   null],   // 🔑 lo primero, con las dos llamas
+  ['top',      '⭐ Lo más vendido', null], // 🏆 el ranking real de las facturas -20 sep-
+  ['todo',     'Todo',          null],
+  ['pelo',     'Para el pelo',  /pelo|gel|wax|cream|shampoo|pomada|spray/i],
+  ['colonias', 'Colonias',      /colonia|after shave|perfume/i],
+  ['maquinas', 'Máquinas',      /maquina|máquina|clipper|trimmer|cargador|cuchilla/i],
+  ['navajas',  'Navajas',       /navaja|afeitar|razor|blade/i],
+  ['acces',    'Accesorios',    /accesorio|peine|cepillo|capa|guante|papel|porta|toalla/i],
+  ['otros',    'Otros',         null]
+];
+
+fetch('productos.json').then(function(r){ return r.json(); }).then(function(d){
+  PRODS = d.productos || [];
+  CLIENTES = d.clientes || [];
+  // 🔑 El descuento y el WhatsApp salen del archivo, para que Sensei los cambie desde
+  // el administrador sin tocar código. -11 sep-
+  COMBOS = d.combos || [];
+  if(d.ajustes){
+    if(typeof d.ajustes.descuento === 'number') DESCUENTO_CONTADO = d.ajustes.descuento / 100;
+    if(d.ajustes.whatsapp) WHATSAPP_NBS = String(d.ajustes.whatsapp);
+  }
+  var cod = new URLSearchParams(location.search).get('c');
+  YO = CLIENTES.find(function(x){ return String(x.id) === String(cod); }) || null;
+  document.getElementById('negocio').textContent = YO ? (YO.neg || YO.n) : 'Haz tu pedido';
+  _refrescarAvisoDescuento();
+  // ⚡ La cinta solo sale si hay algo que enseñar
+  var nPromos = COMBOS.length + PRODS.filter(function(p){ return p.promo || p.oferta; }).length;
+  if(nPromos > 0){
+    var ci = document.getElementById('cintaPromos');
+    var ct = document.getElementById('cintaTexto');
+    if(ct){
+      ct.textContent = COMBOS.length
+        ? '🔥 ' + COMBOS.length + (COMBOS.length === 1 ? ' PACK ESPECIAL' : ' PACKS ESPECIALES')
+          + ' · PAGANDO DE INMEDIATO'
+        : '🔥 ' + nPromos + ' OFERTAS · PAGANDO DE INMEDIATO';
+    }
+    if(ci) ci.style.display = 'flex';
+  }
+  pintarChips();
+  pintar();
+  cargarCarrito();
+  leerYAplicarDescuentos();   // 💵 lee los descuentos que Sensei guardó y repinta -20 sep-
+}).catch(function(){
+  document.getElementById('lista').innerHTML =
+    '<div class="vacio">No pude cargar el catálogo.<br>Revisa tu conexión.</div>';
+});
+
+// 💵 El aviso verde de arriba: sale con el % general, o se esconde si no hay. -20 sep-
+function _refrescarAvisoDescuento(){
+  var av = document.getElementById('avisoDesc');
+  if(!av) return;
+  if(DESCUENTO_CONTADO > 0){
+    av.style.display = '';
+    av.innerHTML = '\ud83d\udcb5 <b>' + Math.round(DESCUENTO_CONTADO*100)
+      + '% de descuento</b> pagando al contado<br>'
+      + '<span class="pista" style="font-size:10.5px">Los precios en verde son de contado</span>';
+  } else {
+    av.style.display = 'none';
+  }
+}
+
+// 💵 Lee los descuentos guardados por Sensei en Firebase y los aplica en vivo. Si no
+//    hay regla puesta, sin internet, o no ha guardado nada, se queda con lo del archivo. -20 sep-
+function leerYAplicarDescuentos(){
+  try {
+    var db = prepararBuzon();
+    if(!db) return;
+    db.collection('nbs_descuentos').doc('config').get().then(function(doc){
+      if(!doc || !doc.exists) return;
+      var cfg = doc.data() || {};
+      if(typeof cfg.general === 'number') DESCUENTO_CONTADO = cfg.general / 100;
+      if(cfg.items){
+        PRODS.forEach(function(p){
+          var v = cfg.items[String(p.id)];
+          if(typeof v === 'number') p.desc = v;   // el % propio de ese producto
+        });
+      }
+      _refrescarAvisoDescuento();
+      pintarChips();
+      pintar();
+    }).catch(function(){ /* sin regla o sin internet: se queda con lo del archivo */ });
+  } catch(e){ /* Firebase no cargó: el catálogo sigue igual */ }
+}
+
+function pintarChips(){
+  // 🔑 Cuántas cosas hay en promo: el numerito le dice que ahí hay algo
+  var cuantas = COMBOS.length + PRODS.filter(function(p){ return p.promo || p.oferta; }).length;
+  document.getElementById('chips').innerHTML = GRUPOS.map(function(g){
+    var esPromo = (g[0] === 'promos');
+    if(esPromo && !cuantas) return '';      // sin promos, no se enseña la pestaña
+    return '<div class="chip' + (esPromo ? ' promo' : '') + (FILTRO===g[0]?' on':'') + '" '
+      + 'onclick="filtrar(\'' + g[0] + '\')">'
+      + g[1]
+      + (esPromo ? '<span class="cuantas">' + cuantas + '</span>' : '')
+      + '</div>';
+  }).join('');
+}
+function filtrar(k){ FILTRO = k; pintarChips(); pintar(); window.scrollTo(0,0); }
+
+// 🔑 Solo se repinta la lista, no la cabecera: así el teclado no se cierra al escribir
+function buscar(v){ BUSCA = v; pintar(); }
+
+function delGrupo(p, k){
+  if(k === 'promos') return !!p.oferta || !!p.promo;   // 🔥🔥 lo rebajado y lo de promo
+  if(k === 'top') return !!p.top;                       // ⭐ los marcados con ranking real
+  if(k === 'todo') return true;
+  var txt = (p.c || '') + ' ' + (p.n || '');
+  if(k === 'otros') return !GRUPOS.some(function(x){ return x[2] && x[2].test(txt); });
+  var g = GRUPOS.find(function(x){ return x[0] === k; });
+  return g && g[2] ? g[2].test(txt) : false;
+}
+
+function pintar(){
+  var q = (BUSCA || '').toLowerCase().trim();
+  var lista = PRODS.filter(function(p){
+    if(p.oculto) return false;          // 🔑 lo que Sensei escondió no se enseña
+    if(!delGrupo(p, FILTRO)) return false;
+    if(!q) return true;
+    return (p.n + ' ' + p.m).toLowerCase().indexOf(q) >= 0;
+  });
+
+  // ⭐ En "Lo más vendido" van en el orden REAL del ranking (1, 2, 3...) -20 sep-
+  if(FILTRO === 'top'){
+    lista.sort(function(a, b){ return (a.top || 99) - (b.top || 99); });
+  }
+
+  // 🔑 Solo se sale si NO hay nada que enseñar — ni productos ni packs. Antes se salía
+  // en cuanto no había productos con promo, y los packs no llegaban a pintarse. -11 sep-
+  var hayPacks = (FILTRO === 'promos' && COMBOS.length > 0);
+  if(!lista.length && !hayPacks){
+    document.getElementById('lista').innerHTML = FILTRO === 'promos'
+      ? '<div class="vacio">Todavía no hay promociones.<br>Vuelve pronto.</div>'
+      : '<div class="vacio">No encontré nada con eso.<br>Prueba con otra palabra.</div>';
+    return;
+  }
+
+  // ⚡ EL AVISO DE PAGO INMEDIATO, solo aquí. Es lo que hace que valga la pena.
+  var cabecera = (FILTRO === 'promos')
+    ? '<div style="background:linear-gradient(135deg,#C62828,#E53935);border-radius:13px;'
+      + 'padding:14px;margin-bottom:12px;text-align:center;color:#fff;'
+      + 'box-shadow:0 3px 12px rgba(198,40,40,.3)">'
+      + '<div style="font-size:16px;font-weight:900;letter-spacing:.4px">'
+      +   '⚡ ESTOS PRECIOS SON PAGANDO DE INMEDIATO</div>'
+      + '<div style="font-size:12.5px;margin-top:5px;opacity:.95">'
+      +   'A crédito van al precio normal</div></div>'
+    : '';
+
+  // 📦 LOS COMBOS, arriba del todo en PROMOS
+  var htmlCombos = '';
+  if(FILTRO === 'promos' && COMBOS.length){
+    htmlCombos = COMBOS.map(function(c, ci){
+      var suelto = c.items.reduce(function(a, it){
+        var p2 = PRODS.find(function(x){ return x.id === it.id; });
+        return a + (p2 ? p2.pr * (it.cant || 1) : 0);
+      }, 0);
+      var ahorro = Math.round((suelto - c.precio) * 100) / 100;
+      return '<div class="pack" style="background:#1D1631;border:2.5px solid #9C5FE0;border-radius:14px;'
+        +   'padding:13px;margin-bottom:11px;box-shadow:0 3px 10px rgba(106,27,154,.18)">'
+        + '<div style="background:linear-gradient(135deg,#6A1B9A,#8E24AA);color:#fff;'
+        +   'border-radius:9px;padding:9px;text-align:center;font-size:15px;font-weight:900;'
+        +   'margin:-4px -4px 10px">📦 ' + esc(c.nombre) + '</div>'
+        + c.items.map(function(it){
+            var p3 = PRODS.find(function(x){ return x.id === it.id; });
+            return '<div style="display:flex;justify-content:space-between;font-size:12.5px;'
+              + 'padding:4px 0;border-bottom:1px solid #F2F2F7">'
+              + '<span>' + (it.cant > 1 ? it.cant + ' × ' : '') + esc(p3 ? p3.n : '?') + '</span>'
+              + '<span style="color:#98A0B8">' + (p3 ? dinero(p3.pr * (it.cant||1)) : '') + '</span>'
+              + '</div>';
+          }).join('')
+        + '<div style="display:flex;justify-content:space-between;align-items:center;'
+        +   'margin-top:11px;padding-top:10px;border-top:2px solid #6A1B9A">'
+        +   '<div><div style="font-size:10px;color:#98A0B8;text-decoration:line-through">'
+        +     dinero(suelto) + ' por separado</div>'
+        +     '<div style="font-size:22px;font-weight:900;color:#C89BFF">'
+        +     dinero(c.precio) + '</div></div>'
+        +   '<button onclick="pedirCombo(' + ci + ')" style="padding:12px 18px;'
+        +     'background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:14px;'
+        +     'font-weight:900;cursor:pointer">Lo quiero</button>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  document.getElementById('lista').innerHTML = cabecera + htmlCombos + lista.map(function(p){
+    var n = CARRO[p.id] || 0;
+    var pc = precioContado(p.pr, p);
+    return '<div class="p">'
+      + '<div class="fo" onclick="verFoto(\'' + p.id + '\')">'
+      +   (p.tf ? '<img data-foto="' + p.id + '" alt="">' : '<div class="sinf">SIN<br>FOTO</div>')
+      + '</div>'
+      + '<div class="inf">'
+      +   '<div class="nom">'
+      +     (FILTRO === 'top' && p.top ? (p.top===1?'🥇 ':p.top===2?'🥈 ':p.top===3?'🥉 ':'<span style="color:#98A0B8;font-weight:900">#'+p.top+'</span> ') : '')
+      +     esc(p.n) + '</div>'
+      +   (p.m ? '<div class="mar">' + esc(p.m) + '</div>' : '')
+      // 🔑 LOS DOS PRECIOS
+      +   '<div class="precios">'
+      +     '<div class="pcontado"><div class="et">CONTADO</div>'
+      +       '<div class="vl">' + dinero(pc) + '</div></div>'
+      +     '<div class="pcredito"><div class="et">A CRÉDITO</div>'
+      +       '<div class="vl">' + dinero(p.pr) + '</div></div>'
+      +   '</div>'
+      // 🎁 EL CARTEL DE LA PROMOCIÓN, grande y llamativo -Sensei, 11 sep-
+      // En "Todo" solo una señal chiquita; el cartel grande va en PROMOS
+      +   ((FILTRO !== 'promos' && (p.promo || p.oferta))
+            ? '<div onclick="event.stopPropagation();filtrar(\'promos\')" '
+              + 'style="font-size:11.5px;font-weight:900;color:#C62828;margin-top:5px;'
+              + 'cursor:pointer">🔥 tiene promo →</div>'
+            : '')
+      +   (FILTRO === 'promos' && p.promo ? '<div style="background:linear-gradient(135deg,#FF9800,#F57C00);'
+                   + 'border-radius:9px;padding:9px 11px;margin-top:7px;font-size:14px;'
+                   + 'font-weight:900;color:#fff;text-align:center;letter-spacing:.3px;'
+                   + 'box-shadow:0 2px 7px rgba(245,124,0,.35)">'
+                   + '\ud83c\udf81 ' + esc(textoPromo(p)) + '</div>' : '')
+      // 🔥 Y EL DE OFERTA, en rojo y grande
+      +   (FILTRO === 'promos' && p.oferta ? '<div style="background:linear-gradient(135deg,#E53935,#C62828);'
+                    + 'border-radius:9px;padding:8px 11px;margin-top:7px;font-size:14px;'
+                    + 'font-weight:900;color:#fff;text-align:center;letter-spacing:.6px;'
+                    + 'box-shadow:0 2px 7px rgba(198,40,40,.35)">'
+                    + '\ud83d\udd25 EN OFERTA</div>' : '')
+      +   '<div class="ctl">'
+      +     (n > 0
+          ? '<button class="bmen" onclick="menos(\'' + p.id + '\')">−</button>'
+            + '<div class="cant">' + n + '</div>'
+          : '')
+      +     '<button class="bmas" onclick="mas(\'' + p.id + '\')">+</button>'
+      +   '</div>'
+      + '</div></div>';
+  }).join('');
+
+  mirarFotos();
+}
+
+function esc(t){
+  return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Las fotos se bajan cuando el barbero llega a ellas
+function mirarFotos(){
+  var faltan = false;
+  document.querySelectorAll('img[data-foto]').forEach(function(im){
+    if(im.src) return;
+    var r = im.getBoundingClientRect();
+    if(r.top < window.innerHeight + 400 && r.bottom > -400){
+      var id = im.getAttribute('data-foto');
+      if(FOTOS[id]) im.src = FOTOS[id];
+      else faltan = true;
+    }
+  });
+  if(faltan) bajarFotos();
+}
+function bajarFotos(){
+  for(var i = 0; i < TROZOS; i++){
+    if(_pedidos[i]) continue;
+    _pedidos[i] = true;
+    (function(n){
+      fetch('fotos_' + (n < 10 ? '0' : '') + n + '.json')
+        .then(function(r){ return r.ok ? r.json() : {}; })
+        .then(function(g){
+          for(var k in g) FOTOS[k] = g[k];
+          document.querySelectorAll('img[data-foto]').forEach(function(im){
+            if(!im.src && FOTOS[im.getAttribute('data-foto')])
+              im.src = FOTOS[im.getAttribute('data-foto')];
+          });
+        }).catch(function(){ _pedidos[n] = false; });
+    })(i);
+  }
+}
+window.addEventListener('scroll', mirarFotos, { passive: true });
+
+function verFoto(id){
+  var p = PRODS.find(function(x){ return x.id === id; });
+  if(!p || !p.tf || !FOTOS[id]) return;
+  document.getElementById('ovImg').src = FOTOS[id];
+  document.getElementById('ovPie').innerHTML = esc(p.n)
+    + '<br><span style="color:#6EE7A0">Contado ' + dinero(precioContado(p.pr, p)) + '</span>'
+    + '  ·  <span style="opacity:.75">Crédito ' + dinero(p.pr) + '</span>';
+  document.getElementById('ovFoto').classList.add('on');
+}
+function cerrarFoto(){ document.getElementById('ovFoto').classList.remove('on'); }
+
+// ═══ EL CARRITO ═══
+function mas(id){ CARRO[id] = (CARRO[id]||0) + 1; guardar(); pintar(); barra(); }
+function menos(id){
+  CARRO[id] = (CARRO[id]||0) - 1;
+  if(CARRO[id] <= 0) delete CARRO[id];
+  guardar(); pintar(); barra();
+}
+function totales(){
+  var n = 0, contado = 0, credito = 0;
+  var conDto = 0, sinDto = 0;      // 🎁 para el 5% del catálogo -17 sep-
+  for(var k in CARRO){
+    // 📦 Los combos llevan su propio precio, igual al contado que a crédito
+    if(k.indexOf('COMBO:') === 0){
+      var c = COMBOS[parseInt(k.split(':')[1], 10)];
+      if(!c) continue;
+      n += CARRO[k];
+      contado += c.precio * CARRO[k];
+      credito += c.precio * CARRO[k];
+      continue;
+    }
+    var p = PRODS.find(function(x){ return x.id === k; });
+    if(!p) continue;
+    n += CARRO[k];
+    var _linea = CARRO[k] * p.pr;
+    contado += conPromo(p, CARRO[k]).total;
+    credito += _linea;
+    // 🎁 Se separa lo que lleva descuento de lo que no -17 sep-
+    if(llevaDescuento(p)) conDto += _linea;
+    else sinDto += _linea;
+  }
+  var dto = Math.round(conDto * DESCUENTO_CATALOGO * 100) / 100;
+  return { n: n, contado: Math.round(contado*100)/100,
+           credito: Math.round(credito*100)/100,
+           // 🎁 El 5% por pedir aquí -17 sep-
+           dto: dto, sinDto: Math.round(sinDto*100)/100,
+           conDescuento: Math.round((credito - dto) * 100) / 100,
+           ahorro: Math.round((credito - contado)*100)/100 };
+}
+function barra(){
+  var t = totales();
+  var b = document.getElementById('barra');
+  if(t.n > 0){
+    b.classList.add('on');
+    document.getElementById('bt1').textContent = t.n + (t.n===1?' producto':' productos');
+    document.getElementById('bt2').textContent = dinero(t.contado) + ' al contado';
+    document.getElementById('bt3').textContent = 'A crédito ' + dinero(t.credito)
+      + '  ·  ahorras ' + dinero(t.ahorro);
+  } else b.classList.remove('on');
+}
+function guardar(){ try{ localStorage.setItem('nbs_carro2', JSON.stringify(CARRO)); }catch(e){} }
+function cargarCarrito(){
+  try{ CARRO = JSON.parse(localStorage.getItem('nbs_carro2') || '{}'); pintar(); barra(); }
+  catch(e){ CARRO = {}; }
+}
+
+// ⚡ ¿Le falta poco para una promoción? Se lo decimos: es lo que más convierte.
+function empujones(){
+  var out = [];
+  for(var k in CARRO){
+    var p = PRODS.find(function(x){ return x.id === k; });
+    if(!p || !p.promo) continue;
+    var n = CARRO[k];
+    if(p.promo.tipo === 'cantidad'){
+      if(n < p.promo.desde && n >= Math.max(1, p.promo.desde - 3)){
+        var faltan = p.promo.desde - n;
+        var ahorro = Math.round((precioContado(p.pr, p) - p.promo.precio) * p.promo.desde * 100) / 100;
+        out.push({ id: k, n: p.n, faltan: faltan, ahorro: ahorro, frase: textoPromo(p) });
+      }
+    } else if(p.promo.tipo === 'lleva'){
+      var resto = n % p.promo.lleva;
+      if(resto > 0 && resto >= p.promo.lleva - 2){
+        var f2 = p.promo.lleva - resto;
+        var unit = precioContado(p.pr, p);
+        var ah2 = Math.round(unit * (p.promo.lleva - p.promo.paga) * 100) / 100;
+        out.push({ id: k, n: p.n, faltan: f2, ahorro: ah2, frase: textoPromo(p) });
+      }
+    }
+  }
+  return out;
+}
+
+function verCarrito(){
+  var items = [], t = totales();
+  for(var k in CARRO){
+    if(k.indexOf('COMBO:') === 0){
+      var cb = COMBOS[parseInt(k.split(':')[1], 10)];
+      if(cb) items.push({ combo: cb, id: k, n: CARRO[k] });
+      continue;
+    }
+    var p = PRODS.find(function(x){ return x.id === k; });
+    if(p) items.push({ p: p, n: CARRO[k] });
+  }
+  if(!items.length) return;
+  document.getElementById('carcaja').innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    +   '<div style="font-size:17px;font-weight:900">🛒 Tu pedido</div>'
+    +   '<button onclick="cerrarCarrito()" style="background:#232C48;border:none;'
+    +     'border-radius:9px;width:34px;height:34px;font-size:16px;cursor:pointer">✕</button></div>'
+    + items.map(function(x){
+        if(x.combo){
+          return '<div class="cl"><div style="flex:1;min-width:0">'
+            + '<div style="font-size:13px;font-weight:800;color:#C89BFF">📦 '
+            +   esc(x.combo.nombre) + '</div>'
+            + '<div style="font-size:11px;color:#98A0B8">' + x.n + ' × '
+            +   dinero(x.combo.precio) + '</div></div>'
+            + '<div style="font-weight:900;font-size:14px;color:#C89BFF">'
+            +   dinero(x.n * x.combo.precio) + '</div>'
+            + '<button class="bmen" onclick="menos(\'' + x.id + '\');verCarrito()">−</button></div>';
+        }
+        return '<div class="cl"><div style="flex:1;min-width:0">'
+          + '<div style="font-size:13px;font-weight:700">' + esc(x.p.n) + '</div>'
+          + '<div style="font-size:11px;color:#98A0B8">' + x.n + ' × '
+          +   dinero(precioContado(x.p.pr, x.p)) + ' contado</div></div>'
+          + '<div style="font-weight:900;font-size:14px;color:#35D07F">'
+          +   dinero(conPromo(x.p, x.n).total) + '</div>'
+          + '<button class="bmen" onclick="menos(\'' + x.p.id + '\');verCarrito()">−</button></div>';
+      }).join('')
+
+    // ⚡ EL EMPUJÓN: "ponle 2 más y te salen a..."
+    + empujones().map(function(e){
+        return '<div onclick="sumarHasta(\'' + e.id + '\',' + e.faltan + ')" '
+          + 'style="background:linear-gradient(135deg,#33230F,#3D2A10);'
+          + 'border:2px solid #FF9800;border-radius:11px;padding:11px;margin-top:11px;'
+          + 'cursor:pointer">'
+          + '<div style="font-size:13.5px;font-weight:900;color:#FFB74D">'
+          +   '⚡ P\u00f3nle ' + e.faltan + ' m\u00e1s de ' + esc(e.n.slice(0,26)) + '</div>'
+          + '<div style="font-size:12px;color:#E8C088;font-weight:700;margin-top:3px">'
+          +   e.frase + ' \u00b7 ahorrar\u00edas ' + dinero(e.ahorro) + '</div>'
+          + '<div style="font-size:11px;color:#FFB74D;font-weight:800;margin-top:4px">'
+          +   'Toca aqu\u00ed para agregarlas</div>'
+          + '</div>';
+      }).join('')
+
+    // 🔑 LOS DOS TOTALES, para que vea lo que se ahorra
+    + '<div style="border:2px solid #0B7A3B;border-radius:12px;padding:13px;margin-top:14px">'
+    +   '<div style="display:flex;justify-content:space-between;font-size:14px;'
+    +     'color:#A7ADC2"><span>Subtotal</span><span style="font-weight:700">'
+    +     dinero(t.credito) + '</span></div>'
+    // 🎁 EL 5% POR PEDIR AQUÍ -17 sep-
+    +   (t.dto > 0.005
+          ? '<div style="display:flex;justify-content:space-between;font-size:14px;'
+            + 'color:#0B7A3B;font-weight:800;margin-top:5px">'
+            + '<span>🎁 Descuento 5%</span><span>−' + dinero(t.dto) + '</span></div>'
+          : '')
+    +   (t.sinDto > 0.005
+          ? '<div style="font-size:10.5px;color:#98A0B8;margin-top:2px">'
+            + 'Máquinas y repuestos (' + dinero(t.sinDto) + ') sin descuento</div>'
+          : '')
+    +   '<div style="display:flex;justify-content:space-between;font-size:20px;font-weight:900;'
+    +     'color:#0B7A3B;margin-top:9px;padding-top:9px;border-top:2px solid #0B7A3B">'
+    +     '<span>TOTAL</span><span>' + dinero(t.conDescuento) + '</span></div>'
+    +   (t.dto > 0.005
+          ? '<div style="background:#0F2B1C;border-radius:8px;padding:8px;margin-top:9px;'
+            + 'text-align:center;font-size:12.5px;font-weight:800;color:#35D07F">'
+            + '🎁 Te ahorras ' + dinero(t.dto) + ' por pedir aquí</div>'
+          : '')
+    + '</div>'
+
+    + '<button onclick="enviar()" style="width:100%;padding:15px;margin-top:13px;'
+    +   'background:#0B7A3B;color:#fff;border:none;border-radius:12px;font-size:16px;'
+    +   'font-weight:900;cursor:pointer">📤 Enviar mi pedido</button>'
+    + '<button onclick="cerrarCarrito()" style="width:100%;padding:12px;margin-top:7px;'
+    +   'background:#232C48;color:#C9CDDB;border:none;border-radius:10px;font-size:13.5px;'
+    +   'font-weight:700;cursor:pointer">Seguir pidiendo</button>';
+  document.getElementById('car').classList.add('on');
+}
+function cerrarCarrito(){ document.getElementById('car').classList.remove('on'); }
+
+// Toca el empujón y se le agregan las que le faltan, de un golpe
+// 📦 Pedir un combo: entra al carrito como UN BLOQUE con su precio, no suelto.
+function pedirCombo(i){
+  var c = COMBOS[i];
+  if(!c) return;
+  CARRO['COMBO:' + i] = (CARRO['COMBO:' + i] || 0) + 1;
+  guardar(); pintar(); barra();
+  alert('📦 ' + c.nombre + ' agregado.\n\n' + dinero(c.precio));
+}
+
+function sumarHasta(id, cuantas){
+  CARRO[id] = (CARRO[id] || 0) + cuantas;
+  guardar(); pintar(); barra(); verCarrito();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  📤 MANDAR EL PEDIDO AL BUZÓN  (17 sep 2026)
+//
+//  🔴 CUIDADO: en septiembre el catálogo entró al MISMO Firebase que la app y le pisó
+//  la sesión — Sensei perdió la huella. Por eso aquí se usa una app de Firebase APARTE,
+//  con su propio nombre ('buzon'), y NUNCA se toca la autenticación.
+//
+//  🔒 Las reglas del 17 sep solo dejan CREAR en nbs_buzon_pedidos. Ni leer, ni cambiar,
+//  ni borrar, ni tocar nada más del negocio.
+// ═══════════════════════════════════════════════════════════════════
+
+var _fbBuzon = null;
+
+function prepararBuzon(){
+  if(_fbBuzon) return _fbBuzon;
+  try {
+    if(typeof firebase === 'undefined') return null;
+    // 🔑 Una app APARTE, con nombre propio: así no toca la sesión de la app de Sensei
+    var app;
+    try { app = firebase.app('buzon'); }
+    catch(e){
+      app = firebase.initializeApp({
+        apiKey: "AIzaSyBqtoMWt9DTMmSN-RR5MUagRIuH7B_Bjbw",
+        authDomain: "nbs2-b641a.firebaseapp.com",
+        projectId: "nbs2-b641a",
+        storageBucket: "nbs2-b641a.firebasestorage.app",
+        messagingSenderId: "946975018761",
+        appId: "1:946975018761:web:6dea81efb50b993ca3cdd8"
+      }, 'buzon');
+    }
+    _fbBuzon = firebase.firestore(app);
+    return _fbBuzon;
+  } catch(e){
+    console.warn('no pude preparar el buzón:', e);
+    return null;
+  }
+}
+
+/**
+ * 📤 Deja el pedido en el buzón. Si no puede (sin internet, Firebase caído), NO pasa
+ * nada: el pedido igual se manda por WhatsApp, que es lo que ya funcionaba.
+ */
+function mandarPedidoAlBuzon(lineasCarro, t, listo){
+  var db = prepararBuzon();
+  if(!db || !YO){ listo(false); return; }
+
+  var items = [];
+  for(var k in CARRO){
+    if(k.indexOf('COMBO:') === 0){
+      var cb = COMBOS[parseInt(k.split(':')[1], 10)];
+      if(!cb) continue;
+      items.push({ pid: k, nombre: 'PACK ' + cb.nombre, cant: CARRO[k],
+                   precio: cb.precio, sinDescuento: false });
+      continue;
+    }
+    var p = PRODS.find(function(x){ return x.id === k; });
+    if(!p) continue;
+    items.push({ pid: String(p.id), nombre: String(p.n || '').slice(0, 60),
+                 cant: CARRO[k], precio: p.pr,
+                 sinDescuento: !llevaDescuento(p) });
+  }
+  if(!items.length){ listo(false); return; }
+
+  var pedido = {
+    cid: String(YO.id),
+    nombre: String(YO.n || ''),
+    barberia: String(YO.neg || ''),
+    items: items,
+    subtotal: t.credito,
+    descuento: t.dto || 0,
+    total: t.conDescuento,
+    cuando: Date.now(),
+    delCatalogo: true,
+    recogido: false
+  };
+
+  // 🔑 Con un límite de tiempo: si tarda, no se le deja esperando
+  var yaTermine = false;
+  var reloj = setTimeout(function(){
+    if(!yaTermine){ yaTermine = true; listo(false); }
+  }, 6000);
+
+  db.collection('nbs_buzon_pedidos').add(pedido)
+    .then(function(){
+      if(yaTermine) return;
+      yaTermine = true; clearTimeout(reloj); listo(true);
+    })
+    .catch(function(e){
+      if(yaTermine) return;
+      yaTermine = true; clearTimeout(reloj);
+      console.warn('el pedido no llegó al buzón:', e);
+      listo(false);
+    });
+}
+
+function enviar(){
+  var t = totales(), lineas = [];
+  for(var k in CARRO){
+    // 📦 Los combos van con su nombre y lo que llevan dentro
+    if(k.indexOf('COMBO:') === 0){
+      var cb = COMBOS[parseInt(k.split(':')[1], 10)];
+      if(!cb) continue;
+      lineas.push(CARRO[k] + ' × PACK ' + cb.nombre + '   ' + dinero(CARRO[k] * cb.precio));
+      cb.items.forEach(function(it){
+        var p2 = PRODS.find(function(x){ return x.id === it.id; });
+        if(p2) lineas.push('     - ' + (it.cant > 1 ? it.cant + ' ' : '') + p2.n);
+      });
+      continue;
+    }
+    var p = PRODS.find(function(x){ return x.id === k; });
+    if(!p) continue;
+    lineas.push(CARRO[k] + ' × ' + p.n + '   ' + dinero(conPromo(p, CARRO[k]).total));
+  }
+  if(!lineas.length) return;
+
+  var m = ['*PEDIDO NBS*', ''];
+  if(YO){ m.push(YO.n); if(YO.neg) m.push(YO.neg); m.push(''); }
+  m = m.concat(lineas);
+  m.push('');
+  m.push('Subtotal: ' + dinero(t.credito));
+  if(t.dto > 0.005){
+    m.push('Descuento 5% por pedir aqui: -' + dinero(t.dto));
+    if(t.sinDto > 0.005){
+      m.push('(maquinas y repuestos ' + dinero(t.sinDto) + ' sin descuento)');
+    }
+  }
+  m.push('*TOTAL: ' + dinero(t.conDescuento) + '*');
+
+  var _texto = m.join('\n');
+
+  // 📤 Primero al buzón, para que le llegue a la app. Si falla, da igual: WhatsApp
+  // sigue funcionando como siempre y el pedido no se pierde. -17 sep-
+  mandarPedidoAlBuzon(lineas, t, function(llego){
+    if(llego){
+      try {
+        var av = document.createElement('div');
+        av.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);'
+          + 'background:#0B7A3B;color:#fff;padding:11px 18px;border-radius:22px;'
+          + 'font-size:13px;font-weight:800;z-index:99999;box-shadow:0 3px 12px rgba(0,0,0,.3)';
+        av.textContent = '\u2705 Tu pedido lleg\u00f3 a NBS';
+        document.body.appendChild(av);
+        setTimeout(function(){ try { av.remove(); } catch(e){} }, 2500);
+      } catch(e){}
+    }
+    CARRO = {}; guardar(); pintar(); barra(); cerrarCarrito();
+    location.href = 'https://wa.me/' + WHATSAPP_NBS + '?text=' + encodeURIComponent(_texto);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  🔒 ADMINISTRADOR DE DESCUENTOS  -20 sep-
+//  Se abre con ?admin en la dirección. Sensei entra con su correo y contraseña
+//  por una app APARTE ('admin'), pone el % de contado de cada producto, y se
+//  guarda en Firebase. Los clientes lo ven en vivo. NO toca su sesión ni su huella.
+// ═══════════════════════════════════════════════════════════════════
+var _admInput = 'width:100%;box-sizing:border-box;background:#151C2E;border:1px solid #2A3348;color:#EEF0F6;border-radius:8px;padding:10px;font-size:15px;margin-bottom:10px';
+var _admBtn = 'width:100%;background:#D4A017;color:#111;border:0;border-radius:8px;padding:12px;font-size:15px;font-weight:800;cursor:pointer';
+var _dbAdmin = null, _authAdmin = null, _cfgAdmin = { general: 10, items: {} };
+
+function _admEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _admMsg(t, err){ var m=document.getElementById('adm-msg'); if(m){ m.style.color = err?'#E5484D':'#35D07F'; m.textContent=t; } }
+
+function _prepararAdmin(){
+  if(_dbAdmin) return true;
+  try {
+    if(typeof firebase === 'undefined') return false;
+    var app;
+    try { app = firebase.app('admin'); }
+    catch(e){
+      app = firebase.initializeApp({
+        apiKey: "AIzaSyBqtoMWt9DTMmSN-RR5MUagRIuH7B_Bjbw",
+        authDomain: "nbs2-b641a.firebaseapp.com",
+        projectId: "nbs2-b641a",
+        storageBucket: "nbs2-b641a.firebasestorage.app",
+        messagingSenderId: "946975018761",
+        appId: "1:946975018761:web:6dea81efb50b993ca3cdd8"
+      }, 'admin');
+    }
+    _authAdmin = firebase.auth(app);
+    _dbAdmin = firebase.firestore(app);
+    return true;
+  } catch(e){ return false; }
+}
+
+function abrirAdmin(){
+  var d = document.createElement('div');
+  d.id = 'admin-ov';
+  d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0B1020;color:#EEF0F6;overflow:auto;padding:16px;font-family:system-ui,-apple-system,sans-serif';
+  d.innerHTML =
+    '<div style="max-width:640px;margin:0 auto">'
+    + '<h2 style="color:#D4A017;font-size:18px;margin:6px 0 14px">🔒 Administrador · Descuentos de contado</h2>'
+    + '<div id="adm-login">'
+    +   '<p style="font-size:13px;color:#98A0B8;margin:0 0 10px">Entra con tu correo y contraseña (los mismos de la app).</p>'
+    +   '<input id="adm-email" type="email" placeholder="Tu correo" autocomplete="username" style="'+_admInput+'">'
+    +   '<input id="adm-pass" type="password" placeholder="Tu contraseña" autocomplete="current-password" style="'+_admInput+'">'
+    +   '<button onclick="adminEntrar()" style="'+_admBtn+'">Entrar</button>'
+    +   '<div id="adm-msg" style="font-size:13px;margin-top:8px"></div>'
+    + '</div>'
+    + '<div id="adm-panel" style="display:none">'
+    +   '<div style="background:#151C2E;border-radius:10px;padding:12px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +     '<span style="font-weight:800">Descuento general:</span>'
+    +     '<input id="adm-general" type="number" min="0" max="90" style="width:70px;background:#0B1020;border:1px solid #2A3348;color:#EEF0F6;border-radius:8px;padding:8px;font-size:15px;text-align:center"> %'
+    +     '<span style="font-size:11px;color:#98A0B8">se usa en los que no tengan el suyo</span>'
+    +   '</div>'
+    +   '<button onclick="adminPonerTodoNormal()" style="width:100%;background:#151C2E;color:#EEF0F6;border:1px solid #2A3348;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">🔄 Poner todo a precio normal</button>'
+    +   '<input id="adm-buscar" placeholder="🔍 buscar producto..." oninput="adminPintarLista()" style="'+_admInput+'">'
+    +   '<div style="font-size:12px;color:#B9BECE;background:#151C2E;border-radius:8px;padding:9px 11px;margin-bottom:8px;line-height:1.45">💡 A cada producto, en la cajita <b style="color:#EEF0F6">DESCUENTO</b> escríbele el % que quieras para el precio de contado.<br>Dejarla <b style="color:#EEF0F6">vacía</b> = usa el general de arriba · escribir <b style="color:#EEF0F6">0</b> = sin descuento (precio normal).</div>'
+    +   '<div id="adm-lista" style="margin:8px 0 80px"></div>'
+    +   '<div style="position:fixed;left:0;right:0;bottom:0;background:#0B1020;border-top:1px solid #1E2740;padding:10px 16px;text-align:center">'
+    +     '<button onclick="adminGuardar()" style="'+_admBtn+';max-width:400px">💾 Guardar todo</button>'
+    +   '</div>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(d);
+}
+
+function adminEntrar(){
+  if(!_prepararAdmin()){ _admMsg('Firebase no cargó, revisa tu internet.', true); return; }
+  var email = (document.getElementById('adm-email').value||'').trim();
+  var pass = document.getElementById('adm-pass').value||'';
+  if(!email || !pass){ _admMsg('Pon tu correo y contraseña.', true); return; }
+  _admMsg('Entrando...', false);
+  _authAdmin.signInWithEmailAndPassword(email, pass).then(function(){
+    _dbAdmin.collection('nbs_descuentos').doc('config').get().then(function(doc){
+      if(doc && doc.exists){ var c=doc.data()||{}; if(typeof c.general==='number') _cfgAdmin.general=c.general; _cfgAdmin.items = c.items || {}; }
+      _admAbrirPanel();
+    }).catch(function(){ _admAbrirPanel(); });   // aunque no pueda leer, deja trabajar
+  }).catch(function(){ _admMsg('Correo o contraseña incorrectos.', true); });
+}
+
+function _admAbrirPanel(){
+  document.getElementById('adm-login').style.display='none';
+  document.getElementById('adm-panel').style.display='';
+  document.getElementById('adm-general').value = _cfgAdmin.general;
+  adminPintarLista();
+}
+
+function _admPctEfectivo(p){
+  var v = _cfgAdmin.items[String(p.id)];
+  return (typeof v==='number') ? v : _cfgAdmin.general;
+}
+
+function adminPintarLista(){
+  var cont = document.getElementById('adm-lista');
+  if(!cont) return;
+  if(!PRODS || !PRODS.length){ cont.innerHTML = '<div style="color:#98A0B8;padding:20px;text-align:center">Cargando productos… espera un momento y busca de nuevo.</div>'; return; }
+  var q = (document.getElementById('adm-buscar').value||'').toLowerCase().trim();
+  var lista = PRODS.filter(function(p){ return !q || (String(p.n)+' '+String(p.m||'')).toLowerCase().indexOf(q)>=0; });
+  var html = '';
+  lista.slice(0, 300).forEach(function(p){
+    var pid = String(p.id);
+    var val = (typeof _cfgAdmin.items[pid]==='number') ? _cfgAdmin.items[pid] : '';
+    var contado = Math.round(p.pr*(1-_admPctEfectivo(p)/100)*100)/100;
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #1A2236">'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_admEsc(p.n)+'</div>'
+      +   '<div style="font-size:11px;color:#98A0B8">Crédito '+dinero(p.pr)+' · Contado <b id="adm-c-'+pid+'" style="color:#35D07F">'+dinero(contado)+'</b></div>'
+      + '</div>'
+      + '<div style="flex-shrink:0;text-align:center">'
+      +   '<div style="font-size:9px;color:#98A0B8;font-weight:700;letter-spacing:.3px;margin-bottom:2px">DESCUENTO</div>'
+      +   '<div style="display:flex;align-items:center;gap:3px;justify-content:center">'
+      +     '<input type="number" min="0" max="90" value="'+val+'" placeholder="'+_cfgAdmin.general+'" '
+      +       'onchange="adminSetItem(\''+pid+'\', this.value)" oninput="adminPreview(\''+pid+'\', this.value, '+p.pr+')" '
+      +       'style="width:52px;text-align:center;background:#151C2E;border:1px solid #2A3348;color:#EEF0F6;border-radius:8px;padding:8px 4px;font-size:15px">'
+      +     '<span style="color:#98A0B8;font-size:14px;font-weight:700">%</span>'
+      +   '</div>'
+      + '</div>';
+  });
+  cont.innerHTML = html || '<div style="color:#98A0B8;padding:20px;text-align:center">Nada encontrado.</div>';
+}
+
+function adminPreview(pid, val, pr){
+  var pct = (val==='' || isNaN(parseFloat(val))) ? _cfgAdmin.general : parseFloat(val);
+  var el = document.getElementById('adm-c-'+pid);
+  if(el) el.textContent = dinero(Math.round(pr*(1-pct/100)*100)/100);
+}
+function adminSetItem(pid, val){
+  val = String(val).trim();
+  if(val===''){ delete _cfgAdmin.items[pid]; }
+  else { var n=parseFloat(val); _cfgAdmin.items[pid] = isNaN(n)?0:Math.max(0,Math.min(90,n)); }
+}
+
+function adminPonerTodoNormal(){
+  if(!confirm('¿Poner TODO a precio normal?\n\nQuita el descuento general y el de cada producto — todo queda sin rebaja (contado = crédito).\n\nDespués le pones descuento solo a los que tú quieras.')) return;
+  _cfgAdmin.general = 0;
+  _cfgAdmin.items = {};
+  var g = document.getElementById('adm-general'); if(g) g.value = 0;
+  adminPintarLista();
+  alert('✅ Todo quedó en precio normal.\n\nPonle descuento a los que quieras y toca 💾 Guardar todo para aplicarlo.');
+}
+
+function adminGuardar(){
+  if(!_dbAdmin){ alert('Vuelve a entrar.'); return; }
+  var g = parseFloat(document.getElementById('adm-general').value);
+  _cfgAdmin.general = isNaN(g) ? 0 : Math.max(0, Math.min(90, g));
+  var datos = { general: _cfgAdmin.general, items: _cfgAdmin.items, actualizado: Date.now() };
+  _dbAdmin.collection('nbs_descuentos').doc('config').set(datos).then(function(){
+    alert('✅ Guardado. Los clientes ya ven los precios nuevos.');
+  }).catch(function(e){
+    alert('No se pudo guardar.\n\nSi es la primera vez, quizás falta pegar la regla de Firebase.\n\n('+(e && e.message ? e.message : e)+')');
+  });
+}
+
+// ¿Entró por ?admin? → abre el panel
+if(new URLSearchParams(location.search).has('admin')){
+  if(document.readyState !== 'loading') abrirAdmin();
+  else document.addEventListener('DOMContentLoaded', abrirAdmin);
+}
+</script>
+<!-- 🔥 Firebase SOLO para dejar el pedido en el buzón. Va al final y por detrás, así
+     no frena el catálogo si internet está lento. -17 sep- -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" defer></script>
+<!-- 🔒 Auth SOLO para el panel de administrador de descuentos, y por una app APARTE
+     ('admin'), así no toca la sesión de la app de Sensei ni su huella. -20 sep- -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" defer></script>
+</body>
+</html>

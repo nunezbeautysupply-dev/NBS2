@@ -1,0 +1,84 @@
+═══════════════════════════════════════════════════
+  EL LABORATORIO DE NBS 2
+  Guardado el 30 de agosto de 2026
+═══════════════════════════════════════════════════
+
+⚠️ ESTA CARPETA NO SE SUBE A LA APP.
+
+Es el juego de pruebas que protege tu app. Guardalo
+donde guardas tus backups.
+
+---------------------------------------------------
+🔑 POR QUE ESTA AQUI
+---------------------------------------------------
+Estas pruebas se habian PERDIDO. El espacio donde
+trabajo se borra entre conversaciones, y solo
+sobrevive lo que se vuelve a crear.
+
+Guardandolas contigo, no se pierden nunca mas.
+
+SI EN UNA CONVERSACION FUTURA CLAUDE DICE QUE NO
+TIENE LAS PRUEBAS: subele este zip.
+
+---------------------------------------------------
+📋 QUE HAY AQUI
+---------------------------------------------------
+
+LAS CINCO GRANDES
+
+  mutacion.py            🧬 LA MAS IMPORTANTE
+     Rompe la app A PROPOSITO de 32 formas y
+     comprueba que las pruebas lo cacen. Si rompo
+     el dinero y las pruebas siguen en verde, esas
+     pruebas NO SIRVEN.
+     Es la unica que comprueba las OTRAS pruebas.
+     → 32 de 32 cazadas (100%)
+
+  cobertura_real.js      📊
+     Mide que porcentaje de la app se toca de
+     verdad al usarla. Dice cuales NUNCA se tocan.
+     → 19% (220 de 1,173 funciones)
+
+  contabilidad_paralela.js  💰
+     Rehace tus cuentas DESDE CERO con codigo
+     distinto y las compara con la app.
+
+  fuzzing_dinero.js      🌪️
+     23 formas de datos rotos. Comprueba que no
+     reviente Y que el numero sea el correcto.
+
+  guardian_html.py       🛡️
+     Cuenta las etiquetas del HTML. Caza el fallo
+     que dejo media app invisible.
+
+LAS AUDITORIAS
+  auditoria_total.js     la estructura de la app
+  auditoria_dinero.js    las cuentas por 3 caminos
+
+LAS 33 SUITES
+  probar_*.js            una por cada area
+
+Y LA ORDEN QUE LO CORRE TODO
+  revisar_todo.sh
+
+---------------------------------------------------
+▶️ COMO SE USA
+---------------------------------------------------
+Todo esto lo corre Claude, no tu. Pero si alguna vez
+quieres ver el estado de tu app, pidele:
+
+   "corre la revision completa"
+
+Y deberia darte esto:
+
+   ✅ TODO EN VERDE — se puede entregar
+        o
+   🔴 HAY FALLOS — NO ENTREGAR
+
+---------------------------------------------------
+🎯 LA REGLA
+---------------------------------------------------
+Antes de entregarte cualquier zip, se corre
+revisar_todo.sh.
+
+Si dice NO ENTREGAR, no se entrega. Sin excepciones.

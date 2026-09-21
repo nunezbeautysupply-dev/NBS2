@@ -1,0 +1,865 @@
+</script>
+<input type="hidden" id="vsel">
+<div id="p-v" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">🧾 Vender</h2>
+  <!-- 👤 A QUIEN LE ESTAS VENDIENDO -Sensei, 21 ago-: "cuando voy al carrito de compras,
+       ahi precisamente el nombre se confunde con todo lo demas, lo necesito mas grande y que
+       se distinga bastante". El nombre solo salia dentro del desplegable, chiquito y hasta
+       cortado. Ahora va en una franja propia arriba del todo, imposible de confundir. -->
+  <div id="v-quien" style="display:none;background:#1a237e;border-radius:11px;padding:9px 12px;margin-bottom:9px;box-shadow:0 3px 10px rgba(26,35,126,.28)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="flex:1;min-width:0">
+        <div id="v-quien-nombre" style="font-size:20px;font-weight:900;color:#fff;line-height:1.1;letter-spacing:-0.4px"></div>
+        <div id="v-quien-negocio" style="font-size:11.5px;font-weight:700;color:#C5CAE9;margin-top:1px"></div>
+      </div>
+      <button onclick="cambiarClienteVenta()" style="flex-shrink:0;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer">✏️ Cambiar</button>
+    </div>
+  </div>
+  <div class="card">
+    <div id="v-escoger-cliente">
+    <label class="lbl">Cliente</label>
+    <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="vcl-buscar" type="text" placeholder="Escribe nombre o barbería..." oninput="filtrarClienteVenta(this.value)" autocomplete="off"></div>
+    <div id="vcl-lista" style="background:white;border:1px solid #ddd;border-radius:8px;max-height:200px;overflow-y:auto;display:none;margin-bottom:8px"></div>
+    <select class="inp" id="vcl" onchange="renderMetodosPago('vini'); renderFavoritosCliente(); pintarAQuienLeVendo()">
+      <option value="">-- Cliente general --</option>
+    </select>
+    </div>
+    <div id="v-favoritos" style="display:none;margin-bottom:10px"></div>
+    <label class="lbl">Buscar producto</label>
+    <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="vb" type="text" placeholder="Escribe para buscar..." oninput="filterV(this.value)" onfocus="filterV(this.value||'')"></div>
+    <div id="vlist" style="background:white;border:1px solid #ddd;border-radius:8px;max-height:200px;overflow-y:auto;display:none;margin-bottom:8px"></div>
+    <div id="vchip" style="display:none;align-items:center;justify-content:space-between;background:#E3F2FD;border-radius:20px;padding:8px 14px;margin-bottom:8px">
+      <span id="vsn" style="font-size:13px;color:#1565C0;font-weight:500"></span>
+      <button onclick="clearV()" style="background:none;border:none;cursor:pointer;color:#1565C0;font-size:18px">✕</button>
+    </div>
+    <!-- Cantidad y Agregar, en una sola linea. Antes eran dos bloques de 45 y 42 px. -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <div style="flex-shrink:0">
+        <label class="lbl" style="margin-bottom:2px">Cantidad</label>
+        <input class="inp" id="vcant" type="number" value="1" min="1" style="width:82px;margin:0;text-align:center;padding:10px 6px">
+      </div>
+      <button class="btn" style="background:#546E7A;color:white;flex:1;margin:0;align-self:flex-end;padding:12px" onclick="addIV()">+ Agregar producto</button>
+    </div>
+    <div onclick="toggleNuevoProdVenta()" style="text-align:center;font-size:12px;font-weight:700;color:#00838F;padding:4px 0 8px;cursor:pointer">📦 Agregar producto nuevo al catálogo</div>
+    <div id="v-nuevo-prod-wrap" style="display:none;background:#E0F7FA;border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:#00838F;margin-bottom:8px">📦 NUEVO PRODUCTO</div>
+      <label class="lbl">Marca *</label><input class="inp" id="vnp-marca" type="text" placeholder="Ej: DORCO, IMMORTAL" autocomplete="off" oninput="onMarcaInput('vnp-marca')" onblur="ocultarDropdown('vnp-marca')">
+      <label class="lbl">Nombre del producto *</label><input class="inp" id="vnp-nombre" type="text" placeholder="Ej: Roja Cortada, Colonia Venom" autocomplete="off" oninput="onNombreProductoInput('vnp-nombre')" onblur="ocultarDropdown('vnp-nombre')">
+      <label class="lbl">Categoría</label><input class="inp" id="vnp-cat" type="text" placeholder="Ej: Pomadas, Navajas..." autocomplete="off" oninput="onCategoriaInput('vnp-cat')" onblur="ocultarDropdown('vnp-cat')">
+      <div class="r2">
+        <div><label class="lbl">Costo ($)</label><input class="inp" id="vnp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
+        <div><label class="lbl">Precio ($)</label><input class="inp" id="vnp-precio" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)"></div>
+      </div>
+      <label class="lbl">Stock inicial</label><input class="inp" id="vnp-stock" type="number" value="0" min="0">
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="flex:1;background:#00838F;color:white;margin:0" onclick="guardarNuevoProdVenta()">✓ Guardar y agregar</button>
+        <button class="btn" style="flex:1;background:#546E7A;color:white;margin:0" onclick="toggleNuevoProdVenta()">Cancelar</button>
+      </div>
+    </div>
+    <div id="iv" style="margin:8px 0"></div>
+    <div style="background:#E8F5E9;border-radius:8px;padding:9px 10px;margin:8px 0">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px"><span>Subtotal</span><span id="vsubtot" style="font-weight:700;font-size:16px;color:#1565C0">$0.00</span></div>
+      <div style="border-top:1px solid #ddd;padding-top:6px">
+        <div style="font-size:10.5px;color:#666;font-weight:800;margin-bottom:4px;letter-spacing:.4px">DESCUENTO (opcional)</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="inp" id="vdesc-tipo" style="flex:1;margin:0;padding:10px" onchange="onDescTipoChange()">
+            <option value="ninguno">Sin descuento</option>
+            <option value="pct">Porcentaje (%)</option>
+            <option value="monto">Monto fijo ($)</option>
+          </select>
+          <input class="inp" id="vdesc-val" type="text" inputmode="numeric" placeholder="0" style="flex:1;margin:0" oninput="onDescInput(this)" value="0">
+        </div>
+        <div id="vdesc-linea" style="display:none;display:flex;justify-content:space-between;margin-top:6px;font-size:13px;color:#E65100">
+          <span id="vdesc-label">Descuento</span><span id="vdesc-amt">-$0.00</span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;border-top:1px solid #ddd;padding-top:8px;margin-top:8px"><span style="font-weight:700">Total</span><span id="vtot" style="font-weight:700;font-size:18px;color:#1565C0">$0.00</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span class="lbl" style="margin:0;flex-shrink:0">Fecha de la venta</span>
+      <input class="inp" id="vfecha" type="date" style="flex:1;margin:0;padding:7px 10px;font-size:13px">
+    </div>
+    <div style="background:#FFF3E0;border-radius:10px;padding:8px 10px;margin-bottom:8px">
+      <label style="font-size:11.5px;font-weight:800;color:#E65100;display:block;margin-bottom:5px;letter-spacing:.4px">💳 TIPO DE PAGO</label>
+      <select class="inp" id="vtipo" onchange="actualizarLabelPagoVenta()" style="font-size:16px;font-weight:700;border:3px solid #E65100;color:#E65100;background:#FFF8F0;padding:12px">
+        <option value="credito">✅ A crédito - pago parcial</option>
+        <option value="contado">💵 Contado - pago completo</option>
+      </select>
+    </div>
+    <div id="vini-g" style="background:#E8F5E9;border-radius:10px;padding:8px 10px;margin-bottom:8px">
+      <label id="v-pago-label" style="font-size:11.5px;font-weight:800;color:#2E7D32;display:block;margin-bottom:5px;letter-spacing:.4px">💰 Pago inicial (opcional, puede ser $0)</label>
+      <div id="pago-metodos-vini"></div>
+      <button type="button" onclick="agregarMetodoPago('vini')" style="background:none;border:1px dashed #2E7D32;border-radius:8px;padding:6px 10px;font-size:11px;color:#2E7D32;cursor:pointer;margin:4px 0 8px;width:100%">+ Agregar otra forma de pago</button>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:#555;font-weight:600">Total de este pago:</span>
+        <span id="pago-total-vini" style="font-size:16px;font-weight:800;color:#2E7D32">$0.00</span>
+      </div>
+    </div>
+    <button class="btn" style="background:#00838F;color:white;font-size:15px;font-weight:800;padding:12px" onclick="cobroRapidoContadoEfectivo()">⚡ Cobro rápido (contado en efectivo)</button>
+    <button class="btn" style="background:#2E7D32;color:white" onclick="registrarVentaConFirma()">✓ Registrar venta</button>
+    <!-- Antes eran dos enlaces chicos pegaditos debajo del boton verde. El 18 sep un
+         pedido de $70 casi se pierde por un toque que cayo en "borrar" queriendo dar
+         "Registrar venta". Sensei pidio: UN solo boton, abajo, con distancia. Al tocarlo
+         abre un menu que pregunta que hacer (guardar y salir / borrar / seguir). -->
+    <div id="pedido-conv-acciones" style="display:none;margin:24px 2px 8px">
+      <button onclick="salirDelPedidoConversion()" style="width:100%;background:#ECEFF1;color:#455A64;border:none;border-radius:10px;padding:11px;font-size:13.5px;font-weight:800;cursor:pointer">✕ Salir de este pedido</button>
+    </div>
+    <button id="btn-cancelar-conversion-pedido" style="display:none;width:0;height:0;padding:0;margin:0;border:0;overflow:hidden;opacity:0" onclick="cancelarConversionPedido()"></button><button id="btn-borrar-pedido-conversion" style="display:none;width:0;height:0;padding:0;margin:0;border:0;overflow:hidden;opacity:0" onclick="borrarPedidoQueSeEstaConvirtiendo()"></button>
+    <div class="snk" id="mk-v">Venta registrada</div>
+  </div>
+</div>
+<div id="p-ped" class="pg">
+  <!-- 📋 LA BARRA DE PEDIDOS GUARDADOS -17 sep 2026-. Va FUERA de los pasos, así que
+       se ve mientras toma el pedido. Antes estaba dentro del paso 1 y desaparecía al
+       elegir barbería: Sensei creía que había perdido los pedidos. -->
+  <div id="barra-pedidos-guardados" onclick="verLosGuardados()"
+       style="display:none;background:linear-gradient(135deg,#C62828,#E53935);color:#fff;
+       border-radius:11px;padding:10px 12px;margin-bottom:9px;cursor:pointer;
+       box-shadow:0 2px 8px rgba(198,40,40,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div id="bpg-titulo" style="font-size:13.5px;font-weight:900"></div>
+        <div id="bpg-quienes" style="font-size:11px;opacity:.95;white-space:nowrap;
+             overflow:hidden;text-overflow:ellipsis"></div>
+      </div>
+      <div id="bpg-monto" style="font-size:15px;font-weight:900;flex-shrink:0"></div>
+      <div style="font-size:18px;flex-shrink:0">›</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:24px;font-weight:800;color:#1a237e;margin-bottom:14px;text-align:center;padding-bottom:12px;border-bottom:2px solid #E8EAF6">⚡ Pedidos Rápidos</h2>
+
+  <!-- PASO 1: Lista de pedidos pendientes -->
+  <div id="ped-lista-wrap">
+    <div id="ped-retomar-wrap"></div>
+    <button class="btn" style="background:var(--nbs-gold-bg);color:var(--nbs-gold-dark);font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px" onclick="ir('p-rutas')">🗺️ Ver Ruta de Visitas</button>
+    <!-- Pedidos pendientes primero, para no tener que bajar a buscarlos -->
+    <div id="ped-pendientes-wrap" style="margin-bottom:8px"></div>
+    <!-- Buscador de barberías/barberos -->
+    <div class="busca-caja" style="border:2px solid var(--nbs-gold);background:white">
+      <span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span>
+      <input id="ped-inicio-buscar" class="busca-fuerte" type="text" placeholder="Buscar barbería o barbero..." oninput="renderBarberiasInicio(this.value)">
+    </div>
+    <!-- Lista de barberías con sus barberos -->
+    <div id="ped-inicio-lista"></div>
+  </div>
+
+  <!-- PASO 2: Seleccionar barbería -->
+  <div id="ped-barberia-wrap" style="display:none">
+    <div class="card">
+      <p style="font-size:15px;font-weight:700;margin-bottom:4px">⚡ Nuevo pedido</p>
+      <p style="font-size:12px;color:#aaa;margin-bottom:14px">Paso 1 de 2 — Selecciona la barbería</p>
+      <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="ped-barberia-buscar" type="text" placeholder="Buscar barbería..." oninput="renderBarberias(this.value)" autocomplete="off"></div>
+      <button class="btn" style="background:#546E7A;color:white;font-size:12px" onclick="var n=prompt('Nombre del cliente a verificar:');if(n)diagnosticoBarberias(n);">🔍 Verificar cliente</button>
+      <div id="ped-barberia-lista"></div>
+      <button class="btn" id="btn-cancelar-pedido" style="background:#546E7A;color:white" onclick="cancelarPedido()">← Volver sin guardar</button>
+    </div>
+  </div>
+
+  <!-- PASO 3: Seleccionar barbero -->
+  <div id="ped-barbero-wrap" style="display:none">
+    <div class="card">
+      <p style="font-size:15px;font-weight:700;margin-bottom:2px">⚡ Nuevo pedido</p>
+      <p style="font-size:12px;color:#aaa;margin-bottom:4px">Paso 2 de 2 — Selecciona el barbero</p>
+      <div id="ped-barberia-sel-label" style="background:#FFF8E1;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px;font-weight:600;color:#F57F17"></div>
+      <div id="ped-barbero-lista"></div>
+      <div style="border-top:1px solid #eee;padding-top:10px;margin-top:4px">
+        <p style="font-size:12px;color:#aaa;margin-bottom:6px">¿El barbero no está en la lista?</p>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="ped-barbero-nuevo" type="text" placeholder="Escribir nombre del barbero" style="flex:1;margin:0" autocomplete="off" oninput="onBarberoNuevoInput()" onblur="ocultarDropdown('ped-barbero-nuevo')">
+          <button onclick="selBarberoPorNombre()" style="padding:10px 14px;background:#F9A825;color:#1a1a1a;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px">+ Usar</button>
+        </div>
+      </div>
+      <button class="btn" style="background:#546E7A;color:white;margin-top:10px" onclick="volverABarberias()">← Cambiar barbería</button>
+    </div>
+  </div>
+
+  <!-- PASO 4: Formulario del pedido -->
+  <div id="ped-form-wrap" style="display:none">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div id="ped-barbero-actual" style="font-size:18px;font-weight:800;color:#1a237e"></div>
+          <div id="ped-barberia-actual" style="font-size:12px;color:#aaa;margin-top:2px"></div>
+          <div id="ped-balance-actual" style="font-size:13px;font-weight:800;margin-top:4px"></div>
+        </div>
+        <button id="ped-btn-cancelar-arriba" onclick="cancelarPedido()" style="background:#f5f5f5;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px;color:#546E7A;font-weight:600">✕ Cancelar</button>
+      </div>
+      <div id="ped-favoritos" style="display:none;margin-bottom:10px"></div>
+      <label class="lbl">Buscar producto</label>
+      <div style="display:flex;gap:8px">
+        <div class="busca-caja" style="border:2px solid var(--nbs-gold)">
+          <span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span>
+          <input id="pedb" class="busca-fuerte" type="text" placeholder="Escribe o dicta el producto..." oninput="filterPed(this.value)" onfocus="filterPed(this.value||'')">
+        </div>
+        <button id="btn-dictar-pedido" onclick="dictarProductoPedido()" style="background:#5E35B1;color:white;border:none;border-radius:8px;width:44px;flex-shrink:0;cursor:pointer;font-size:18px">🎤</button>
+      </div>
+      <div id="dictado-resultado-wrap" style="display:none;background:#EDE7F6;border-radius:10px;padding:12px;margin-bottom:8px"></div>
+      <input type="hidden" id="pedsel">
+      <div id="pedplist" style="background:white;border:1px solid #ddd;border-radius:8px;max-height:200px;overflow-y:auto;display:none;margin-bottom:8px"></div>
+      <div id="pedchip" style="display:none;align-items:center;justify-content:space-between;background:#FFF8E1;border-radius:20px;padding:8px 14px;margin-bottom:8px">
+        <span id="pedsn" style="font-size:13px;color:#F57F17;font-weight:500"></span>
+        <button onclick="clearPed()" style="background:none;border:none;cursor:pointer;color:#F57F17;font-size:18px">✕</button>
+      </div>
+      <label class="lbl">Cantidad</label>
+      <input class="inp" id="pedcant" type="number" value="1" min="1">
+      <button class="btn" style="background:#546E7A;color:white" onclick="addPedItem()">+ Agregar al pedido</button>
+      <button class="btn" style="background:#00838F;color:white" onclick="toggleNuevoProdPed()">📦 Agregar producto nuevo al catálogo</button>
+      <div id="ped-nuevo-prod-casa">
+      <div id="ped-nuevo-prod-wrap" style="display:none;background:#E0F7FA;border-radius:10px;padding:12px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:#00838F;margin-bottom:8px">📦 NUEVO PRODUCTO</div>
+        <div id="pednp-titulo-barbero" style="display:none;font-size:13px;font-weight:700;color:#00838F;background:white;border-radius:7px;padding:7px 9px;margin-bottom:8px"></div>
+        <label class="lbl">Marca *</label><input class="inp" id="pednp-marca" type="text" placeholder="Ej: DORCO, IMMORTAL" autocomplete="off" oninput="onMarcaInput('pednp-marca')" onblur="ocultarDropdown('pednp-marca')">
+        <label class="lbl">Nombre del producto *</label><input class="inp" id="pednp-nombre" type="text" placeholder="Ej: Roja Cortada, Colonia Venom" autocomplete="off" oninput="onNombreProductoInput('pednp-nombre')" onblur="ocultarDropdown('pednp-nombre')">
+        <label class="lbl">Categoría</label><input class="inp" id="pednp-cat" type="text" placeholder="Ej: Pomadas, Navajas..." autocomplete="off" oninput="onCategoriaInput('pednp-cat')" onblur="ocultarDropdown('pednp-cat')">
+        <div class="r2">
+          <div><label class="lbl">Costo ($)</label><input class="inp" id="pednp-costo" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)"></div>
+          <div><label class="lbl">Precio ($)</label><input class="inp" id="pednp-precio" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)"></div>
+        </div>
+        <label class="lbl">Stock inicial</label><input class="inp" id="pednp-stock" type="number" value="0" min="0">
+        <div style="display:flex;gap:8px">
+          <button class="btn" style="flex:1;background:#00838F;color:white;margin:0" onclick="guardarNuevoProdPed()">✓ Guardar y agregar al pedido</button>
+          <button class="btn" style="flex:1;background:#546E7A;color:white;margin:0" onclick="cerrarPanelProdNuevo()">Cancelar</button>
+        </div>
+      </div>
+      </div><!-- cierra ped-nuevo-prod-casa -->
+      <div id="pedItems" style="margin:8px 0"></div>
+      <button class="btn" style="background:#F9A825;color:#1a1a1a" onclick="savePedido()">✓ Guardar pedido</button>
+      <button class="btn" id="ped-btn-cancelar-abajo" style="background:#546E7A;color:white" onclick="cancelarPedido()">← Volver a la lista</button>
+      <div class="snk" id="mk-ped">Pedido guardado</div>
+    </div>
+  </div>
+
+  <!-- ===== PEDIDO A VARIOS BARBEROS A LA VEZ - todos abiertos, sin orden fijo ===== -->
+  <div id="ped-multi-wrap" style="display:none">
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div id="ped-multi-titulo" style="font-size:18px;font-weight:800;color:#1a237e"></div>
+          <div id="ped-multi-sub" style="font-size:12px;color:#aaa;margin-top:2px"></div>
+        </div>
+        <button onclick="cancelarPedidoMultiple()" style="background:#f5f5f5;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px;color:#546E7A;font-weight:600">✕ Cancelar</button>
+      </div>
+    </div>
+    <div id="ped-multi-lista"></div>
+    <button class="btn" id="ped-multi-guardar" style="background:#F9A825;color:#1a1a1a" onclick="terminarBarberiaMulti()">✓ Terminar con esta barbería</button>
+  </div>
+</div>
+<div id="p-comp" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">🚚 Compras</h2>
+  <div class="card">
+    <label class="lbl">Suplidor *</label>
+    <div style="display:flex;gap:8px">
+      <select class="inp" id="ccsup" style="flex:1">
+        <option value="">-- Seleccionar suplidor --</option>
+      </select>
+      <button id="btn-nuevo-sup-compra" type="button" onclick="crearSuplidorRapido()" style="background:#546E7A;color:white;border:none;border-radius:8px;padding:0 14px;cursor:pointer;font-size:20px;flex-shrink:0">+</button>
+    </div>
+    <label class="lbl" style="margin-top:10px">📅 Fecha de la factura</label>
+    <input class="inp" type="date" id="cc-fecha" style="margin-bottom:4px">
+    <div style="font-size:10.5px;color:var(--nbs-muted);margin-bottom:8px">Viene puesta la de hoy. Cámbiala si la factura es de otro día.</div>
+    <!-- 📎 SE RECOGE LO QUE NO SE USA TODOS LOS DIAS -Sensei, 29 ago-. Medido: la foto y
+         los dos lectores ocupaban 228 px a la vista siempre. Nada se quito: se recogio. -->
+    <button type="button" id="cc-btn-factura" onclick="toggleBloqueCompra('cc-bloque-factura','cc-btn-factura')"
+      style="width:100%;padding:11px;margin-bottom:8px;background:#F2F2F6;color:#37474F;border:1.5px solid #DCDCE4;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+      <span>📎 Foto y lectura de la factura</span><span class="cc-flecha">›</span></button>
+    <div id="cc-bloque-factura" style="display:none">
+    <label class="lbl">Hojas de la factura del suplidor (opcional)</label>
+    <div id="cc-hojas-fila" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap"></div>
+    <div style="font-size:12px;color:#aaa;margin-bottom:10px">Toca ➕ para agregar otra hoja. Toca una hoja para verla o quitarla. Quedan guardadas junto a esta compra, de constancia.</div>
+    <input type="hidden" id="cc-foto-data">
+    <input type="file" id="cc-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarHojaFactura(this)">
+    <input type="file" id="cc-foto-galeria" accept="image/*" style="display:none" onchange="cargarHojaFactura(this)">
+    <button type="button" id="cc-btn-ocr" style="width:100%;padding:10px;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px" onclick="leerTextoFacturaCompra()">🔍 Leer el texto de la foto -para copiar y pegar más rápido</button>
+    <button type="button" onclick="abrirLectorFactura()" style="width:100%;padding:12px;background:#E8F5E9;color:#2E7D32;border:2px solid #2E7D32;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;margin-bottom:10px">📄 Leer factura del suplidor (PDF)</button>
+    <!-- Solo sale si dejo una factura a medias -28 jul-. Asi puede salir al catalogo a
+         arreglar un producto y volver sin perder lo que llevaba revisado. -->
+    <button type="button" id="cc-volver-factura" onclick="volverALaFactura()" style="display:none;width:100%;padding:12px;background:#FFF8E1;color:#8D6E63;border:2px solid #F9A825;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;margin-bottom:10px">📄 Volver a la factura que estaba leyendo</button>
+    <input type="file" id="factura-pdf-input" accept="application/pdf,.pdf" style="display:none" onchange="procesarPdfFactura(this)">
+    <div id="cc-ocr-resultado" style="display:none;background:#FAFAFA;border:1px solid #ddd;border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="font-size:11px;color:#777;font-weight:700;margin-bottom:6px">TEXTO ENCONTRADO EN LA FOTO -tócalo y cópialo, no siempre sale perfecto-</div>
+      <textarea id="cc-ocr-texto" readonly style="width:100%;min-height:100px;border:none;background:white;border-radius:6px;padding:8px;font-size:12px;font-family:monospace;resize:vertical"></textarea>
+    </div>
+    </div><!-- fin del bloque de foto y lectura de factura -->
+    <label class="lbl">Buscar producto existente</label>
+    <div style="display:flex;gap:8px">
+      <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="ccb" type="text" placeholder="Escribe para buscar..." oninput="filterCC(this.value)" onfocus="filterCC(this.value||'')"></div>
+      <button id="btn-dictar-compra" onclick="dictarProductoCompra()" style="background:#5E35B1;color:white;border:none;border-radius:8px;width:44px;flex-shrink:0;cursor:pointer;font-size:18px">🎤</button>
+    </div>
+    <div id="dictado-compra-wrap" style="display:none;background:#EDE7F6;border-radius:10px;padding:12px;margin-bottom:8px"></div>
+    <input type="hidden" id="ccsel">
+    <div id="cclist" style="background:white;border:1px solid #ddd;border-radius:8px;max-height:200px;overflow-y:auto;display:none;margin-bottom:8px"></div>
+    <div id="ccchip" style="display:none;align-items:center;justify-content:space-between;background:#EFEBE9;border-radius:20px;padding:8px 14px;margin-bottom:8px">
+      <span id="ccsn" style="font-size:13px;color:#5D4037;font-weight:500"></span>
+      <button onclick="clearCC()" style="background:none;border:none;cursor:pointer;color:#5D4037;font-size:18px">✕</button>
+    </div>
+    <button class="btn" style="background:#795548;color:white" onclick="mostrarNuevoProductoCompra()">+ Producto nuevo (no esta en catalogo)</button>
+    <div id="cc-nuevo-prod" style="display:none">
+      <label class="lbl">Marca *</label>
+      <input class="inp" id="ccnp-marca" type="text" placeholder="Ej: DORCO, IMMORTAL" autocomplete="off" oninput="onMarcaInput('ccnp-marca')" onblur="ocultarDropdown('ccnp-marca')">
+      <label class="lbl">Nombre del producto *</label>
+      <input class="inp" id="ccnp-nombre" type="text" placeholder="Ej: Roja Cortada, Colonia Venom" autocomplete="off" oninput="onNombreProductoInput('ccnp-nombre');avisarSiProductoExiste(this.value)" onblur="ocultarDropdown('ccnp-nombre')">
+      <p id="ccnombre-aviso" style="display:none;font-size:11px;color:var(--nbs-red-text);margin:-6px 0 8px">⚠️ Ya existe un producto con un nombre parecido — revisa "Buscar producto existente" arriba antes de crear uno nuevo.</p>
+      <label class="lbl">Categoría</label>
+      <input class="inp" id="ccnp-cat" type="text" placeholder="Ej: Pomadas, Navajas..." autocomplete="off" oninput="onCategoriaInput('ccnp-cat')" onblur="ocultarDropdown('ccnp-cat')">
+    </div>
+    <div style="display:grid;grid-template-columns:0.7fr 1fr 1fr;gap:8px">
+      <div><label class="lbl">Cant.</label><input class="inp" id="cccant" type="number" value="1" min="1" style="text-align:center;padding:10px 4px"></div>
+      <div><label class="lbl">Costo ($)</label><input class="inp" id="cccosto" type="text" inputmode="decimal" value="0.00" onfocus="this.select();this.dataset.modoPreciso=''" oninput="formatoCostoPreciso(this, event)" onblur="finalizarCostoPreciso(this)" style="text-align:center;padding:10px 4px"></div>
+      <div><label class="lbl">Precio venta ($)</label><input class="inp" id="ccprecio" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)" style="text-align:center;padding:10px 4px"></div>
+    </div>
+    <p style="font-size:11px;color:#aaa;margin:-4px 0 8px">El precio de venta solo aplica si es producto nuevo.</p>
+    <button class="btn" style="background:#546E7A;color:white" onclick="addCC()">+ Agregar producto a la compra</button>
+    <div id="iccp" style="margin:8px 0"></div>
+    <!-- 💰 Lo mismo con envio, tarjeta y descuentos: 274 px que no son de todas las
+         facturas. Si el PDF trae descuentos, este bloque se abre solo. -29 ago- -->
+    <button type="button" id="cc-btn-extras" onclick="toggleBloqueCompra('cc-bloque-extras','cc-btn-extras')"
+      style="width:100%;padding:11px;margin-bottom:8px;background:#F2F2F6;color:#37474F;border:1.5px solid #DCDCE4;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+      <span>💰 Envío, tarjeta y descuentos</span><span class="cc-flecha">›</span></button>
+    <div id="cc-bloque-extras" style="display:none">
+    <label class="lbl">Costo de envío -shipping- -opcional</label>
+    <input class="inp" id="cc-envio" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);renderICC()">
+    <label class="lbl">Cargo por tarjeta de crédito -opcional</label>
+    <input class="inp" id="cc-tarjeta" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);renderICC()">
+    <!-- 💸 DESCUENTOS DE LA FACTURA DE COMPRA -Sensei, 19 ago-. Hasta TRES. Se escriben en
+         positivo y la app los RESTA del total. NO se reparten entre los productos: el costo
+         de cada uno se queda como el lo escribio -igual que el envio y el cargo por tarjeta-. -->
+    <div style="background:#FFEBEE;border-radius:9px;padding:8px;margin:8px 0">
+      <label style="font-size:12.5px;font-weight:800;color:#C62828;display:block;margin-bottom:5px">💸 DESCUENTOS -opcional, hasta 3</label>
+      <div style="display:flex;gap:5px;margin-bottom:4px"><input class="inp" id="cc-desc1" type="text" placeholder="Por qué (ej: promoción)" autocomplete="off" style="flex:1;padding:7px 8px;font-size:12.5px;margin:0"><input class="inp" id="cc-descm1" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);pintarTotalCompra()" style="width:84px;padding:7px 4px;font-size:12.5px;text-align:center;margin:0"></div><div style="display:flex;gap:5px;margin-bottom:4px"><input class="inp" id="cc-desc2" type="text" placeholder="Por qué (ej: promoción)" autocomplete="off" style="flex:1;padding:7px 8px;font-size:12.5px;margin:0"><input class="inp" id="cc-descm2" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);pintarTotalCompra()" style="width:84px;padding:7px 4px;font-size:12.5px;text-align:center;margin:0"></div><div style="display:flex;gap:5px;margin-bottom:4px"><input class="inp" id="cc-desc3" type="text" placeholder="Por qué (ej: promoción)" autocomplete="off" style="flex:1;padding:7px 8px;font-size:12.5px;margin:0"><input class="inp" id="cc-descm3" type="text" inputmode="numeric" placeholder="$0.00" onfocus="this.select()" oninput="formatoMoneda(this);pintarTotalCompra()" style="width:84px;padding:7px 4px;font-size:12.5px;text-align:center;margin:0"></div><div style="font-size:10.5px;color:#B71C1C;margin-top:2px">Escribe el número sin el menos. La app lo resta sola.</div>
+    </div>
+    </div><!-- fin del bloque de envio, tarjeta y descuentos -->
+    <div style="background:#EFEBE9;border-radius:8px;padding:12px;margin:8px 0">
+      <div id="cc-desc-detalle"></div>
+      <div style="display:flex;justify-content:space-between"><span>Total compra</span><span id="cctot" style="font-weight:700;font-size:18px;color:#5D4037">$0.00</span></div>
+    </div>
+    <label class="lbl">Tipo de pago</label>
+    <div style="background:#FFF3E0;border-radius:10px;padding:12px;margin-bottom:8px">
+      <label style="font-size:15px;font-weight:800;color:#E65100;display:block;margin-bottom:8px">💳 TIPO DE PAGO</label>
+      <select class="inp" id="cctipo" onchange="actualizarLabelPagoCompra()" style="font-size:16px;font-weight:700;border:3px solid #E65100;color:#E65100;background:#FFF8F0;padding:12px">
+        <option value="credito">✅ A crédito - pago parcial</option>
+        <option value="contado">💵 Contado - pago completo</option>
+      </select>
+    </div>
+    <div id="ccini-g" style="background:#E8F5E9;border-radius:10px;padding:12px;margin-bottom:8px">
+      <label id="cc-pago-label" style="font-size:14px;font-weight:700;color:#2E7D32;display:block;margin-bottom:6px">💰 Pago inicial (opcional, puede ser $0)</label>
+      <div id="pago-metodos-ccini"></div>
+      <button type="button" onclick="agregarMetodoPago('ccini')" style="background:none;border:1px dashed #2E7D32;border-radius:8px;padding:6px 10px;font-size:11px;color:#2E7D32;cursor:pointer;margin:4px 0 8px;width:100%">+ Agregar otra forma de pago</button>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:#555;font-weight:600">Total de este pago:</span>
+        <span id="pago-total-ccini" style="font-size:16px;font-weight:800;color:#2E7D32">$0.00</span>
+      </div>
+    </div>
+    <button class="btn" style="background:#2E7D32;color:white" onclick="saveCC()">✓ Registrar compra</button>
+    <div class="snk" id="mk-cc">Compra registrada</div>
+  </div>
+</div>
+<div id="p-cl-perfil" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <div id="cl-perfil-contenido"></div>
+</div>
+
+<div id="p-cl-factura" class="pg">
+  <button class="back" onclick="document.getElementById('p-cl-factura').style.display='none';document.getElementById('p-cl-perfil').style.display='block'">← Volver al cliente</button>
+  <div id="factura-acciones" style="display:flex;gap:8px;margin-bottom:12px">
+    <button class="btn" style="flex:1;background:#1a237e;color:white;margin:0;padding:12px" id="btn-print-factura">🖨️ Imprimir</button>
+    <button class="btn" style="flex:1;background:#2E7D32;color:white;margin:0;padding:12px" id="btn-email-factura">✉️ Email</button>
+  </div>
+  <div id="cl-factura-contenido"></div>
+</div>
+
+<div id="p-facturas" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:10px">🧾 Facturas</h2>
+  <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="fact-buscar" type="text" placeholder="Buscar por nombre, apodo, negocio, teléfono..." oninput="renderFacturas(this.value)" autocomplete="off"></div>
+
+  <div class="card" style="padding:12px;margin-bottom:10px">
+    <p style="font-size:11px;font-weight:700;color:var(--nbs-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Ordenar y filtrar</p>
+    <label class="lbl">Ordenar por</label>
+    <select class="inp" id="fact-orden" onchange="renderFacturas(document.getElementById('fact-buscar').value)" style="margin-bottom:10px">
+      <option value="fecha-desc">📅 Fecha (más reciente primero)</option>
+      <option value="fecha-asc">📅 Fecha (más antigua primero)</option>
+      <option value="monto-desc">💲 Monto (mayor a menor)</option>
+      <option value="monto-asc">💲 Monto (menor a mayor)</option>
+      <option value="ranking-clientes">🏆 Ranking de clientes (total gastado)</option>
+    </select>
+    <label class="lbl">Rango de fechas (opcional)</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div><label style="font-size:10px;color:#aaa">Desde</label><input class="inp" id="fact-desde" type="date" onchange="renderFacturas(document.getElementById('fact-buscar').value)" style="margin-bottom:0"></div>
+      <div><label style="font-size:10px;color:#aaa">Hasta</label><input class="inp" id="fact-hasta" type="date" onchange="renderFacturas(document.getElementById('fact-buscar').value)" style="margin-bottom:0"></div>
+    </div>
+    <button type="button" onclick="document.getElementById('fact-desde').value='';document.getElementById('fact-hasta').value='';document.getElementById('fact-orden').value='fecha-desc';renderFacturas(document.getElementById('fact-buscar').value)" style="width:100%;padding:8px;background:#F0F0F2;color:var(--nbs-ink);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">Limpiar filtros</button>
+  </div>
+
+  <div id="fact-lista"></div>
+</div>
+
+<div id="p-gastos" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">💸 Gastos</h2>
+  <div id="gastos-lista-wrap">
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn" style="flex:1;background:#1565C0;color:white;margin:0" onclick="document.getElementById('gastos-l').style.display='block';document.getElementById('gastos-n').style.display='none'">Lista</button>
+      <button class="btn" style="flex:1;background:#C62828;color:white;margin:0" onclick="document.getElementById('gastos-n').style.display='block';document.getElementById('gastos-l').style.display='none'">+ Nuevo gasto</button>
+    </div>
+    <div id="gastos-l">
+      <div class="r2" style="margin-bottom:8px">
+        <div><label class="lbl">Desde</label><input class="inp" id="gfrom" type="date"></div>
+        <div><label class="lbl">Hasta</label><input class="inp" id="gto" type="date"></div>
+      </div>
+      <button class="btn" style="background:#546E7A;color:white" onclick="renderGastos()">🔍 Filtrar</button>
+      <div id="gastos-resumen" style="background:#FFEBEE;border-radius:8px;padding:12px;margin-bottom:12px;display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;font-weight:700;color:#C62828">TOTAL GASTOS</span>
+          <span id="gastos-total" style="font-size:22px;font-weight:700;color:#C62828">$0.00</span>
+        </div>
+      </div>
+      <div id="glista"></div>
+      <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="imprimirReporteGastos()">🖨️ Imprimir / Compartir este reporte</button>
+    </div>
+    <div id="gastos-n" style="display:none">
+      <div class="card">
+        <p style="font-size:15px;font-weight:700;margin-bottom:12px">Registrar gasto</p>
+        <label class="lbl">Categoría *</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <button type="button" id="gbtn-gas" onclick="selGcat('Gasolina')" style="padding:12px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:13px;font-weight:600">⛽ Gasolina</button>
+          <button type="button" id="gbtn-com" onclick="selGcat('Comida')" style="padding:12px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:13px;font-weight:600">🍽️ Comida</button>
+          <button type="button" id="gbtn-ofi" onclick="selGcat('Gastos de oficina')" style="padding:12px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:13px;font-weight:600">📎 Oficina</button>
+          <button type="button" id="gbtn-mis" onclick="selGcat('Miscelaneos')" style="padding:12px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:13px;font-weight:600">📦 Miscelaneos</button>
+        </div>
+
+        <!-- Opciones adicionales para Comida -->
+        <div id="gcomida-wrap" style="display:none;background:#FFF8E1;border-radius:10px;padding:12px;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;color:#E65100;margin-bottom:8px">🍽️ DETALLE DE COMIDA</div>
+          <label class="lbl">Tipo</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+            <button type="button" id="gcbtn-des" onclick="selComidaTipo('Desayuno')" style="padding:10px 4px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:12px;font-weight:600">☀️ Desayuno</button>
+            <button type="button" id="gcbtn-alm" onclick="selComidaTipo('Almuerzo')" style="padding:10px 4px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:12px;font-weight:600">🍱 Almuerzo</button>
+            <button type="button" id="gcbtn-cen" onclick="selComidaTipo('Cena')" style="padding:10px 4px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:12px;font-weight:600">🌙 Cena</button>
+            <button type="button" id="gcbtn-mer" onclick="selComidaTipo('Merienda')" style="padding:10px 4px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:12px;font-weight:600">🍎 Merienda</button>
+            <button type="button" id="gcbtn-beb" onclick="selComidaTipo('Bebidas')" style="padding:10px 4px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:12px;font-weight:600">☕ Bebidas</button>
+            <button type="button" id="gcbtn-ot2" onclick="selComidaTipo('Otro')" style="padding:10px 4px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:12px;font-weight:600">📝 Otro</button>
+          </div>
+          <label class="lbl">¿Qué se compró?</label>
+          <input class="inp" id="gcomida-desc" type="text" placeholder="Ej: Sandwich y café, Arroz con pollo...">
+          <label class="lbl">Nombre del negocio / lugar</label>
+          <input class="inp" id="gcomida-lugar" type="text" placeholder="Ej: Dunkin Donuts, McDonald's, Subway...">
+          <input type="hidden" id="gcomida-tipo">
+        </div>
+
+        <label class="lbl">Otras categorías</label>
+        <select class="inp" id="gcat-select" onchange="selGcatSelect(this.value)">
+          <option value="">-- Seleccionar otra categoría --</option>
+          <option>Renta</option>
+          <option>Luz / Electricidad</option>
+          <option>Teléfono / Internet</option>
+          <option>Trabajando en la calle</option>
+          <option>Viaje a New York</option>
+          <option>Viaje / Transporte</option>
+          <option>Publicidad / Marketing</option>
+          <option>Seguro</option>
+          <option>Impuestos</option>
+          <option>Mantenimiento / Reparación</option>
+          <option>Otro</option>
+        </select>
+        <input type="hidden" id="gcat">
+        <div id="gcat-sel-display" style="display:none;background:#FFF3E0;border-radius:8px;padding:8px 12px;margin-top:6px;font-size:13px;font-weight:600;color:#E65100"></div>
+        <div id="gcat-otro" style="display:none;margin-top:6px">
+          <label class="lbl">Describe el tipo de gasto</label>
+          <input class="inp" id="gcat-desc" type="text" placeholder="Ej: Honorarios contador...">
+        </div>
+        <label class="lbl">Monto ($) *</label>
+        <input class="inp" id="gmonto" type="text" inputmode="numeric" value="0.00" onfocus="this.select()" oninput="formatoMoneda(this)">
+        <label class="lbl">Fecha</label>
+        <input class="inp" id="gfecha" type="date" lang="en-US">
+        <label class="lbl">Descripción / Notas</label>
+        <input class="inp" id="gnota" type="text" placeholder="Opcional - detalle del gasto">
+        <label class="lbl">Foto del recibo o factura (opcional)</label>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div id="gasto-foto-preview" onclick="abrirOpcionesFotoGasto()" style="width:56px;height:56px;border-radius:10px;background:var(--nbs-gold-bg);border:2px dashed var(--nbs-gold);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;overflow:hidden;cursor:pointer">📷</div>
+          <div style="font-size:12px;color:#aaa;flex:1">Toca para tomar una foto o elegir de la galería — así tienes constancia del gasto</div>
+        </div>
+        <input type="hidden" id="gasto-foto-data">
+        <input type="file" id="gasto-foto-camara" accept="image/*" capture="camera" style="display:none" onchange="cargarFotoGasto(this)">
+        <input type="file" id="gasto-foto-galeria" accept="image/*" style="display:none" onchange="cargarFotoGasto(this)">
+        <button class="btn" style="background:#C62828;color:white" onclick="saveGasto()">✓ Registrar gasto</button>
+        <button class="btn" style="background:#546E7A;color:white" onclick="document.getElementById('gastos-n').style.display='none';document.getElementById('gastos-l').style.display='block';subirPantalla()">← Volver a la lista</button>
+        <div class="snk" id="mk-gasto">Gasto registrado</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="p-bitacora" class="pg" style="display:none">
+  <div class="card">
+    <p style="font-size:16px;font-weight:800;margin-bottom:3px;color:var(--nbs-ink)">📋 Bitácora de visitas</p>
+    <p style="font-size:11.5px;color:var(--nbs-muted);margin-bottom:11px;line-height:1.5">Todo lo que pasó con cada cliente: la fecha, la hora, si compró y qué se llevó.</p>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px">
+      <button onclick="rangoBitacora('hoy')" class="btn" style="flex:1;min-width:64px;margin:0;padding:9px 5px;font-size:11.5px;background:#1a237e;color:#fff">Hoy</button>
+      <button onclick="rangoBitacora('semana')" class="btn" style="flex:1;min-width:64px;margin:0;padding:9px 5px;font-size:11.5px;background:#1a237e;color:#fff">7 días</button>
+      <button onclick="rangoBitacora('mes')" class="btn" style="flex:1;min-width:64px;margin:0;padding:9px 5px;font-size:11.5px;background:#1a237e;color:#fff">30 días</button>
+      <button onclick="rangoBitacora('todo')" class="btn" style="flex:1;min-width:64px;margin:0;padding:9px 5px;font-size:11.5px;background:#546E7A;color:#fff">Todo</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:9px">
+      <div style="flex:1"><label class="lbl">Desde</label><input class="inp" id="bit-desde" type="date" onchange="cambiarFechaBitacora('desde', this.value)"></div>
+      <div style="flex:1"><label class="lbl">Hasta</label><input class="inp" id="bit-hasta" type="date" onchange="cambiarFechaBitacora('hasta', this.value)"></div>
+    </div>
+    <input class="inp" id="bit-buscar" type="search" placeholder="🔍 Buscar cliente, barbería o producto..." oninput="buscarEnBitacora(this.value)">
+  </div>
+  <div id="bit-contenido"></div>
+  <div class="card" style="margin-top:10px">
+    <div style="display:flex;gap:6px">
+      <button onclick="imprimirBitacora()" class="btn" style="flex:1;margin:0;background:#546E7A;color:#fff;font-size:12.5px">🖨️ Imprimir</button>
+      <button onclick="compartirBitacora()" class="btn" style="flex:1;margin:0;background:#25D366;color:#fff;font-size:12.5px">📤 Compartir</button>
+    </div>
+  </div>
+</div>
+<div id="p-margen" style="display:none">
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <button class="btn" style="background:#F0F0F2;color:var(--nbs-ink);font-weight:700" onclick="volverAtras()">← Atrás</button>
+    <button class="btn" style="background:#F0F0F2;color:var(--nbs-ink);font-weight:700" onclick="ir('p-inicio')">🏠 Inicio</button>
+  </div>
+  <h2 style="font-size:19px;font-weight:800;color:var(--nbs-ink);margin-bottom:4px">📊 Margen por producto</h2>
+  <p style="font-size:12px;color:var(--nbs-muted);margin-bottom:10px;line-height:1.45">
+    Cuánto te cuesta cada producto, en cuánto lo vendes y cuánto te queda.
+    Es la ganancia <b>bruta</b>: no incluye gasolina, tiempo ni los demás gastos del negocio.
+  </p>
+  <div style="margin-bottom:10px">
+    <input id="margen-buscar" type="text" placeholder="🔍 Buscar producto, marca o $precio..."
+      oninput="buscarEnMargen(this.value)"
+      style="width:100%;box-sizing:border-box;padding:11px;border:2px solid var(--nbs-line);border-radius:10px;font-size:14px;font-family:inherit">
+  </div>
+  <button class="btn" style="background:#1a237e;color:white;margin-bottom:10px" onclick="compartirMargenProductos()">🖨️ Imprimir / Compartir este reporte</button>
+  <div id="margen-lista"></div>
+</div>
+
+<div id="p-rpt" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">📊 Reportes</h2>
+  <button onclick="abrirRepProducto()" style="width:100%;padding:13px;margin-bottom:8px;background:#E3F2FD;color:#1565C0;border:1.5px solid #1565C033;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">📊</span><span style="flex:1"><span style="display:block">Cuánto vendí de…</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Un producto, entre las fechas que elijas</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepDormido()" style="width:100%;padding:13px;margin-bottom:8px;background:#FFEBEE;color:#C62828;border:1.5px solid #C6282833;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">💀</span><span style="flex:1"><span style="display:block">Dinero dormido</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Lo que tienes parado y no se vende</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepGanancia()" style="width:100%;padding:13px;margin-bottom:8px;background:#E8F5E9;color:#2E7D32;border:1.5px solid #2E7D3233;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">💵</span><span style="flex:1"><span style="display:block">Ganancia real</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Vendido menos costo menos gastos</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepMeses()" style="width:100%;padding:13px;margin-bottom:8px;background:#F3E5F5;color:#6A1B9A;border:1.5px solid #6A1B9A33;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">📈</span><span style="flex:1"><span style="display:block">Mes a mes</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Cómo va creciendo tu negocio</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepDias()" style="width:100%;padding:13px;margin-bottom:8px;background:#E0F2F1;color:#00695C;border:1.5px solid #00695C33;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">📅</span><span style="flex:1"><span style="display:block">Por día de la semana</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Qué días te dejan más</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepClientes()" style="width:100%;padding:13px;margin-bottom:8px;background:#FFF3E0;color:#E65100;border:1.5px solid #E6510033;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">🏪</span><span style="flex:1"><span style="display:block">Quién te compra más</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Tus barberías ordenadas</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="abrirRepReponer()" style="width:100%;padding:13px;margin-bottom:8px;background:#FFFDE7;color:#F9A825;border:1.5px solid #F9A82533;border-radius:11px;font-size:13.5px;font-weight:800;cursor:pointer;text-align:left;display:flex;align-items:center;gap:11px"><span style="font-size:20px">📦</span><span style="flex:1"><span style="display:block">Qué reponer</span><span style="display:block;font-size:11px;font-weight:600;opacity:.75">Lo que más sale y ya queda poco</span></span><span style="opacity:.5">›</span></button>
+  <button onclick="mostrarMargenProductos()" style="width:100%;padding:12px;background:#6A1B9A;color:white;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:12px">📊 Margen por producto — cuánto te deja cada uno</button>
+  <button onclick="mostrarReporteClientes('ganancia')" style="width:100%;padding:12px;background:#1a237e;color:white;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:8px">📊 Reporte por Cliente (comprado, pagado y ganancia)</button>
+    <button onclick="revisarFechasSospechosas()" style="width:100%;padding:10px;background:#FFF3E0;color:#E65100;border:1px solid #FFCC80;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:14px">🔍 Revisar si hay fechas guardadas con formato incorrecto</button>
+  <div class="card">
+    <div class="r2">
+      <div><label class="lbl">Desde</label><input class="inp" id="rfrom" type="date"></div>
+      <div><label class="lbl">Hasta</label><input class="inp" id="rto" type="date"></div>
+    </div>
+    <label class="lbl">Ver por</label>
+    <select class="inp" id="rtipo">
+      <optgroup label="📊 Ventas">
+        <option value="total">Resumen general de ventas</option>
+        <option value="cliente">Ventas por cliente</option>
+        <option value="pagos">💵 Pagos que me hicieron (quién y cuánto)</option>
+        <option value="ruta">Entregado, devuelto y pendiente por negocio</option>
+        <option value="tiponegocio">Ventas por tipo de negocio</option>
+        <option value="productos">Productos más vendidos (cantidad)</option>
+        <option value="ganancia">Productos mejor ganancia ($)</option>
+        <option value="categoria">Ventas por categoría de producto</option>
+      </optgroup>
+      <optgroup label="💸 Gastos">
+        <option value="gastos">Resumen de gastos</option>
+        <option value="gastos-cat">Gastos por categoría</option>
+      </optgroup>
+      <optgroup label="📈 Comparativos">
+        <option value="ventas-vs-gastos">Ventas vs Gastos (balance)</option>
+      </optgroup>
+    </select>
+    <button class="btn" style="background:#E65100;color:white" onclick="genRpt()">🔍 Generar reporte</button>
+  </div>
+  <div id="rptres"></div>
+</div>
+<div id="p-vip" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:4px">⭐ Programa Lealtad VIP</h2>
+<p style="font-size:12px;color:#aaa;margin-bottom:14px">Compra 10 de la misma marca y el mismo tipo y gana 1 gratis · Cuenta desde junio 2026</p>
+  <div style="background:linear-gradient(135deg,#880E4F,#AD1457);border-radius:12px;padding:14px;margin-bottom:14px;color:white">
+    <div style="font-size:12px;opacity:0.8;margin-bottom:4px">REGLA DEL PROGRAMA</div>
+    <div style="font-size:14px;font-weight:600">🛒 10 de la misma MARCA y el mismo TIPO → 🎁 1 GRATIS</div>
+    <div style="font-size:11px;opacity:0.7;margin-top:4px">Productos de $10.00 · las navajas de $5.00 cuentan 2 por 1</div>
+  </div>
+
+  <div style="background:#FCE4EC;border-radius:10px;padding:12px;margin-bottom:14px;text-align:center">
+    <div style="font-size:11px;color:#AD1457;font-weight:700">CLIENTES INSCRITOS EN EL PROGRAMA</div>
+    <div id="vip-total-num" style="font-size:24px;font-weight:800;color:#AD1457">0</div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <p style="font-size:13px;font-weight:700;margin-bottom:8px">🔍 Buscar cliente (ver estatus o inscribir)</p>
+    <div style="display:flex;gap:8px">
+      <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="vip-buscar-cl" type="text" placeholder="Escribe el nombre del cliente..." oninput="filtrarVIPBusqueda(this.value)" autocomplete="off"></div>
+      <button id="btn-dictar-vip" onclick="dictarBusquedaSimple('vip-buscar-cl','btn-dictar-vip')" style="background:#5E35B1;color:white;border:none;border-radius:8px;width:44px;flex-shrink:0;cursor:pointer;font-size:18px">🎤</button>
+    </div>
+    <div id="vip-buscar-lista" style="background:white;border:1px solid #ddd;border-radius:8px;max-height:200px;overflow-y:auto;display:none"></div>
+    <button id="vip-ver-todos-btn" style="display:none;width:100%;padding:10px;background:var(--nbs-gold-bg);color:var(--nbs-gold-dark);border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;margin-top:8px" onclick="document.getElementById('vip-buscar-cl').value='';renderVIP('');mostrarBotonVerTodosVIP(false);">← Ver todos los inscritos</button>
+    <button class="btn" style="background:#546E7A;color:white;font-size:12px" onclick="diagnosticoVIP()">🔍 Diagnóstico VIP</button>
+  </div>
+
+  <p style="font-size:13px;font-weight:700;color:#AD1457;margin-bottom:8px">Clientes inscritos en el programa</p>
+  <div id="vip-lista"></div>
+  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="abrirMenuReporte('vip-lista','Programa VIP')">🖨️ Imprimir / Compartir este reporte</button>
+</div>
+
+<div id="p-cxc" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:10px">💳 Cuentas por Cobrar / Facturas</h2>
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <button id="cxc-tab-pendientes" onclick="cambiarPestanaCxC('pendientes')" style="flex:1;padding:10px;background:var(--nbs-gold);color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📋 Pendientes</button>
+    <button id="cxc-tab-historial" onclick="cambiarPestanaCxC('historial')" style="flex:1;padding:10px;background:#F0F0F2;color:var(--nbs-ink);border:none;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">📅 Día por día</button>
+    <button id="cxc-tab-saldadas" onclick="cambiarPestanaCxC('saldadas')" style="flex:1;padding:10px;background:#F0F0F2;color:var(--nbs-ink);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✅ Facturas Saldadas</button>
+  </div>
+  <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="cxc-buscar" type="text" placeholder="Buscar por nombre o negocio..." oninput="cxcBuscarActivo(this.value)" autocomplete="off"></div>
+  <div id="cxc-lista"></div>
+  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="abrirMenuReporte('cxc-lista','Cuentas por Cobrar')">🖨️ Imprimir / Compartir este reporte</button>
+  <div id="cxc-saldadas-lista" style="display:none"></div>
+  <div id="cxc-historial-lista" style="display:none"></div>
+
+  <div style="margin-top:32px;padding-top:16px;border-top:1px solid #eee">
+    <div style="font-size:10px;color:#bbb;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;text-align:center">Herramienta avanzada — usar rara vez</div>
+    <button onclick="renumerarTodasLasFacturas()" style="width:100%;padding:10px;background:#FAFAFA;color:#999;border:1px dashed #ddd;border-radius:8px;font-size:11px;cursor:pointer">🔢 Renumerar todas las facturas (de la más vieja a la más nueva)</button>
+  </div>
+
+  <div id="cxc-abono" style="display:none">
+    <div class="card">
+      <p style="font-size:26px;font-weight:700;margin-bottom:6px" id="cxc-nombre"></p>
+      <p style="font-size:16px;font-weight:700;color:#C62828;margin-bottom:14px" id="cxc-saldo-txt"></p>
+      <div id="cxc-credito-favor" style="display:none;margin-bottom:12px"></div>
+      <div id="cxc-facturas" style="margin-bottom:12px"></div>
+      <button class="btn" style="background:#F0F0F2;color:var(--nbs-ink);font-weight:700" onclick="document.getElementById('cxc-abono').style.display='none';document.getElementById('cxc-lista').style.display='block';subirPantalla()">←Volver a la lista</button>
+
+      <div class="snk" id="mk-ab">Abono registrado</div>
+    </div>
+  </div>
+</div>
+<!-- 🔴 EL ESCANER estaba DENTRO de cxc-abono, que vive escondida, y por eso no podia verse desde ningun otro sitio. Sacado al BODY el 30 ago; lo cazo la prueba nueva. -->
+<div id="scanner-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:99998">
+  <video id="scanner-video" style="width:100%;height:100%;object-fit:cover" autoplay muted playsinline></video>
+  <div style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+    <div style="width:80%;max-width:320px;height:120px;border:3px solid #fff;border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,0.5)"></div>
+  </div>
+  <div style="position:absolute;top:16px;left:0;width:100%;text-align:center;color:white;font-size:15px;font-weight:600">Apunta la camara al codigo de barras</div>
+  <button onclick="cerrarEscanerSKU()" style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:#B71C1C;color:white;border:none;border-radius:24px;padding:14px 32px;font-size:15px;font-weight:600;cursor:pointer">✕ Cancelar</button>
+  <div id="scanner-msg" style="position:absolute;bottom:90px;left:0;width:100%;text-align:center;color:#FFD600;font-size:13px;display:none"></div>
+</div>
+
+<textarea id="pd" style="display:none">[{"id": 1, "nombre": "PAPEL DE CUELLO ROLLO - PAPEL NEGRO", "cat": "PAPEL CUELLO", "sku": "", "costo": 5.5, "precio": 10.0, "stock": 20, "min": 10, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 2, "nombre": "PAPEL DE CUELLO ROLLO - PAPEL BLANCO", "cat": "PAPEL CUELLO", "sku": "", "costo": 5.5, "precio": 10.0, "stock": 20, "min": 10, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 3, "nombre": "PAPEL DE CUELLO ROLLO - PAPEL VERDE", "cat": "PAPEL CUELLO", "sku": "", "costo": 5.5, "precio": 10.0, "stock": 8, "min": 5, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 4, "nombre": "PAPEL DE CUELLO ROLLO - PAPEL ORANGE", "cat": "PAPEL CUELLO", "sku": "", "costo": 5.5, "precio": 10.0, "stock": 12, "min": 5, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 5, "nombre": "PAPEL DE CUELLO ROLLO - PAPEL ROJO", "cat": "PAPEL CUELLO", "sku": "", "costo": 5.5, "precio": 10.0, "stock": 12, "min": 5, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 6, "nombre": "LEVEL 3 Professional Nitrile Gloves Pearl Pink - GUANTE NEGRO/BLACK", "cat": "GUANTES", "sku": "", "costo": 5.5, "precio": 11.99, "stock": 8, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 7, "nombre": "LEVEL 3 Professional Nitrile Gloves Pearl Pink - GUANTE ROJO/RED", "cat": "GUANTES", "sku": "", "costo": 5.5, "precio": 11.99, "stock": 8, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 8, "nombre": "LEVEL 3 Professional Nitrile Gloves Pearl Pink - GUANTE VERDE/GREEN", "cat": "GUANTES", "sku": "", "costo": 5.5, "precio": 11.99, "stock": 8, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 9, "nombre": "LEVEL 3 Professional Nitrile Gloves Pearl Pink - GUANTE ROSADO/PINK", "cat": "GUANTES", "sku": "", "costo": 5.5, "precio": 11.99, "stock": 8, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 10, "nombre": "LEVEL 3 Professional Nitrile Gloves Pearl Pink - GUANTE NARANJA/ORANGE", "cat": "GUANTES", "sku": "", "costo": 5.5, "precio": 11.99, "stock": 8, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 11, "nombre": "LEVEL 3 Professional Nitrile Gloves Pearl Pink - GUANTE SILVER", "cat": "GUANTES", "sku": "", "costo": 5.5, "precio": 11.99, "stock": 8, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 12, "nombre": "LEVEL 3 Professional Nitrile Gloves Pearl Pink - GUANTE AZUL/BLUE", "cat": "GUANTES", "sku": "", "costo": 5.5, "precio": 11.99, "stock": 5, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 13, "nombre": "DORCO Prime NAVAJAS", "cat": "NAVAJAS", "sku": "8801038569857", "costo": 6.0, "precio": 10.0, "stock": 100, "min": 30, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 14, "nombre": "DORCO ROJA CORTADA NAVAJAS", "cat": "NAVAJAS", "sku": "8801038602295", "costo": 3.0, "precio": 5.0, "stock": 100, "min": 30, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 15, "nombre": "ASTRA VERDE NAVAJAS", "cat": "NAVAJAS", "sku": "7702018007257", "costo": 6.0, "precio": 11.99, "stock": 180, "min": 30, "qtySold": 20, "amountSold": 199.8, "profit": 68.36}, {"id": 16, "nombre": "DORCO ROJA REGULAR NAVAJAS", "cat": "NAVAJAS", "sku": "8801038200088", "costo": 4.5, "precio": 10.0, "stock": 100, "min": 30, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 17, "nombre": "DERBY PREMIUM NEGRA NAVAJAS", "cat": "NAVAJAS", "sku": "", "costo": 3.25, "precio": 7.0, "stock": 30, "min": 10, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 18, "nombre": "DERBY VERDE NAVAJAS", "cat": "NAVAJAS", "sku": "", "costo": 3.0, "precio": 6.0, "stock": 30, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 19, "nombre": "WILKINSON NAVAJAS", "cat": "NAVAJAS", "sku": "", "costo": 17.0, "precio": 25.0, "stock": 12, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 20, "nombre": "PAPEL DE CUELLO SANEK CAJA", "cat": "PAPEL CUELLO", "sku": "", "costo": 7.0, "precio": 12.0, "stock": 20, "min": 10, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 21, "nombre": "Wahl HI-VIZ Nightshade trimmer", "cat": "MAQUINAS", "sku": "", "costo": 130.0, "precio": 249.0, "stock": 5, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 22, "nombre": "Wahl retro tcut cordless trimmer", "cat": "MAQUINAS", "sku": "", "costo": 40.0, "precio": 90.0, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 23, "nombre": "Wahl detailer trimmer gold", "cat": "MAQUINAS", "sku": "", "costo": 116.59, "precio": 199.0, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 24, "nombre": "Wahl senior 5 star cordless", "cat": "MAQUINAS", "sku": "", "costo": 73.0, "precio": 199.99, "stock": 5, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 25, "nombre": "Wahl detailer trimmer cordless", "cat": "MAQUINAS", "sku": "", "costo": 75.0, "precio": 149.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 26, "nombre": "Andis trimmer GTX-EXO Black", "cat": "MAQUINAS", "sku": "", "costo": 109.99, "precio": 199.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 27, "nombre": "Wahl magic clip Clipper", "cat": "MAQUINAS", "sku": "", "costo": 85.0, "precio": 139.99, "stock": 3, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 28, "nombre": "BABYLISS TRIMMER DUAL LITHIUM BATTERY", "cat": "MAQUINAS", "sku": "", "costo": 129.99, "precio": 250.0, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 29, "nombre": "REBEL MR. CARTOON CLIPPER STYLECRAFT", "cat": "MAQUINAS", "sku": "", "costo": 130.0, "precio": 199.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 30, "nombre": "JRL FRESHFADE 2020C CLIPPER - ART COLLECTION X2", "cat": "MAQUINAS", "sku": "", "costo": 125.0, "precio": 199.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 31, "nombre": "STYLECRAFT INSTINCT CLIPPER METAL EDITION", "cat": "MAQUINAS", "sku": "", "costo": 161.0, "precio": 299.99, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 32, "nombre": "Inmortal cologne original #03", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 33, "nombre": "INMORTAL WAX SPICE BOMB", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.25, "precio": 9.99, "stock": 40, "min": 10, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 34, "nombre": "Inmortal hair fiber cream pomada", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.25, "precio": 9.99, "stock": 20, "min": 10, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 35, "nombre": "Inmortal colonia VENOM", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 20, "min": 10, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 36, "nombre": "Inmortal hair matte clay", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.25, "precio": 9.99, "stock": 12, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 37, "nombre": "INMORTAL HAIR POWDER ONE MILLION DOLLAR", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.25, "precio": 11.99, "stock": 144, "min": 12, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 38, "nombre": "Inmortal cologne original #01", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 11.99, "stock": 36, "min": 12, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 39, "nombre": "Inmortal hair cream pomade", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.25, "precio": 11.99, "stock": 38, "min": 12, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 40, "nombre": "Inmortal colonia AVENTURA", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 41, "nombre": "Inmortal hair wax strawberry", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.25, "precio": 9.99, "stock": 48, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 42, "nombre": "After shave cream", "cat": "AFTER SHAVE CREAM", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 43, "nombre": "Inmortal cologne original #06", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 44, "nombre": "After shave cream", "cat": "AFTER SHAVE CREAM", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 45, "nombre": "Inmortal hair wax the creed", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.25, "precio": 9.99, "stock": 48, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 46, "nombre": "Inmortal cologne original #02", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 47, "nombre": "Inmortal shaving gel", "cat": "PARA AFEITAR", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 18, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 48, "nombre": "Inmortal cologne original #04", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 49, "nombre": "Inmortal cologne original #05", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 50, "nombre": "Inmortal hair wax one in a million", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.25, "precio": 9.99, "stock": 8, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 51, "nombre": "INMORTAL COLONIA RESERVE 12", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 18, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 52, "nombre": "INMORTAL COLONIA STAY BLESSED #01", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 53, "nombre": "INMORTAL COLONIA RESERVE SAMURAI SPIRIT", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 18, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 54, "nombre": "INMORTAL COLONIA STAY BLESSED #02", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 55, "nombre": "INMORTAL COLONIA STAY BLESSED #04", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 18, "min": 5, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 56, "nombre": "INMORTAL COLONIA STAY BLESSED #03", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 18, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 57, "nombre": "INMORTAL AFTER SHAVE CREAM BALSAM SAMURAI SPIRIT", "cat": "AFTER SHAVE CREAM", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 30, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 58, "nombre": "INMORTAL AFTER SHAVE CREAM BALSAM ONE MILLION", "cat": "AFTER SHAVE CREAM", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 30, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 59, "nombre": "INMORTAL AFTER SHAVE CREAM BALSAM #02", "cat": "AFTER SHAVE CREAM", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 30, "min": 5, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 60, "nombre": "INMORTAL AFTER SHAVE CREAM BALSAM #01", "cat": "AFTER SHAVE CREAM", "sku": "", "costo": 4.75, "precio": 9.99, "stock": 30, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 61, "nombre": "VENTI GOLD EDITION ONE MILLION COLONIA", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 62, "nombre": "Clubman colonia", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 6.11, "precio": 9.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 63, "nombre": "Nishman After Shave Cologne 06 Aqua di Asil", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 12, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 64, "nombre": "Barber Marmara No.1 After Shave cologne", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 5.19, "precio": 9.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 65, "nombre": "Nishman After Shave Cologne 02 Storm", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 16, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 66, "nombre": "Level 3 cologne vibrant", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.8, "precio": 9.99, "stock": 10, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 67, "nombre": "BARBER COLOGNE 500 ML AMIKOO", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 8.0, "precio": 14.99, "stock": 12, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 68, "nombre": "Barber Marmara Puerto Rico cologne", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 8.0, "precio": 14.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 69, "nombre": "BARBER COLOGNE 500 ML LOVE MEMORY", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 8.0, "precio": 14.99, "stock": 10, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 70, "nombre": "Level 3 cologne aqua", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.8, "precio": 9.99, "stock": 12, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 71, "nombre": "Barber Marmara No.3 After Shave cologne", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 5.19, "precio": 9.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 72, "nombre": "Barber Marmara No.4 After Shave cologne", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 5.19, "precio": 9.99, "stock": 4, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 73, "nombre": "Barber Marmara Colombia cologne", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 8.0, "precio": 14.99, "stock": 5, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 74, "nombre": "LEVEL3 COLONIA FRESH", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.8, "precio": 9.99, "stock": 12, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 75, "nombre": "L3VEL3 AFTERSHAVE COLOGNE MIDNIGHT", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.8, "precio": 9.99, "stock": 12, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 76, "nombre": "KABUTO KATANA FRESHNESS BALM SAYA", "cat": "AFTER SHAVE CREAM", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 8, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 77, "nombre": "KABUTO KATANA SCENT COLOGNE HASAKI", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 78, "nombre": "GUMMY COLONIA LEMON AFTER SHAVE", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 3.89, "precio": 9.99, "stock": 3, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 79, "nombre": "KABUTO KATANA FRESHNESS BALM KOJIRI", "cat": "AFTER SHAVE CREAM", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 8, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 80, "nombre": "KABUTO KATANA SCENT COLOGNE NAGASA", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 81, "nombre": "GUMMY COLONIA SAVOUR AFTER SHAVE", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 3.89, "precio": 9.99, "stock": 3, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 82, "nombre": "GUMMY COLONIA INVITE AFTER SHAVE", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 3, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 83, "nombre": "BARBER COLOGNE GRAFFITI #23", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 3.89, "precio": 9.99, "stock": 10, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 84, "nombre": "BARBER COLOGNE GRAFFITI #21", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 3.89, "precio": 9.99, "stock": 16, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 85, "nombre": "BARBER COLOGNE GRAFFITI #22", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 3.89, "precio": 9.99, "stock": 10, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 86, "nombre": "BARBER COLOGNE GRAFFITI #25", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 3.89, "precio": 9.99, "stock": 10, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 87, "nombre": "VENTI COLONIA AFTER SHAVE BLUE", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 88, "nombre": "BARBER COLOGNE GRAFFITI #24", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 3.89, "precio": 9.99, "stock": 10, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 89, "nombre": "VENTI COLONIA AFTER SHAVE RED", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 90, "nombre": "NISHMAN AFTER SHAVE COLOGNE VOLCANO 05", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.0, "precio": 11.99, "stock": 12, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 91, "nombre": "NISHMAN AFTER SHAVE CREAM COLOGNE #03", "cat": "AFTER SHAVE CREAM", "sku": "", "costo": 4.0, "precio": 11.99, "stock": 12, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 92, "nombre": "KABUTO KATANA HAIR GEL", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 11.99, "stock": 5, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 93, "nombre": "KABUTO KATANA POWDER WAX STYLING POWDER", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 11.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 94, "nombre": "KABUTO KATANA SOFT MATTE PASTE", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 95, "nombre": "KABUTO KATANA CLASSIC POMADE", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 12, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 96, "nombre": "KABUTO KATANA STRONG HOLD WAX", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 97, "nombre": "KABUTO KATANA FIBER DENSITY HAIR TONIC", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 11.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 98, "nombre": "KABUTO KATANA GROOMING CREAM", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 12, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 99, "nombre": "KABUTO KATANA AQUA WAX", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 12, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 100, "nombre": "KABUTO KATANA SPIDER WAX", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 101, "nombre": "KABUTO KATANA SHAVING HIDRO GEL", "cat": "PARA AFEITAR", "sku": "", "costo": 6.0, "precio": 14.99, "stock": 30, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 102, "nombre": "Clippercide blade care", "cat": "DESINFECTANTES", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 103, "nombre": "Cool Care", "cat": "DESINFECTANTES", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 188, "min": 36, "qtySold": 12, "amountSold": 119.88, "profit": 29.87}, {"id": 104, "nombre": "BARBICIDE DISINFECTANT 1.89L 1/2 GALON", "cat": "DESINFECTANTES", "sku": "", "costo": 12.0, "precio": 19.99, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 105, "nombre": "Permasharp blade NAVAJAS", "cat": "NAVAJAS", "sku": "", "costo": 4.5, "precio": 9.99, "stock": 20, "min": 5, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 106, "nombre": "Dorco HQ NAVAJAS", "cat": "NAVAJAS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 20, "min": 5, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 107, "nombre": "Persona blade NAVAJAS", "cat": "NAVAJAS", "sku": "", "costo": 9.5, "precio": 15.99, "stock": 15, "min": 5, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 108, "nombre": "Level 3 hair spray", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.8, "precio": 9.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 109, "nombre": "LEVEL3 PAPEL DE CUELLO NEGRO", "cat": "PAPEL CUELLO", "sku": "", "costo": 5.5, "precio": 9.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 110, "nombre": "Level 3 tinted hair gel black", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.8, "precio": 9.99, "stock": 32, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 111, "nombre": "LEVEL3 STYLING POWDER", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 12, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 112, "nombre": "Level 3 Freeze Hair Spray", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.8, "precio": 9.99, "stock": 8, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 113, "nombre": "LEVEL 3 Straight Razor Holder BLACK", "cat": "PORTA NAVAJAS", "sku": "", "costo": 4.8, "precio": 11.99, "stock": 5, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 114, "nombre": "LEVEL 3 Straight Razor Holder WHITE", "cat": "PORTA NAVAJAS", "sku": "", "costo": 5.5, "precio": 11.99, "stock": 5, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 115, "nombre": "Level 3 hair brilliant cream", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.8, "precio": 9.99, "stock": 8, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 116, "nombre": "L3VEL3 AFTERSHAVE COLOGNE MIDNIGHT", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.8, "precio": 9.99, "stock": 12, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 117, "nombre": "INMORTAL CLIPPER BLADE CARE", "cat": "DESINFECTANTES", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 18, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 118, "nombre": "BARBICIDE DESINFECTANTE 16 oz", "cat": "DESINFECTANTES", "sku": "", "costo": 3.75, "precio": 11.99, "stock": 4, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 119, "nombre": "Babyliss desinfectant spray", "cat": "DESINFECTANTES", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 5, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 120, "nombre": "LEVEL 3 Straight Razor Holder RED", "cat": "PORTA NAVAJAS", "sku": "", "costo": 4.8, "precio": 11.99, "stock": 5, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 121, "nombre": "BABYLISS TOMB 45 TRIMMER #FXT45T", "cat": "MAQUINAS", "sku": "", "costo": 133.0, "precio": 199.99, "stock": 1, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 122, "nombre": "Nishman After Shave Cream #4", "cat": "AFTER SHAVE CREAM", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 16, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 123, "nombre": "nishman Hair Styling Cream Wax", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.0, "precio": 7.99, "stock": 12, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 124, "nombre": "Nish Man hair gel Fuchsia", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 5, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 125, "nombre": "Nish Man hair gel casual", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.0, "precio": 7.99, "stock": 5, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 126, "nombre": "Nishman Shaving Gel Easy Shave 1000ml", "cat": "PARA AFEITAR", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 20, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 127, "nombre": "NISHMAN Barber Talc Powder for After Haircut", "cat": "POLVOS", "sku": "", "costo": 4.0, "precio": 6.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 128, "nombre": "nishman Hair Styling WAX Series Gold One AQUA", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 12, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 129, "nombre": "NISHMAN COLONIA #08 SUN SENSE", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 12, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 130, "nombre": "Sprayer bottle mist", "cat": "ACCESORIOS", "sku": "", "costo": 4.0, "precio": 7.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 131, "nombre": "LEVEL3 JUEGO DE PEINETA", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 4.0, "precio": 6.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 132, "nombre": "Barber cape Hipster premium quality", "cat": "CAPPAS/JACKET", "sku": "", "costo": 12.0, "precio": 21.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 133, "nombre": "Barber strong jacket large black", "cat": "CAPPAS/JACKET", "sku": "", "costo": 35.0, "precio": 49.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 134, "nombre": "Fade brush for hair cleaning", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 4.0, "precio": 6.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 135, "nombre": "Barber cape Rich Gold premium quality", "cat": "CAPPAS/JACKET", "sku": "", "costo": 0.12, "precio": 21.99, "stock": 3, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 136, "nombre": "Neck duster", "cat": "ACCESORIOS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 137, "nombre": "Botella spray mist azul", "cat": "ACCESORIOS", "sku": "", "costo": 4.0, "precio": 7.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 138, "nombre": "Nano Blue Aftershave Atomizer black", "cat": "ACCESORIOS", "sku": "", "costo": 18.0, "precio": 34.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 139, "nombre": "Babyliss apron", "cat": "CAPPAS/JACKET", "sku": "", "costo": 13.0, "precio": 24.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 140, "nombre": "Neck duster", "cat": "ACCESORIOS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 141, "nombre": "Wahl Charging Stand for Cordless Clipper", "cat": "CARGADORES", "sku": "", "costo": 20.0, "precio": 34.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 142, "nombre": "Neck duster", "cat": "ACCESORIOS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 143, "nombre": "TOMB45 BLACK TEMPORARY COLOR", "cat": "TINTES", "sku": "", "costo": 12.0, "precio": 24.99, "stock": 12, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 144, "nombre": "Wahl premium cutting guide #1", "cat": "Otro", "sku": "", "costo": 4.0, "precio": 5.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 145, "nombre": "Hand mirror blue", "cat": "ACCESORIOS", "sku": "", "costo": 4.39, "precio": 9.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 146, "nombre": "Water Bottle Sprayer Mist medium", "cat": "Otro", "sku": "", "costo": 4.0, "precio": 7.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 147, "nombre": "KIEPE MAGNETIC STATION MAT", "cat": "ACCESORIOS", "sku": "", "costo": 35.0, "precio": 59.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 148, "nombre": "Barber strong jacket Medium black", "cat": "CAPPAS/JACKET", "sku": "", "costo": 35.0, "precio": 49.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 149, "nombre": "Botella spray mist roja", "cat": "ACCESORIOS", "sku": "", "costo": 4.0, "precio": 6.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 150, "nombre": "BaByliss Charging Stand Clipper PRO GOLD", "cat": "ACCESORIOS", "sku": "", "costo": 20.0, "precio": 34.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 151, "nombre": "Sprayer gum battery operated", "cat": "ACCESORIOS", "sku": "", "costo": 34.99, "precio": 34.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 152, "nombre": "Gummy hair gel maximum hold", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 36, "min": 12, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 153, "nombre": "BaByliss Charging Stand trimmer PRO GOLD", "cat": "ACCESORIOS", "sku": "", "costo": 20.0, "precio": 34.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 154, "nombre": "Wahl premium guide # 1/2", "cat": "Otro", "sku": "", "costo": 3.5, "precio": 4.99, "stock": 5, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 155, "nombre": "Neck duster", "cat": "ACCESORIOS", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 156, "nombre": "Fade brush to clean hair large", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 4.99, "precio": 7.99, "stock": 5, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 157, "nombre": "Babyliss comb set", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 7.99, "precio": 14.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 158, "nombre": "L3VEL3 Milly Clutch Razor Holder BLACK", "cat": "PORTA NAVAJAS", "sku": "", "costo": 14.79, "precio": 24.99, "stock": 8, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 159, "nombre": "Speed O Guide #00 red", "cat": "ACCESORIOS", "sku": "", "costo": 3.0, "precio": 4.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 160, "nombre": "Nano Blue Aftershave Atomizer GOLD", "cat": "ACCESORIOS", "sku": "", "costo": 12.0, "precio": 34.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 161, "nombre": "Neck duster", "cat": "ACCESORIOS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 162, "nombre": "TOMB45 BROWN/BLACK TEMPORARY COLOR", "cat": "TINTES", "sku": "", "costo": 11.99, "precio": 19.99, "stock": 12, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 163, "nombre": "Babyliss LO-PROFX Clipper Charging stand", "cat": "CARGADORES", "sku": "", "costo": 20.0, "precio": 34.99, "stock": 1, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 164, "nombre": "Barber cape", "cat": "CAPPAS/JACKET", "sku": "", "costo": 10.0, "precio": 19.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 165, "nombre": "Mirror extra large black", "cat": "ACCESORIOS", "sku": "", "costo": 6.0, "precio": 14.99, "stock": 3, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 166, "nombre": "Razor blade disposal", "cat": "ACCESORIOS", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 10, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 167, "nombre": "Neck duster large", "cat": "ACCESORIOS", "sku": "", "costo": 6.0, "precio": 7.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 168, "nombre": "Neck duster", "cat": "ACCESORIOS", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 169, "nombre": "L3VEL3 Milly Clutch Razor Holder WHITE", "cat": "PORTA NAVAJAS", "sku": "", "costo": 14.79, "precio": 24.99, "stock": 8, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 170, "nombre": "Barber cape live like a king premium quality", "cat": "CAPPAS/JACKET", "sku": "", "costo": 12.0, "precio": 24.99, "stock": 3, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 171, "nombre": "Hand mirror", "cat": "ACCESORIOS", "sku": "", "costo": 4.39, "precio": 9.99, "stock": 3, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 172, "nombre": "Clubman Bump repair", "cat": "PARA LA CARA", "sku": "", "costo": 4.29, "precio": 9.99, "stock": 16, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 173, "nombre": "Babyliss LO-PROFX Trimmer Charging stand", "cat": "CARGADORES", "sku": "", "costo": 20.0, "precio": 34.99, "stock": 1, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 174, "nombre": "Neck duster", "cat": "ACCESORIOS", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 175, "nombre": "Wahl premium cutting guide #1-1/2", "cat": "Otro", "sku": "", "costo": 3.5, "precio": 4.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 176, "nombre": "Speed O Guide #000 rojo", "cat": "ACCESORIOS", "sku": "", "costo": 3.0, "precio": 4.99, "stock": 5, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 177, "nombre": "L3VEL3 Bristle Brush", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 4.0, "precio": 6.99, "stock": 7, "min": 3, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 178, "nombre": "Wahl Professional Multi-Fast Charge 3 tools at once Power Station", "cat": "CARGADORES", "sku": "", "costo": 80.0, "precio": 139.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 179, "nombre": "Nano Blue Aftershave Atomizer WHITE", "cat": "ACCESORIOS", "sku": "", "costo": 12.0, "precio": 34.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 180, "nombre": "Straight Razor Blade", "cat": "PORTA NAVAJAS", "sku": "", "costo": 4.0, "precio": 7.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 181, "nombre": "Barber cape", "cat": "CAPPAS/JACKET", "sku": "", "costo": 10.0, "precio": 19.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 182, "nombre": "POTE SPRAYER MIST COLOR MADERA GRANDE", "cat": "ACCESORIOS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 183, "nombre": "BROCHA PARA LIMPIAR CABELLOS CON DISPENSADOR DE POLVO", "cat": "ACCESORIOS", "sku": "", "costo": 5.0, "precio": 10.0, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 184, "nombre": "CALENTADOR PARA AGUA", "cat": "ACCESORIOS", "sku": "", "costo": 7.0, "precio": 14.99, "stock": 10, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 185, "nombre": "PEINE CON CURVA PROFESSIONAL PARA BARBEROS", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 3.0, "precio": 6.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 186, "nombre": "Gummy Professional Powder Wax 20g", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.5, "precio": 7.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 187, "nombre": "CAPA CABALLERO NEGRA GRANDE", "cat": "CAPPAS/JACKET", "sku": "", "costo": 10.0, "precio": 19.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 188, "nombre": "PEINE PARA RECORTAR CON MAQUINAS", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 3.0, "precio": 6.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 189, "nombre": "BLUE COMB PEINE AZUL", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 2.0, "precio": 4.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 190, "nombre": "TEND SKIN SOLUTION", "cat": "PARA LA CARA", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 191, "nombre": "Wahl deluxe guide", "cat": "Otro", "sku": "", "costo": 18.0, "precio": 29.99, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 192, "nombre": "Tintation Spray black", "cat": "TINTES", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 60, "min": 24, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 193, "nombre": "BOTELLA SPRAYER ALUMINIO", "cat": "ACCESORIOS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 194, "nombre": "ANDIS PEINE NEGRO", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 4.0, "precio": 6.99, "stock": 5, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 195, "nombre": "Pro Holder For Scissor White", "cat": "ACCESORIOS", "sku": "", "costo": 7.0, "precio": 11.99, "stock": 4, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 196, "nombre": "Pro Holder For Scissor Black", "cat": "ACCESORIOS", "sku": "", "costo": 7.0, "precio": 11.99, "stock": 4, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 197, "nombre": "Wahl detailer trimmer", "cat": "MAQUINAS", "sku": "", "costo": 40.0, "precio": 89.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 198, "nombre": "Inmortal talco polvo deluxe", "cat": "POLVOS", "sku": "", "costo": 4.25, "precio": 9.99, "stock": 96, "min": 10, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 199, "nombre": "Pro Shave Brushless Shaving Cream 24 oz", "cat": "PARA AFEITAR", "sku": "", "costo": 9.0, "precio": 15.99, "stock": 12, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 200, "nombre": "TOMB45 TRIMMER BABYLISS", "cat": "MAQUINAS", "sku": "", "costo": 132.29, "precio": 199.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 201, "nombre": "Babyliss Pro Limited Edition Grey Metal Double Foil Shaver", "cat": "MAQUINAS", "sku": "", "costo": 91.99, "precio": 149.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 202, "nombre": "BaByliss Pro Foil FX Cordless Metal Double Foil Shaver Purple Edition", "cat": "MAQUINAS", "sku": "", "costo": 91.99, "precio": 134.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 203, "nombre": "Stylecraft 360 Jeezy Cordless Vector Motor Metal Clipper", "cat": "MAQUINAS", "sku": "", "costo": 172.49, "precio": 299.99, "stock": 7, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 204, "nombre": "Level3 pomada gold", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.8, "precio": 9.99, "stock": 10, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 205, "nombre": "Cepillito de limpiar cabellos", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 3.99, "precio": 5.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 206, "nombre": "Level3 5 in 1 Clipper Spray Cleaner", "cat": "DESINFECTANTES", "sku": "", "costo": 4.99, "precio": 9.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 207, "nombre": "Turbo Power TwinTurbo 3200", "cat": "MAQUINAS", "sku": "", "costo": 115.0, "precio": 149.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 208, "nombre": "Gummy mousse", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 18, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 209, "nombre": "New Well Shaving Gel para piel sensitiva", "cat": "PARA AFEITAR", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 10, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 210, "nombre": "BARBER Squeeze Shave Gel 250ml #3", "cat": "PARA AFEITAR", "sku": "", "costo": 3.89, "precio": 9.99, "stock": 4, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 211, "nombre": "JRL ONYX CLIPPER", "cat": "MAQUINAS", "sku": "", "costo": 112.2, "precio": 219.99, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 212, "nombre": "CEPILLO PARA PEINAR EN MADERA MEDIANO", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 3.99, "precio": 7.99, "stock": 6, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 213, "nombre": "ANDIS PEINE BLANCO", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 3.99, "precio": 6.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 214, "nombre": "BARBER HAIR GEL 500 ML NO.33", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 215, "nombre": "STYLECRAFT INSTINCT TRIMMER METAL EDITION", "cat": "MAQUINAS", "sku": "", "costo": 132.0, "precio": 199.99, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 216, "nombre": "INSTINCT SHAVER REPLACEMENT COMBO", "cat": "REEMPLAZOS", "sku": "", "costo": 23.0, "precio": 44.99, "stock": 4, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 217, "nombre": "BARBER FADE BRUSH R", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 4.0, "precio": 6.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 218, "nombre": "TIJERA 6.25in SHEAR MATE SILVER", "cat": "TIJERAS", "sku": "", "costo": 35.0, "precio": 59.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 219, "nombre": "POTECITO SPRAYER ROJO PEQUEO", "cat": "ACCESORIOS", "sku": "", "costo": 4.0, "precio": 7.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 220, "nombre": "Neck strips sanek", "cat": "PAPEL CUELLO", "sku": "", "costo": 6.0, "precio": 9.99, "stock": 18, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 221, "nombre": "Andis replacement cutter and foil", "cat": "REEMPLAZOS", "sku": "", "costo": 15.99, "precio": 24.99, "stock": 4, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 222, "nombre": "Proline oil sheen", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 3.39, "precio": 7.99, "stock": 8, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 223, "nombre": "KIEPE TATTOO TRIMMER", "cat": "MAQUINAS", "sku": "", "costo": 54.0, "precio": 99.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 224, "nombre": "CAPA NUEVA QUE SE CIERRA DONDE QUIERAS", "cat": "CAPPAS/JACKET", "sku": "", "costo": 12.0, "precio": 19.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 225, "nombre": "Andis Master cordless", "cat": "MAQUINAS", "sku": "", "costo": 129.99, "precio": 219.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 226, "nombre": "Wahl Senior Metal Edition Clipper with Charging Stand", "cat": "MAQUINAS", "sku": "", "costo": 143.0, "precio": 219.99, "stock": 1, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 227, "nombre": "ANDIS beSpoke Trimmer", "cat": "MAQUINAS", "sku": "", "costo": 99.99, "precio": 159.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 228, "nombre": "Professional Hair Cutting Shears 6in", "cat": "TIJERAS", "sku": "", "costo": 10.0, "precio": 19.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 229, "nombre": "Andis t-outliner corded replacement blade", "cat": "REEMPLAZOS", "sku": "", "costo": 12.0, "precio": 19.99, "stock": 5, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 230, "nombre": "Level 3 shampoo and conditioner", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 231, "nombre": "Clubman polvo", "cat": "POLVOS", "sku": "", "costo": 3.99, "precio": 5.99, "stock": 12, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 232, "nombre": "Oil sheen cantu", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 0, "min": 2, "qtySold": 12, "amountSold": 119.88, "profit": 66.55}, {"id": 233, "nombre": "Babyliss replacement blade FX707Z", "cat": "REEMPLAZOS", "sku": "", "costo": 25.3, "precio": 39.99, "stock": 6, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 234, "nombre": "Level 3 hair forming cream", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.8, "precio": 9.99, "stock": 8, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 235, "nombre": "Babyliss shaver gold 2pack", "cat": "MAQUINAS", "sku": "", "costo": 89.99, "precio": 139.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 236, "nombre": "Wahl magic clip replacement blade", "cat": "REEMPLAZOS", "sku": "", "costo": 15.0, "precio": 24.99, "stock": 5, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 237, "nombre": "BABYLISS LIMITED FX BOOST CLIPPER TRIMMER COMBO", "cat": "MAQUINAS", "sku": "", "costo": 200.0, "precio": 349.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 238, "nombre": "Oil Sheen renutrients", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.0, "precio": 7.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 239, "nombre": "Babyliss FX3 Ferrari trimmer", "cat": "MAQUINAS", "sku": "", "costo": 89.99, "precio": 149.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 240, "nombre": "STYLECRAFT INSTINCT TRIMMER", "cat": "MAQUINAS", "sku": "", "costo": 126.49, "precio": 199.99, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 241, "nombre": "Totex Gel para el pelo Freeze 700 ml", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 12, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 242, "nombre": "Lucky tiger", "cat": "PARA AFEITAR", "sku": "", "costo": 6.0, "precio": 11.99, "stock": 0, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 243, "nombre": "reemplazo Babyliss shaver gold", "cat": "REEMPLAZOS", "sku": "", "costo": 17.89, "precio": 29.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 244, "nombre": "Pinaud clubman deluxe powder whiskey", "cat": "POLVOS", "sku": "", "costo": 3.39, "precio": 6.99, "stock": 10, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 245, "nombre": "Immortal Hair Wax Shine Aventus", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 246, "nombre": "BaByliss Pro FOILFX02 Cordless Metal Double Foil Shaver - Black", "cat": "MAQUINAS", "sku": "", "costo": 79.99, "precio": 119.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 247, "nombre": "Andis reSURGE shaver Foil Wet/Dry Shaver", "cat": "MAQUINAS", "sku": "", "costo": 89.99, "precio": 159.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 248, "nombre": "Elegance shaving gel half gallon", "cat": "PARA AFEITAR", "sku": "", "costo": 6.0, "precio": 19.99, "stock": 3, "min": 2, "qtySold": 1, "amountSold": 19.99, "profit": 13.99}, {"id": 249, "nombre": "Nishman Shaving Gel Easy Shave 1000ml", "cat": "PARA AFEITAR", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 12, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 250, "nombre": "Level3 Oil Sheen Spray 12.95oz", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.39, "precio": 9.99, "stock": 18, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 251, "nombre": "BABYLISS BOOST+ TRIMMER", "cat": "MAQUINAS", "sku": "", "costo": 105.0, "precio": 189.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 252, "nombre": "Immortal Chaos Sea Salt Styling Powder 20g", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.25, "precio": 11.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 253, "nombre": "SHAVING GEL Y AFTER SHAVE COMBO", "cat": "PARA AFEITAR", "sku": "", "costo": 5.0, "precio": 12.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 254, "nombre": "STYLECRAFT INSTINCT CLIPPER", "cat": "MAQUINAS", "sku": "", "costo": 150.0, "precio": 259.99, "stock": 1, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 255, "nombre": "TOTEX Shaving gel para piel sensitiva", "cat": "PARA AFEITAR", "sku": "", "costo": 4.99, "precio": 11.99, "stock": 8, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 256, "nombre": "Babyliss PRO Trimmer y Clipper blue con cargadores incluidos", "cat": "MAQUINAS", "sku": "", "costo": 139.99, "precio": 299.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 257, "nombre": "Tintation Spray Brown", "cat": "TINTES", "sku": "", "costo": 3.99, "precio": 9.99, "stock": 30, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 258, "nombre": "Bump Pro Shave Cream Menthol", "cat": "PARA AFEITAR", "sku": "", "costo": 5.0, "precio": 7.99, "stock": 12, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 259, "nombre": "ECO HAIR GEL CANNABIS SATIVA OIL 32 oz", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 11.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 260, "nombre": "Andis GTX-EXO cordless replacement blade", "cat": "REEMPLAZOS", "sku": "", "costo": 27.0, "precio": 44.99, "stock": 4, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 261, "nombre": "Venti wax one million dollar", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 262, "nombre": "Wahl Magic Clip Clipper GOLD", "cat": "MAQUINAS", "sku": "", "costo": 138.19, "precio": 199.99, "stock": 3, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 263, "nombre": "Johnny B MODE Hair Gel 16OZ", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 12.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 264, "nombre": "WAHL VAPOR CLIPPER", "cat": "MAQUINAS", "sku": "", "costo": 126.5, "precio": 199.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 265, "nombre": "BARBER FADE S BRUSH SMALL", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 4.0, "precio": 6.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 266, "nombre": "ECO KRYSTAL 5 LBS", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 11.5, "precio": 15.99, "stock": 3, "min": 6, "qtySold": 1, "amountSold": 15.99, "profit": 4.49}, {"id": 267, "nombre": "BARBER HAIR GEL #34 500 ML", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 268, "nombre": "WHITE COMB PEINE BLANCO", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 3.0, "precio": 4.99, "stock": 8, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 269, "nombre": "GUMMY SHAVING GEL", "cat": "PARA AFEITAR", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 270, "nombre": "Wahl detailer T-WIDE blade replacement", "cat": "REEMPLAZOS", "sku": "", "costo": 11.99, "precio": 19.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 271, "nombre": "Wahl Professional Sterling Finish Limited Edition Shaver (White)", "cat": "MAQUINAS", "sku": "", "costo": 52.0, "precio": 74.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 272, "nombre": "BabylissPro BaBylissPRO LimitedFX Gold Trimmer & Double Foil Shaver Combo FXDUOFS2TG", "cat": "MAQUINAS", "sku": "", "costo": 143.79, "precio": 259.99, "stock": 3, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 273, "nombre": "ECO KRYSTAL 32 oz", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 4, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 274, "nombre": "proshave shaving cream", "cat": "PARA AFEITAR", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 275, "nombre": "BABYLISSPRO MATTE BLACK BOOST+ CLIPPER", "cat": "MAQUINAS", "sku": "", "costo": 133.0, "precio": 229.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 276, "nombre": "Level 3 Black gloves Small", "cat": "GUANTES", "sku": "", "costo": 5.5, "precio": 12.0, "stock": 0, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 277, "nombre": "GUIDE CASE", "cat": "ACCESORIOS", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 278, "nombre": "Reemplazo babyliss shaver negra", "cat": "REEMPLAZOS", "sku": "", "costo": 18.0, "precio": 29.99, "stock": 2, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 279, "nombre": "GUMMY SHAVING GEL", "cat": "PARA AFEITAR", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 280, "nombre": "Immortal Infuse Carbon Scrub 150ml", "cat": "Otro", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 281, "nombre": "Venti One Million Dollars Gel 16.9 oz.", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 282, "nombre": "SANEK GUANTES LARGE", "cat": "GUANTES", "sku": "", "costo": 5.49, "precio": 11.99, "stock": 20, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 283, "nombre": "ELEGANCE HAIR CREAM", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 11.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 284, "nombre": "LEVEL3 AQUA SHAVING GEL", "cat": "PARA AFEITAR", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 12, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 285, "nombre": "PORTA NAVAJAS SOLO GOLD", "cat": "PORTA NAVAJAS", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 286, "nombre": "GUMMY FACE TONIC PARA LIMPIAR LOS POROS", "cat": "PARA LA CARA", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 287, "nombre": "TOMB45 POWER MAT", "cat": "CARGADORES", "sku": "", "costo": 49.99, "precio": 79.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 288, "nombre": "BABYLISS FX3 COLLECTION TRIMMER BLACK", "cat": "MAQUINAS", "sku": "", "costo": 82.35, "precio": 159.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 289, "nombre": "Level L3VEL3 blades", "cat": "NAVAJAS", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 35, "min": 10, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 290, "nombre": "CEPILLO PARA PEINAR EN MADERA GRANDE", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 291, "nombre": "BaByliss Black FX Boost+ Limited Edition Clipper & Trimmer Set w/ Charging Base", "cat": "MAQUINAS", "sku": "", "costo": 225.0, "precio": 349.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 292, "nombre": "POTECITO SPRAYER MORADO PEQUEO", "cat": "ACCESORIOS", "sku": "", "costo": 5.0, "precio": 7.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 293, "nombre": "SPRAYER REPLACEMENT", "cat": "ACCESORIOS", "sku": "", "costo": 3.0, "precio": 7.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 294, "nombre": "JRL Forte Pro Dryer BLOWER", "cat": "MAQUINAS", "sku": "", "costo": 139.0, "precio": 249.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 295, "nombre": "Johnny B MODE Lucky Boy Hair gel 12OZ", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 296, "nombre": "Totex Barber Beard Oil & Mustache Cocoba Oil Serum Conditioner Men Care 75 ml", "cat": "PRODUCTOS PARA BARBA", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 10, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 297, "nombre": "Totex Barber Beard Oil & Mustache Cocoba Oil Serum Conditioner Men Care 75 ml", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 298, "nombre": "BARBER COLOR NEGRO SEMIPERMANENTE", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 7.99, "stock": 7, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 299, "nombre": "TOMB45 PISTOLA DE PINTAR PROFESSIONAL LARGE", "cat": "MAQUINAS", "sku": "", "costo": 145.0, "precio": 220.0, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 300, "nombre": "NISHMAN SALOON SIZE SHAMPOO 5000 ML", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 15.0, "precio": 24.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 301, "nombre": "MENTHOL SHAVE CREAM 32 OZ.", "cat": "PARA AFEITAR", "sku": "", "costo": 7.99, "precio": 15.99, "stock": 10, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 302, "nombre": "Johnny B KINF MODE Hair Gel 12OZ", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 303, "nombre": "Wahl 2215-700 Blade set t-wide gold plated", "cat": "REEMPLAZOS", "sku": "", "costo": 25.0, "precio": 44.99, "stock": 4, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 304, "nombre": "BABYLISS LIMITED EDITION BLUE METAL DOUBLE FOIL SHAVER #FXFS2BL", "cat": "MAQUINAS", "sku": "", "costo": 92.0, "precio": 149.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 305, "nombre": "WAHL CLIPPER TRAY PARA 5 MAQUINAS", "cat": "ACCESORIOS", "sku": "", "costo": 15.0, "precio": 29.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 306, "nombre": "Level3 Slime Gel", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.99, "precio": 11.99, "stock": 10, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 307, "nombre": "Clubman Classic Barber Shave Cream 16oz", "cat": "PARA AFEITAR", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 308, "nombre": "TINTE PERMANENTE SHAMPOO", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 7.5, "precio": 19.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 309, "nombre": "TIJERA PROFESSIONAL DE 9in PULGADAS", "cat": "TIJERAS", "sku": "", "costo": 20.0, "precio": 59.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 310, "nombre": "BARBER Squeeze Shave Gel 250ml #1", "cat": "PARA AFEITAR", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 311, "nombre": "BABYLISS TOMB 45 CLIPPER #FXT45C", "cat": "MAQUINAS", "sku": "", "costo": 144.0, "precio": 219.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 312, "nombre": "CEPILLO PARA PEINAR EN MADERA MEDIANO", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 313, "nombre": "Babyliss all in one Clipper spray", "cat": "DESINFECTANTES", "sku": "", "costo": 5.99, "precio": 9.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 314, "nombre": "CEPILLO PARA PEINAR", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 4.0, "precio": 7.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 315, "nombre": "DEPILADOR DE PELOS EN LA NARIZ", "cat": "ACCESORIOS", "sku": "", "costo": 7.99, "precio": 14.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 316, "nombre": "BABYLISSPRO 2-SPEED CORD / CORDLESS MASSAGER GOLD #FXSSMG", "cat": "MAQUINAS", "sku": "", "costo": 110.0, "precio": 189.99, "stock": 4, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 317, "nombre": "STYLECRAFT SABER 2.0 CLIPPER BLACK #SC617B", "cat": "MAQUINAS", "sku": "", "costo": 172.5, "precio": 299.99, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 318, "nombre": "Andis reSURGE Shaver Replacement Cutters & Foil", "cat": "REEMPLAZOS", "sku": "", "costo": 19.99, "precio": 34.99, "stock": 2, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 319, "nombre": "BARBER Squeeze Shave Gel 250ml #4", "cat": "PARA AFEITAR", "sku": "", "costo": 4.0, "precio": 7.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 320, "nombre": "BaBylissPRO UVFOIL Double Foil Shaver", "cat": "REEMPLAZOS", "sku": "", "costo": 104.0, "precio": 179.99, "stock": 0, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 321, "nombre": "NISHMAN HAIR STYLING WAX COLA 09", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 18, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 322, "nombre": "BaBylissPRO GoldFX All-Metal Lithium Outlining Trimmer", "cat": "MAQUINAS", "sku": "", "costo": 142.0, "precio": 199.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 323, "nombre": "LEVEL3 BLACK FACIAL MASK", "cat": "PARA LA CARA", "sku": "", "costo": 5.39, "precio": 9.99, "stock": 14, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 324, "nombre": "STYLECRAFT SABER CLIPPER", "cat": "MAQUINAS", "sku": "", "costo": 140.0, "precio": 199.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 325, "nombre": "Barber shaving gel pequea 250ml", "cat": "PARA AFEITAR", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 326, "nombre": "TIJERA PROFESSIONAL DE 7.5in PULGADAS", "cat": "TIJERAS", "sku": "", "costo": 20.0, "precio": 49.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 327, "nombre": "SPRAY LACA GIGANTE Barber Monster Hold", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 6.0, "precio": 14.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 328, "nombre": "SANEK GUANTES X-LARGE", "cat": "GUANTES", "sku": "", "costo": 5.5, "precio": 11.99, "stock": 10, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 329, "nombre": "Turbo Power Megaturbo Dryer 2500", "cat": "MAQUINAS", "sku": "", "costo": 70.0, "precio": 150.0, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 330, "nombre": "Cepillo de limpiar cabellos", "cat": "PEINES Y CEPILLOS", "sku": "", "costo": 4.0, "precio": 6.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 331, "nombre": "TIJERA PROFESSIONAL DE 8in PULGADAS", "cat": "TIJERAS", "sku": "", "costo": 20.0, "precio": 49.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 332, "nombre": "PORTA NAVAJAS SOLO NEGRO", "cat": "PORTA NAVAJAS", "sku": "", "costo": 4.0, "precio": 9.99, "stock": 12, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 333, "nombre": "Wahl shaver replacement combo", "cat": "REEMPLAZOS", "sku": "", "costo": 17.0, "precio": 24.99, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 334, "nombre": "Babyliss replacement blade graphite fine tooth", "cat": "REEMPLAZOS", "sku": "", "costo": 26.4, "precio": 39.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 335, "nombre": "Neck strips", "cat": "PAPEL CUELLO", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 20, "min": 4, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 336, "nombre": "Gamma Shorty Cordless Clipper stylecraft", "cat": "MAQUINAS", "sku": "", "costo": 145.0, "precio": 249.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 337, "nombre": "POTECITO SPRAYER ORO GOLD PEQUEO", "cat": "ACCESORIOS", "sku": "", "costo": 0.05, "precio": 9.99, "stock": 6, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 338, "nombre": "KIEPE TATTOO CLIPPER", "cat": "MAQUINAS", "sku": "", "costo": 80.0, "precio": 149.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 339, "nombre": "Pro Holder For Scissor Green", "cat": "ACCESORIOS", "sku": "", "costo": 7.0, "precio": 14.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 340, "nombre": "Level3 spider wax", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 9.99, "stock": 8, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 341, "nombre": "ECO OLIVE OIL 5 LBS", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 11.5, "precio": 15.99, "stock": 6, "min": 2, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 342, "nombre": "Level3 after shave colonia FLAME", "cat": "AFTER SHAVE COLONIAS", "sku": "", "costo": 4.99, "precio": 9.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 343, "nombre": "Immortal Hair Jam Gel", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 4.99, "precio": 11.99, "stock": 24, "min": 6, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 344, "nombre": "BABYLISS BARBER DISINFECTANTBOX #BDISBOX", "cat": "MAQUINAS", "sku": "", "costo": 60.0, "precio": 120.0, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 345, "nombre": "STYLECRAFT INSTINCT SHAVER BLACK #SC807B", "cat": "MAQUINAS", "sku": "", "costo": 103.0, "precio": 200.0, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 346, "nombre": "STYLECRAFT SABER 2.0 CLIPPER WHITE #SC619W", "cat": "MAQUINAS", "sku": "", "costo": 173.0, "precio": 329.99, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 347, "nombre": "Gamma+ Boosted Hair Clippers Set", "cat": "MAQUINAS", "sku": "", "costo": 106.49, "precio": 199.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 348, "nombre": "Cocco Cordless Hair Trimmer", "cat": "MAQUINAS", "sku": "", "costo": 45.0, "precio": 45.0, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 349, "nombre": "COCCO HYPER VELOCE PRO TRIMMER RED #CHVPT", "cat": "MAQUINAS", "sku": "", "costo": 115.0, "precio": 219.99, "stock": 2, "min": 1, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 350, "nombre": "JRL CORDLESS HAIR CLIPPER (BLACK, GOLD) #FF2020C-G", "cat": "MAQUINAS", "sku": "", "costo": 118.0, "precio": 199.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 351, "nombre": "JRL ONYX HAIR TRIMMER #FF2020T-B", "cat": "MAQUINAS", "sku": "", "costo": 84.0, "precio": 169.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 352, "nombre": "JRL Onyx Clipper White FF2020C-B", "cat": "MAQUINAS", "sku": "", "costo": 100.0, "precio": 219.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 353, "nombre": "JRL Forte Pro Dryer White", "cat": "MAQUINAS", "sku": "", "costo": 130.0, "precio": 229.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 354, "nombre": "JRL CLIPPER FRESHFADE 2020C tatto x3", "cat": "Otro", "sku": "", "costo": 125.0, "precio": 199.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 355, "nombre": "JRL Onyx Single-Foil Pro Shaver", "cat": "MAQUINAS", "sku": "", "costo": 70.0, "precio": 129.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 356, "nombre": "Andis Phenom Trimmer #562062", "cat": "MAQUINAS", "sku": "", "costo": 97.0, "precio": 159.99, "stock": 5, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 357, "nombre": "Andis Phenom Cord/Cordless Clipper #562060", "cat": "MAQUINAS", "sku": "", "costo": 115.0, "precio": 199.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 358, "nombre": "Andis Slimline Pro Li T-Blade Trimmer - Chrome (32810)", "cat": "MAQUINAS", "sku": "", "costo": 39.99, "precio": 90.0, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 359, "nombre": "Andis Corded GTX T-Outliner Trimmer with T-Blade 04785", "cat": "MAQUINAS", "sku": "", "costo": 39.99, "precio": 99.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 360, "nombre": "Andis Styliner II Trimmer #26700", "cat": "MAQUINAS", "sku": "", "costo": 39.99, "precio": 99.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 361, "nombre": "T-Outliner T-Blade Trimmer", "cat": "MAQUINAS", "sku": "", "costo": 39.99, "precio": 89.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 362, "nombre": "Wahl Senior Corded 5 Star", "cat": "MAQUINAS", "sku": "", "costo": 73.0, "precio": 150.0, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 363, "nombre": "Babyliss Barbersonic desinfectant BOX", "cat": "PRODUCTOS PARA BARBA", "sku": "", "costo": 60.0, "precio": 119.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 364, "nombre": "MONKEY BLADES NAVAJAS", "cat": "NAVAJAS", "sku": "", "costo": 6.0, "precio": 11.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 365, "nombre": "ANDIS PROFOIL PLUS II SHAVER", "cat": "MAQUINAS", "sku": "", "costo": 61.19, "precio": 119.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 366, "nombre": "WAHL Comb Guide premium Pack with #1/2, #1, #1.1/2", "cat": "ACCESORIOS", "sku": "", "costo": 10.09, "precio": 17.99, "stock": 9, "min": 3, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 367, "nombre": "Wahl Hi-Viz Trimmer Silver", "cat": "MAQUINAS", "sku": "", "costo": 117.0, "precio": 229.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 368, "nombre": "JRL Diamante Combo", "cat": "MAQUINAS", "sku": "", "costo": 245.0, "precio": 449.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 369, "nombre": "JRL Diamante Combo Yellow", "cat": "MAQUINAS", "sku": "", "costo": 245.0, "precio": 449.99, "stock": 4, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 370, "nombre": "Stylecraft Rebel 2.0 Clipper", "cat": "MAQUINAS", "sku": "", "costo": 95.0, "precio": 199.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 371, "nombre": "Slimline Pro 2.0 Trimmer", "cat": "MAQUINAS", "sku": "", "costo": 80.0, "precio": 129.99, "stock": 8, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 372, "nombre": "Andis Recon Trimmer", "cat": "MAQUINAS", "sku": "", "costo": 121.0, "precio": 229.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 373, "nombre": "Andis Recon Clipper", "cat": "MAQUINAS", "sku": "", "costo": 170.0, "precio": 299.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 374, "nombre": "Klipaz Clipper", "cat": "MAQUINAS", "sku": "", "costo": 95.0, "precio": 199.99, "stock": 3, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 375, "nombre": "Wmark Combo Clipper Trimmer", "cat": "MAQUINAS", "sku": "", "costo": 85.0, "precio": 199.99, "stock": 1, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 376, "nombre": "Level3 Cappa Blue/Black", "cat": "CAPPAS/JACKET", "sku": "", "costo": 8.0, "precio": 24.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 377, "nombre": "Level3 Cappa Colores", "cat": "CAPPAS/JACKET", "sku": "", "costo": 8.0, "precio": 24.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 378, "nombre": "Level3 Cappa Blue/White", "cat": "CAPPAS/JACKET", "sku": "", "costo": 8.0, "precio": 24.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 379, "nombre": "Level3 Cappa Baige", "cat": "CAPPAS/JACKET", "sku": "", "costo": 8.0, "precio": 24.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 380, "nombre": "Dorco Titan Blade NAVAJAS", "cat": "NAVAJAS", "sku": "", "costo": 3.5, "precio": 9.99, "stock": 100, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 381, "nombre": "Persona Gem Blade NAVAJAS", "cat": "NAVAJAS", "sku": "", "costo": 11.0, "precio": 19.99, "stock": 25, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 382, "nombre": "Instinct X Clipper", "cat": "MAQUINAS", "sku": "", "costo": 90.0, "precio": 249.99, "stock": 2, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 383, "nombre": "Dorco Prime Cortada NAVAJAS", "cat": "NAVAJAS", "sku": "", "costo": 1.75, "precio": 4.99, "stock": 100, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 384, "nombre": "Gentlemen Republic Gel 16 oz", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 24, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 385, "nombre": "Gentlemen Republic Gel Oceano", "cat": "PRODUCTO PARA PELO", "sku": "", "costo": 5.0, "precio": 11.99, "stock": 24, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}, {"id": 386, "nombre": "W Mark sprayer gun", "cat": "ACCESORIOS", "sku": "", "costo": 18.0, "precio": 34.99, "stock": 0, "min": 0, "qtySold": 0, "amountSold": 0.0, "profit": 0.0}]</textarea>
+
+
+<div id="p-docs" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:22px;font-weight:800;color:#1a237e;margin-bottom:6px;text-align:center">📁 Mis Documentos</h2>
+  <p style="font-size:12px;color:var(--nbs-muted);text-align:center;margin-bottom:16px">Todos tus documentos en un solo lugar. Necesitan internet para abrirse.</p>
+  <div id="docs-lista"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     NBS ACADEMIA - lecciones de negocio en AUDIO.
+     Pedida por Sensei el 21 jul 2026: escuchar mientras
+     trabaja la ruta, sin detenerse a leer. La voz del
+     telefono lee las lecciones; mantiene la pantalla
+     encendida para que no se corte el audio.
+     ═══════════════════════════════════════════════ -->
+<div id="p-academia" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:22px;font-weight:800;color:#1a237e;margin-bottom:6px;text-align:center">🎓 NBS Academia</h2>
+  <p style="font-size:12px;color:var(--nbs-muted);text-align:center;margin-bottom:14px">Aprende de negocio escuchando, mientras trabajas</p>
+
+  <div style="background:linear-gradient(160deg,#232c5e 0%,#1a2350 100%);border-radius:16px;padding:16px 14px 18px;margin-bottom:16px;box-shadow:0 6px 18px rgba(0,0,0,0.25)">
+    <div style="font-size:11px;color:#E3B23C;font-weight:800;letter-spacing:1px">ESCUCHANDO AHORA</div>
+    <div id="aca-titulo" style="font-size:20px;font-weight:800;color:#ffffff;margin:6px 0 2px;line-height:1.2">Toca una lección</div>
+    <div id="aca-parte" style="font-size:12.5px;color:#9aa2cc">&nbsp;</div>
+
+    <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin:16px 0 4px">
+      <button id="aca-ant" style="width:56px;height:56px;border-radius:50%;background:#2c356f;border:none;color:#fff;font-size:22px;cursor:pointer">⏮</button>
+      <button id="aca-play" style="width:82px;height:82px;border-radius:50%;background:linear-gradient(145deg,#f0c04a,#d99b1f);border:none;color:#161d44;font-size:34px;cursor:pointer;box-shadow:0 5px 15px rgba(227,178,60,0.45)">▶</button>
+      <button id="aca-sig" style="width:56px;height:56px;border-radius:50%;background:#2c356f;border:none;color:#fff;font-size:22px;cursor:pointer">⏭</button>
+    </div>
+
+    <div id="aca-pantalla" style="text-align:center;font-size:12px;color:#8a92bd;margin-top:8px">La pantalla se mantiene encendida al reproducir</div>
+
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+      <button class="aca-velo" data-v="0.85" style="background:#20285a;border:1px solid #313a7d;color:#c7cdf0;padding:6px 13px;border-radius:18px;font-size:12.5px;font-weight:700;cursor:pointer">Lento</button>
+      <button class="aca-velo aca-velo-on" data-v="1" style="background:#E3B23C;border:1px solid #E3B23C;color:#161d44;padding:6px 13px;border-radius:18px;font-size:12.5px;font-weight:700;cursor:pointer">Normal</button>
+      <button class="aca-velo" data-v="1.15" style="background:#20285a;border:1px solid #313a7d;color:#c7cdf0;padding:6px 13px;border-radius:18px;font-size:12.5px;font-weight:700;cursor:pointer">Rápido</button>
+    </div>
+  </div>
+
+  <div style="font-size:12px;font-weight:800;color:var(--nbs-muted);letter-spacing:1px;margin-bottom:8px">TODAS LAS LECCIONES</div>
+  <div id="aca-lista"></div>
+  <p style="font-size:11.5px;color:var(--nbs-muted);text-align:center;margin-top:16px;line-height:1.5">Consejo: ten el teléfono en su soporte y cargando.<br>No aprietes el botón de apagar mientras escuchas.</p>
+</div>
+
+<div id="p-panorama" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:22px;font-weight:800;color:#1a237e;margin-bottom:6px;text-align:center">📊 Panorama Completo</h2>
+  <p style="font-size:12px;color:var(--nbs-muted);text-align:center;margin-bottom:14px">Toda la salud de tu negocio en un solo lugar</p>
+  <div id="panorama-periodo" style="display:flex;gap:6px;margin-bottom:16px"></div>
+  <div id="panorama-contenido"></div>
+  <button class="btn" style="background:#1a237e;color:white;margin-top:16px" onclick="exportarPanoramaPDF()">📤 Compartir este reporte</button>
+</div>
+
+<div id="p-dashboard" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:24px;font-weight:800;color:#1a237e;margin-bottom:16px;text-align:center;padding-bottom:12px;border-bottom:2px solid #E8EAF6">📊 Resumen Financiero del Negocio</h2>
+  <div id="dashboard-contenido"></div>
+  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="abrirMenuReporte('dashboard-contenido','Dashboard Financiero')">🖨️ Imprimir / Compartir este reporte</button>
+</div>
+
+<div id="p-rutas" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:24px;font-weight:800;color:#1a237e;margin-bottom:16px;text-align:center;padding-bottom:12px;border-bottom:2px solid #E8EAF6">🗺️ Ruta de Visitas</h2>
+  <button onclick="revisarDireccionesDeNegocios()" style="width:100%;padding:10px;background:#FFF3E0;color:#E65100;border:1px solid #FFCC80;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:14px">🔍 Revisar si hay direcciones que no coinciden entre barberos del mismo negocio</button>
+  <div id="rutas-contenido"></div>
+</div>
+
+<div id="p-cuadre" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:14px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:20px;font-weight:900;color:var(--nbs-ink);margin-bottom:2px;text-align:center">🧮 Cuadre de Caja</h2>
+  <div style="font-size:11.5px;color:var(--nbs-muted);text-align:center;margin-bottom:14px">Cuenta tu dinero y compáralo con lo que dice la app</div>
+  <div id="cuadre-cuerpo"></div>
+</div>
+
+<div id="p-manual" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:20px;font-weight:700;color:var(--nbs-ink);margin-bottom:4px;text-align:center">📖 Manual de Usuario</h2>
+  <p style="font-size:12px;color:var(--nbs-muted);text-align:center;margin-bottom:16px">Toca cada tema para abrirlo</p>
+  <div class="busca-caja" style="border:2px solid var(--nbs-gold);margin-bottom:8px"><span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span><input class="busca-fuerte" id="manual-buscar" type="text" placeholder="Buscar en el manual..." oninput="renderManual(this.value)"></div>
+  <button onclick="compartirManualCompleto()" style="width:100%;padding:11px;margin-bottom:12px;background:#E8EAF6;color:#1a237e;border:1.5px solid #1a237e;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">🖨️ Imprimir o compartir todo el manual</button>
+  <div id="manual-contenido"></div>
+</div>
+
+<div id="p-cxp" class="pg">
+  <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
+  <h2 style="font-size:20px;font-weight:700;color:var(--nbs-ink);margin-bottom:14px">📤 Cuentas por Pagar</h2>
+  <div id="cxp-contenido"></div>
+  <button class="btn" style="width:100%;background:#1a237e;color:white;margin-top:14px;padding:12px" onclick="abrirMenuReporte('cxp-contenido','Cuentas por Pagar')">🖨️ Imprimir / Compartir este reporte</button>
+</div>
+<button id="btn-subir-flotante" style="display:none;position:fixed;bottom:24px;left:16px;z-index:999997;background:var(--nbs-gold);color:white;border:none;border-radius:50px;padding:10px 16px;font-size:13px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,0.25);cursor:pointer;align-items:center;gap:6px;opacity:0.92">⬆️ Subir</button>
+<script>
+(function(){
+  var btn = document.getElementById('btn-subir-flotante');
+  var ultimoObjetivoScroll = window;
+  var temporizadorOcultar = null;
+  function alManejarScroll(e){
+    var objetivo = e.target;
+    var esVentana = (objetivo === document || objetivo === document.documentElement || objetivo === document.body);
+    var scrollActual = esVentana ? window.scrollY : objetivo.scrollTop;
+    ultimoObjetivoScroll = esVentana ? window : objetivo;
+    // Aparece solo si hay MOVIMIENTO y ya se bajó un poco (más de 400px).
+    if(scrollActual > 400){
+      btn.style.display = 'flex';
+      acomodarBotonSubir();
+      // Cada vez que hay movimiento, se reinicia el temporizador.
+      // Si pasan 2 segundos SIN mover, el botón se oculta solo (para no estorbar).
+      if(temporizadorOcultar) clearTimeout(temporizadorOcultar);
+      temporizadorOcultar = setTimeout(function(){ btn.style.display = 'none'; }, 2000);
+    } else {
+      btn.style.display = 'none';
+      if(temporizadorOcultar) clearTimeout(temporizadorOcultar);
+    }
+  }
+  // El boton Subir se paraba ENCIMA de la barra de aviso de respaldo y le tapaba el texto
+  // -tiene z-index mas alto, siempre ganaba el-. Ahora se hace a un lado solo: si la barra
+  // esta visible, se sube por encima de ella; si no, se queda comodo abajo.
+  function acomodarBotonSubir(){
+    var barra = document.getElementById('aviso-bajar-respaldo');
+    var barraVisible = barra && barra.style.display !== 'none' && barra.offsetHeight > 0;
+    btn.style.bottom = barraVisible ? (barra.offsetHeight + 14) + 'px' : '24px';
+  }
+  window.acomodarBotonSubir = acomodarBotonSubir;
+  setInterval(acomodarBotonSubir, 1000);
+  // Captura -tercer parametro true- para detectar scroll dentro de CUALQUIER ventana emergente
+  // de pantalla completa, no solo la pantalla principal, ya que los eventos de scroll no burbujean.
+  document.addEventListener('scroll', alManejarScroll, true);
+  btn.onclick = function(){
+    if(ultimoObjetivoScroll === window){
+      window.scrollTo({top:0,behavior:'smooth'});
+    } else {
+      ultimoObjetivoScroll.scrollTo({top:0,behavior:'smooth'});
+    }
+  };
+})();
+</script>
+</div><!-- cierra #app-contenido -->
+
+<!-- Letrero propio para salir de la app (reemplaza al confirm() de Android,
+     que congelaba la app y hacia que se cerrara aunque tocaras Cancelar) -->
+<div id="salir-ov" onclick="cerrarLetreroSalir()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.72);z-index:99998"></div>
+<div id="salir-box" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;background:#ffffff;border-radius:18px;padding:24px 20px 20px;width:86%;max-width:340px;box-shadow:0 12px 44px rgba(0,0,0,.45);text-align:center">
+  <div style="font-size:44px;line-height:1">&#128682;</div>
+  <div style="font-size:21px;font-weight:800;color:#1a237e;margin:10px 0 6px;line-height:1.25">&iquest;Salir de la app?</div>
+  <div style="font-size:15px;color:#555;line-height:1.5;margin-bottom:14px">Tu informaci&oacute;n ya est&aacute; guardada.</div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <button onclick="cerrarLetreroSalir()" style="width:100%;padding:17px;border:none;border-radius:13px;background:#1a237e;color:#fff;font-size:19px;font-weight:800;cursor:pointer">&#10004; No, quedarme aqu&iacute;</button>
+    <button onclick="salirDeLaApp()" style="width:100%;padding:15px;border:1.5px solid #c62828;border-radius:13px;background:#fff;color:#c62828;font-size:16px;font-weight:800;cursor:pointer">&#128682; S&iacute;, salir de la app</button>
+  </div>
+</div><!-- cierra salir-box. 🔴 SE PERDIO el 30 ago al poner los dos botones, y dejo TODOS los avisos grandes dentro de un letrero oculto: no se veia ninguno. -->
+
+<!-- Panel de diagnostico del boton atras (temporal, para encontrar la falla) -->
+<div id="logatras-ov" onclick="cerrarLogAtras()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.75);z-index:99996"></div>
+<div id="logatras-caja" style="display:none;position:fixed;left:4%;right:4%;top:6%;bottom:6%;z-index:99997;background:#fff;border-radius:16px;padding:14px;box-shadow:0 12px 44px rgba(0,0,0,.45);flex-direction:column;overflow:hidden">
+  <div style="font-size:19px;font-weight:800;color:#1a237e;margin-bottom:4px">&#128295; Registro del bot&oacute;n atr&aacute;s</div>
+  <div style="font-size:13px;color:#666;margin-bottom:10px">Haz tu prueba y despu&eacute;s c&oacute;piame esto.</div>
+  <pre id="logatras-texto" style="flex:1;overflow:auto;background:#f4f5fa;border:1px solid #dcdfee;border-radius:10px;padding:10px;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;margin:0 0 12px;color:#222"></pre>
+  <div style="display:flex;gap:8px">
+    <button onclick="borrarLogAtras()" style="flex:1;padding:13px 6px;border:1px solid #c62828;border-radius:11px;background:#fff;color:#c62828;font-size:14px;font-weight:800;font-family:inherit">Borrar</button>
+    <button onclick="copiarLogAtras()" style="flex:1.4;padding:13px 6px;border:none;border-radius:11px;background:#1a237e;color:#fff;font-size:14px;font-weight:800;font-family:inherit">Copiar</button>
+    <button onclick="cerrarLogAtras()" style="flex:1;padding:13px 6px;border:1px solid #999;border-radius:11px;background:#fff;color:#444;font-size:14px;font-weight:800;font-family:inherit">Cerrar</button>
+  </div>
+</div>
+
+<div id="salir-aviso" style="display:none;position:fixed;left:8%;right:8%;top:36%;z-index:99999;background:#1a237e;color:#fff;border-radius:16px;padding:22px 18px;text-align:center;box-shadow:0 12px 44px rgba(0,0,0,.5)">
+  <div style="font-size:40px;line-height:1">&#11013;&#65039;</div>
+  <div style="font-size:20px;font-weight:800;margin-top:8px;line-height:1.3">Toca ATR&Aacute;S<br>una vez m&aacute;s para salir</div>
+  <div style="font-size:13.5px;color:#c7cdf0;margin-top:9px;line-height:1.45">El tel&eacute;fono no deja que la app se cierre sola.</div>
+</div>
+
+<!-- Letrero de avisos GRANDE (reemplaza al chiquito del telefono) -->
+<div id="aviso-ov" onclick="cerrarAviso()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.72);z-index:2000000"></div>
+<div id="aviso-caja" style="display:none;position:fixed;left:5%;right:5%;top:50%;transform:translateY(-50%);max-height:80%;z-index:2000001;background:#fff;border-radius:18px;padding:24px 20px 20px;box-shadow:0 12px 44px rgba(0,0,0,.45);overflow-y:auto">
+  <div id="aviso-texto" style="font-size:18.5px;line-height:1.55;color:#1a1a1a;font-weight:600;text-align:center;margin-bottom:20px;word-break:break-word"></div>
+  <button onclick="cerrarAviso()" style="width:100%;padding:17px;border:none;border-radius:13px;background:#1a237e;color:#fff;font-size:19px;font-weight:800;cursor:pointer;font-family:inherit">Entendido</button>
+</div>
+
+<!-- Ventana de la revision de integridad (chequeo de los datos) -->
+<div id="integridad-ov" onclick="cerrarIntegridad()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.75);z-index:99992"></div>
+<div id="integridad-caja" style="display:none;position:fixed;left:4%;right:4%;top:5%;bottom:5%;z-index:99993;background:#fff;border-radius:16px;padding:16px;box-shadow:0 12px 44px rgba(0,0,0,.45);flex-direction:column;overflow:hidden">
+  <div id="integridad-cuerpo" style="flex:1;overflow-y:auto;padding-right:2px"></div>
+  <div style="display:flex;gap:8px;margin-top:12px;flex:0 0 auto">
+    <button onclick="configurarRecordatorioIntegridad()" style="flex:1;padding:14px;border:2px solid #1a237e;border-radius:12px;background:#fff;color:#1a237e;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">🔔 Recordarme 3 veces al día</button>
+    <button onclick="cerrarIntegridad()" style="flex:1;padding:14px;border:none;border-radius:12px;background:#1a237e;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">Cerrar</button>
+  </div>
+</div>
+
+<!-- Ventana del reporte por cliente (comprado, pagado, ganancia) -->
+<div id="topclientes-ov" onclick="cerrarReporteClientes()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.75);z-index:99992"></div>
+<div id="topclientes-caja" style="display:none;position:fixed;left:4%;right:4%;top:5%;bottom:5%;z-index:99993;background:#fff;border-radius:16px;padding:16px;box-shadow:0 12px 44px rgba(0,0,0,.45);flex-direction:column;overflow:hidden">
+  <div id="topclientes-cuerpo" style="flex:1;overflow-y:auto;padding-right:2px"></div>
+  <div style="display:flex;gap:8px;margin-top:12px;flex:0 0 auto">
+    <button onclick="compartirReporteClientes()" style="flex:1;padding:14px;border:2px solid #1a237e;border-radius:12px;background:#fff;color:#1a237e;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">📤 Compartir</button>
+    <button onclick="cerrarReporteClientes()" style="flex:1;padding:14px;border:none;border-radius:12px;background:#1a237e;color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">Cerrar</button>
+  </div>
+</div>
+
+
+<!-- Fondo del recordatorio de visita (se restauro el 23 jul: se habia perdido
+     al limpiar el sistema viejo, y sin el la ventana no llegaba a mostrarse) -->
+<div id="recvis-ov" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,30,.6);z-index:99994"></div>
+<div id="recvis-caja" style="display:none;position:fixed;left:7%;right:7%;top:50%;transform:translateY(-50%);z-index:99995;background:#fff;border-radius:18px;padding:24px 20px 20px;box-shadow:0 12px 44px rgba(0,0,0,.45);text-align:center">
+  <div style="font-size:42px;line-height:1">&#128336;</div>
+  <div style="font-size:19px;font-weight:800;color:#1a237e;margin:10px 0 4px;line-height:1.3">&iquest;Ya terminaste en</div>
+  <div id="recvis-neg" style="font-size:19px;font-weight:900;color:#2E7D32;line-height:1.25;margin-bottom:6px"></div>
+  <div id="recvis-min" style="font-size:14px;color:#777;margin-bottom:20px"></div>
+  <button onclick="recvisMarcar()" style="width:100%;padding:16px;border:none;border-radius:13px;background:#2E7D32;color:#fff;font-size:18px;font-weight:800;cursor:pointer;margin-bottom:10px;font-family:inherit">&#10003;&nbsp; S&iacute;, marcar visitada</button>
+  <button onclick="recvisPosponer()" style="width:100%;padding:15px;border:2px solid #d5d8e8;border-radius:13px;background:#fff;color:#444;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;line-height:1.35">&#9200;&nbsp; Todav&iacute;a no<br><span style="font-size:13.5px;font-weight:600;color:#888">Recu&eacute;rdame en 10 minutos</span></button>
+</div>
+</body>
+</html>
