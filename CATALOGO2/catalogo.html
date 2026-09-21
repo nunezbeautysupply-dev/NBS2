@@ -939,6 +939,7 @@ function abrirAdmin(){
     +     '<input id="adm-general" type="number" min="0" max="90" style="width:70px;background:#0B1020;border:1px solid #2A3348;color:#EEF0F6;border-radius:8px;padding:8px;font-size:15px;text-align:center"> %'
     +     '<span style="font-size:11px;color:#98A0B8">se usa en los que no tengan el suyo</span>'
     +   '</div>'
+    +   '<button onclick="adminPonerTodoNormal()" style="width:100%;background:#151C2E;color:#EEF0F6;border:1px solid #2A3348;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">🔄 Poner todo a precio normal</button>'
     +   '<input id="adm-buscar" placeholder="🔍 buscar producto..." oninput="adminPintarLista()" style="'+_admInput+'">'
     +   '<div id="adm-lista" style="margin:8px 0 80px"></div>'
     +   '<div style="position:fixed;left:0;right:0;bottom:0;background:#0B1020;border-top:1px solid #1E2740;padding:10px 16px;text-align:center">'
@@ -1009,6 +1010,15 @@ function adminSetItem(pid, val){
   val = String(val).trim();
   if(val===''){ delete _cfgAdmin.items[pid]; }
   else { var n=parseFloat(val); _cfgAdmin.items[pid] = isNaN(n)?0:Math.max(0,Math.min(90,n)); }
+}
+
+function adminPonerTodoNormal(){
+  if(!confirm('¿Poner TODO a precio normal?\n\nQuita el descuento general y el de cada producto — todo queda sin rebaja (contado = crédito).\n\nDespués le pones descuento solo a los que tú quieras.')) return;
+  _cfgAdmin.general = 0;
+  _cfgAdmin.items = {};
+  var g = document.getElementById('adm-general'); if(g) g.value = 0;
+  adminPintarLista();
+  alert('✅ Todo quedó en precio normal.\n\nPonle descuento a los que quieras y toca 💾 Guardar todo para aplicarlo.');
 }
 
 function adminGuardar(){
