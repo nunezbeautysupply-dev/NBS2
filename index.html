@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260920b-OFICIAL-V2.0">
+<meta name="app-version" content="20260921a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -853,6 +853,9 @@ function cuandoHayaFirebase(fn){
       <button id="fb-con" onclick="filtroFoto('CONFOTO')" style="flex:1;padding:9px 4px;
         background:#fff;color:#0B7A3B;border:1.5px solid #0B7A3B;border-radius:9px;
         font-size:12px;font-weight:800;cursor:pointer">🖼️ Con foto</button>
+      <button id="fb-agotados" onclick="filtroFoto('AGOTADOS')" style="flex:1;padding:9px 4px;
+        background:#fff;color:#B71C1C;border:1.5px solid #B71C1C;border-radius:9px;
+        font-size:12px;font-weight:800;cursor:pointer">🔴 Agotados</button>
     </div>
     </div>
     <!-- ⚙️ OPCIONES DEL CATALOGO -Sensei, 19 ago-: "ya hay demasiadas [opciones] arriba,
@@ -10610,10 +10613,12 @@ function pintarBotonesFoto(){
     return !!(p.foto && String(p.foto).length > 100);
   }).length;
   var sinFoto = productos.length - conFoto;
+  var agotados = productos.filter(function(p){ return !p.stock || p.stock <= 0; }).length;
 
   var b = [['fb-todos', '', '#1a237e', 'Todos', productos.length],
            ['fb-sin', 'SINFOTO', '#C62828', '📷 Sin foto', sinFoto],
-           ['fb-con', 'CONFOTO', '#0B7A3B', '🖼️ Con foto', conFoto]];
+           ['fb-con', 'CONFOTO', '#0B7A3B', '🖼️ Con foto', conFoto],
+           ['fb-agotados', 'AGOTADOS', '#B71C1C', '🔴 Agotados', agotados]];
   b.forEach(function(x){
     var e = document.getElementById(x[0]);
     if(!e) return;
@@ -10663,7 +10668,7 @@ function renderCatalogo(q){
     // Se rellena el desplegable con sus suplidores, conservando lo que tenga escogido
     var _sups = LS('nsup', []);
     // 🔑 Ahora son 4 fijas: todos, sin precio, sin foto, con foto. -13 sep-
-    var _falta = _sel.options.length !== (_sups.length + 4);
+    var _falta = _sel.options.length !== (_sups.length + 5);
     if(_falta){
       var _html = '<option value="">🏪 Todos los suplidores</option>';
       _sups.forEach(function(sp){
@@ -10673,6 +10678,7 @@ function renderCatalogo(q){
       // 📷 Con foto y sin foto — para saber cuáles le faltan. -13 sep-
       _html += '<option value="SINFOTO">📷 Solo los que NO tienen foto</option>';
       _html += '<option value="CONFOTO">🖼️ Solo los que SÍ tienen foto</option>';
+      _html += '<option value="AGOTADOS">🔴 Solo los agotados (sin stock)</option>';
       _sel.innerHTML = _html;
       _sel.value = _filtro || '';
     }
@@ -10684,6 +10690,9 @@ function renderCatalogo(q){
     list = list.filter(function(p){ return !(p.foto && String(p.foto).length > 100); });
   } else if(_filtro === 'CONFOTO'){
     list = list.filter(function(p){ return !!(p.foto && String(p.foto).length > 100); });
+  } else if(_filtro === 'AGOTADOS'){
+    // 🔴 Los que están en 0 o menos — para saber qué reponer. -21 sep-
+    list = list.filter(function(p){ return !p.stock || p.stock <= 0; });
   } else if(_filtro){
     var _ids = productosDeSuplidor(_filtro);
     list = list.filter(function(p){ return _ids[String(p.id)]; });
@@ -19544,7 +19553,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260920b';
+var NOVEDADES_VERSION = '20260921a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
