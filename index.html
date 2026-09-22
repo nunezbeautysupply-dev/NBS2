@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260921d-OFICIAL-V2.0">
+<meta name="app-version" content="20260921e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19620,7 +19620,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260921d';
+var NOVEDADES_VERSION = '20260921e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -26533,6 +26533,13 @@ function verCl(id){
     + (_inact ? 'background:#E8F5E9;border:1.5px solid #2E7D32;color:#2E7D32' : 'background:#FFF8E1;border:1.5px solid #F9A825;color:#F57F17') + '">'
     + (_inact ? '\u2705 Reactivar (darle servicio)' : '\u23f8\ufe0f Marcar inactivo') + '</button>';
 
+  // 💰 Cobrar al balance -21 sep-: solo si debe algo. Aplica el pago a lo más viejo primero.
+  if(D.debe > 0.005){
+    h += '<button onclick="abonarAlBalance(' + _arg(id) + ')" '
+      + 'style="width:100%;margin-top:8px;padding:12px;border-radius:9px;background:#2E7D32;color:white;border:none;font-size:13.5px;font-weight:800;cursor:pointer">'
+      + '\ud83d\udcb0 Cobrar al balance (lo m\u00e1s viejo primero)</button>';
+  }
+
   if(_credArriba > 0.005){
     h += '<div onclick="irACobrarCliente(' + _arg(id) + ')" '
       + 'style="display:flex;align-items:center;gap:9px;background:#FFF8E1;'
@@ -29243,9 +29250,107 @@ function usarCreditoAFavor(cid){
   });
 }
 
-// 📋 El recuadro que enseña DÓNDE fue el crédito y cómo queda su balance.  (4 sep 2026)
-function mostrarCreditoAplicado(cid, usado, queda, tocadas, deudaAntes, deudaDespues){
+// ═══════════════════════════════════════════════════════════════════
+//  💰 COBRAR AL BALANCE -21 sep-. Cuando el cliente le paga, el pago paga la
+//  factura MÁS VIEJA primero (no la compra de hoy). Lo que sobre queda como
+//  crédito a favor. 🔑 Calca el motor ya probado de usarCreditoAFavor, con efectivo.
+// ═══════════════════════════════════════════════════════════════════
+function abonarAlBalance(cid){
   clientes = LS('ncl', []);
+  var c = clientes.find(function(x){ return String(x.id) === String(cid); });
+  if(!c) return;
+
+  var deuda = 0;
+  try { deuda = balanceDelCliente(cid); } catch(e){}
+  if(deuda <= 0.005){ avisoGrande('\ud83d\udc4d ' + nombreCl(c) + ' no debe nada.\n\nNo hay balance donde aplicar un pago.'); return; }
+
+  var txt = prompt('\ud83d\udcb0 \u00bfCu\u00e1nto te paga ' + nombreCl(c) + '?\n\nDebe $' + fmtNum(deuda) + '.\nSe aplica a la factura M\u00c1S VIEJA primero.\n\nEscribe el monto:');
+  if(txt === null) return;
+  var monto = Math.round(dinero(txt) * 100) / 100;
+  if(monto <= 0.005){ alert('Pon un monto v\u00e1lido.'); return; }
+
+  var V = LS('nv', []);
+  var suyas = V.filter(function(v){
+    return String(v.cid) === String(cid) && v.tipo === 'credito' && !v.cancelada;
+  });
+  suyas.sort(function(a, b){
+    var fa = '', fb = '';
+    try { fa = fechaVentaAISO(a) || ''; } catch(e){}
+    try { fb = fechaVentaAISO(b) || ''; } catch(e){}
+    if(!fa) fa = '9999-99-99';
+    if(!fb) fb = '9999-99-99';
+    return fa < fb ? -1 : (fa > fb ? 1 : 0);
+  });
+
+  var queda = monto, usado = 0, tocadas = [];
+  suyas.forEach(function(v){
+    if(queda <= 0.005) return;
+    var debe = cobradoYDebeDe(v).debe;
+    if(debe <= 0.005) return;
+    var pone = Math.min(queda, debe);
+    pone = Math.round(pone * 100) / 100;
+    if(pone <= 0.005) return;
+    queda = Math.round((queda - pone) * 100) / 100;
+    usado = Math.round((usado + pone) * 100) / 100;
+    tocadas.push({ id: v.id, monto: pone, nf: v.numFactura || String(v.id).slice(-4),
+                   fecha: v.fecha || '', debiaAntes: debe,
+                   debeDespues: Math.round((debe - pone) * 100) / 100 });
+  });
+
+  if(usado <= 0.005){ avisoGrande('Este cliente no tiene facturas de cr\u00e9dito con saldo.'); return; }
+  var sobra = Math.round((monto - usado) * 100) / 100;
+
+  var texto = 'Recibes $' + fmtNum(monto) + ' de ' + nombreCl(c) + '.\n\nSe aplica as\u00ed (lo m\u00e1s viejo primero):\n\n'
+            + tocadas.map(function(t){
+                return '\u2022 #' + t.nf + ' \u2014 $' + fmtNum(t.monto)
+                     + (t.debeDespues > 0.005 ? ' (queda $' + fmtNum(t.debeDespues) + ')' : ' (saldada)');
+              }).join('\n')
+            + (sobra > 0.005 ? '\n\nSobran $' + fmtNum(sobra) + ' \u2192 cr\u00e9dito a favor.' : '')
+            + '\n\n\u00bfConfirmas?';
+  if(!confirm(texto)) return;
+
+  protegerConHuella(function(){
+    var _recibo = (typeof nuevoNumeroRecibo === 'function') ? nuevoNumeroRecibo() : nuevoPagoId();
+    var _fecha = fechaHoy();
+    var _hora = (typeof horaAhora12 === 'function') ? horaAhora12() : '';
+    var Vg = LS('nv', []);
+    tocadas.forEach(function(t){
+      var vv = Vg.find(function(x){ return String(x.id) === String(t.id); });
+      if(!vv) return;
+      if(!vv.pagosFactura) vv.pagosFactura = [];
+      vv.pagosFactura.push({ pid: nuevoPagoId(), recibo: _recibo, montoCobro: monto,
+                             monto: t.monto, fecha: _fecha, hora: _hora,
+                             metodo: 'efectivo', nota: 'Cobro al balance (lo m\u00e1s viejo primero)' });
+    });
+    if(!SS('nv', Vg)) return;
+    ventas = LS('nv', []);
+
+    if(sobra > 0.005){
+      var Cg = LS('ncl', []);
+      var i2 = Cg.findIndex(function(x){ return String(x.id) === String(cid); });
+      if(i2 >= 0){
+        Cg[i2].creditoAFavor = Math.round(((parseFloat(Cg[i2].creditoAFavor) || 0) + sobra) * 100) / 100;
+        Cg[i2].mod = Date.now();
+        if(!SS('ncl', Cg)) return;
+      }
+      clientes = LS('ncl', []);
+    }
+
+    var deudaDespues = 0;
+    try { deudaDespues = balanceDelCliente(cid); } catch(e){}
+
+    avisoGrande('\u2705 Cobrados $' + fmtNum(usado) + '.\n\n'
+      + tocadas.map(function(t){ return '$' + fmtNum(t.monto) + ' \u2192 #' + t.nf + (t.debeDespues > 0.005 ? ' (queda $' + fmtNum(t.debeDespues) + ')' : ' (saldada)'); }).join('\n')
+      + (sobra > 0.005 ? '\n\n$' + fmtNum(sobra) + ' quedaron a su favor.' : '')
+      + '\n\nAhora debe: $' + fmtNum(deudaDespues));
+
+    try { verCl(cid); } catch(e){}
+    try { pintarPanelCliente(cid); } catch(e){}
+  });
+}
+
+// 📋 El recuadro que enseña DÓNDE fue el crédito y cómo queda su balance.  (4 sep 2026)
+function mostrarCreditoAplicado(cid, usado, queda, tocadas, deudaAntes, deudaDespues){  clientes = LS('ncl', []);
   var c = clientes.find(function(x){ return String(x.id) === String(cid); });
 
   var ov = document.getElementById('credito-aplicado-overlay');
