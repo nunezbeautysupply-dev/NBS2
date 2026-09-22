@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260921c-OFICIAL-V2.0">
+<meta name="app-version" content="20260921d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1236,6 +1236,7 @@ function cuandoHayaFirebase(fn){
     <button class="btn" style="background:#6A1B9A;color:white" onclick="eliminarDuplicadosClientes()">🔍 Eliminar clientes duplicados</button>
   </div>
   <button class="btn" style="width:100%;margin:0 0 8px;background:#1a237e;color:white" onclick="abrirListadoClientes()">📋 Listado completo (orden y filtros)</button>
+  <button class="btn" style="width:100%;margin:0 0 8px;background:#F9A825;color:#5D4037" onclick="abrirClientesInactivos()">😴 Clientes inactivos</button>
   <div style="display:flex;gap:8px;margin-bottom:14px">
     <button class="btn" style="flex:1;background:#455A64;color:white;margin:0" onclick="imprimirFichasClientes()">🖨️ Imprimir fichas completas</button>
     <button class="btn" style="flex:1;background:#455A64;color:white;margin:0" onclick="imprimirListaClientes()">🖨️ Imprimir lista resumida</button>
@@ -9908,7 +9909,9 @@ function renderCl(q){
     },0);
     var balance = Math.max(0, totalCred - totalPag);
     var creditoCl = c.creditoAFavor || 0; // 24 jul, pedido por Sensei: mostrar SIEMPRE el credito a favor tambien
+    var esInactivo = sinServicio(c);      // 😴 -21 sep-: se ven opacos y con franja roja
     var d=document.createElement('div');d.className='clrow';
+    if(esInactivo) d.style.cssText = 'opacity:0.55;border-left:4px solid #C62828';
     var direccionCorta = [c.dir, c.ciudad].filter(Boolean).join(', ');
     d.innerHTML=(c.foto ? '<div style="width:44px;height:44px;border-radius:50%;overflow:hidden;flex-shrink:0"><img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover"></div>' : '<div class="av">'+ini(c.nombre,c.apellido)+'</div>')
       +'<div style="flex:1">'
@@ -9917,7 +9920,7 @@ function renderCl(q){
           ? '<div style="font-size:10px;font-weight:900;color:#3949AB;letter-spacing:1.2px;'
             + 'line-height:1;margin-bottom:2px">CLIENTE ' + codigoDeCliente(c) + '</div>'
           : '')
-      +'<div style="font-size:18px;font-weight:900;color:var(--nbs-ink)">'+escaparHtml(((c.nombre||'')+' '+(c.apellido||'')).replace(/\s+/g,' ').trim())+(c.apodo?' <span style="color:var(--nbs-gold-dark);font-weight:700">"'+escaparHtml(c.apodo)+'"</span>':'')+(c.vipActivo?' <span style="color:var(--nbs-red-text);font-size:13px">★</span>':'')+'</div>'
+      +'<div style="font-size:18px;font-weight:900;color:var(--nbs-ink)">'+escaparHtml(((c.nombre||'')+' '+(c.apellido||'')).replace(/\s+/g,' ').trim())+(c.apodo?' <span style="color:var(--nbs-gold-dark);font-weight:700">"'+escaparHtml(c.apodo)+'"</span>':'')+(c.vipActivo?' <span style="color:var(--nbs-red-text);font-size:13px">★</span>':'')+(esInactivo?' <span style="background:#FFEBEE;color:#C62828;font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;vertical-align:middle">⏸️ INACTIVO</span>':'')+'</div>'
       +'<div style="font-size:12px;color:var(--nbs-muted)">'+escaparHtml(c.negocio||'Cliente')+' · '+escaparHtml(c.tel||'Sin tel.')+'</div>'
       +(direccionCorta ? '<div style="font-size:11px;color:var(--nbs-muted-2);margin-top:1px">📍 '+escaparHtml(direccionCorta)+'</div>' : '')
       +(balance>0.01 ? '<div style="font-size:12px;font-weight:700;margin-top:2px;color:var(--nbs-red-text)">Balance: $'+fmtNum(balance)+'</div>' : '')
@@ -19617,7 +19620,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260921c';
+var NOVEDADES_VERSION = '20260921d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -26522,6 +26525,13 @@ function verCl(id){
     + n('TE DEJA', '$' + fmtNum(D.ganancia), 'var(--nbs-green-text)')
     + n('\u00daLTIMA', D.diasDesde === null ? '\u2014' : (D.diasDesde + ' d'))
     + '</div>';
+
+  // 😴 Botón visible para inactivar/reactivar -21 sep-. Antes solo estaba enterrado en Ajustes.
+  var _inact = sinServicio(c);
+  h += '<button onclick="cambiarSinServicioDesdeCuenta(' + _arg(id) + ')" '
+    + 'style="width:100%;margin-top:8px;padding:9px;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer;'
+    + (_inact ? 'background:#E8F5E9;border:1.5px solid #2E7D32;color:#2E7D32' : 'background:#FFF8E1;border:1.5px solid #F9A825;color:#F57F17') + '">'
+    + (_inact ? '\u2705 Reactivar (darle servicio)' : '\u23f8\ufe0f Marcar inactivo') + '</button>';
 
   if(_credArriba > 0.005){
     h += '<div onclick="irACobrarCliente(' + _arg(id) + ')" '
