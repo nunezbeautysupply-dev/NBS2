@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260921f-OFICIAL-V2.0">
+<meta name="app-version" content="20260921g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18428,7 +18428,22 @@ function previewCobroPedidos(cid){
     sobra = Math.round((sobra - usar) * 100) / 100;
   });
 
+  // 🔢 En cuánto queda la cuenta después de este pago. -21 sep-
+  var deudaTotal = pendientes.reduce(function(s, f){ return s + (f.saldo || 0); }, 0);
+  var aplicado = Math.round((monto - sobra) * 100) / 100;
+  var quedaDebiendo = Math.round((deudaTotal - aplicado) * 100) / 100;
+  if(quedaDebiendo < 0) quedaDebiendo = 0;
+
   var h = '<div style="background:var(--nbs-green-bg);border-radius:10px;padding:11px">';
+  // Lo primero que ve: en cuánto queda la cuenta
+  h += '<div style="text-align:center;padding:7px;margin-bottom:9px;border-radius:8px;'
+    + (quedaDebiendo > 0.005 ? 'background:var(--nbs-red-bg)' : 'background:#E8F5E9') + '">'
+    + (quedaDebiendo > 0.005
+        ? '<span style="font-size:10.5px;font-weight:800;color:var(--nbs-muted);letter-spacing:.3px">DESPU\u00c9S QUEDA DEBIENDO</span><br>'
+          + '<span style="font-size:19px;font-weight:900;color:var(--nbs-red-text)">$' + fmtNum(quedaDebiendo) + '</span>'
+        : '<span style="font-size:15px;font-weight:900;color:var(--nbs-green-text)">\u2705 QUEDA SALDADO</span>'
+          + (sobra > 0.005 ? '<br><span style="font-size:11px;font-weight:700;color:var(--nbs-gold-dark)">y $' + fmtNum(sobra) + ' a favor</span>' : ''))
+    + '</div>';
   h += '<div style="font-size:11px;font-weight:900;color:var(--nbs-green-text);margin-bottom:7px">'
     + '\u2713 AS\u00cd SE VA A APLICAR</div>';
   reparto.forEach(function(r){
@@ -19615,7 +19630,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260921f';
+var NOVEDADES_VERSION = '20260921g';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
