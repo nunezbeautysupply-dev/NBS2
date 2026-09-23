@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260922b-OFICIAL-V2.0">
+<meta name="app-version" content="20260922c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -827,6 +827,7 @@ function cuandoHayaFirebase(fn){
   <div style="display:flex;gap:8px;margin-bottom:16px"><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="volverAtras()">← Atrás</button><button class="back" style="margin-bottom:0;width:auto;flex:1" onclick="ir('p-inicio')">🏠 Inicio</button></div>
   <h2 style="font-size:20px;font-weight:700;color:#1a237e;margin-bottom:14px">📦 Catálogo de Productos</h2>
   <button onclick="abrirFotosRapido()" style="width:100%;padding:12px;margin-bottom:14px;background:#1a237e;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer">📸 Ponerle fotos a los productos</button>
+  <button onclick="abrirJuntarDuplicados()" style="width:100%;padding:12px;margin-bottom:14px;background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer">🔗 Juntar productos duplicados</button>
   <button onclick="abrirTraerFotos()" style="width:100%;padding:12px;margin-bottom:14px;background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer">📥 Traer fotos del catálogo</button>
   <button onclick="mandarFotosAlCatalogo()" style="width:100%;padding:12px;margin-bottom:14px;background:#0B7A3B;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer">📤 Mandar mis fotos al catálogo</button>
   <label style="display:flex;align-items:center;gap:9px;background:#E7F6ED;border:1.5px solid #0B7A3B;border-radius:11px;padding:11px;margin-bottom:14px;cursor:pointer"><input type="checkbox" id="chk-limpiar-app" checked onchange="cambiarLimpiarFotos(this.checked)" style="width:20px;height:20px"><span><span style="display:block;font-size:13px;font-weight:900;color:#0B7A3B">✨ Limpiar las fotos solas</span><span style="display:block;font-size:11px;color:#2E7D32;line-height:1.45">Recorta el producto, lo centra, quita el fondo y las deja todas iguales</span></span></label>
@@ -4742,6 +4743,7 @@ var RECUADROS_ENCIMA = [
   { id: 'fotorapido-overlay',       cerrar: 'cerrarFotosRapido' },
   { id: 'pin-overlay',              cerrar: 'cerrarPinRecuadro' },
   { id: 'inactivos-ov',            cerrar: 'cerrarInactivos' },   // 😴 clientes inactivos -21 sep-
+  { id: 'juntar-dup-ov',           cerrar: 'cerrarJuntarDuplicados' }, // 🔗 juntar duplicados -22 sep-
   { id: 'estado-fechas-overlay',    cerrar: 'cerrarEstadoPorFechas' },
   { id: 'aviso-backup-overlay',     cerrar: 'cerrarAvisoConBackup' },
   { id: 'credito-aplicado-overlay', cerrar: 'cerrarCreditoAplicado' },
@@ -10671,6 +10673,140 @@ function filtroFoto(cual){
   if(sel) sel.value = cual;
   window._filtroFoto = cual;
   renderCatalogo(document.getElementById('catq') ? document.getElementById('catq').value : '');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  🔗 JUNTAR PRODUCTOS DUPLICADOS -22 sep-. El mismo producto con dos nombres
+//  distintos. Se juntan de a uno: Sensei confirma cada par. Al juntar, se le
+//  SUMA el stock del repetido al que se queda, se REAPUNTAN sus ventas (y compras,
+//  devoluciones, pedidos) al que se queda, y el repetido se quita. Nada de dinero
+//  cambia — solo cambia a qué producto se le atribuyen las ventas.
+// ═══════════════════════════════════════════════════════════════════
+function _sonParecidos(a, b){
+  var na = normalizarTexto(a || ''), nb = normalizarTexto(b || '');
+  if(!na || !nb) return false;
+  if(na === nb) return true;
+  var wa = na.split(/\s+/).filter(function(w){ return w.length > 2; });
+  var wb = nb.split(/\s+/).filter(function(w){ return w.length > 2; });
+  if(wa.length < 2 || wb.length < 2) return false;
+  if(wa[0] !== wb[0]) return false;   // deben compartir la 1ra palabra (la marca)
+  var comunes = wa.filter(function(w){ return wb.indexOf(w) >= 0; }).length;
+  var union = {}; wa.concat(wb).forEach(function(w){ union[w] = 1; });
+  return (comunes / Object.keys(union).length) >= 0.6;
+}
+
+// 🔴 LO DELICADO: reapunta las ventas del repetido al que se queda. No toca ni un
+// número de dinero — el precio y la cantidad de cada renglón quedan igual; solo
+// cambia el pid (a qué producto pertenece). Suma el stock y quita el repetido.
+function _fundirDosProductos(idKeep, idQuita){
+  idKeep = String(idKeep); idQuita = String(idQuita);
+  if(idKeep === idQuita) return false;
+  var P = LS('np', []);
+  var iK = -1, iQ = -1;
+  for(var i = 0; i < P.length; i++){
+    if(String(P[i].id) === idKeep) iK = i;
+    if(String(P[i].id) === idQuita) iQ = i;
+  }
+  if(iK < 0 || iQ < 0) return false;
+  P[iK].stock = (Number(P[iK].stock) || 0) + (Number(P[iQ].stock) || 0);
+  P.splice(iQ, 1);
+  if(!SS('np', P)) return false;
+  try { loadProds(); } catch(e){}
+
+  function reapuntar(clave, cargar){
+    try {
+      var lista = LS(clave, []);
+      var cambio = false;
+      lista.forEach(function(v){
+        (v.items || []).forEach(function(it){
+          if(String(it.pid) === idQuita){ it.pid = idKeep; cambio = true; }
+        });
+      });
+      if(cambio){ SS(clave, lista); if(cargar) cargar(); }
+    } catch(e){}
+  }
+  reapuntar('nv', function(){ try { ventas = LS('nv', []); } catch(e){} });
+  reapuntar('nc', function(){ try { compras = LS('nc', []); } catch(e){} });
+  reapuntar('ndevoluciones', function(){ try { devoluciones = LS('ndevoluciones', []); } catch(e){} });
+  reapuntar('npedidos', function(){ try { pedidos = LS('npedidos', []); } catch(e){} });
+  try { _masVendidosCache = null; } catch(e){}
+  return true;
+}
+
+function _vendidoDe(pid){
+  var n = 0;
+  try {
+    LS('nv', []).forEach(function(v){
+      if(v.esBalanceInicial) return;
+      (v.items || []).forEach(function(it){ if(String(it.pid) === String(pid)) n += (Number(it.cant) || 0); });
+    });
+  } catch(e){}
+  return n;
+}
+
+function abrirJuntarDuplicados(){
+  try { loadProds(); } catch(e){}
+  var P = productos.slice();
+  var pares = [];
+  for(var i = 0; i < P.length; i++){
+    for(var j = i + 1; j < P.length; j++){
+      if(_sonParecidos(P[i].nombre, P[j].nombre)) pares.push([String(P[i].id), String(P[j].id)]);
+    }
+  }
+  window._paresDup = pares;
+  window._parDupIdx = 0;
+  if(!pares.length){ avisoGrande('\ud83d\udc4d No encontr\u00e9 productos que se parezcan.\n\nNo hay duplicados obvios que juntar.'); return; }
+  _pintarParDuplicado();
+}
+
+function _pintarParDuplicado(){
+  var pares = window._paresDup || [];
+  var idx = window._parDupIdx || 0;
+  var ov = document.getElementById('juntar-dup-ov');
+  if(idx >= pares.length){
+    if(ov) ov.remove();
+    avisoGrande('\u2705 Listo, revisaste todos los parecidos.');
+    return;
+  }
+  try { loadProds(); } catch(e){}
+  var par = pares[idx];
+  var a = productos.find(function(p){ return String(p.id) === par[0]; });
+  var b = productos.find(function(p){ return String(p.id) === par[1]; });
+  if(!a || !b){ window._parDupIdx++; _pintarParDuplicado(); return; }  // uno ya se juntó
+
+  if(!ov){ ov = document.createElement('div'); ov.id = 'juntar-dup-ov'; document.body.appendChild(ov); }
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px';
+  function tarjeta(p, otro){
+    return '<div style="background:#F7F7FB;border-radius:11px;padding:12px;margin-bottom:10px">'
+      + '<div style="font-size:15px;font-weight:800;color:#1a237e;margin-bottom:3px">' + escaparHtml(p.nombre || '') + '</div>'
+      + '<div style="font-size:11px;color:#888;margin-bottom:9px">stock ' + (Number(p.stock) || 0) + ' \u00b7 vendido ' + _vendidoDe(p.id) + (p.marca ? ' \u00b7 ' + escaparHtml(p.marca) : '') + '</div>'
+      + '<button onclick="quedarseConProducto(\'' + p.id + '\',\'' + otro + '\')" style="width:100%;padding:10px;background:#2E7D32;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">\u2713 Quedarse con este</button>'
+      + '</div>';
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:18px;max-width:420px;width:100%">'
+    + '<div style="font-size:16px;font-weight:900;color:#1a237e;text-align:center;margin-bottom:4px">\ud83d\udd17 \u00bfSon el mismo producto?</div>'
+    + '<div style="font-size:11px;color:#888;text-align:center;margin-bottom:14px">El que escojas se queda; el otro se le junta (stock + ventas). Par ' + (idx + 1) + ' de ' + pares.length + '</div>'
+    + tarjeta(a, b.id)
+    + tarjeta(b, a.id)
+    + '<button onclick="_saltarParDuplicado()" style="width:100%;padding:11px;background:#fff;border:1.5px solid #C62828;color:#C62828;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;margin-top:2px">\u2715 No son el mismo</button>'
+    + '<button onclick="cerrarJuntarDuplicados()" style="width:100%;padding:9px;background:#F0F0F2;color:#666;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;margin-top:7px">Salir</button>'
+    + '</div>';
+}
+
+function _saltarParDuplicado(){ window._parDupIdx = (window._parDupIdx || 0) + 1; _pintarParDuplicado(); }
+function cerrarJuntarDuplicados(){ var ov = document.getElementById('juntar-dup-ov'); if(ov) ov.remove(); }
+
+function quedarseConProducto(idKeep, idQuita){
+  try { loadProds(); } catch(e){}
+  var K = productos.find(function(p){ return String(p.id) === String(idKeep); });
+  var Q = productos.find(function(p){ return String(p.id) === String(idQuita); });
+  if(!K || !Q) return;
+  if(!confirm('\u00bfJuntar en "' + (K.nombre || '') + '"?\n\nSe le suma el stock de "' + (Q.nombre || '') + '" y se le pasan sus ventas.\nEl repetido se quita.\n\nNada se pierde.')) return;
+  protegerConHuella(function(){
+    if(_fundirDosProductos(idKeep, idQuita)){ try { avisoChico('\u2705 Juntados'); } catch(e){} }
+    window._parDupIdx = (window._parDupIdx || 0) + 1;
+    _pintarParDuplicado();
+  });
 }
 
 function pintarBotonesFoto(){
@@ -19629,7 +19765,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260922b';
+var NOVEDADES_VERSION = '20260922c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -35456,6 +35592,12 @@ function iniciarAppDespuesDeLogin(){
   // la app abierta el pedido no llegaba hasta que se bloqueaba por inactividad.
   if(!window._relojDelBuzon){
     window._relojDelBuzon = setInterval(_mirarElBuzon, 120000);
+  }
+  // 💬 EL CHAT VA POR SU CUENTA, MÁS SEGUIDO -22 sep-: cada 10 s con la app abierta,
+  // para que el mensaje del cliente llegue casi al instante (antes iba pegado al reloj
+  // del buzón de 2 min y tardaba mucho). El reloj del buzón de pedidos se queda en 2 min.
+  if(!window._relojChat){
+    window._relojChat = setInterval(function(){ try { revisarChatSinLeer(); } catch(e){} }, 10000);
   }
   // Y al volver a la app desde otra pantalla del teléfono
   if(!window._buzonAlVolver){
