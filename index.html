@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260922c-OFICIAL-V2.0">
+<meta name="app-version" content="20260922d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19765,7 +19765,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260922c';
+var NOVEDADES_VERSION = '20260922d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -43954,19 +43954,29 @@ function revisarChatSinLeer(){
       var esPrimera = (typeof antes !== 'number');
       if((esPrimera && n > 0) || (!esPrimera && n > antes)){
         try { sonarCampanaChat(); } catch(e){}
-        try { if(navigator.vibrate) navigator.vibrate([300, 120, 300]); } catch(e){}
+        try { if(navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 600]); } catch(e){}
       }
       window._chatSinLeerAntes = n;
     }).catch(function(e){ console.warn('chat: no pude contar los sin leer:', e); });
   } catch(e){ console.warn('chat: no pude revisar:', e); }
 }
 
-// 🔔 La campana del CHAT -22 sep-: dos notas que SUBEN (C6 → E6), distinta a la del
-// pedido, para que Sensei sepa de una que es un mensaje y no un pedido.
+// 🔔 La campana del CHAT -22 sep-: melodía que SUBE, repetida, MÁS LARGA y MÁS FUERTE
+// que antes (era casi imperceptible), distinta a la del pedido. Dura ~2 s.
 function sonarCampanaChat(){
   try {
-    _pitido(1046, 0,    0.13, 0.30);   // C6
-    _pitido(1318, 0.15, 0.20, 0.30);   // E6 (sube)
+    var v = 0.55;   // más fuerte (antes 0.30)
+    // Primera vuelta: do-mi-sol subiendo
+    _pitido(1046, 0.00, 0.17, v);   // C6
+    _pitido(1318, 0.19, 0.17, v);   // E6
+    _pitido(1568, 0.38, 0.26, v);   // G6 (sostiene)
+    // Segunda vuelta, para que dure y se note
+    _pitido(1046, 0.75, 0.17, v);   // C6
+    _pitido(1318, 0.94, 0.17, v);   // E6
+    _pitido(1568, 1.13, 0.26, v);   // G6
+    // Remate largo
+    _pitido(1318, 1.45, 0.18, v);   // E6
+    _pitido(1568, 1.66, 0.40, v);   // G6 (largo)
   } catch(e){}
 }
 
