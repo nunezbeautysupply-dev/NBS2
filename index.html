@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260921h-OFICIAL-V2.0">
+<meta name="app-version" content="20260922a-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18423,7 +18423,7 @@ function _renderTablaCobro(cid){
   var quedaDeb = Math.round((deudaTotal - aplicado) * 100) / 100;
   if(quedaDeb < 0) quedaDeb = 0;
 
-  var h = '<div style="max-height:150px;overflow:auto;border:1px solid #E5E5EC;border-radius:8px;margin-bottom:9px">';
+  var h = '<div style="border:1px solid #E5E5EC;border-radius:8px;margin-bottom:9px;overflow:hidden">';
   h += '<table style="width:100%;border-collapse:collapse">';
   h += '<thead><tr style="background:#EEEEF4">'
     + '<th style="text-align:left;padding:5px 7px;font-size:9px;color:var(--nbs-muted);font-weight:900">FACT#</th>'
@@ -19629,7 +19629,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260921h';
+var NOVEDADES_VERSION = '20260922a';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
