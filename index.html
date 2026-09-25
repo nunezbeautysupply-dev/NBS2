@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260925d-OFICIAL-V2.0">
+<meta name="app-version" content="20260925e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19765,7 +19765,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260925d';
+var NOVEDADES_VERSION = '20260925e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -20971,7 +20971,11 @@ function comoMeFueHoy(){
     var t = parseFloat(v.total) || 0;
     vendido += t;
     ganancia += parseFloat(v.ganancia) || 0;
-    if(v.tipo === 'contado'){ cobrado += t; return; }
+    // 🔴 ARREGLO -25 sep-: el COBRADO sigue la fecha del PAGO, no la de la venta. Antes,
+    // una venta de contado sumaba su total completo en la fecha de la VENTA e ignoraba la
+    // fecha de sus pagos; por eso, al editar la fecha de un pago al 23, seguía contándose
+    // en el cobrado de HOY. Ahora el contado también cuenta por la fecha de sus pagos,
+    // igual que el crédito, para que el cobrado siempre cuadre con cuándo entró el dinero.
     (v.pagosFactura || []).forEach(function(p){
       if(!p.esDevolucion && String(p.fecha) === hoy) cobrado += parseFloat(p.monto) || 0;
     });
@@ -37731,16 +37735,16 @@ function pintarMiniResumen(){
     function dentro(f){ var x = resFechaADate(f); return x && x >= d0 && x <= d1; }
     V.forEach(function(v){
       if(v.cancelada) return;
-      if(dentro(v.fecha)){
-        vendido += (v.total || 0);
-        if(v.tipo === 'contado') cobrado += cobradoYDebeDe(v).cobrado;
-      }
-      if(v.tipo === 'credito' && v.pagosFactura){
-        (v.pagosFactura || []).forEach(function(p){
-          if(typeof p.monto !== 'number' || p.monto <= 0 || p.esDevolucion) return;
-          if(dentro(p.fecha || v.fecha)) cobrado += p.monto;
-        });
-      }
+      // VENDIDO: por la fecha de la VENTA
+      if(dentro(v.fecha)) vendido += (v.total || 0);
+      // 🔴 ARREGLO -25 sep-: COBRADO por la fecha del PAGO, para TODAS las ventas (contado
+      // y crédito igual). Antes el contado sumaba su cobrado por la fecha de la VENTA e
+      // ignoraba la fecha del pago; por eso, al editar un pago al día 23, el banner seguía
+      // contándolo en el "Cobré" de hoy. Ahora sigue cuándo entró el dinero de verdad.
+      (v.pagosFactura || []).forEach(function(p){
+        if(typeof p.monto !== 'number' || p.monto <= 0 || p.esDevolucion) return;
+        if(dentro(p.fecha || v.fecha)) cobrado += p.monto;
+      });
     });
     el.innerHTML = '<span>Cobr&eacute; $'+fmtNum(cobrado)+'</span>'
       + '<span style="color:#8FD19A;letter-spacing:2px">&middot;&middot;&middot;</span>'
@@ -37863,16 +37867,20 @@ function calcularResumen(){
       var t = v.total || 0;
       vendido += t; nVentas++;
       var _cd = cobradoYDebeDe(v);
-      if(v.tipo === 'contado'){ contado += _cd.cobrado; cobrado += _cd.cobrado; if(_cd.cobrado > 0) nCobros++; }
+      if(v.tipo === 'contado'){ contado += _cd.cobrado; }
       else { credito += t; }
     }
-    // ── COBRADO: abonos pagados en el rango, sea cual sea la fecha de la factura ──
-    if(v.tipo === 'credito' && v.pagosFactura && (v.pagosFactura || []).length){
+    // ── COBRADO: pagos hechos en el rango, de TODAS las ventas (contado y crédito),
+    //    por la fecha del PAGO -arreglo 25 sep-. Antes el contado se contaba por la fecha
+    //    de la VENTA; ahora sigue cuándo entró el dinero de verdad. 'abonos' cuenta solo
+    //    los pagos de crédito (los abonos a facturas viejas).
+    if(v.pagosFactura && (v.pagosFactura || []).length){
       (v.pagosFactura || []).forEach(function(p){
         if(typeof p.monto !== 'number' || p.monto <= 0) return;
         if(p.esDevolucion) return;
         if(dentro(p.fecha || v.fecha)){
-          cobrado += p.monto; abonos += p.monto; nCobros++;
+          cobrado += p.monto; nCobros++;
+          if(v.tipo === 'credito') abonos += p.monto;
         }
       });
     }
