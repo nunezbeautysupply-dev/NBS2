@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260925c-OFICIAL-V2.0">
+<meta name="app-version" content="20260925d-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19765,7 +19765,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260925c';
+var NOVEDADES_VERSION = '20260925d';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34807,6 +34807,20 @@ function hayADondeVolver(){
   if(actual && actual !== 'p-inicio') return true;
   return false;
 }
+
+// 🛡️ REPONER EL GUARDIÁN EN CADA TOQUE REAL -25 sep-. LA CAUSA DE RAÍZ de que el botón
+// atrás del celular sacara la app: Chrome DESCARTA el pushState que la app hace sola (el que
+// se repone dentro del popstate), porque no viene de una interacción del usuario. Pero SÍ
+// respeta el pushState que ocurre DURANTE un toque suyo. Como Sensei toca la pantalla todo el
+// tiempo al usar la app, aquí reponemos el guardián en cada toque: si el estado actual ya es
+// nuestro no hace nada (no se llena el historial), y si un atrás se comió el guardián, el
+// próximo toque pone uno nuevo que Chrome NO descarta. Así siempre queda un paso de sobra.
+document.addEventListener('pointerdown', function(){
+  try { ponerGuardianAtras(); } catch(e){}
+}, { capture: true, passive: true });
+document.addEventListener('touchstart', function(){
+  try { ponerGuardianAtras(); } catch(e){}
+}, { capture: true, passive: true });
 
 window.addEventListener('popstate', function(){
   logAtras('ATRAS: pantalla=' + pantallaActual() + ' | largo=' + history.length
