@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260923a-OFICIAL-V2.0">
+<meta name="app-version" content="20260925b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5214,7 +5214,7 @@ function toggleSinServicio(btn){
     var debe = 0;
     try {
       LS('nv', []).forEach(function(v){
-        if(String(v.cid) !== String(id) || v.cancelada || v.tipo !== 'credito') return;
+        if(String(v.cid) !== String(id) || v.cancelada) return;
         var pg = 0;
         (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
         debe += cobradoYDebeDe(v).debe;
@@ -9903,14 +9903,14 @@ function renderCl(q){
   }
   if(!list.length){el.innerHTML='<p style="color:#aaa;font-size:13px;text-align:center;padding:20px">Sin clientes</p>';return;}
   ventas = LS('nv',[]);
+  // 🔴 ARREGLO -25 sep-: el balance de la lista se calculaba SOLO con ventas a crédito, y
+  // se saltaba las de CONTADO que quedaron debiendo (contado modificada). Por eso la ficha
+  // decía que debía y la lista decía $0. Ahora usa calcularBalancesClientes(), la MISMA
+  // regla (cobradoYDebeDe) que la ficha, así siempre cuadran.
+  var _balLista = {};
+  try { _balLista = (calcularBalancesClientes() || {}).total || {}; } catch(e){}
   list.forEach(function(c){
-    var ventasC = ventas.filter(function(v){ return String(v.cid)===String(c.id) && v.tipo==='credito' && !v.cancelada; });
-    var totalCred = ventasC.reduce(function(s,v){ return s+v.total; },0);
-    var totalPag = ventasC.reduce(function(s,v){
-      var pf = v.pagosFactura ? (v.pagosFactura || []).filter(function(p){return typeof p.monto==='number';}).reduce(function(sp,p){return sp+p.monto;},0) : 0;
-      return s+pf;
-    },0);
-    var balance = Math.max(0, totalCred - totalPag);
+    var balance = _balLista[String(c.id)] || 0;
     var creditoCl = c.creditoAFavor || 0; // 24 jul, pedido por Sensei: mostrar SIEMPRE el credito a favor tambien
     var esInactivo = sinServicio(c);      // 😴 -21 sep-: se ven opacos y con franja roja
     var d=document.createElement('div');d.className='clrow';
@@ -19765,7 +19765,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260923a';
+var NOVEDADES_VERSION = '20260925b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -20895,7 +20895,7 @@ function deudasViejas(diasMin){
   clientes = LS('ncl', []);
   var porCli = {};
   V.forEach(function(v){
-    if(v.tipo !== 'credito') return;
+    if(v.cancelada) return;
     var pg = 0;
     (v.pagosFactura || []).forEach(function(p){ if(!p.esDevolucion) pg += parseFloat(p.monto) || 0; });
     var saldo = cobradoYDebeDe(v).debe;
@@ -25519,6 +25519,7 @@ function _renglonIntervalo(K){
     'cambiarIntervaloVisita(' + _arg(K.cliente.id) + ')');
 }
 
+
 function cambiarIntervaloVisita(cid){
   clientes = LS('ncl', []);
   var i = clientes.findIndex(function(c){ return String(c.id) === String(cid); });
@@ -25648,42 +25649,6 @@ function quitarPrecioEspecial(cid, pid){
 }
 
 // ── ⚙️ AJUSTES DE SU CUENTA: editar sus datos, sin servicio, borrarlo ──
-function _renglonAjustesCuenta(K){
-  var sinServ = !!K.cliente.sinServicio;
-  var cont = _sub(
-    '<button onclick="event.stopPropagation();editarCl(' + _arg(K.cliente.id) + ')" '
-    +   'style="width:100%;padding:12px;background:var(--nbs-ink);color:#fff;border:none;'
-    +   'border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;margin-bottom:8px">'
-    +   '\u270f\ufe0f Editar todos sus datos</button>'
-    + '<div style="font-size:10.5px;color:var(--nbs-muted);margin-bottom:12px;line-height:1.5">'
-    +   'Nombre, apodo, barber\u00eda, tel\u00e9fono, direcci\u00f3n, la persona que atiende, la foto.</div>'
-
-    + '<button onclick="event.stopPropagation();cambiarSinServicioDesdeCuenta(' + _arg(K.cliente.id) + ')" '
-    +   'style="width:100%;padding:11px;background:#fff;border:1.5px solid '
-    +   (sinServ ? 'var(--nbs-green-text);color:var(--nbs-green-text)' : '#F9A825;color:#F57F17')
-    +   ';border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer;margin-bottom:8px">'
-    +   (sinServ ? '\u2705 Volver a darle servicio' : '\u23f8\ufe0f Marcarlo SIN SERVICIO') + '</button>'
-    + '<div style="font-size:10.5px;color:var(--nbs-muted);margin-bottom:12px;line-height:1.5">'
-    +   (sinServ
-        ? 'Ahora mismo NO te sale en pedidos ni en la ruta. Sus facturas y su deuda siguen ah\u00ed.'
-        : 'Si lo marcas, deja de salirte en pedidos y en la ruta, pero NO se borra nada: '
-          + 'sus facturas y lo que te debe se quedan igual.') + '</div>'
-
-    + '<button onclick="event.stopPropagation();eliminarCl(' + _arg(K.cliente.id) + ')" '
-    +   'style="width:100%;padding:11px;background:#fff;border:1.5px solid #C62828;color:#C62828;'
-    +   'border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer">'
-    +   '\ud83d\uddd1\ufe0f Borrar este cliente</button>'
-    + '<div style="font-size:10.5px;color:var(--nbs-muted);margin-top:6px;line-height:1.5">'
-    +   (K.activas.length
-        ? '\u26a0\ufe0f Tiene ' + K.activas.length + ' factura(s). Piensa bien antes de borrarlo \u2014 '
-          + 'si solo quieres que deje de salirte, m\u00e1rcalo sin servicio.'
-        : 'No tiene facturas, se puede borrar sin problema.') + '</div>'
-  );
-  return _filaPanel('ajustescta', '\u2699\ufe0f', 'Ajustes de su cuenta',
-    sinServ ? 'sin servicio' : '', sinServ ? 'var(--nbs-gold-dark)' : null, cont,
-    'editarCl(' + _arg(K.cliente.id) + ')');
-}
-
 function cambiarSinServicioDesdeCuenta(cid){
   clientes = LS('ncl', []);
   var i = clientes.findIndex(function(c){ return String(c.id) === String(cid); });
@@ -26483,7 +26448,6 @@ function pintarPanelCliente(cid){
   try { h += _renglonNotas(K); } catch(e){}
   try { h += _renglonIntervalo(K); } catch(e){}
   // (los precios especiales se quitaron: Sensei no los usa — 15 ago)
-  try { h += _renglonAjustesCuenta(K); } catch(e){}
 
   // ── 📍 VISITAS ──
   var visitasCont = _sub(
@@ -26567,9 +26531,6 @@ function pintarPanelCliente(cid){
     + btn((c.consignacion ? '\ud83d\udd01 Cuenta de CONSIGNACI\u00d3N' : '\ud83d\udd01 Marcar como cuenta de consignaci\u00f3n'),
           'toggleConsignacion(this)', (c.consignacion ? '#00695C' : '#ECEFF1'), (c.consignacion ? '#fff' : '#546E7A'))
       .replace('<button ', '<button id="btn-consig-cl" data-clid="' + cid + '" ')
-    + btn((c.sinServicio ? '\ud83d\udeab SIN SERVICIO \u2014 toca para volver a atenderlo' : '\ud83d\udeab Ya no le doy servicio'),
-          'toggleSinServicio(this)', (c.sinServicio ? '#B71C1C' : '#ECEFF1'), (c.sinServicio ? '#fff' : '#546E7A'))
-      .replace('<button ', '<button id="btn-sinserv-cl" data-clid="' + cid + '" ')
     + '<div style="font-size:11px;font-weight:800;color:var(--nbs-muted);letter-spacing:.4px;padding:6px 2px 6px">ADMINISTRAR</div>'
     + btn('\u270f\ufe0f Editar cliente', 'editarCl(' + cid + ')', '#1565C0')
     + btn('\ud83d\udcb2 Precios especiales de este cliente', 'abrirPreciosPersonalizados(' + cid + ')', '#00695C')
@@ -37783,13 +37744,15 @@ function pintarDetalleClientes(d0, d1, dentro){
   });
 
   // BALANCE: lo que debe hoy en total (de todas sus facturas, no solo del rango)
+  // 🔴 ARREGLO -25 sep-: antes saltaba TODAS las de contado (v.tipo !== 'credito'),
+  // así que una venta de contado que quedó debiendo mostraba BCE $0 aquí aunque la
+  // ficha decía que debía. Ahora usa cobradoYDebeDe(v).debe sobre TODAS las ventas,
+  // la MISMA regla que la ficha, para que siempre cuadren.
   ventas.forEach(function(v){
-    if(v.cancelada || v.tipo !== 'credito') return;
+    if(v.cancelada) return;
     var cid = String(v.cid || 'general');
     if(!porCli[cid]) return;
-    var pag = (v.pagosFactura || []).reduce(function(s,p){
-      return s + ((typeof p.monto === 'number' && !p.esDevolucion) ? p.monto : 0); }, 0);
-    porCli[cid].bce += Math.max(0, (v.total || 0) - pag);
+    porCli[cid].bce += cobradoYDebeDe(v).debe;
   });
 
   var filas = [];
