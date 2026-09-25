@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260925b-OFICIAL-V2.0">
+<meta name="app-version" content="20260925c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19765,7 +19765,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260925b';
+var NOVEDADES_VERSION = '20260925c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34855,6 +34855,11 @@ window.addEventListener('popstate', function(){
   mostrarLetreroSalir();
 });
 
+// 🔑 REFUERZO -25 sep-: al VOLVER a la app se repone el paso protector.
+// En Android, cuando la app se manda a segundo plano (mirar WhatsApp, atender una
+// llamada) y se vuelve, a veces se pierde ese paso, y el siguiente atrás sacaba de la
+// app. Ahora se repone SIEMPRE que la app vuelve a estar a la vista, recibe foco, o se
+// recarga. Sensei: es la causa más común de que el atrás siguiera sacando la app.
 function mostrarLetreroSalir(){
   var ov = document.getElementById('salir-ov');
   var box = document.getElementById('salir-box');
@@ -34874,6 +34879,18 @@ function mostrarLetreroSalir(){
   // De aqui solo se sale TOCANDO un boton.
   logAtras('LETRERO: se queda con ' + profundidadGuardian() + ' guardianes. Atras no hace nada.');
 }
+
+function _reponerGuardianAlVolver(){
+  try {
+    if(document.visibilityState !== 'hidden' && !_saliendoApp){
+      ponerGuardianAtras(true);
+      logAtras('REPUESTO: guardian repuesto al volver a la app');
+    }
+  } catch(e){}
+}
+document.addEventListener('visibilitychange', _reponerGuardianAlVolver);
+window.addEventListener('focus', _reponerGuardianAlVolver);
+window.addEventListener('pageshow', _reponerGuardianAlVolver);
 
 function cerrarLetreroSalir(){
   var ov = document.getElementById('salir-ov');
