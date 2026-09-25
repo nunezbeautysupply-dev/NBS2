@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260925e-OFICIAL-V2.0">
+<meta name="app-version" content="20260925f-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2533,6 +2533,17 @@ function _pitido(frecuencia, inicioSeg, duracionSeg, volumen){
   vol.gain.linearRampToValueAtTime(0, t0 + duracionSeg);
   osc.start(t0);
   osc.stop(t0 + duracionSeg + 0.02);
+}
+
+// 🔊 SONIDO DE CUIDADO -25 sep-: dos notas GRAVES que BAJAN (G4 → Eb4), serio, como un
+// "uh-oh". Distinto a la campana del chat (que sube y es aguda) y al aviso de pedido.
+// Suena justo antes de una acción delicada, para que Sensei pare y piense.
+function sonidoCuidado(){
+  try {
+    var v = 0.5;
+    _pitido(392, 0,    0.20, v);   // G4  (grave, serio)
+    _pitido(311, 0.22, 0.34, v);   // Eb4 (baja más — advertencia)
+  } catch(e){}
 }
 // DESBLOQUEO DEL SONIDO (25 jul, arregla "el aviso de actualización no suena"):
 // el teléfono NO deja sonar nada hasta que la persona toca la pantalla al menos una vez
@@ -19765,7 +19776,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260925e';
+var NOVEDADES_VERSION = '20260925f';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -27860,7 +27871,17 @@ function verificarPIN(callback, motivo){
 // Protege una accion peligrosa (borrar cliente, borrar pago, etc.) pidiendo SOLO la huella
 // -un toque, rapido-. Si el usuario NO tiene huella configurada, cae al PIN como respaldo
 // para que la accion nunca quede sin proteccion. El callback solo corre si se verifica.
-function protegerConHuella(callback){
+function protegerConHuella(callback, aviso){
+  // 🔊 ALERTA DE CUIDADO -25 sep-: antes de pedir la huella, suena una advertencia y sale
+  // un aviso, porque esta acción es delicada (toca dinero, un cliente o la integridad del
+  // negocio). Es una CAPA EXTRA para que Sensei pare y confirme antes de un error caro.
+  // No quita la huella ni el confirm que ya tenga cada acción; se suma antes de todo.
+  try { sonidoCuidado(); } catch(e){}
+  try { if(navigator.vibrate) navigator.vibrate([140, 70, 140]); } catch(e){}
+  var _txtCuidado = (typeof aviso === 'string' && aviso)
+    ? aviso
+    : 'Vas a hacer algo delicado (borrar, cancelar, modificar o pagar). Si te equivocas, puede afectar tu dinero o a un cliente.';
+  if(!confirm('\u26A0\uFE0F CUIDADO\n\n' + _txtCuidado + '\n\n\u00bfSeguro que quieres seguir?')) return;
   var idHuella = localStorage.getItem(CLAVE_HUELLA_ID);
   if(idHuella && window.PublicKeyCredential && navigator.credentials && navigator.credentials.get){
     navigator.credentials.get({
