@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260926b-OFICIAL-V2.0">
+<meta name="app-version" content="20260926c-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19795,7 +19795,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260926b';
+var NOVEDADES_VERSION = '20260926c';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -44719,6 +44719,7 @@ function salirGuardandoPedido(){
       <label class="lbl">Cantidad</label>
       <input class="inp" id="pedcant" type="number" value="1" min="1">
       <button class="btn" style="background:#546E7A;color:white" onclick="addPedItem()">+ Agregar al pedido</button>
+      <div id="pedItems" style="margin:8px 0"></div>
       <button class="btn" style="background:#00838F;color:white" onclick="toggleNuevoProdPed()">📦 Agregar producto nuevo al catálogo</button>
       <div id="ped-nuevo-prod-casa">
       <div id="ped-nuevo-prod-wrap" style="display:none;background:#E0F7FA;border-radius:10px;padding:12px;margin-bottom:8px">
@@ -44738,7 +44739,6 @@ function salirGuardandoPedido(){
         </div>
       </div>
       </div><!-- cierra ped-nuevo-prod-casa -->
-      <div id="pedItems" style="margin:8px 0"></div>
       <button class="btn" style="background:#F9A825;color:#1a1a1a" onclick="savePedido()">✓ Guardar pedido</button>
       <button class="btn" id="ped-btn-cancelar-abajo" style="background:#546E7A;color:white" onclick="cancelarPedido()">← Volver a la lista</button>
       <div class="snk" id="mk-ped">Pedido guardado</div>
