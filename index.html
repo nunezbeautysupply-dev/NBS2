@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260926f-OFICIAL-V2.0">
+<meta name="app-version" content="20260926g-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18801,7 +18801,7 @@ function renderPedidosMultiples(){
   pedidosMultiTemp.forEach(function(p){ negocios[p.barberia] = true; });
   var listaNegocios = Object.keys(negocios);
   document.getElementById('ped-multi-titulo').textContent = listaNegocios.length === 1 ? listaNegocios[0] : 'Varios negocios';
-  document.getElementById('ped-multi-sub').textContent = pedidosMultiTemp.length + ' barbero(s) · agrégale a cualquiera, en el orden que quieras';
+  document.getElementById('ped-multi-sub').textContent = pedidosMultiTemp.length + ' barbero(s) · en el orden que quieras';
 
   var totalGeneral = 0;
   // Se leen las ventas UNA sola vez aqui -no una por cada barbero- para que dibujar la
@@ -19028,22 +19028,22 @@ function renderPedidosMultiples(){
     html += '</div>';
 
     // --- Productos ya agregados a este barbero, editables aqui mismo ---
-    html += '<div style="padding:4px 12px 12px">';
+    html += '<div style="padding:2px 8px 8px">';
     if((p.items || []).length){
       (p.items || []).forEach(function(it, itIdx){
         var sub = it.cant * it.precio;
-        html += '<div style="padding:8px;margin-top:6px;border:0.5px solid var(--nbs-line);border-radius:9px;background:#FCFCFD">'
-          +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
-          +'<input type="text" value="'+escaparHtml(it.nombre)+'" oninput="actualizarItemMulti('+idx+','+itIdx+',\'nombre\',this.value)" style="flex:1;min-width:0;border:0.5px solid #ddd;border-radius:6px;padding:6px 7px;font-size:12px;font-weight:600;color:var(--nbs-ink)">'
-          +'<button onclick="quitarItemMulti('+idx+','+itIdx+')" style="background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>'
+        html += '<div style="padding:5px 7px;margin-top:5px;border:0.5px solid var(--nbs-line);border-radius:8px;background:#FCFCFD">'
+          +'<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">'
+          +'<input type="text" value="'+escaparHtml(it.nombre)+'" oninput="actualizarItemMulti('+idx+','+itIdx+',\'nombre\',this.value)" style="flex:1;min-width:0;border:0.5px solid #ddd;border-radius:6px;padding:4px 6px;font-size:12px;font-weight:600;color:var(--nbs-ink)">'
+          +'<button onclick="quitarItemMulti('+idx+','+itIdx+')" style="background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>'
           +'</div>'
           +'<div style="display:flex;align-items:center;gap:6px">'
-          +'<button onclick="cambiarCantItemMulti('+idx+','+itIdx+',-1)" style="width:32px;height:32px;background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:7px;cursor:pointer;font-size:16px;font-weight:700;line-height:1;flex-shrink:0">−</button>'
-          +'<input id="multi-icant-'+idx+'-'+itIdx+'" type="number" min="1" value="'+it.cant+'" oninput="actualizarItemMulti('+idx+','+itIdx+',\'cant\',parseInt(this.value)||1)" style="width:42px;padding:6px 2px;border:0.5px solid #ddd;border-radius:6px;font-size:12px;text-align:center">'
-          +'<button onclick="cambiarCantItemMulti('+idx+','+itIdx+',1)" style="width:32px;height:32px;background:var(--nbs-green-bg);color:var(--nbs-green-text);border:none;border-radius:7px;cursor:pointer;font-size:16px;font-weight:700;line-height:1;flex-shrink:0">+</button>'
+          +'<button onclick="cambiarCantItemMulti('+idx+','+itIdx+',-1)" style="width:28px;height:28px;background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:7px;cursor:pointer;font-size:16px;font-weight:700;line-height:1;flex-shrink:0">−</button>'
+          +'<input id="multi-icant-'+idx+'-'+itIdx+'" type="number" min="1" value="'+it.cant+'" oninput="actualizarItemMulti('+idx+','+itIdx+',\'cant\',parseInt(this.value)||1)" style="width:40px;padding:4px 2px;border:0.5px solid #ddd;border-radius:6px;font-size:12px;text-align:center">'
+          +'<button onclick="cambiarCantItemMulti('+idx+','+itIdx+',1)" style="width:28px;height:28px;background:var(--nbs-green-bg);color:var(--nbs-green-text);border:none;border-radius:7px;cursor:pointer;font-size:16px;font-weight:700;line-height:1;flex-shrink:0">+</button>'
           +'<div style="display:flex;align-items:center;gap:3px">'
           +'<span style="font-size:11px;color:#999">$</span>'
-          +'<input type="text" inputmode="decimal" value="'+it.precio.toFixed(2)+'" onfocus="this.select()" oninput="formatoMoneda(this);actualizarItemMulti('+idx+','+itIdx+',\'precio\',dinero(this.value)||0)" style="width:62px;padding:6px 4px;border:0.5px solid #ddd;border-radius:6px;font-size:12px;text-align:center">'
+          +'<input type="text" inputmode="decimal" value="'+it.precio.toFixed(2)+'" onfocus="this.select()" oninput="formatoMoneda(this);actualizarItemMulti('+idx+','+itIdx+',\'precio\',dinero(this.value)||0)" style="width:58px;padding:4px 4px;border:0.5px solid #ddd;border-radius:6px;font-size:12px;text-align:center">'
           +'</div>'
           +'<span id="multi-isub-'+idx+'-'+itIdx+'" style="flex:1;text-align:right;font-size:13px;font-weight:700;color:var(--nbs-green-text)">$'+fmtNum(sub)+'</span>'
           +'</div>'
@@ -19796,7 +19796,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260926f';
+var NOVEDADES_VERSION = '20260926g';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
