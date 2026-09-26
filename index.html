@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260926h-OFICIAL-V2.0">
+<meta name="app-version" content="20260926i-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19774,7 +19774,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260926h';
+var NOVEDADES_VERSION = '20260926i';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -34861,6 +34861,19 @@ document.addEventListener('pointerdown', function(){
 document.addEventListener('touchstart', function(){
   try { ponerGuardianAtras(); } catch(e){}
 }, { capture: true, passive: true });
+// 🔑 CLAVE -26 sep, recuperado de la versión de julio que SÍ funcionó: el Samsung de Sensei
+// en modo ícono (PWA) NO dispara 'pointerdown', pero SÍ 'click', 'touchstart', 'mousedown' y
+// 'keydown'. Por eso hay que rellenar el guardián en TODOS estos, o en su teléfono nunca se
+// repone y la app se cierra. (En julio esto fue lo que lo resolvió.)
+document.addEventListener('click', function(){
+  try { ponerGuardianAtras(); } catch(e){}
+}, { capture: true });
+document.addEventListener('mousedown', function(){
+  try { ponerGuardianAtras(); } catch(e){}
+}, { capture: true });
+document.addEventListener('keydown', function(){
+  try { ponerGuardianAtras(); } catch(e){}
+}, { capture: true });
 
 window.addEventListener('popstate', function(){
   logAtras('ATRAS: pantalla=' + pantallaActual() + ' | largo=' + history.length
