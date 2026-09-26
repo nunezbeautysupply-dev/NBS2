@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260925l-OFICIAL-V2.0">
+<meta name="app-version" content="20260926b-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -19795,7 +19795,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260925l';
+var NOVEDADES_VERSION = '20260926b';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -22251,7 +22251,7 @@ function renderFavoritosPedido(){
       conteo[it.pid].cant += it.cant;
     });
   });
-  var topPids = Object.keys(conteo).sort(function(a,b){ return conteo[b].cant - conteo[a].cant; }).slice(0,4);
+  var topPids = Object.keys(conteo).sort(function(a,b){ return conteo[b].cant - conteo[a].cant; }).slice(0,3);
   if(!topPids.length){ cont.style.display='none'; cont.innerHTML=''; return; }
   loadProds();
   var botones = '';
@@ -22260,10 +22260,10 @@ function renderFavoritosPedido(){
     if(!prod) return;
     var precio = obtenerPrecioParaCliente(cid, prod.id, prod.precio);
     botones += '<button onclick="agregarFavoritoPedido(\''+prod.id+'\')" '
-      + 'style="flex:1;min-width:calc(50% - 4px);background:#FFF8E1;border:1.5px solid var(--nbs-gold);'
-      + 'border-radius:10px;padding:10px 8px;cursor:pointer;text-align:left">'
-      + '<div style="font-size:14px;font-weight:700;color:var(--nbs-ink);line-height:1.2">'+escaparHtml(prod.nombre)+'</div>'
-      + '<div style="font-size:13px;font-weight:800;color:#2E7D32;margin-top:3px">$'+fmtNum(precio)+' <span style="color:#E65100">+ Agregar</span></div>'
+      + 'style="width:calc(33.33% - 6px);background:#FFF8E1;border:1.5px solid var(--nbs-gold);'
+      + 'border-radius:9px;padding:6px 5px;cursor:pointer;text-align:center;overflow:hidden">'
+      + '<div style="font-size:10.5px;font-weight:700;color:var(--nbs-ink);line-height:1.15;height:26px;overflow:hidden">'+escaparHtml(prod.nombre)+'</div>'
+      + '<div style="font-size:11px;font-weight:900;color:#2E7D32;margin-top:2px">$'+fmtNum(precio)+'</div>'
       + '</button>';
   });
   if(!botones){ cont.style.display='none'; cont.innerHTML=''; return; }
@@ -26648,9 +26648,11 @@ function verCl(id){
       + '. Su deuda podr\u00eda estar repartida entre las dos.</div>';
   }
 
-  // Los cuatro números
-  var n = function(t, v, col){
-    return '<div style="flex:1;background:#F5F5F9;border-radius:10px;padding:8px 4px;text-align:center;min-width:0">'
+  // Los cuatro números -26 sep: ahora se pueden TOCAR para abrir su detalle-
+  var n = function(t, v, col, click){
+    var oc = click ? (' onclick="event.stopPropagation();' + click + '"') : '';
+    var cur = click ? 'cursor:pointer;' : '';
+    return '<div' + oc + ' style="flex:1;background:#F5F5F9;border-radius:10px;padding:8px 4px;text-align:center;min-width:0;' + cur + '">'
       + '<div style="font-size:9px;font-weight:800;color:var(--nbs-muted);letter-spacing:.3px">' + t + '</div>'
       + '<div style="font-size:14.5px;font-weight:900;margin-top:2px;color:' + (col || 'var(--nbs-ink)') + ';'
       +   'overflow:hidden;text-overflow:ellipsis">' + v + '</div></div>';
@@ -26667,11 +26669,11 @@ function verCl(id){
   // visible as\u00ed como su balance pendiente". Sale una quinta casilla, en naranja y justo
   // al lado de DEBE, solo cuando de verdad tiene cr\u00e9dito.
   h += '<div style="display:flex;gap:6px;margin-top:12px">'
-    + n('COMPR\u00d3', '$' + fmtNum(D.comprado))
-    + n('DEBE', '$' + fmtNum(D.debe), D.debe > 0.005 ? 'var(--nbs-red-text)' : 'var(--nbs-ink)')
-    + (_credArriba > 0.005 ? n('A FAVOR', '$' + fmtNum(_credArriba), '#E65100') : '')
-    + n('TE DEJA', '$' + fmtNum(D.ganancia), 'var(--nbs-green-text)')
-    + n('\u00daLTIMA', D.diasDesde === null ? '\u2014' : (D.diasDesde + ' d'))
+    + n('COMPR\u00d3', '$' + fmtNum(D.comprado), null, 'abrirEstadoPorFechas(' + _arg(id) + ')')
+    + n('DEBE', '$' + fmtNum(D.debe), D.debe > 0.005 ? 'var(--nbs-red-text)' : 'var(--nbs-ink)', 'irACobrarCliente(' + _arg(id) + ')')
+    + (_credArriba > 0.005 ? n('A FAVOR', '$' + fmtNum(_credArriba), '#E65100', 'abrirEstadoPorFechas(' + _arg(id) + ')') : '')
+    + n('TE DEJA', '$' + fmtNum(D.ganancia), 'var(--nbs-green-text)', 'abrirEstadoPorFechas(' + _arg(id) + ')')
+    + n('\u00daLTIMA', D.diasDesde === null ? '\u2014' : (D.diasDesde + ' d'), null, 'abrirEstadoPorFechas(' + _arg(id) + ')')
     + '</div>';
 
   // 😴 Botón visible para inactivar/reactivar -21 sep-. Antes solo estaba enterrado en Ajustes.
@@ -34829,21 +34831,28 @@ var _ultimoGuardian = 0;
 // ═══════════════════════════════════════════════════════════════════
 
 // Se pone el único paso que hace falta. Se llama al arrancar y tras cada atrás.
+var COLCHON_ATRAS = 10;   // 🛡️ -26 sep- colchón grande, se rellena en cada toque real
 function profundidadGuardian(){
-  try { return (history.state && history.state.nbs) ? 1 : 0; } catch(e){ return 0; }
+  try { return (history.state && history.state.nbs) || 0; } catch(e){ return 0; }
 }
 
-var MIN_GUARDIANES = 1;      // ya no hay colchón: un solo paso
-var GUARDIANES_BAJOS = 1;
+var MIN_GUARDIANES = 10;      // colchón de 10 pasos
+var GUARDIANES_BAJOS = 3;
 
 function ponerGuardianAtras(forzar){
   try {
-    // \ud83d\udd11 CUANDO VIENE DEL BOT\u00d3N ATR\u00c1S se repone SIEMPRE -forzar=true-. Antes se
-    // miraba "si el estado ya es nuestro, no hace falta": pero tras un atr\u00e1s el estado
-    // que queda TAMBI\u00c9N es nuestro, as\u00ed que no repon\u00eda nada. Cada atr\u00e1s gastaba un
-    // paso, no se repon\u00eda ninguno, y al acabarse Android cerraba la app. -8 sep-
-    if(!forzar && history.state && history.state.nbs) return;
-    history.pushState({ nbs: 1, t: Date.now() }, '', window.location.href);
+    // 🛡️ RELLENA EL COLCHÓN hasta COLCHON_ATRAS pasos. Durante un TOQUE real del usuario
+    // (pointerdown/touchstart), Chrome SÍ respeta estos pushState — por eso se rellena en
+    // cada toque. Antes había un solo guardián: un par de toques de atrás seguidos y salía.
+    // Ahora hay 10 de colchón, así que en la práctica no se sale (Sensei toca la pantalla
+    // todo el tiempo y se rellena). NOTA HONESTA: en web/PWA NINGÚN truco lo hace 100%
+    // imposible de salir — el navegador lo prohíbe. Esto es lo más firme que se puede.
+    var actual = (history.state && history.state.nbs) || 0;
+    var guardas = 0;
+    while(actual < COLCHON_ATRAS && guardas < COLCHON_ATRAS){
+      actual++; guardas++;
+      history.pushState({ nbs: actual, t: Date.now() }, '', window.location.href);
+    }
   } catch(e){}
 }
 
