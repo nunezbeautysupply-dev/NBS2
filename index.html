@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260926c-OFICIAL-V2.0">
+<meta name="app-version" content="20260926e-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -344,6 +344,7 @@ button:active{transform:scale(0.96);filter:brightness(0.93);}
    que fue la causa real de que el fondo se viera "palido" al escribir. */
 .busca-fuerte{ font-size:15px !important; font-weight:700 !important; padding:20px 0 !important; background:#fff !important; -webkit-tap-highlight-color:transparent !important; }
 .busca-caja{ border:3px solid #444 !important; background:#fff !important; box-shadow:0 2px 6px rgba(0,0,0,.22) !important; -webkit-tap-highlight-color:transparent !important; }
+.busca-fina .busca-fuerte{ padding:11px 0 !important; }
 /* Los botones de accion tambien se leen mejor */
 .btn{ font-weight:800 !important; }
 .mlb2{ font-weight:800 !important; font-size:18.5px !important; padding:15px 12px !important; }
@@ -378,8 +379,8 @@ button:active{transform:scale(0.96);filter:brightness(0.93);}
   background:#E4E6EF;
   border:2.5px solid #14141F;
   border-radius:14px;
-  padding:18px 15px;
-  margin-bottom:13px;
+  padding:11px 14px;
+  margin-bottom:8px;
   cursor:pointer;
   text-align:left;
   box-shadow:3px 3px 0 #14141F;   /* sombra dura: le da relieve y fuerza */
@@ -391,7 +392,7 @@ button:active{transform:scale(0.96);filter:brightness(0.93);}
   box-shadow:0 0 0 #14141F;
 }
 .ini-ico{
-  width:50px;height:50px;
+  width:42px;height:42px;
   border-radius:12px;
   background:var(--cb);
   border:2px solid #14141F;
@@ -400,7 +401,7 @@ button:active{transform:scale(0.96);filter:brightness(0.93);}
   flex-shrink:0;
 }
 .ini-txt{ flex:1; display:flex; flex-direction:column; gap:2px; min-width:0; }
-.ini-txt b{ font-size:20px; font-weight:900; color:#1a237e; letter-spacing:0.2px; }
+.ini-txt b{ font-size:17px; font-weight:900; color:#1a237e; letter-spacing:0.2px; }
 .ini-txt i{ font-size:13px; font-weight:600; color:#5A5A66; font-style:normal; }
 .ini-fl{ font-size:24px; color:#1a237e; font-weight:900; flex-shrink:0; }
 .ini-btn:active{
@@ -638,9 +639,9 @@ function cuandoHayaFirebase(fn){
      accesos que Sensei usa todos los dias, en el orden que el pidio.
      ═══════════════════════════════════════════════════════════════════════════ -->
 <div id="p-inicio" class="pg">
-  <div style="text-align:center;padding:6px 0 22px">
-    <img src="icon-512.png" alt="NBS" style="width:92px;height:92px;object-fit:contain">
-    <div class="ini-nombre" style="font-size:21px;font-weight:900;margin-top:10px;letter-spacing:-0.3px">Nunez Beauty Supply</div>
+  <div style="text-align:center;padding:4px 0 10px">
+    <img src="icon-512.png" alt="NBS" style="width:60px;height:60px;object-fit:contain">
+    <div class="ini-nombre" style="font-size:17px;font-weight:900;margin-top:5px;letter-spacing:-0.3px">Nunez Beauty Supply</div>
     <div style="display:inline-block;margin-top:8px;background:#2E7D32;color:white;font-size:13px;font-weight:800;letter-spacing:0.5px;padding:5px 16px;border-radius:20px;box-shadow:0 2px 6px rgba(46,125,50,0.3)">NBS 2 · APP OFICIAL</div>
   </div>
 
@@ -18976,7 +18977,7 @@ function renderPedidosMultiples(){
         var yaEnPedido = (p.items || []).some(function(it){ return String(it.pid) === String(x.prod.id); });
         var yaEnHabituales = (p._habituales || []).some(function(h){ return String(h.prod.id) === String(x.prod.id); });
         return !yaEnPedido && !yaEnHabituales;
-      }).slice(0, 6);
+      }).slice(0, 3);
       if(_mv.length){
         html += '<div style="padding:9px 12px 2px">'
           + botonesRapidos('LO QUE M\u00c1S VENDES', '\u26a1', _mv, idx, '#1565C0')
@@ -18988,12 +18989,12 @@ function renderPedidosMultiples(){
       html += '<div style="padding:9px 12px 2px">'
         +'<div style="font-size:12px;font-weight:700;color:#37474F;margin-bottom:6px">\u26A1 LO QUE M\u00c1S COMPRA</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:8px">';
-      p._habituales.forEach(function(h, hi){
+      p._habituales.slice(0, 3).forEach(function(h, hi){
         html += '<button onclick="agregarHabitualMulti('+idx+','+hi+')" '
-          + 'style="flex:1;min-width:calc(50% - 4px);background:#F2F2F6;border:1.5px solid #C7C7D1;'
-          + 'border-radius:10px;padding:10px 8px;cursor:pointer;text-align:left">'
-          + '<div style="font-size:14px;font-weight:700;color:var(--nbs-ink);line-height:1.2">'+escaparHtml(h.prod.nombre)+'</div>'
-          + '<div style="font-size:13px;font-weight:800;color:#2E7D32;margin-top:3px">$'+fmtNum(h.prod.precio)+' <span style="color:#999;font-weight:600">&middot; x'+h.veces+'</span></div>'
+          + 'style="flex:1 1 30%;min-width:86px;background:#F2F2F6;border:1.5px solid #C7C7D1;'
+          + 'border-radius:9px;padding:8px 5px;cursor:pointer;text-align:center;overflow:hidden">'
+          + '<div style="font-size:10.5px;font-weight:800;color:var(--nbs-ink);line-height:1.25;height:26px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">'+escaparHtml(h.prod.nombre)+'</div>'
+          + '<div style="font-size:11px;font-weight:900;color:#2E7D32;margin-top:2px">$'+fmtNum(h.prod.precio)+' <span style="color:#999;font-weight:600">x'+h.veces+'</span></div>'
           + '</button>';
       });
       html += '</div></div>';
@@ -19002,7 +19003,7 @@ function renderPedidosMultiples(){
     // --- Buscador propio de esta tarjeta ---
     html += '<div style="padding:9px 12px 4px">'
       +'<div style="display:flex;gap:6px;background:#F2F2F6;padding:7px;border-radius:13px;border:1px solid #DCDCE4">'
-      +'<div class="busca-caja" style="border:2px solid #444">'
+      +'<div class="busca-caja busca-fina" style="border:2px solid #444">'
       +'<span style="font-size:15px;flex-shrink:0;opacity:0.75">🔍</span>'
       +'<input id="multi-buscar-'+idx+'" class="busca-fuerte" type="text" placeholder="Buscar producto..." onfocus="marcarBarberoActivo('+idx+')" oninput="filterPedMulti('+idx+', this.value)" onfocus="filterPedMulti('+idx+', this.value||\'\')">'
       +'</div>'
@@ -19795,7 +19796,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260926c';
+var NOVEDADES_VERSION = '20260926e';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -44703,7 +44704,7 @@ function salirGuardandoPedido(){
       <div id="ped-favoritos" style="display:none;margin-bottom:10px"></div>
       <label class="lbl">Buscar producto</label>
       <div style="display:flex;gap:8px">
-        <div class="busca-caja" style="border:2px solid var(--nbs-gold)">
+        <div class="busca-caja busca-fina" style="border:2px solid var(--nbs-gold)">
           <span style="font-size:16px;flex-shrink:0;opacity:0.75">🔍</span>
           <input id="pedb" class="busca-fuerte" type="text" placeholder="Escribe o dicta el producto..." oninput="filterPed(this.value)" onfocus="filterPed(this.value||'')">
         </div>
@@ -44716,9 +44717,6 @@ function salirGuardandoPedido(){
         <span id="pedsn" style="font-size:13px;color:#F57F17;font-weight:500"></span>
         <button onclick="clearPed()" style="background:none;border:none;cursor:pointer;color:#F57F17;font-size:18px">✕</button>
       </div>
-      <label class="lbl">Cantidad</label>
-      <input class="inp" id="pedcant" type="number" value="1" min="1">
-      <button class="btn" style="background:#546E7A;color:white" onclick="addPedItem()">+ Agregar al pedido</button>
       <div id="pedItems" style="margin:8px 0"></div>
       <button class="btn" style="background:#00838F;color:white" onclick="toggleNuevoProdPed()">📦 Agregar producto nuevo al catálogo</button>
       <div id="ped-nuevo-prod-casa">
