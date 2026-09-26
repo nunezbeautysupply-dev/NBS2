@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260926g-OFICIAL-V2.0">
+<meta name="app-version" content="20260926h-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18845,7 +18845,7 @@ function renderPedidosMultiples(){
     var html = '<div id="multi-cab-'+idx+'" onclick="toggleBarberoMulti('+idx+')" style="padding:11px 12px;display:flex;align-items:center;gap:9px;cursor:pointer;border-bottom:0.5px solid #f0f0f3;background:'+(_abiertoEste?'#DDE3FA':'#EFEFF3')+'">'
       +'<div style="width:34px;height:34px;border-radius:9px;background:#455A64;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:white;flex-shrink:0">'+escaparHtml(p.cliente.nombre[0])+'</div>'
       +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:18px;font-weight:900;color:#1A1A1A;line-height:1.15;letter-spacing:-0.3px">'+escaparHtml(nombreCompleto)+'</div>'
+      +'<div style="font-size:15px;font-weight:900;color:#1A1A1A;line-height:1.2;letter-spacing:-0.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escaparHtml(nombreCompleto)+'</div>'
       +(listaNegocios.length > 1 ? '<div style="font-size:11px;color:#888">'+escaparHtml(p.barberia)+'</div>' : '')
       +'</div>'
       +'<div id="multi-total-'+idx+'" style="font-size:15px;font-weight:800;color:'+(totalBarbero>0?'var(--nbs-green-text)':'#bbb')+'">$'+fmtNum(totalBarbero)+'</div>'
@@ -18869,12 +18869,13 @@ function renderPedidosMultiples(){
     var facturasDebe = balances.detalle[String(p.cliente.id)] || [];
     var tieneCredito = creditoBarbero > 0.01;
     html += '<div onclick="toggleBalanceMulti('+idx+')" style="padding:7px 12px;background:'+(debe>0.01?'#FFF3F3':(tieneCredito?'#FFF3E0':'#F1F8F2'))+';border-bottom:0.5px solid #f0f0f3;cursor:'+(debe>0.01?'pointer':'default')+';display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
-      +'<span style="font-size:11px;color:#999;font-weight:700">BALANCE</span>'
-      +(debe>0.01 ? '<span style="font-size:14px;font-weight:800;color:var(--nbs-red-dark)">$'+fmtNum(debe)+'</span>' : '')
+      +'<span style="font-size:10.5px;color:#999;font-weight:700">BALANCE (todas las facturas)</span>'
+      +(debe>0.01 ? '<span style="font-size:15px;font-weight:900;color:var(--nbs-red-dark)">$'+fmtNum(debe)+'</span>' : '')
       +(tieneCredito ? '<span style="font-size:13px;font-weight:800;color:#E65100">💰 ($'+fmtNum(creditoBarbero)+') a favor</span>' : '')
       +(debe>0.01
-         ? '<span style="font-size:11px;color:#999;margin-left:auto">'+facturasDebe.length+' factura(s) ▾</span>'
+         ? '<span style="font-size:11px;color:#777;font-weight:700;margin-left:auto">'+facturasDebe.length+' fact. <span style="font-size:18px;color:var(--nbs-red-dark);font-weight:900">▾</span></span>'
          : (tieneCredito ? '' : '<span style="font-size:11px;color:var(--nbs-green-text);margin-left:auto;font-weight:600">✓ al día</span>'))
+      +(debe>0.01 ? '<button onclick="event.stopPropagation();cobrarDesdePedidos('+_arg(p.cliente.id)+')" style="background:#00695C;color:#fff;border:none;border-radius:8px;padding:6px 11px;font-size:11.5px;font-weight:800;cursor:pointer;flex-shrink:0">💵 Cobrarle</button>' : '')
       +'</div>';
     if(debe > 0.01){
       html += '<div id="multi-bal-detalle-'+idx+'" style="display:none;padding:8px 12px;background:#FFF8F8;border-bottom:0.5px solid #f0f0f3">';
@@ -18920,21 +18921,8 @@ function renderPedidosMultiples(){
     // MÁS VENDE en general acierta mucho más. Se saltan los que ya están en el
     // pedido y los que ya salen en sus habituales, para no repetir botones.
     // 💰 SU BALANCE, debajo del nombre
-    if(_debe > 0.005){
-      html += '<div style="padding:8px 12px;background:var(--nbs-red-bg);'
-        + 'display:flex;align-items:center;justify-content:space-between;gap:8px">'
-        + '<span style="font-size:13px;font-weight:900;color:var(--nbs-red-text)">'
-        +   '\ud83d\udcb0 Te debe $' + fmtNum(_debe) + '</span>'
-        // 💵 COBRARLE SIN SALIR DE PEDIDOS RÁPIDOS. -15 ago-
-        + '<button onclick="event.stopPropagation();cobrarDesdePedidos(' + _arg(p.cliente.id) + ')" '
-        +   'style="background:#00695C;color:#fff;border:none;border-radius:8px;padding:8px 13px;'
-        +   'font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0">\ud83d\udcb5 Cobrarle</button>'
-        + '</div>';
-    } else {
-      html += '<div style="padding:6px 12px;background:var(--nbs-green-bg)">'
-        + '<span style="font-size:11.5px;font-weight:800;color:var(--nbs-green-text)">'
-        +   '\u2705 No te debe nada</span></div>';
-    }
+// 3 Te debe redundante quitado -26 sep-
+    
 
     // 🚫🚪 SI HOY NO TE COMPRA — dos motivos MUY distintos. -16 ago-
     if(!p._guardado && !(p.items || []).length){
@@ -18972,28 +18960,18 @@ function renderPedidosMultiples(){
       }
     }
 
-    if(!p._guardado && _abierto){
-      var _mv = masVendidos(8).filter(function(x){
-        var yaEnPedido = (p.items || []).some(function(it){ return String(it.pid) === String(x.prod.id); });
-        var yaEnHabituales = (p._habituales || []).some(function(h){ return String(h.prod.id) === String(x.prod.id); });
-        return !yaEnPedido && !yaEnHabituales;
-      }).slice(0, 3);
-      if(_mv.length){
-        html += '<div style="padding:9px 12px 2px">'
-          + botonesRapidos('LO QUE M\u00c1S VENDES', '\u26a1', _mv, idx, '#1565C0')
-          + '</div>';
-      }
-    }
+// 4 LO QUE MAS VENDES quitado -26 sep-
+    
 
     if(p._habituales.length && !p._guardado && _abierto){
       html += '<div style="padding:9px 12px 2px">'
-        +'<div style="font-size:12px;font-weight:700;color:#37474F;margin-bottom:6px">\u26A1 LO QUE M\u00c1S COMPRA</div>'
+        +'<div style="font-size:10px;font-weight:700;color:#37474F;margin-bottom:3px">\u26A1 LO QUE M\u00c1S COMPRA</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:8px">';
-      p._habituales.slice(0, 3).forEach(function(h, hi){
+      p._habituales.slice(0, 6).forEach(function(h, hi){
         html += '<button onclick="agregarHabitualMulti('+idx+','+hi+')" '
           + 'style="flex:1 1 30%;min-width:86px;background:#F2F2F6;border:1.5px solid #C7C7D1;'
-          + 'border-radius:9px;padding:8px 5px;cursor:pointer;text-align:center;overflow:hidden">'
-          + '<div style="font-size:10.5px;font-weight:800;color:var(--nbs-ink);line-height:1.25;height:26px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">'+escaparHtml(h.prod.nombre)+'</div>'
+          + 'border-radius:8px;padding:5px 4px;cursor:pointer;text-align:center;overflow:hidden">'
+          + '<div style="font-size:10px;font-weight:800;color:var(--nbs-ink);line-height:1.2;height:23px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">'+escaparHtml(h.prod.nombre)+'</div>'
           + '<div style="font-size:11px;font-weight:900;color:#2E7D32;margin-top:2px">$'+fmtNum(h.prod.precio)+' <span style="color:#999;font-weight:600">x'+h.veces+'</span></div>'
           + '</button>';
       });
@@ -19032,7 +19010,7 @@ function renderPedidosMultiples(){
     if((p.items || []).length){
       (p.items || []).forEach(function(it, itIdx){
         var sub = it.cant * it.precio;
-        html += '<div style="padding:5px 7px;margin-top:5px;border:0.5px solid var(--nbs-line);border-radius:8px;background:#FCFCFD">'
+        html += '<div style="padding:5px 7px;margin-top:3px;border:0.5px solid var(--nbs-line);border-radius:8px;background:#FCFCFD">'
           +'<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">'
           +'<input type="text" value="'+escaparHtml(it.nombre)+'" oninput="actualizarItemMulti('+idx+','+itIdx+',\'nombre\',this.value)" style="flex:1;min-width:0;border:0.5px solid #ddd;border-radius:6px;padding:4px 6px;font-size:12px;font-weight:600;color:var(--nbs-ink)">'
           +'<button onclick="quitarItemMulti('+idx+','+itIdx+')" style="background:var(--nbs-red-bg);color:var(--nbs-red-dark);border:none;border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>'
@@ -19796,7 +19774,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260926g';
+var NOVEDADES_VERSION = '20260926h';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
