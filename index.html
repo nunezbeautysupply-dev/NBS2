@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="app-version" content="20260926l-OFICIAL-V2.0">
+<meta name="app-version" content="20260926m-OFICIAL-V2.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18943,9 +18943,10 @@ function renderPedidosMultiples(){
     if(!p._guardado){
       var _cuantasSug = 0;
       try {
-        _cuantasSug = masVendidos(8).filter(function(x){
-          return !(p.items || []).some(function(it){ return String(it.pid) === String(x.prod.id); });
-        }).slice(0, 6).length + (p._habituales || []).length;
+        // -26 sep- Se quitó "LO QUE MÁS VENDES"; el contador ahora es SOLO "lo que más
+        // compra" (máximo 6), que es lo único que de verdad se despliega. Antes contaba
+        // los que ya no salen y por eso decía 12 aunque salieran 6.
+        _cuantasSug = Math.min((p._habituales || []).length, 6);
       } catch(e){}
       if(_cuantasSug){
         html += '<div style="padding:8px 12px 2px">'
@@ -19774,7 +19775,7 @@ var _asistenteAbierto = false;
 //  Usa la misma voz del Asistente. Le lee lo que trae la versión que
 //  acaba de subir, en palabras cortas, sin tecnicismos.
 // ═══════════════════════════════════════════════════════════════════
-var NOVEDADES_VERSION = '20260926l';
+var NOVEDADES_VERSION = '20260926m';
 
 var NOVEDADES = [
   'Esto es lo que arreglamos desde ayer.',
@@ -22782,11 +22783,16 @@ function abrirEntregaPremioVIP(cid, grupoClave){
                         anticipado: _anticipado, tenia: g.total, faltaban: _faltan };
   loadProds();
 
-  // Los productos que PODRIA regalar: los de ese mismo grupo
+  // Los productos que PODRIA regalar: los de ese mismo grupo (marca+tipo).
+  // 🔑 -26 sep-: el premio es GRATIS, así que el PRECIO no importa para elegir cuál dar.
+  // Antes solo encontraba productos que siguieran a precio VIP ($10); si Sensei les cambió
+  // el precio, no encontraba ninguno. Ahora prueba con el precio real Y con uno VIP, y con
+  // cualquiera de los dos que dé el grupo correcto, lo incluye.
   var candidatos = productos.filter(function(p){
-    var falso = { pid: p.id, nombre: p.nombre, precio: p.precio, cant: 1 };
-    var k = claveGrupoVIP(falso, p);
-    return k && k.clave === grupoClave;
+    var k1 = claveGrupoVIP({ pid: p.id, nombre: p.nombre, precio: p.precio, cant: 1 }, p);
+    if(k1 && k1.clave === grupoClave) return true;
+    var k2 = claveGrupoVIP({ pid: p.id, nombre: p.nombre, precio: 10, cant: 1 }, p);
+    return k2 && k2.clave === grupoClave;
   });
 
   var h = '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px">'
